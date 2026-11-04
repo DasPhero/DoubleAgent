@@ -14,6 +14,8 @@ export function HealthCheck():Promise<core.AppStatus>;
 
 export function InitializeVault(arg1:string):Promise<void>;
 
+export function InitializeVaultWithHello():Promise<void>;
+
 export function LockVault():Promise<void>;
 
 export function ResetVault():Promise<void>;

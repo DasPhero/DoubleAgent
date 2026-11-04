@@ -289,6 +289,41 @@ func TestS3_QuickUnlockWithBiometricVerifier_F03(t *testing.T) {
 	if store.IsLocked() {
 		t.Fatal("expected vault to be unlocked after approved quick unlock")
 	}
+
+	// Verify that a brand-new Store instance (simulating full app restart) can also unlock via persistent DPAPI .hello file
+	restartedStore := vault.NewStore(vault.StoreOptions{
+		FilePath: vaultPath,
+		KDF:      fastTestKDF(),
+		Verifier: func(_ context.Context, _ string) error {
+			return nil
+		},
+	})
+	if !restartedStore.HasQuickUnlock() {
+		t.Fatal("expected restarted store to detect persisted .hello DPAPI key")
+	}
+	if err := restartedStore.UnlockWithQuickUnlock(context.Background()); err != nil {
+		t.Fatalf("restarted UnlockWithQuickUnlock failed: %v", err)
+	}
+}
+
+func TestS3_InitializeWithHelloDirect_F03(t *testing.T) {
+	tmpDir := t.TempDir()
+	vaultPath := filepath.Join(tmpDir, "doubleagent.vault")
+
+	store := vault.NewStore(vault.StoreOptions{
+		FilePath: vaultPath,
+		KDF:      fastTestKDF(),
+		Verifier: func(_ context.Context, _ string) error {
+			return nil
+		},
+	})
+
+	if err := store.InitializeWithHello(context.Background()); err != nil {
+		t.Fatalf("InitializeWithHello failed: %v", err)
+	}
+	if store.IsLocked() || !store.IsInitialized() || !store.HasQuickUnlock() {
+		t.Fatal("expected vault to be initialized, unlocked, and Hello-ready after InitializeWithHello")
+	}
 }
 
 

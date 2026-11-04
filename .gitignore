@@ -30,6 +30,7 @@ Thumbs.db
 
 # Local vaults / test artifacts
 *.vault
+*.hello
 *.db
 *.sqlite
 

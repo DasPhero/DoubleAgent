@@ -26,6 +26,7 @@ interface TerminalDataPayload {
 interface WailsAppBindings {
   HealthCheck: () => Promise<AppStatusPayload>;
   InitializeVault: (masterPassword: string) => Promise<void>;
+  InitializeVaultWithHello: () => Promise<void>;
   UnlockVault: (masterPassword: string) => Promise<void>;
   ChangeVaultPassword: (currentPassword: string, newPassword: string) => Promise<void>;
   EnableQuickUnlock: () => Promise<void>;
@@ -178,6 +179,26 @@ export function App(): React.JSX.Element {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setStatusMessage(`Vault setup failed: ${msg}`);
+    }
+  };
+
+  const handleInitializeWithHello = async (): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api) {
+      setVaultInitialized(true);
+      setVaultLocked(false);
+      setQuickUnlockReady(true);
+      setShowVaultModal(false);
+      return;
+    }
+    try {
+      await api.InitializeVaultWithHello();
+      await refreshVaultState();
+      setShowVaultModal(false);
+      setStatusMessage('Vault created & protected with Windows Hello / Security Key + DPAPI.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`Windows Hello setup failed: ${msg}`);
     }
   };
 
@@ -470,6 +491,13 @@ export function App(): React.JSX.Element {
               </button>
               <button
                 type="button"
+                className="btn-secondary"
+                onClick={() => void handleInitializeWithHello()}
+              >
+                Use Windows Hello / Key
+              </button>
+              <button
+                type="button"
                 className="btn-primary"
                 onClick={() => void handleInitializeVault(false)}
               >
@@ -488,7 +516,7 @@ export function App(): React.JSX.Element {
               <p>This vault is currently in passwordless mode. Click Unlock to open it.</p>
             ) : (
               <>
-                <p>Enter your Master Password, or use Windows Hello / Security Key if enabled.</p>
+                <p>Enter your Master Password or unlock directly with Windows Hello / Security Key.</p>
                 <input
                   aria-label="Master Password"
                   type="password"
@@ -509,15 +537,13 @@ export function App(): React.JSX.Element {
               >
                 Reset Vault
               </button>
-              {quickUnlockReady && (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => void handleQuickUnlockHello()}
-                >
-                  Windows Hello / Key
-                </button>
-              )}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => void handleQuickUnlockHello()}
+              >
+                Windows Hello / Key
+              </button>
               <button
                 type="button"
                 className="btn-secondary"

@@ -121,6 +121,16 @@ func (a *App) InitializeVault(masterPassword string) error {
 	return nil
 }
 
+// InitializeVaultWithHello creates a new encrypted vault using Windows Hello / FIDO2 security key verification
+// and stores the random 256-bit key protected by Windows DPAPI (F-03).
+func (a *App) InitializeVaultWithHello() error {
+	if err := a.vaultStore.InitializeWithHello(a.ctx); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:locked", false)
+	return nil
+}
+
 // UnlockVault unlocks (or initializes on first run) the encrypted vault with the master password (F-03).
 func (a *App) UnlockVault(masterPassword string) error {
 	if err := a.vaultStore.Unlock(a.ctx, masterPassword); err != nil {

@@ -26,6 +26,10 @@ export function InitializeVault(arg1) {
   return window['go']['main']['App']['InitializeVault'](arg1);
 }
 
+export function InitializeVaultWithHello() {
+  return window['go']['main']['App']['InitializeVaultWithHello']();
+}
+
 export function LockVault() {
   return window['go']['main']['App']['LockVault']();
 }

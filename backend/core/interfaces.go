@@ -209,6 +209,7 @@ type SecretStore interface {
 	IsPasswordless() bool
 	HasQuickUnlock() bool
 	Initialize(ctx context.Context, masterPassword string) error
+	InitializeWithHello(ctx context.Context) error
 	Unlock(ctx context.Context, masterPassword string) error
 	ChangePassword(ctx context.Context, currentPassword, newPassword string) error
 	EnableQuickUnlock() error
