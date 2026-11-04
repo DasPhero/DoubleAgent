@@ -9,26 +9,29 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
    - Exposes a minimal, explicitly typed `App` struct to the frontend via Wails bindings.
 2. **Core Boundary (`backend/core/`)**:
    - Defines pure domain models and the three core boundary interfaces:
-     - `SshTransport` (see [ADR-0006](../adr/ADR-0006-ssh-transport.md))
+     - `SshTransport` (see [ADR-0006](../adr/ADR-0006-ssh-transport.md) & [Spike S2](../spikes/S2-ssh-transport.md))
      - `TerminalEngine`
      - `SecretStore` (see [ADR-0007](../adr/ADR-0007-vault-crypto.md))
-   - Imports **zero** external SSH, PTY, or cryptography packages.
-3. **Backend Packages (`backend/{ssh,pty,vault,data}`)**:
-   - Implement the `backend/core` interfaces.
+   - Imports **zero** external SSH, PTY, or cryptography packages (enforced by `TestM0_0_CoreBoundaryNoForbiddenImports`).
+3. **SSH Transport (`backend/ssh/`)**:
+   - `Transport` implements `core.SshTransport` using `golang.org/x/crypto/ssh`.
+   - `KnownHostsStore` enforces `F-06` (`SHA256` fingerprint TOFU via `KnownHostDecisionFunc` and hard block via `core.ErrHostKeyMismatch` when a known key changes).
+   - Supports `AuthPassword`, `AuthPrivateKey` (Ed25519/RSA, with or without passphrase), and `AuthKeyboardInteractive` (2FA/TOTP).
+   - Opens interactive `xterm-256color` PTY shells (`OpenShell`) and dynamic window resizing (`ResizeShell`).
 4. **Frontend (`frontend/`)**:
    - React 18 + TypeScript (`strict: true`) + Vite + Vitest.
    - English-only UI. Never holds secrets or opens raw sockets.
 
-## Bound-Method Surface (`M0-0`)
+## Bound-Method Surface
 
-- `App.HealthCheck() core.AppStatus`: Returns application name, version, and current milestone status for the walking skeleton check.
+- `App.HealthCheck() core.AppStatus`: Returns application name, version, and current milestone status.
 
 ## How to Run & Test
 
 ```bash
 # Backend tests & static analysis
-go test ./...
-go vet ./...
+go vet ./backend/... .
+go test -v ./backend/... .
 
 # Frontend tests & build
 cd frontend
@@ -39,4 +42,3 @@ npm run build
 # Standalone binary build
 wails build
 ```
-

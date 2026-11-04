@@ -1,6 +1,6 @@
 # ADR-0006: SSH Transport on `golang.org/x/crypto/ssh` behind `SshTransport`
 
-- **Status:** Accepted (Spike S2 will validate implementation details)
+- **Status:** Accepted (Closed by [Spike S2](../spikes/S2-ssh-transport.md))
 - **Date:** 2026-11-04
 
 ## Context
@@ -9,12 +9,12 @@ DoubleAgent requires SSH connectivity supporting password authentication, public
 
 ## Decision
 
-1. Use `golang.org/x/crypto/ssh` and `github.com/pkg/sftp` in the Go backend (`backend/ssh`).
+1. Use `golang.org/x/crypto/ssh` (and `github.com/pkg/sftp` when SFTP `F-12` is built) in the Go backend (`backend/ssh`).
 2. Encapsulate all SSH operations behind the `SshTransport` interface defined in `backend/core`.
-3. No code outside `backend/ssh` may import `golang.org/x/crypto/ssh` or `github.com/pkg/sftp` directly.
+3. Enforce strict `SHA256` host-key verification via `KnownHostsStore` (TOFU on first connection, hard block with `core.ErrHostKeyMismatch` on key change) and modern KEX/Cipher/MAC defaults.
+4. Abstract dial establishment via `DialFunc` (`NewTransportWithDialer`) to support `ProxyJump` chains (`F-14`/`F-25`) and deterministic in-memory testing.
 
 ## Consequences
 
 - Pure Go compilation with zero CGo dependencies.
-- `backend/core` remains completely independent of transport libraries and can be tested with mock implementations.
-
+- `backend/core` remains completely independent of transport libraries and is verified by `TestM0_0_CoreBoundaryNoForbiddenImports`.
