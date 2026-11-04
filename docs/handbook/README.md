@@ -9,9 +9,15 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
 ## Current Capabilities (`M0` Complete: `M0-0`, `S2`, `S1`, `S3`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
-- **Encrypted Vault (`S3` — `F-03`)**:
+- **Encrypted Vault, Passwordless Option, Reset & Windows Hello (`S3` — `F-03`)**:
   - DoubleAgent always starts with the **Vault Locked**.
-  - Click **Unlock Vault** in the top header and enter your **Master Password**. On first use, DoubleAgent initializes a new encrypted vault file (`doubleagent.vault`) protected with **Argon2id** key derivation and **XChaCha20-Poly1305** authenticated encryption.
+  - On first launch, click **Set Up Vault**:
+    - Enter and confirm a **Master Password** and click **Create Vault** to protect `doubleagent.vault` with **Argon2id + XChaCha20-Poly1305**, **OR**
+    - Click **Skip Password for Now** to start in passwordless mode and set a Master Password at any time later.
+  - Once unlocked, click **Vault Security** in the top bar to:
+    - Set or change your **Master Password** (preserving all saved hosts and keys).
+    - Click **Enable Windows Hello / Key** to arm native Windows Hello / FIDO2 security-key quick unlock for the current session after an auto-lock.
+    - Click **Reset Vault** if you ever forget your Master Password (archives the old vault to `doubleagent.vault.reset.<timestamp>.bak` and starts fresh).
   - Click **Lock Vault** at any time to wipe the encryption key from memory immediately, or let the automatic inactivity timer lock the vault after 15 minutes.
 - **Quick Connect & Interactive Terminal (`S1` — `F-01`, `F-06`, `F-07`, `F-11`)**:
   - Enter **Host / IP**, **Port**, **Username**, and **Password** in the top Quick Connect bar and click **Connect SSH**.

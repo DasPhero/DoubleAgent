@@ -5,6 +5,9 @@ export namespace core {
 	    version: string;
 	    milestone: string;
 	    vaultLocked: boolean;
+	    vaultInitialized: boolean;
+	    passwordless: boolean;
+	    quickUnlockReady: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppStatus(source);
@@ -16,6 +19,9 @@ export namespace core {
 	        this.version = source["version"];
 	        this.milestone = source["milestone"];
 	        this.vaultLocked = source["vaultLocked"];
+	        this.vaultInitialized = source["vaultInitialized"];
+	        this.passwordless = source["passwordless"];
+	        this.quickUnlockReady = source["quickUnlockReady"];
 	    }
 	}
 	export class TerminalSize {

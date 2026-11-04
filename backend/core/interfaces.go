@@ -20,10 +20,13 @@ var (
 
 // AppStatus represents the basic health and metadata of the DoubleAgent process.
 type AppStatus struct {
-	Name      string `json:"name"`
-	Version   string `json:"version"`
-	Milestone string `json:"milestone"`
-	VaultLock bool   `json:"vaultLocked"`
+	Name             string `json:"name"`
+	Version          string `json:"version"`
+	Milestone        string `json:"milestone"`
+	VaultLock        bool   `json:"vaultLocked"`
+	VaultInitialized bool   `json:"vaultInitialized"`
+	Passwordless     bool   `json:"passwordless"`
+	QuickUnlockReady bool   `json:"quickUnlockReady"`
 }
 
 // ConnectRequest represents the frontend-bound parameters for starting an SSH terminal session (S1, F-01, F-07).
@@ -202,7 +205,15 @@ type VaultPayload struct {
 // SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).
 // Implementations live in backend/vault; the master key never leaves the Go process.
 type SecretStore interface {
+	IsInitialized() bool
+	IsPasswordless() bool
+	HasQuickUnlock() bool
+	Initialize(ctx context.Context, masterPassword string) error
 	Unlock(ctx context.Context, masterPassword string) error
+	ChangePassword(ctx context.Context, currentPassword, newPassword string) error
+	EnableQuickUnlock() error
+	UnlockWithQuickUnlock(ctx context.Context) error
+	ResetVault() error
 	Lock() error
 	IsLocked() bool
 	Touch()

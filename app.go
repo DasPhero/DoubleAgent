@@ -99,14 +99,26 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-// HealthCheck returns the current status of DoubleAgent.
+// HealthCheck returns the current status of DoubleAgent, including Vault initialization and Quick Unlock state.
 func (a *App) HealthCheck() core.AppStatus {
 	return core.AppStatus{
-		Name:      "DoubleAgent",
-		Version:   "0.1.0",
-		Milestone: "S3",
-		VaultLock: a.vaultStore.IsLocked(),
+		Name:             "DoubleAgent",
+		Version:          "0.1.0",
+		Milestone:        "S3",
+		VaultLock:        a.vaultStore.IsLocked(),
+		VaultInitialized: a.vaultStore.IsInitialized(),
+		Passwordless:     a.vaultStore.IsPasswordless(),
+		QuickUnlockReady: a.vaultStore.HasQuickUnlock(),
 	}
+}
+
+// InitializeVault creates a new encrypted vault with the given masterPassword (or empty string for passwordless mode) (F-03).
+func (a *App) InitializeVault(masterPassword string) error {
+	if err := a.vaultStore.Initialize(a.ctx, masterPassword); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:locked", false)
+	return nil
 }
 
 // UnlockVault unlocks (or initializes on first run) the encrypted vault with the master password (F-03).
@@ -115,6 +127,34 @@ func (a *App) UnlockVault(masterPassword string) error {
 		return err
 	}
 	a.emit(a.ctx, "vault:locked", false)
+	return nil
+}
+
+// ChangeVaultPassword changes (or sets for the first time on a passwordless vault) the master password (F-03).
+func (a *App) ChangeVaultPassword(currentPassword, newPassword string) error {
+	return a.vaultStore.ChangePassword(a.ctx, currentPassword, newPassword)
+}
+
+// EnableQuickUnlock arms Windows Hello / FIDO2 security key convenience unlock for the current session (F-03).
+func (a *App) EnableQuickUnlock() error {
+	return a.vaultStore.EnableQuickUnlock()
+}
+
+// UnlockVaultWithHello triggers Windows Hello / FIDO2 verification and unwraps the session master key (F-03).
+func (a *App) UnlockVaultWithHello() error {
+	if err := a.vaultStore.UnlockWithQuickUnlock(a.ctx); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:locked", false)
+	return nil
+}
+
+// ResetVault archives the existing vault file and resets to an uninitialized state if the password was forgotten (F-03).
+func (a *App) ResetVault() error {
+	if err := a.vaultStore.ResetVault(); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:locked", true)
 	return nil
 }
 

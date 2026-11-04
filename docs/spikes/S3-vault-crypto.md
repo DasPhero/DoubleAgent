@@ -23,3 +23,4 @@ Verify that `golang.org/x/crypto/argon2` (`IDKey`) and `golang.org/x/crypto/chac
 4. **Inactivity Auto-Lock & Key Zeroing (`F-03`):**
    - `Store` starts locked (`IsLocked() == true`).
    - `Lock()` and the inactivity timer (`AutoLockTimeout`) zero the `masterKey` byte slice in memory, clear the in-memory `VaultPayload`, and invoke `OnAutoLock` (`vault:locked` event to UI).
+

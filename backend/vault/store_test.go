@@ -184,3 +184,111 @@ func TestS3_VaultAutoLockTimer_F03(t *testing.T) {
 		t.Fatal("expected store.IsLocked() to be true after auto-lock timeout")
 	}
 }
+
+func TestS3_PasswordlessInitThenSetPasswordChangeAndReset_F03(t *testing.T) {
+	tmpDir := t.TempDir()
+	vaultPath := filepath.Join(tmpDir, "doubleagent.vault")
+
+	store := vault.NewStore(vault.StoreOptions{
+		FilePath: vaultPath,
+		KDF:      fastTestKDF(),
+	})
+
+	if store.IsInitialized() {
+		t.Fatal("expected vault to not be initialized before first setup")
+	}
+
+	// 1. Initialize without a password (passwordless mode)
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("passwordless Initialize failed: %v", err)
+	}
+	if !store.IsInitialized() || !store.IsPasswordless() {
+		t.Fatal("expected vault to report initialized and passwordless")
+	}
+
+	// Save a host while passwordless
+	if err := store.SavePayload(context.Background(), core.VaultPayload{
+		Hosts: []core.HostRecord{{ID: "h1", Label: "Lab", Address: "10.0.0.99", Port: 22}},
+	}); err != nil {
+		t.Fatalf("SavePayload failed: %v", err)
+	}
+
+	// 2. Set a master password afterwards via ChangePassword("", "new-strong-pass")
+	if err := store.ChangePassword(context.Background(), "", "new-strong-pass"); err != nil {
+		t.Fatalf("ChangePassword from passwordless failed: %v", err)
+	}
+	if store.IsPasswordless() {
+		t.Fatal("expected IsPasswordless() to be false after setting a password")
+	}
+
+	// Lock and verify empty password now fails, while new password succeeds
+	_ = store.Lock()
+	if err := store.Unlock(context.Background(), ""); !errors.Is(err, core.ErrVaultInvalidAuth) {
+		t.Fatalf("expected empty password to fail after password was set, got %v", err)
+	}
+	if err := store.Unlock(context.Background(), "new-strong-pass"); err != nil {
+		t.Fatalf("Unlock with new password failed: %v", err)
+	}
+	p, err := store.GetPayload()
+	if err != nil || len(p.Hosts) != 1 || p.Hosts[0].Address != "10.0.0.99" {
+		t.Fatalf("expected host data preserved across password change, got %+v", p.Hosts)
+	}
+
+	// 3. ResetVault archives old file and allows fresh setup
+	if err := store.ResetVault(); err != nil {
+		t.Fatalf("ResetVault failed: %v", err)
+	}
+	if store.IsInitialized() || !store.IsLocked() {
+		t.Fatal("expected vault to be uninitialized and locked after ResetVault")
+	}
+}
+
+func TestS3_QuickUnlockWithBiometricVerifier_F03(t *testing.T) {
+	tmpDir := t.TempDir()
+	vaultPath := filepath.Join(tmpDir, "doubleagent.vault")
+
+	allowBio := true
+	store := vault.NewStore(vault.StoreOptions{
+		FilePath: vaultPath,
+		KDF:      fastTestKDF(),
+		Verifier: func(_ context.Context, _ string) error {
+			if !allowBio {
+				return errors.New("user cancelled Windows Hello / FIDO prompt")
+			}
+			return nil
+		},
+	})
+
+	if err := store.Initialize(context.Background(), "master-123"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+	if err := store.EnableQuickUnlock(); err != nil {
+		t.Fatalf("EnableQuickUnlock failed: %v", err)
+	}
+	if !store.HasQuickUnlock() {
+		t.Fatal("expected HasQuickUnlock() to be true")
+	}
+
+	// Lock vault (simulating auto-lock)
+	_ = store.Lock()
+
+	// Denied biometric verification must keep vault locked
+	allowBio = false
+	if err := store.UnlockWithQuickUnlock(context.Background()); err == nil {
+		t.Fatal("expected UnlockWithQuickUnlock to fail when verifier rejects")
+	}
+	if !store.IsLocked() {
+		t.Fatal("expected vault to remain locked when verifier rejects")
+	}
+
+	// Approved biometric verification unwraps session key and unlocks vault
+	allowBio = true
+	if err := store.UnlockWithQuickUnlock(context.Background()); err != nil {
+		t.Fatalf("UnlockWithQuickUnlock failed: %v", err)
+	}
+	if store.IsLocked() {
+		t.Fatal("expected vault to be unlocked after approved quick unlock")
+	}
+}
+
+
