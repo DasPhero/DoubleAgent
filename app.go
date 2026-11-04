@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 
 	"doubleagent/backend/core"
 	"doubleagent/backend/ssh"
+	"doubleagent/backend/vault"
 )
 
 // EventEmitter abstracts Wails runtime event emission so App can be unit-tested without a live WebView.
@@ -24,6 +27,7 @@ type App struct {
 	ctx        context.Context
 	transport  core.SshTransport
 	knownHosts *ssh.KnownHostsStore
+	vaultStore core.SecretStore
 	emit       EventEmitter
 
 	mu            sync.Mutex
@@ -31,14 +35,32 @@ type App struct {
 	pendingKeys   map[string]chan bool
 }
 
-// NewApp creates a new App application struct with the default SSH transport.
+func defaultVaultPath() string {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil || cfgDir == "" {
+		return "doubleagent.vault"
+	}
+	return filepath.Join(cfgDir, "DoubleAgent", "doubleagent.vault")
+}
+
+// NewApp creates a new App application struct with the default SSH transport and encrypted Vault store.
 func NewApp() *App {
 	kh := ssh.NewKnownHostsStore()
-	return NewAppWithTransport(ssh.NewTransport(kh), kh, runtime.EventsEmit)
+	return NewAppWithDependencies(ssh.NewTransport(kh), kh, nil, runtime.EventsEmit)
 }
 
 // NewAppWithTransport creates an App with an injected SshTransport and EventEmitter for testing.
 func NewAppWithTransport(transport core.SshTransport, kh *ssh.KnownHostsStore, emit EventEmitter) *App {
+	return NewAppWithDependencies(transport, kh, nil, emit)
+}
+
+// NewAppWithDependencies creates an App with injected SshTransport, KnownHostsStore, SecretStore, and EventEmitter.
+func NewAppWithDependencies(
+	transport core.SshTransport,
+	kh *ssh.KnownHostsStore,
+	vaultStore core.SecretStore,
+	emit EventEmitter,
+) *App {
 	if kh == nil {
 		kh = ssh.NewKnownHostsStore()
 	}
@@ -48,7 +70,8 @@ func NewAppWithTransport(transport core.SshTransport, kh *ssh.KnownHostsStore, e
 	if emit == nil {
 		emit = func(_ context.Context, _ string, _ ...interface{}) {}
 	}
-	return &App{
+
+	app := &App{
 		ctx:           context.Background(),
 		transport:     transport,
 		knownHosts:    kh,
@@ -56,6 +79,19 @@ func NewAppWithTransport(transport core.SshTransport, kh *ssh.KnownHostsStore, e
 		activeStreams: make(map[string]*core.SshShellStreams),
 		pendingKeys:   make(map[string]chan bool),
 	}
+
+	if vaultStore == nil {
+		vaultStore = vault.NewStore(vault.StoreOptions{
+			FilePath:        defaultVaultPath(),
+			MaxBackups:      3,
+			AutoLockTimeout: 15 * time.Minute,
+			OnAutoLock: func() {
+				app.emit(app.ctx, "vault:locked", true)
+			},
+		})
+	}
+	app.vaultStore = vaultStore
+	return app
 }
 
 // startup is called when the Wails application starts.
@@ -68,9 +104,27 @@ func (a *App) HealthCheck() core.AppStatus {
 	return core.AppStatus{
 		Name:      "DoubleAgent",
 		Version:   "0.1.0",
-		Milestone: "S1",
-		VaultLock: true,
+		Milestone: "S3",
+		VaultLock: a.vaultStore.IsLocked(),
 	}
+}
+
+// UnlockVault unlocks (or initializes on first run) the encrypted vault with the master password (F-03).
+func (a *App) UnlockVault(masterPassword string) error {
+	if err := a.vaultStore.Unlock(a.ctx, masterPassword); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:locked", false)
+	return nil
+}
+
+// LockVault immediately wipes the master key from memory and locks the vault (F-03).
+func (a *App) LockVault() error {
+	if err := a.vaultStore.Lock(); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:locked", true)
+	return nil
 }
 
 func hostPromptKey(host string, port uint16) string {
@@ -80,6 +134,8 @@ func hostPromptKey(host string, port uint16) string {
 // ConnectSSH opens an SSH connection, verifies the host key (prompting the user on first-seen TOFU),
 // starts an interactive PTY shell, and streams sanitized output events to the frontend (F-01, F-06, F-07).
 func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
+	a.vaultStore.Touch()
+
 	port := req.Port
 	if port == 0 {
 		port = 22
@@ -180,6 +236,7 @@ func (a *App) ResolveHostKeyPrompt(host string, port uint16, trust bool) error {
 
 // WriteTerminal writes user keystrokes from xterm.js into the active SSH shell stdin (F-07).
 func (a *App) WriteTerminal(sessionID string, data string) error {
+	a.vaultStore.Touch()
 	a.mu.Lock()
 	streams, ok := a.activeStreams[sessionID]
 	a.mu.Unlock()

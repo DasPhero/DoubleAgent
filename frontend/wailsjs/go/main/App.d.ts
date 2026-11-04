@@ -8,8 +8,12 @@ export function DisconnectSession(arg1:string):Promise<void>;
 
 export function HealthCheck():Promise<core.AppStatus>;
 
+export function LockVault():Promise<void>;
+
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function ResolveHostKeyPrompt(arg1:string,arg2:number,arg3:boolean):Promise<void>;
+
+export function UnlockVault(arg1:string):Promise<void>;
 
 export function WriteTerminal(arg1:string,arg2:string):Promise<void>;

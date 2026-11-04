@@ -11,13 +11,16 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
    - Defines pure domain models and the three core boundary interfaces:
      - `SshTransport` (see [ADR-0006](../adr/ADR-0006-ssh-transport.md) & [Spike S2](../spikes/S2-ssh-transport.md))
      - `TerminalEngine`
-     - `SecretStore` (see [ADR-0007](../adr/ADR-0007-vault-crypto.md))
+     - `SecretStore` (see [ADR-0007](../adr/ADR-0007-vault-crypto.md) & [Spike S3](../spikes/S3-vault-crypto.md))
    - Imports **zero** external SSH, PTY, or cryptography packages (enforced by `TestM0_0_CoreBoundaryNoForbiddenImports`).
 3. **SSH Transport (`backend/ssh/`)**:
    - `Transport` implements `core.SshTransport` using `golang.org/x/crypto/ssh`.
    - `KnownHostsStore` enforces `F-06` (`SHA256` fingerprint TOFU via `KnownHostDecisionFunc` and hard block via `core.ErrHostKeyMismatch` when a known key changes).
    - Opens interactive `xterm-256color` PTY shells (`OpenShell`) and dynamic window resizing (`ResizeShell`).
-4. **Frontend (`frontend/`)**:
+4. **Encrypted Vault (`backend/vault/`)**:
+   - `Store` implements `core.SecretStore` using `golang.org/x/crypto/argon2` (`IDKey`) and `golang.org/x/crypto/chacha20poly1305` (`NewX`).
+   - Binds the versioned KDF header as AAD, writes atomically via `.tmp` + `Sync` + `Rename`, rotates `.bak.1`..`.bak.N` backups, and zeroes the master key in memory upon `Lock()` or inactivity auto-lock (`F-03`).
+5. **Frontend (`frontend/`)**:
    - React 18 + TypeScript (`strict: true`) + Vite + Vitest + `xterm.js` (`@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@xterm/addon-unicode11`, `@xterm/addon-webgl`).
    - [`TerminalView.tsx`](../../frontend/src/components/TerminalView.tsx) renders terminal output strictly via `term.write()`, never `innerHTML`.
 
@@ -25,6 +28,8 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
 
 ### Bound Methods
 - `App.HealthCheck() core.AppStatus`
+- `App.UnlockVault(masterPassword string) error`
+- `App.LockVault() error`
 - `App.ConnectSSH(req core.ConnectRequest) (string, error)`
 - `App.ResolveHostKeyPrompt(host string, port uint16, trust bool) error`
 - `App.WriteTerminal(sessionID string, data string) error`
@@ -32,6 +37,7 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
 - `App.DisconnectSession(sessionID string) error`
 
 ### Backend → Frontend Events
+- `vault:locked` (`bool`): Emitted when the vault is unlocked (`false`), manually locked (`true`), or auto-locked on inactivity (`true`).
 - `ssh:hostkey-prompt` (`core.HostKeyInfo`): Emitted when connecting to an unknown host key (TOFU).
 - `terminal:data` (`core.TerminalDataEvent`): Emitted with 32 KB sanitized chunks (`StripOSC52Sequences`) from the remote PTY.
 - `terminal:exit` (`core.TerminalExitEvent`): Emitted when the remote shell closes.

@@ -7,12 +7,15 @@ import (
 	"time"
 )
 
-// Common domain errors for SSH transport and host-key verification.
+// Common domain errors for SSH transport, host-key verification, and vault operations.
 var (
 	ErrSessionNotFound     = errors.New("ssh session not found")
 	ErrHostKeyMismatch     = errors.New("remote host key has changed (potential MITM)")
 	ErrHostKeyUntrusted    = errors.New("remote host key is not trusted")
 	ErrUnsupportedAuthType = errors.New("unsupported authentication method")
+	ErrVaultLocked         = errors.New("vault is locked")
+	ErrVaultInvalidAuth    = errors.New("invalid master password or corrupted vault")
+	ErrVaultCorrupted      = errors.New("vault file format is invalid or corrupted")
 )
 
 // AppStatus represents the basic health and metadata of the DoubleAgent process.
@@ -56,7 +59,7 @@ const (
 	AuthKeyboardInteractive AuthMethodType = "interactive"
 )
 
-// KeyboardInteractiveChallenge Responder answers 2FA / PAM prompts during keyboard-interactive auth.
+// KeyboardInteractiveResponder answers 2FA / PAM prompts during keyboard-interactive auth.
 type KeyboardInteractiveResponder func(user, instruction string, questions []string, echos []bool) ([]string, error)
 
 // SshAuthConfig holds credentials resolved from the vault or prompt for a single connection attempt.
@@ -134,10 +137,75 @@ type TerminalEngine interface {
 	Close(ctx context.Context, sessionID string) error
 }
 
-// SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007).
+// HostRecord represents a configured SSH target stored inside the encrypted vault (Spec Section 8, F-01).
+type HostRecord struct {
+	ID             string   `json:"id"`
+	Label          string   `json:"label"`
+	Address        string   `json:"address"`
+	Port           uint16   `json:"port"`
+	GroupID        string   `json:"groupId,omitempty"`
+	IdentityID     string   `json:"identityId,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
+	Color          string   `json:"color,omitempty"`
+	Favorite       bool     `json:"favorite,omitempty"`
+	JumpChain      []string `json:"jumpChain,omitempty"`
+	ForwardRuleIDs []string `json:"forwardRuleIds,omitempty"`
+}
+
+// GroupDefaults holds inheritable connection settings for a host group (F-01).
+type GroupDefaults struct {
+	Port          uint16 `json:"port,omitempty"`
+	Username      string `json:"username,omitempty"`
+	IdentityID    string `json:"identityId,omitempty"`
+	KeepaliveSecs uint16 `json:"keepaliveSecs,omitempty"`
+}
+
+// GroupRecord represents a hierarchical host folder stored in the vault (Spec Section 8, F-01).
+type GroupRecord struct {
+	ID              string        `json:"id"`
+	Name            string        `json:"name"`
+	ParentID        string        `json:"parentId,omitempty"`
+	DefaultSettings GroupDefaults `json:"defaultSettings"`
+}
+
+// IdentityRecord represents reusable authentication credentials stored in the vault (Spec Section 8).
+type IdentityRecord struct {
+	ID         string         `json:"id"`
+	Label      string         `json:"label"`
+	Username   string         `json:"username"`
+	AuthMethod AuthMethodType `json:"authMethod"`
+	Password   string         `json:"password,omitempty"`
+	KeyID      string         `json:"keyId,omitempty"`
+	TotpID     string         `json:"totpId,omitempty"`
+}
+
+// SshKeyRecord represents an SSH keypair stored in the vault (Spec Section 8, F-04).
+type SshKeyRecord struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Type        string `json:"type"`
+	PublicKey   string `json:"publicKey"`
+	PrivateKey  string `json:"privateKey"`
+	Passphrase  string `json:"passphrase,omitempty"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03).
+type VaultPayload struct {
+	SchemaVersion int              `json:"schemaVersion"`
+	Hosts         []HostRecord     `json:"hosts"`
+	Groups        []GroupRecord    `json:"groups"`
+	Identities    []IdentityRecord `json:"identities"`
+	Keys          []SshKeyRecord   `json:"keys"`
+}
+
+// SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).
 // Implementations live in backend/vault; the master key never leaves the Go process.
 type SecretStore interface {
 	Unlock(ctx context.Context, masterPassword string) error
 	Lock() error
 	IsLocked() bool
+	Touch()
+	GetPayload() (VaultPayload, error)
+	SavePayload(ctx context.Context, payload VaultPayload) error
 }

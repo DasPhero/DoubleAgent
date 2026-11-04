@@ -14,6 +14,8 @@ interface TerminalDataPayload {
 }
 
 interface WailsAppBindings {
+  UnlockVault: (masterPassword: string) => Promise<void>;
+  LockVault: () => Promise<void>;
   ConnectSSH: (req: {
     address: string;
     port: number;
@@ -48,13 +50,16 @@ function getWailsRuntime(): WailsRuntime | undefined {
 }
 
 export function App(): React.JSX.Element {
+  const [vaultLocked, setVaultLocked] = useState<boolean>(true);
+  const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
+  const [masterPassword, setMasterPassword] = useState<string>('');
   const [address, setAddress] = useState<string>('');
   const [port, setPort] = useState<string>('22');
   const [username, setUsername] = useState<string>('root');
   const [password, setPassword] = useState<string>('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>(
-    'Walking skeleton ready (S1). Enter SSH host details above to connect.'
+    'Ready (M0 complete: S1/S2/S3). Unlock the vault or enter SSH host details above to connect.'
   );
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
@@ -88,12 +93,47 @@ export function App(): React.JSX.Element {
       setStatusMessage('SSH session disconnected.');
     });
 
+    const offVaultLock = rt.EventsOn('vault:locked', (raw: unknown) => {
+      setVaultLocked(Boolean(raw));
+    });
+
     return () => {
       offData();
       offPrompt();
       offExit();
+      offVaultLock();
     };
   }, []);
+
+  const handleVaultUnlock = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    const api = getWailsBindings();
+    if (!api) {
+      setVaultLocked(false);
+      setShowUnlockModal(false);
+      setMasterPassword('');
+      return;
+    }
+    try {
+      await api.UnlockVault(masterPassword);
+      setVaultLocked(false);
+      setShowUnlockModal(false);
+      setMasterPassword('');
+      setStatusMessage('Vault unlocked (Argon2id + XChaCha20-Poly1305).');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`Vault unlock failed: ${msg}`);
+    }
+  };
+
+  const handleVaultLock = async (): Promise<void> => {
+    const api = getWailsBindings();
+    if (api) {
+      await api.LockVault();
+    }
+    setVaultLocked(true);
+    setStatusMessage('Vault locked.');
+  };
 
   const handleConnect = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -165,7 +205,24 @@ export function App(): React.JSX.Element {
       <header className="app-header">
         <div className="brand-group">
           <h1>DoubleAgent</h1>
-          <span className="status-badge">Vault Locked</span>
+          <span className="status-badge">{vaultLocked ? 'Vault Locked' : 'Vault Unlocked'}</span>
+          {vaultLocked ? (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setShowUnlockModal(true)}
+            >
+              Unlock Vault
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void handleVaultLock()}
+            >
+              Lock Vault
+            </button>
+          )}
         </div>
 
         <form className="quick-connect-bar" onSubmit={(e) => void handleConnect(e)}>
@@ -209,6 +266,39 @@ export function App(): React.JSX.Element {
           )}
         </form>
       </header>
+
+      {showUnlockModal && (
+        <div className="modal-backdrop" role="dialog" aria-label="Unlock Vault">
+          <form className="modal-card" onSubmit={(e) => void handleVaultUnlock(e)}>
+            <h2>Unlock Encrypted Vault (F-03)</h2>
+            <p>Enter your master password to derive the Argon2id + XChaCha20-Poly1305 key.</p>
+            <input
+              aria-label="Master Password"
+              type="password"
+              placeholder="Master Password"
+              value={masterPassword}
+              onChange={(e) => setMasterPassword(e.target.value)}
+              required
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setShowUnlockModal(false);
+                  setMasterPassword('');
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                Unlock
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {hostKeyPrompt && (
         <div className="modal-backdrop" role="dialog" aria-label="Verify SSH Host Key">

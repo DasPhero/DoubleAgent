@@ -83,8 +83,8 @@ func TestM0_0_AppHealthCheck(t *testing.T) {
 	if status.Name != "DoubleAgent" {
 		t.Fatalf("expected Name DoubleAgent, got %q", status.Name)
 	}
-	if status.Milestone != "S1" {
-		t.Fatalf("expected Milestone S1, got %q", status.Milestone)
+	if status.Milestone != "S3" {
+		t.Fatalf("expected Milestone S3, got %q", status.Milestone)
 	}
 	if !status.VaultLock {
 		t.Fatal("expected VaultLock to be true on startup (F-03)")

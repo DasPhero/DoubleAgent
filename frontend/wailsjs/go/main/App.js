@@ -14,12 +14,20 @@ export function HealthCheck() {
   return window['go']['main']['App']['HealthCheck']();
 }
 
+export function LockVault() {
+  return window['go']['main']['App']['LockVault']();
+}
+
 export function ResizeTerminal(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResizeTerminal'](arg1, arg2, arg3);
 }
 
 export function ResolveHostKeyPrompt(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveHostKeyPrompt'](arg1, arg2, arg3);
+}
+
+export function UnlockVault(arg1) {
+  return window['go']['main']['App']['UnlockVault'](arg1);
 }
 
 export function WriteTerminal(arg1, arg2) {
