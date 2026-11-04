@@ -210,6 +210,24 @@
   font-size: 0.8rem;
 }
 
+.info-banner {
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  background-color: rgba(13, 148, 136, 0.16);
+  border: 1px solid var(--border-teal);
+  color: #5eead4;
+  font-size: 0.8rem;
+}
+
+.error-banner {
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  background-color: rgba(220, 38, 38, 0.18);
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  color: #fca5a5;
+  font-size: 0.8rem;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

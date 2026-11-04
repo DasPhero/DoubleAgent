@@ -18,25 +18,43 @@ type KeyProtector interface {
 	Unprotect(ciphertext []byte) ([]byte, error)
 }
 
-// DefaultBiometricVerifier triggers the native Windows Hello / FIDO2 UserConsentVerifier dialog on Windows.
+// DefaultBiometricVerifier triggers the native Windows Hello / FIDO2 UserConsentVerifier dialog on Windows,
+// polling IAsyncOperation.Status directly (no System.Runtime.WindowsRuntime.dll dependency) and bringing the prompt to the foreground.
 func DefaultBiometricVerifier(ctx context.Context, message string) error {
 	safeMsg := strings.ReplaceAll(message, "'", "''")
 	psScript := fmt.Sprintf(`
 $ErrorActionPreference = 'Stop'
 [Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType = WindowsRuntime] | Out-Null
+[Windows.Foundation.AsyncStatus, Windows.Foundation, ContentType = WindowsRuntime] | Out-Null
+
 $op = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('%s')
-$asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`+"`"+`1'
-})[0].MakeGenericMethod([Windows.Security.Credentials.UI.UserConsentVerificationResult])
-$task = $asTask.Invoke($null, @($op))
-$result = $task.GetAwaiter().GetResult()
+
+# Bring the Windows Security / Hello credential dialog to the foreground
+$wshell = New-Object -ComObject WScript.Shell
+for ($i = 0; $i -lt 600; $i++) {
+    if ($op.Status -ne [Windows.Foundation.AsyncStatus]::Started) {
+        break
+    }
+    if ($i -eq 2 -or $i -eq 8 -or $i -eq 20) {
+        $null = $wshell.AppActivate('Windows Security')
+        $null = $wshell.AppActivate('Windows-Sicherheit')
+    }
+    Start-Sleep -Milliseconds 100
+}
+
+if ($op.Status -ne [Windows.Foundation.AsyncStatus]::Completed) {
+    Write-Error "Windows Hello verification did not complete (status: $($op.Status))"
+    exit 1
+}
+
+$result = $op.GetResults()
 if ($result -ne [Windows.Security.Credentials.UI.UserConsentVerificationResult]::Verified) {
-    Write-Error "Verification failed: $result"
+    Write-Error "Verification cancelled or rejected ($result)"
     exit 1
 }
 `, safeMsg)
 
-	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", psScript)
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", psScript)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("windows hello / security key verification failed: %s", strings.TrimSpace(string(out)))

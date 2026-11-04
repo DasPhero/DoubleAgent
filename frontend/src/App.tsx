@@ -71,6 +71,8 @@ export function App(): React.JSX.Element {
   const [vaultInitialized, setVaultInitialized] = useState<boolean>(false);
   const [passwordless, setPasswordless] = useState<boolean>(false);
   const [quickUnlockReady, setQuickUnlockReady] = useState<boolean>(false);
+  const [helloPending, setHelloPending] = useState<boolean>(false);
+  const [modalError, setModalError] = useState<string>('');
 
   const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
@@ -149,10 +151,36 @@ export function App(): React.JSX.Element {
     };
   }, [refreshVaultState]);
 
+  const handleOpenVaultButton = async (): Promise<void> => {
+    setModalError('');
+    // If the vault is in passwordless mode, unlock it directly on 1 click without showing a confusing modal!
+    if (vaultInitialized && passwordless) {
+      const api = getWailsBindings();
+      if (!api) {
+        setVaultLocked(false);
+        return;
+      }
+      try {
+        await api.UnlockVault('');
+        await refreshVaultState();
+        setStatusMessage('Vault unlocked (Passwordless Mode).');
+        return;
+      } catch {
+        // Fallback to modal if something changed
+      }
+    }
+    setShowVaultModal(true);
+  };
+
   const handleInitializeVault = async (omitPassword: boolean): Promise<void> => {
+    setModalError('');
     const pw = omitPassword ? '' : masterPassword;
+    if (!omitPassword && !pw) {
+      setModalError('Please enter a Master Password or choose "Skip Password for Now".');
+      return;
+    }
     if (!omitPassword && pw !== confirmPassword) {
-      setStatusMessage('Master password and confirmation do not match.');
+      setModalError('Master password and confirmation do not match.');
       return;
     }
     const api = getWailsBindings();
@@ -178,11 +206,12 @@ export function App(): React.JSX.Element {
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage(`Vault setup failed: ${msg}`);
+      setModalError(`Vault setup failed: ${msg}`);
     }
   };
 
   const handleInitializeWithHello = async (): Promise<void> => {
+    setModalError('');
     const api = getWailsBindings();
     if (!api) {
       setVaultInitialized(true);
@@ -191,6 +220,7 @@ export function App(): React.JSX.Element {
       setShowVaultModal(false);
       return;
     }
+    setHelloPending(true);
     try {
       await api.InitializeVaultWithHello();
       await refreshVaultState();
@@ -198,12 +228,15 @@ export function App(): React.JSX.Element {
       setStatusMessage('Vault created & protected with Windows Hello / Security Key + DPAPI.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage(`Windows Hello setup failed: ${msg}`);
+      setModalError(`Windows Hello setup failed: ${msg}`);
+    } finally {
+      setHelloPending(false);
     }
   };
 
   const handleVaultUnlock = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
+    setModalError('');
     const api = getWailsBindings();
     if (!api) {
       setVaultLocked(false);
@@ -219,15 +252,17 @@ export function App(): React.JSX.Element {
       setStatusMessage('Vault unlocked (Argon2id + XChaCha20-Poly1305).');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage(`Vault unlock failed: ${msg}`);
+      setModalError(`Unlock failed: ${msg}`);
     }
   };
 
   const handleQuickUnlockHello = async (): Promise<void> => {
+    setModalError('');
     const api = getWailsBindings();
     if (!api) {
       return;
     }
+    setHelloPending(true);
     try {
       await api.UnlockVaultWithHello();
       await refreshVaultState();
@@ -235,7 +270,9 @@ export function App(): React.JSX.Element {
       setStatusMessage('Vault unlocked via Windows Hello / Security Key.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage(`Windows Hello / Security Key unlock failed: ${msg}`);
+      setModalError(msg);
+    } finally {
+      setHelloPending(false);
     }
   };
 
@@ -248,15 +285,16 @@ export function App(): React.JSX.Element {
     try {
       await api.EnableQuickUnlock();
       await refreshVaultState();
-      setStatusMessage('Windows Hello / Security Key Quick Unlock enabled for this session.');
+      setStatusMessage('Windows Hello / Security Key Quick Unlock enabled.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage(`Could not enable Quick Unlock: ${msg}`);
+      setModalError(`Could not enable Quick Unlock: ${msg}`);
     }
   };
 
   const handleChangePassword = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
+    setModalError('');
     const api = getWailsBindings();
     if (!api) {
       setPasswordless(newPassword === '');
@@ -278,11 +316,12 @@ export function App(): React.JSX.Element {
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage(`Password update failed: ${msg}`);
+      setModalError(`Password update failed: ${msg}`);
     }
   };
 
   const handleResetVault = async (): Promise<void> => {
+    setModalError('');
     const api = getWailsBindings();
     if (api) {
       await api.ResetVault();
@@ -385,7 +424,7 @@ export function App(): React.JSX.Element {
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => setShowVaultModal(true)}
+              onClick={() => void handleOpenVaultButton()}
             >
               {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
             </button>
@@ -394,7 +433,10 @@ export function App(): React.JSX.Element {
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => setShowSettingsModal(true)}
+                onClick={() => {
+                  setModalError('');
+                  setShowSettingsModal(true);
+                }}
               >
                 Vault Security
               </button>
@@ -456,8 +498,8 @@ export function App(): React.JSX.Element {
           <div className="modal-card">
             <h2>Initialize Encrypted Vault (F-03)</h2>
             <p>
-              Set a Master Password for Argon2id + XChaCha20-Poly1305 encryption, or start without a
-              password and set one later in <strong>Vault Security</strong>.
+              Choose how you want to protect your local SSH vault (you can change this anytime in{' '}
+              <strong>Vault Security</strong>):
             </p>
             <input
               aria-label="Master Password"
@@ -465,6 +507,7 @@ export function App(): React.JSX.Element {
               placeholder="New Master Password"
               value={masterPassword}
               onChange={(e) => setMasterPassword(e.target.value)}
+              disabled={helloPending}
               autoFocus
             />
             <input
@@ -473,11 +516,19 @@ export function App(): React.JSX.Element {
               placeholder="Confirm Master Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={helloPending}
             />
+            {helloPending && (
+              <div className="info-banner">
+                Waiting for Windows Hello / Security Key confirmation window...
+              </div>
+            )}
+            {modalError && <div className="error-banner">{modalError}</div>}
             <div className="modal-actions">
               <button
                 type="button"
                 className="btn-secondary"
+                disabled={helloPending}
                 onClick={() => setShowVaultModal(false)}
               >
                 Cancel
@@ -485,6 +536,7 @@ export function App(): React.JSX.Element {
               <button
                 type="button"
                 className="btn-secondary"
+                disabled={helloPending}
                 onClick={() => void handleInitializeVault(true)}
               >
                 Skip Password for Now
@@ -492,13 +544,15 @@ export function App(): React.JSX.Element {
               <button
                 type="button"
                 className="btn-secondary"
+                disabled={helloPending}
                 onClick={() => void handleInitializeWithHello()}
               >
-                Use Windows Hello / Key
+                {helloPending ? 'Verifying Hello...' : 'Use Windows Hello / Key'}
               </button>
               <button
                 type="button"
                 className="btn-primary"
+                disabled={helloPending}
                 onClick={() => void handleInitializeVault(false)}
               >
                 Create Vault
@@ -512,26 +566,41 @@ export function App(): React.JSX.Element {
         <div className="modal-backdrop" role="dialog" aria-label="Unlock Vault">
           <form className="modal-card" onSubmit={(e) => void handleVaultUnlock(e)}>
             <h2>Unlock Encrypted Vault (F-03)</h2>
-            {passwordless ? (
-              <p>This vault is currently in passwordless mode. Click Unlock to open it.</p>
-            ) : (
-              <>
-                <p>Enter your Master Password or unlock directly with Windows Hello / Security Key.</p>
-                <input
-                  aria-label="Master Password"
-                  type="password"
-                  placeholder="Master Password"
-                  value={masterPassword}
-                  onChange={(e) => setMasterPassword(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </>
+            <p>
+              Unlock with <strong>Windows Hello / Security Key</strong> (PIN, Fingerprint, YubiKey) or
+              enter your <strong>Master Password</strong> below:
+            </p>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={helloPending}
+              onClick={() => void handleQuickUnlockHello()}
+            >
+              {helloPending
+                ? 'Waiting for Windows Hello / Security Key...'
+                : 'Unlock with Windows Hello / Security Key'}
+            </button>
+            {!passwordless && (
+              <input
+                aria-label="Master Password"
+                type="password"
+                placeholder="Or enter Master Password"
+                value={masterPassword}
+                onChange={(e) => setMasterPassword(e.target.value)}
+                disabled={helloPending}
+              />
             )}
+            {helloPending && (
+              <div className="info-banner">
+                Please complete the Windows Security prompt (check your taskbar if not focused).
+              </div>
+            )}
+            {modalError && <div className="error-banner">{modalError}</div>}
             <div className="modal-actions">
               <button
                 type="button"
                 className="btn-danger"
+                disabled={helloPending}
                 onClick={() => void handleResetVault()}
                 title="Archives the current vault and starts fresh if you forgot the password"
               >
@@ -540,13 +609,7 @@ export function App(): React.JSX.Element {
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => void handleQuickUnlockHello()}
-              >
-                Windows Hello / Key
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
+                disabled={helloPending}
                 onClick={() => {
                   setShowVaultModal(false);
                   setMasterPassword('');
@@ -554,8 +617,8 @@ export function App(): React.JSX.Element {
               >
                 Cancel
               </button>
-              <button type="submit" className="btn-primary">
-                Unlock
+              <button type="submit" className="btn-secondary" disabled={helloPending}>
+                Unlock with Password
               </button>
             </div>
           </form>
@@ -575,10 +638,9 @@ export function App(): React.JSX.Element {
               <input
                 aria-label="Current Master Password"
                 type="password"
-                placeholder="Current Master Password"
+                placeholder="Current Master Password (optional if unlocked via Hello)"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                required
               />
             )}
             <input
@@ -590,17 +652,18 @@ export function App(): React.JSX.Element {
             />
             <div className="quick-unlock-box">
               <span>
-                Windows Hello / FIDO2 Quick Unlock:{' '}
-                <strong>{quickUnlockReady ? 'Enabled' : 'Not Armed'}</strong>
+                Windows Hello / DPAPI Key:{' '}
+                <strong>{quickUnlockReady ? 'Active & Saved' : 'Not Armed'}</strong>
               </span>
               <button
                 type="button"
                 className="btn-secondary"
                 onClick={() => void handleEnableQuickUnlock()}
               >
-                Enable Windows Hello / Key
+                Sync Windows Hello / Key
               </button>
             </div>
+            {modalError && <div className="error-banner">{modalError}</div>}
             <div className="modal-actions">
               <button
                 type="button"

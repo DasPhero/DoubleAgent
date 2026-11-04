@@ -22,7 +22,7 @@ describe('M0 Application Shell, Quick Connect, and Vault Setup/Reset/Passwordles
     fireEvent.click(screen.getByRole('button', { name: /Vault Security/i }));
     expect(screen.getByRole('dialog', { name: /Vault Security Settings/i })).toBeInTheDocument();
     expect(screen.getByLabelText('New Master Password')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Enable Windows Hello \/ Key/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sync Windows Hello \/ Key/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Reset Vault/i })).toBeInTheDocument();
   });
 });
