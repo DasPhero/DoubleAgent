@@ -41,4 +41,51 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByText('Bastion 01')).toBeInTheDocument();
     expect(screen.getByText('deploy@10.10.0.5:2222')).toBeInTheDocument();
   });
+
+  it('opens Command Palette via Ctrl+K, performs fuzzy search over Name/Address/Tags, and supports user@host:port Quick Connect (F-02)', () => {
+    render(<App />);
+
+    // Unlock vault first
+    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+
+    // Add a host with tags
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'prod-web-01' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), {
+      target: { value: '10.99.1.50' },
+    });
+    fireEvent.change(screen.getByLabelText('Host Tags'), {
+      target: { value: 'nginx, frontend' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
+
+    // Press Ctrl+K to open Command Palette (F-02)
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    expect(screen.getByRole('dialog', { name: 'Command Palette' })).toBeInTheDocument();
+
+    const paletteInput = screen.getByLabelText('Command Palette Input');
+
+    // Fuzzy search by subsequence in Name ("pw01" -> "prod-web-01")
+    fireEvent.change(paletteInput, { target: { value: 'pw01' } });
+    expect(screen.getByText('#nginx')).toBeInTheDocument();
+
+    // Search by Tag ("frontend")
+    fireEvent.change(paletteInput, { target: { value: 'frontend' } });
+    expect(screen.getByText('#frontend')).toBeInTheDocument();
+
+    // Type user@host:port Quick Connect target
+    fireEvent.change(paletteInput, { target: { value: 'admin@192.168.50.10:2222' } });
+    const qcButton = screen.getByRole('button', {
+      name: /Quick Connect admin@192.168.50.10:2222/i,
+    });
+    expect(qcButton).toBeInTheDocument();
+
+    // Trigger Quick Connect
+    fireEvent.click(qcButton);
+    expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+    expect((screen.getByLabelText('Host Address') as HTMLInputElement).value).toBe('192.168.50.10');
+    expect((screen.getByLabelText('Port') as HTMLInputElement).value).toBe('2222');
+    expect((screen.getByLabelText('Username') as HTMLInputElement).value).toBe('admin');
+  });
 });

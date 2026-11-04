@@ -59,6 +59,134 @@ interface VaultSummary {
   identities: IdentitySummary[];
 }
 
+interface QuickConnectTarget {
+  user: string;
+  address: string;
+  port: number;
+  display: string;
+}
+
+interface HostSearchResult {
+  host: HostSummary;
+  score: number;
+  matchedFields: string[];
+}
+
+interface CommandPaletteResponse {
+  query: string;
+  hostResults: HostSearchResult[];
+  quickConnect?: QuickConnectTarget;
+}
+
+function parseQuickConnectLocal(raw: string): QuickConnectTarget | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const token = trimmed.replace(/^ssh\s+/i, '').trim();
+  const hasExplicit = token.includes('@') || token.includes(':');
+  if (!hasExplicit || token.includes(' ')) {
+    return undefined;
+  }
+  let user = 'root';
+  let hostPort = token;
+  const atIdx = token.indexOf('@');
+  if (atIdx !== -1) {
+    user = token.slice(0, atIdx).trim();
+    hostPort = token.slice(atIdx + 1).trim();
+    if (!user || !hostPort) {
+      return undefined;
+    }
+  }
+  let address = hostPort;
+  let port = 22;
+  const colonIdx = hostPort.lastIndexOf(':');
+  if (colonIdx !== -1) {
+    address = hostPort.slice(0, colonIdx).trim();
+    const p = Number(hostPort.slice(colonIdx + 1).trim());
+    if (!address || !Number.isInteger(p) || p < 1 || p > 65535) {
+      return undefined;
+    }
+    port = p;
+  }
+  return {
+    user,
+    address,
+    port,
+    display: `${user}@${address}:${port}`,
+  };
+}
+
+function fuzzyScoreLocal(candidate: string, needle: string, weight: number): number {
+  if (!candidate || !needle) {
+    return 0;
+  }
+  if (candidate === needle) {
+    return weight * 3;
+  }
+  if (candidate.startsWith(needle)) {
+    return weight * 2;
+  }
+  const subIdx = candidate.indexOf(needle);
+  if (subIdx !== -1) {
+    return weight + Math.max(0, 20 - subIdx);
+  }
+  // Subsequence fuzzy match
+  if (needle.length < 2 || needle.length > candidate.length) {
+    return 0;
+  }
+  let nIdx = 0;
+  for (let i = 0; i < candidate.length && nIdx < needle.length; i++) {
+    if (candidate[i] === needle[nIdx]) {
+      nIdx++;
+    }
+  }
+  return nIdx === needle.length ? Math.floor(weight / 2) : 0;
+}
+
+function searchHostsFuzzyLocal(hosts: HostSummary[], query: string): HostSearchResult[] {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return hosts.map((host) => ({ host, score: 1, matchedFields: [] }));
+  }
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const out: HostSearchResult[] = [];
+  for (const host of hosts) {
+    let total = 0;
+    let allMatched = true;
+    const matchedFields: string[] = [];
+    for (const tok of tokens) {
+      let tokScore = 0;
+      const nameScore = fuzzyScoreLocal(host.label.toLowerCase(), tok, 120);
+      if (nameScore > 0) {
+        tokScore += nameScore;
+        matchedFields.push('name');
+      }
+      const addrScore = fuzzyScoreLocal(host.address.toLowerCase(), tok, 100);
+      if (addrScore > 0) {
+        tokScore += addrScore;
+        matchedFields.push('address');
+      }
+      for (const tag of host.tags) {
+        const tagScore = fuzzyScoreLocal(tag.toLowerCase(), tok, 90);
+        if (tagScore > 0) {
+          tokScore += tagScore;
+          matchedFields.push(`tag:${tag}`);
+        }
+      }
+      if (tokScore === 0) {
+        allMatched = false;
+        break;
+      }
+      total += tokScore;
+    }
+    if (allMatched && total > 0) {
+      out.push({ host, score: total, matchedFields });
+    }
+  }
+  return out.sort((a, b) => b.score - a.score || a.host.label.localeCompare(b.host.label));
+}
+
 interface TerminalDataPayload {
   sessionId: string;
   data: string;
@@ -75,6 +203,7 @@ interface WailsAppBindings {
   ResetVault: () => Promise<void>;
   LockVault: () => Promise<void>;
   GetVaultSummary: () => Promise<VaultSummary>;
+  SearchCommandPalette?: (query: string) => Promise<CommandPaletteResponse>;
   SaveGroup: (group: GroupRecord) => Promise<void>;
   DeleteGroup: (groupId: string) => Promise<void>;
   SaveIdentity: (identity: {
@@ -141,6 +270,13 @@ export function App(): React.JSX.Element {
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showAddHostModal, setShowAddHostModal] = useState<boolean>(false);
   const [showAddGroupModal, setShowAddGroupModal] = useState<boolean>(false);
+  const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
+  const [paletteQuery, setPaletteQuery] = useState<string>('');
+  const [palettePassword, setPalettePassword] = useState<string>('');
+  const [paletteResponse, setPaletteResponse] = useState<CommandPaletteResponse>({
+    query: '',
+    hostResults: [],
+  });
 
   const [masterPassword, setMasterPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
@@ -246,6 +382,75 @@ export function App(): React.JSX.Element {
       offVaultLock();
     };
   }, [refreshVaultState]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCommandPalette((prev) => !prev);
+      } else if (e.key === 'Escape') {
+        setShowCommandPalette(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!showCommandPalette) {
+      return;
+    }
+    const api = getWailsBindings();
+    if (api?.SearchCommandPalette && !vaultLocked) {
+      void api
+        .SearchCommandPalette(paletteQuery)
+        .then((res) => setPaletteResponse(res))
+        .catch(() => {
+          setPaletteResponse({
+            query: paletteQuery,
+            hostResults: searchHostsFuzzyLocal(vaultSummary.hosts, paletteQuery),
+            quickConnect: parseQuickConnectLocal(paletteQuery),
+          });
+        });
+    } else {
+      setPaletteResponse({
+        query: paletteQuery,
+        hostResults: searchHostsFuzzyLocal(vaultSummary.hosts, paletteQuery),
+        quickConnect: parseQuickConnectLocal(paletteQuery),
+      });
+    }
+  }, [showCommandPalette, paletteQuery, vaultSummary.hosts, vaultLocked]);
+
+  const handleQuickConnectFromPalette = async (qc: QuickConnectTarget): Promise<void> => {
+    setAddress(qc.address);
+    setPort(String(qc.port));
+    setUsername(qc.user);
+    setShowCommandPalette(false);
+    setPaletteQuery('');
+    const api = getWailsBindings();
+    if (!api) {
+      setStatusMessage(`Quick Connect ready for ${qc.display}`);
+      return;
+    }
+    setStatusMessage(`Connecting to ${qc.display}...`);
+    try {
+      const id = await api.ConnectSSH({
+        address: qc.address,
+        port: qc.port,
+        username: qc.user,
+        password: palettePassword,
+        privateKey: '',
+        passphrase: '',
+        size: { cols: 120, rows: 34 },
+      });
+      setSessionId(id);
+      setPalettePassword('');
+      setStatusMessage(`Connected (${qc.display})`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`Connection failed: ${msg}`);
+    }
+  };
 
   const handleOpenVaultButton = (): void => {
     setModalError('');
@@ -667,6 +872,16 @@ export function App(): React.JSX.Element {
               </button>
             </>
           )}
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              setPaletteQuery('');
+              setShowCommandPalette(true);
+            }}
+          >
+            Command Palette (Ctrl+K)
+          </button>
         </div>
 
         <form className="quick-connect-bar" onSubmit={(e) => void handleConnect(e)}>
@@ -840,6 +1055,114 @@ export function App(): React.JSX.Element {
           </section>
         )}
       </div>
+
+      {showCommandPalette && (
+        <div className="modal-backdrop" role="dialog" aria-label="Command Palette">
+          <div className="modal-card palette-card">
+            <h2>Command Palette &amp; Quick Connect (F-02)</h2>
+            <p>
+              Fuzzy search saved hosts by <strong>Name</strong>, <strong>Address</strong>, or{' '}
+              <strong>Tags</strong>, or type <code>user@host:port</code> to connect directly.
+            </p>
+            <input
+              aria-label="Command Palette Input"
+              placeholder="Search hosts, tags, or type user@host:port..."
+              value={paletteQuery}
+              onChange={(e) => setPaletteQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (paletteResponse.quickConnect) {
+                    void handleQuickConnectFromPalette(paletteResponse.quickConnect);
+                  } else if (paletteResponse.hostResults.length > 0) {
+                    const topHost = paletteResponse.hostResults[0].host;
+                    setShowCommandPalette(false);
+                    setPaletteQuery('');
+                    void handleConnectSavedHost(topHost);
+                  }
+                }
+              }}
+              autoFocus
+            />
+
+            {paletteResponse.quickConnect && (
+              <div className="quick-unlock-box">
+                <div className="palette-item-main">
+                  <strong>Quick Connect: {paletteResponse.quickConnect.display}</strong>
+                  <span>Direct SSH connection (Enter or click Connect)</span>
+                </div>
+                <input
+                  aria-label="Quick Connect Password"
+                  type="password"
+                  placeholder="Password (optional)"
+                  value={palettePassword}
+                  onChange={(e) => setPalettePassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  onClick={() => {
+                    if (paletteResponse.quickConnect) {
+                      void handleQuickConnectFromPalette(paletteResponse.quickConnect);
+                    }
+                  }}
+                >
+                  Quick Connect {paletteResponse.quickConnect.display}
+                </button>
+              </div>
+            )}
+
+            <div className="palette-results" aria-label="Command Palette Results">
+              {vaultLocked ? (
+                <div className="info-banner">
+                  Vault is currently locked. Unlock the vault to search saved hosts, or type{' '}
+                  <code>user@host:port</code> above for direct Quick Connect.
+                </div>
+              ) : paletteResponse.hostResults.length === 0 ? (
+                <p>No saved hosts match &ldquo;{paletteQuery}&rdquo;.</p>
+              ) : (
+                paletteResponse.hostResults.map((item) => (
+                  <button
+                    key={item.host.id}
+                    type="button"
+                    className="palette-item"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      void handleConnectSavedHost(item.host);
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong>{item.host.label}</strong>
+                      <span>
+                        {item.host.effectiveUser}@{item.host.address}:{item.host.effectivePort}
+                      </span>
+                    </div>
+                    <div className="palette-tags">
+                      {item.host.tags.map((tag) => (
+                        <span key={tag} className="tag-pill">
+                          #{tag}
+                        </span>
+                      ))}
+                      <span className="kbd-badge">Connect ↵</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowCommandPalette(false)}
+              >
+                Close (Esc)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddGroupModal && (
         <div className="modal-backdrop" role="dialog" aria-label="New Host Group">

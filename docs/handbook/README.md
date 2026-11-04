@@ -6,12 +6,16 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0` & `M1-1`)
+## Current Capabilities (`M0`, `M1-1`, & `M1-2`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
 - **Visual Security State (Dark Crimson Locked ↔ Dark Teal Unlocked)**:
   - When the **Vault is Locked**, the entire application displays a **Dark Crimson / Red** theme so you can see at a glance that secrets are locked.
   - As soon as you unlock the Vault, the UI transitions to the **Dark Slate + Teal** glass theme.
+- **Command Palette & Quick Connect (`M1-2` — `F-02`)**:
+  - Press **`Ctrl+K`** (or click **Command Palette (`Ctrl+K`)** in the top bar) from anywhere in the workspace.
+  - **Fuzzy Search**: Type fragments or subsequences of a host's **Name** (e.g. `pw01` for `prod-web-01`), **IP/Hostname**, or **Tags** (e.g. `nginx`) and press `Enter` (or click the result) to connect immediately.
+  - **Direct `user@host:port` Quick Connect**: Type `user@host:port`, `user@host`, `host:port`, or `ssh -p 2222 user@host` into the Command Palette to connect to an ad-hoc SSH target directly.
 - **Hosts & Groups Management with Inheritance (`M1-1` — `F-01`)**:
   - Once unlocked, use the left **Hosts & Groups** sidebar:
     - Click **+ Group** to create hierarchical folders with default **Port**, **Username**, and **Keepalive** settings.

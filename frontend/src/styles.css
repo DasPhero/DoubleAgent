@@ -364,3 +364,78 @@
   gap: 0.5rem;
   margin-top: 0.4rem;
 }
+
+/* Command Palette (F-02) */
+.palette-card {
+  max-width: 560px;
+}
+
+.palette-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 290px;
+  overflow-y: auto;
+  margin-top: 0.25rem;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  background-color: rgba(9, 13, 20, 0.72);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-main);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.palette-item:hover,
+.palette-item.active {
+  border-color: var(--accent-bright);
+  background-color: var(--accent-glow);
+}
+
+.palette-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.palette-item-main strong {
+  font-size: 0.85rem;
+  color: #f8fafc;
+}
+
+.palette-item-main span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.palette-tags {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.tag-pill {
+  font-size: 0.68rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 9999px;
+  background-color: rgba(15, 23, 34, 0.9);
+  border: 1px solid var(--border-accent);
+  color: var(--accent-text);
+}
+
+.kbd-badge {
+  font-family: Consolas, monospace;
+  font-size: 0.7rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  background-color: rgba(9, 13, 20, 0.85);
+  border: 1px solid var(--border-subtle);
+  color: var(--accent-text);
+}

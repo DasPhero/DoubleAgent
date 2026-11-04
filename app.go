@@ -186,6 +186,26 @@ func (a *App) GetVaultSummary() (core.VaultSummary, error) {
 	return core.BuildVaultSummary(payload), nil
 }
 
+// SearchCommandPalette performs fuzzy search across saved hosts (Name, Address, Tags, Group)
+// and parses ad-hoc quick-connect targets like "user@host:port" (F-02).
+func (a *App) SearchCommandPalette(query string) (core.CommandPaletteResponse, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.CommandPaletteResponse{}, err
+	}
+	summary := core.BuildVaultSummary(payload)
+	results := core.SearchHostsFuzzy(summary.Hosts, query)
+
+	resp := core.CommandPaletteResponse{
+		Query:       query,
+		HostResults: results,
+	}
+	if qc, ok := core.ParseQuickConnectTarget(query); ok {
+		resp.QuickConnect = &qc
+	}
+	return resp, nil
+}
+
 // SaveGroup creates or updates a host group in the encrypted vault (F-01).
 func (a *App) SaveGroup(group core.GroupRecord) error {
 	if group.ID == "" || group.Name == "" {

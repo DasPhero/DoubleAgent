@@ -37,6 +37,7 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
 - `App.ResetVault() error`
 - `App.LockVault() error`
 - `App.GetVaultSummary() (core.VaultSummary, error)`
+- `App.SearchCommandPalette(query string) (core.CommandPaletteResponse, error)`
 - `App.SaveGroup(group core.GroupRecord) error`
 - `App.DeleteGroup(groupID string) error`
 - `App.SaveIdentity(identity core.IdentityRecord) error`
