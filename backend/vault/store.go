@@ -138,6 +138,10 @@ func (s *Store) IsInitialized() bool {
 func (s *Store) IsPasswordless() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.isPasswordlessLocked()
+}
+
+func (s *Store) isPasswordlessLocked() bool {
 	rawBytes, err := os.ReadFile(s.filePath)
 	if err != nil {
 		return false
@@ -150,14 +154,17 @@ func (s *Store) IsPasswordless() bool {
 }
 
 // HasQuickUnlock reports whether Windows Hello / Security Key quick-unlock is available
-// (either persisted via OS DPAPI in <vault>.hello or armed in memory).
+// (either persisted via OS DPAPI in <vault>.hello, armed in memory, or on a passwordless vault).
 func (s *Store) HasQuickUnlock() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, err := os.Stat(s.helloKeyPath()); err == nil {
 		return true
 	}
-	return len(s.quickWrapKey) == chacha20poly1305.KeySize && len(s.quickWrappedMK) > 0
+	if len(s.quickWrapKey) == chacha20poly1305.KeySize && len(s.quickWrappedMK) > 0 {
+		return true
+	}
+	return s.isPasswordlessLocked()
 }
 
 // Initialize creates a brand-new encrypted vault file on disk.
@@ -408,17 +415,18 @@ func (s *Store) EnableQuickUnlock() error {
 }
 
 // UnlockWithQuickUnlock prompts Windows Hello / FIDO2 security key verification and unwraps the master key
-// from either the persistent Windows DPAPI `.hello` file or the in-memory wrapped key.
+// from either the persistent Windows DPAPI `.hello` file, the in-memory wrapped key, or a passwordless vault.
 func (s *Store) UnlockWithQuickUnlock(ctx context.Context) error {
 	s.mu.Lock()
 	hasMemQuick := len(s.quickWrapKey) == chacha20poly1305.KeySize && len(s.quickWrappedMK) > chacha20poly1305.NonceSizeX
 	_, dpapiStatErr := os.Stat(s.helloKeyPath())
 	hasDPAPI := (dpapiStatErr == nil)
+	isPasswordless := s.isPasswordlessLocked()
 	verifier := s.verifier
 	protector := s.protector
 	s.mu.Unlock()
 
-	if !hasDPAPI && !hasMemQuick {
+	if !hasDPAPI && !hasMemQuick && !isPasswordless {
 		return errors.New("Windows Hello unlock is not yet enrolled; set up or unlock your vault once first")
 	}
 
@@ -438,26 +446,40 @@ func (s *Store) UnlockWithQuickUnlock(ctx context.Context) error {
 		}
 	}
 
-	if len(unwrappedKey) == 0 {
-		if len(s.quickWrapKey) != chacha20poly1305.KeySize || len(s.quickWrappedMK) <= chacha20poly1305.NonceSizeX {
-			return errors.New("quick unlock state expired")
+	if len(unwrappedKey) == 0 && len(s.quickWrapKey) == chacha20poly1305.KeySize && len(s.quickWrappedMK) > chacha20poly1305.NonceSizeX {
+		if aead, err := chacha20poly1305.NewX(s.quickWrapKey); err == nil {
+			nonce := s.quickWrappedMK[:chacha20poly1305.NonceSizeX]
+			ct := s.quickWrappedMK[chacha20poly1305.NonceSizeX:]
+			if k, err := aead.Open(nil, nonce, ct, nil); err == nil {
+				unwrappedKey = k
+			}
 		}
-		aead, err := chacha20poly1305.NewX(s.quickWrapKey)
-		if err != nil {
-			return err
-		}
-		nonce := s.quickWrappedMK[:chacha20poly1305.NonceSizeX]
-		ct := s.quickWrappedMK[chacha20poly1305.NonceSizeX:]
-		k, err := aead.Open(nil, nonce, ct, nil)
-		if err != nil {
-			return core.ErrVaultInvalidAuth
-		}
-		unwrappedKey = k
 	}
 
-	return s.unlockFromDiskWithKeyFuncLocked(ctx, func(_ []byte, _ KDFParams) ([]byte, error) {
-		return unwrappedKey, nil
-	})
+	if len(unwrappedKey) == chacha20poly1305.KeySize {
+		err := s.unlockFromDiskWithKeyFuncLocked(ctx, func(_ []byte, _ KDFParams) ([]byte, error) {
+			return unwrappedKey, nil
+		})
+		if err == nil {
+			_ = s.persistHelloKeyLocked()
+			return nil
+		}
+		if !isPasswordless {
+			return err
+		}
+	}
+
+	if isPasswordless {
+		if err := s.unlockFromDiskWithKeyFuncLocked(ctx, func(salt []byte, kdf KDFParams) ([]byte, error) {
+			return deriveKey("", salt, kdf), nil
+		}); err != nil {
+			return err
+		}
+		_ = s.persistHelloKeyLocked()
+		return nil
+	}
+
+	return errors.New("quick unlock state expired")
 }
 
 // ResetVault archives any existing vault file to a timestamped .reset.bak file and locks/clears memory

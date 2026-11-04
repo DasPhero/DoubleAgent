@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -18,43 +19,70 @@ type KeyProtector interface {
 	Unprotect(ciphertext []byte) ([]byte, error)
 }
 
+var (
+	user32                      = syscall.NewLazyDLL("user32.dll")
+	procAllowSetForegroundWin   = user32.NewProc("AllowSetForegroundWindow")
+	procFindWindowW             = user32.NewProc("FindWindowW")
+	procSetForegroundWindow     = user32.NewProc("SetForegroundWindow")
+	procBringWindowToTop        = user32.NewProc("BringWindowToTop")
+)
+
+const asfwAny = uintptr(0xFFFFFFFF)
+
+func focusWindowsSecurityDialog(stop <-chan struct{}) {
+	className, err := syscall.UTF16PtrFromString("Credential Dialog Xaml Host")
+	if err != nil {
+		return
+	}
+	ticker := time.NewTicker(120 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			hwnd, _, _ := procFindWindowW.Call(uintptr(unsafe.Pointer(className)), 0)
+			if hwnd != 0 {
+				_, _, _ = procBringWindowToTop.Call(hwnd)
+				_, _, _ = procSetForegroundWindow.Call(hwnd)
+			}
+		}
+	}
+}
+
 // DefaultBiometricVerifier triggers the native Windows Hello / FIDO2 UserConsentVerifier dialog on Windows,
-// polling IAsyncOperation.Status directly (no System.Runtime.WindowsRuntime.dll dependency) and bringing the prompt to the foreground.
+// explicitly loading System.Runtime.WindowsRuntime for AsTask awaiting and bringing the security dialog to the foreground.
 func DefaultBiometricVerifier(ctx context.Context, message string) error {
+	// Grant child/broker processes permission to take foreground focus from DoubleAgent.
+	_, _, _ = procAllowSetForegroundWin.Call(asfwAny)
+
+	stopFocus := make(chan struct{})
+	defer close(stopFocus)
+	go focusWindowsSecurityDialog(stopFocus)
+
 	safeMsg := strings.ReplaceAll(message, "'", "''")
 	psScript := fmt.Sprintf(`
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
 [Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType = WindowsRuntime] | Out-Null
-[Windows.Foundation.AsyncStatus, Windows.Foundation, ContentType = WindowsRuntime] | Out-Null
 
 $op = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('%s')
+$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`+"`"+`1'
+})[0]
+$asTask = $asTaskGeneric.MakeGenericMethod([Windows.Security.Credentials.UI.UserConsentVerificationResult])
+$task = $asTask.Invoke($null, @($op))
+$task.Wait()
+$result = $task.Result
 
-# Bring the Windows Security / Hello credential dialog to the foreground
-$wshell = New-Object -ComObject WScript.Shell
-for ($i = 0; $i -lt 600; $i++) {
-    if ($op.Status -ne [Windows.Foundation.AsyncStatus]::Started) {
-        break
-    }
-    if ($i -eq 2 -or $i -eq 8 -or $i -eq 20) {
-        $null = $wshell.AppActivate('Windows Security')
-        $null = $wshell.AppActivate('Windows-Sicherheit')
-    }
-    Start-Sleep -Milliseconds 100
-}
-
-if ($op.Status -ne [Windows.Foundation.AsyncStatus]::Completed) {
-    Write-Error "Windows Hello verification did not complete (status: $($op.Status))"
-    exit 1
-}
-
-$result = $op.GetResults()
 if ($result -ne [Windows.Security.Credentials.UI.UserConsentVerificationResult]::Verified) {
     Write-Error "Verification cancelled or rejected ($result)"
     exit 1
 }
 `, safeMsg)
 
-	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", psScript)
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", psScript)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("windows hello / security key verification failed: %s", strings.TrimSpace(string(out)))
