@@ -6,10 +6,14 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0-0` & `S2`)
+## Current Capabilities (`M0-0`, `S2`, `S1`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Quick Connect & Interactive Terminal (`S1` — `F-01`, `F-06`, `F-07`, `F-11`)**:
+  - Enter **Host / IP**, **Port**, **Username**, and **Password** in the top Quick Connect bar and click **Connect SSH**.
+  - On first connection to a host, DoubleAgent displays the **Verify Unknown Host Key (`F-06`)** modal with the key algorithm and `SHA256:...` fingerprint. Click **Trust Host Key** to continue or **Reject & Abort** to cancel.
+  - Once connected, an interactive **xterm.js** terminal session opens with 256-color / Truecolor support, automatic window resize (`FitAddon`), and a 10,000-line scrollback buffer.
 - **SSH Transport & Host-Key Security (`S2` — `F-01`, `F-04`, `F-06`, `F-07`, `F-20`)**:
   - Supports password authentication, Ed25519 and RSA private keys (with optional passphrase), and keyboard-interactive 2FA prompts.
-  - **Strict Known Hosts (`F-06`)**: Displays `SHA256` fingerprints on first connection (Trust on First Use). If a previously trusted server changes its host key, DoubleAgent blocks the connection immediately to protect against Man-in-the-Middle (MITM) attacks.
-  - **Modern Cryptography**: Uses Curve25519 / ECDH key exchanges and AEAD ciphers (`ChaCha20-Poly1305`, `AES-GCM`) by default.
+  - Blocks connections immediately if a previously trusted server changes its host key (`core.ErrHostKeyMismatch`).
+  - Strips untrusted `OSC 52` clipboard-write escape sequences from remote terminal output.

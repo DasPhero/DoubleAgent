@@ -23,6 +23,29 @@ type AppStatus struct {
 	VaultLock bool   `json:"vaultLocked"`
 }
 
+// ConnectRequest represents the frontend-bound parameters for starting an SSH terminal session (S1, F-01, F-07).
+type ConnectRequest struct {
+	Address    string       `json:"address"`
+	Port       uint16       `json:"port"`
+	Username   string       `json:"username"`
+	Password   string       `json:"password"`
+	PrivateKey string       `json:"privateKey"`
+	Passphrase string       `json:"passphrase"`
+	Size       TerminalSize `json:"size"`
+}
+
+// TerminalDataEvent is emitted from the Go backend to the frontend when remote PTY output arrives (F-07).
+type TerminalDataEvent struct {
+	SessionID string `json:"sessionId"`
+	Data      string `json:"data"`
+}
+
+// TerminalExitEvent is emitted when an SSH shell session closes or disconnects.
+type TerminalExitEvent struct {
+	SessionID string `json:"sessionId"`
+	Reason    string `json:"reason"`
+}
+
 // AuthMethodType enumerates supported SSH authentication mechanisms (F-01, F-04, F-05, F-20).
 type AuthMethodType string
 

@@ -16,15 +16,25 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
 3. **SSH Transport (`backend/ssh/`)**:
    - `Transport` implements `core.SshTransport` using `golang.org/x/crypto/ssh`.
    - `KnownHostsStore` enforces `F-06` (`SHA256` fingerprint TOFU via `KnownHostDecisionFunc` and hard block via `core.ErrHostKeyMismatch` when a known key changes).
-   - Supports `AuthPassword`, `AuthPrivateKey` (Ed25519/RSA, with or without passphrase), and `AuthKeyboardInteractive` (2FA/TOTP).
    - Opens interactive `xterm-256color` PTY shells (`OpenShell`) and dynamic window resizing (`ResizeShell`).
 4. **Frontend (`frontend/`)**:
-   - React 18 + TypeScript (`strict: true`) + Vite + Vitest.
-   - English-only UI. Never holds secrets or opens raw sockets.
+   - React 18 + TypeScript (`strict: true`) + Vite + Vitest + `xterm.js` (`@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-search`, `@xterm/addon-unicode11`, `@xterm/addon-webgl`).
+   - [`TerminalView.tsx`](../../frontend/src/components/TerminalView.tsx) renders terminal output strictly via `term.write()`, never `innerHTML`.
 
-## Bound-Method Surface
+## Bound-Method Surface & Events (`app.go`)
 
-- `App.HealthCheck() core.AppStatus`: Returns application name, version, and current milestone status.
+### Bound Methods
+- `App.HealthCheck() core.AppStatus`
+- `App.ConnectSSH(req core.ConnectRequest) (string, error)`
+- `App.ResolveHostKeyPrompt(host string, port uint16, trust bool) error`
+- `App.WriteTerminal(sessionID string, data string) error`
+- `App.ResizeTerminal(sessionID string, cols uint16, rows uint16) error`
+- `App.DisconnectSession(sessionID string) error`
+
+### Backend → Frontend Events
+- `ssh:hostkey-prompt` (`core.HostKeyInfo`): Emitted when connecting to an unknown host key (TOFU).
+- `terminal:data` (`core.TerminalDataEvent`): Emitted with 32 KB sanitized chunks (`StripOSC52Sequences`) from the remote PTY.
+- `terminal:exit` (`core.TerminalExitEvent`): Emitted when the remote shell closes.
 
 ## How to Run & Test
 
