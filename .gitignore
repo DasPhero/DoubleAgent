@@ -1,0 +1,35 @@
+# Binaries and build output
+build/bin/
+*.exe
+*.exe~
+*.msi
+*.dll
+*.so
+*.dylib
+*.AppImage
+
+# Test binary, built with `go test -c`
+*.test
+*.out
+coverage.txt
+
+# Dependency directories
+frontend/node_modules/
+frontend/dist/
+
+# Wails auto-generated bindings (tracked or regenerated during build; keep wailsjs tracked if needed, ignore temp)
+wails.json.tmp
+
+# IDE & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local vaults / test artifacts
+*.vault
+*.db
+*.sqlite
+
