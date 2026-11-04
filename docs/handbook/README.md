@@ -6,9 +6,17 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0` Complete: `M0-0`, `S2`, `S1`, `S3`)
+## Current Capabilities (`M0` & `M1-1`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Visual Security State (Dark Crimson Locked ↔ Dark Teal Unlocked)**:
+  - When the **Vault is Locked**, the entire application displays a **Dark Crimson / Red** theme so you can see at a glance that secrets are locked.
+  - As soon as you unlock the Vault, the UI transitions to the **Dark Slate + Teal** glass theme.
+- **Hosts & Groups Management with Inheritance (`M1-1` — `F-01`)**:
+  - Once unlocked, use the left **Hosts & Groups** sidebar:
+    - Click **+ Group** to create hierarchical folders with default **Port**, **Username**, and **Keepalive** settings.
+    - Click **+ Host** to save an SSH host inside the encrypted Vault. Leave Port (`0`) or Username empty to inherit them automatically from the assigned Group, or specify values on the Host to override the Group defaults (`F-01`).
+    - Filter saved hosts by name, IP, or tags in the sidebar search box and click **Connect** to open a session immediately.
 - **Encrypted Vault, Passwordless Option, Reset & Windows Hello (`S3` — `F-03`)**:
   - DoubleAgent always starts with the **Vault Locked**.
   - On first launch, click **Set Up Vault**:

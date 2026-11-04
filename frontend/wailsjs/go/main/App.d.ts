@@ -6,9 +6,17 @@ export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;
 
 export function ConnectSSH(arg1:core.ConnectRequest):Promise<string>;
 
+export function ConnectSavedHost(arg1:string,arg2:core.TerminalSize):Promise<string>;
+
+export function DeleteGroup(arg1:string):Promise<void>;
+
+export function DeleteHost(arg1:string):Promise<void>;
+
 export function DisconnectSession(arg1:string):Promise<void>;
 
 export function EnableQuickUnlock():Promise<void>;
+
+export function GetVaultSummary():Promise<core.VaultSummary>;
 
 export function HealthCheck():Promise<core.AppStatus>;
 
@@ -23,6 +31,12 @@ export function ResetVault():Promise<void>;
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function ResolveHostKeyPrompt(arg1:string,arg2:number,arg3:boolean):Promise<void>;
+
+export function SaveGroup(arg1:core.GroupRecord):Promise<void>;
+
+export function SaveHost(arg1:core.HostRecord):Promise<void>;
+
+export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
 
 export function UnlockVault(arg1:string):Promise<void>;
 

@@ -104,7 +104,7 @@ func (a *App) HealthCheck() core.AppStatus {
 	return core.AppStatus{
 		Name:             "DoubleAgent",
 		Version:          "0.1.0",
-		Milestone:        "S3",
+		Milestone:        "M1-1",
 		VaultLock:        a.vaultStore.IsLocked(),
 		VaultInitialized: a.vaultStore.IsInitialized(),
 		Passwordless:     a.vaultStore.IsPasswordless(),
@@ -175,6 +175,177 @@ func (a *App) LockVault() error {
 	}
 	a.emit(a.ctx, "vault:locked", true)
 	return nil
+}
+
+// GetVaultSummary returns non-secret groups, hosts (with inherited values resolved), and identities (F-01, Golden Rule 2).
+func (a *App) GetVaultSummary() (core.VaultSummary, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.VaultSummary{}, err
+	}
+	return core.BuildVaultSummary(payload), nil
+}
+
+// SaveGroup creates or updates a host group in the encrypted vault (F-01).
+func (a *App) SaveGroup(group core.GroupRecord) error {
+	if group.ID == "" || group.Name == "" {
+		return errors.New("group id and name are required")
+	}
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	updated := false
+	for i := range payload.Groups {
+		if payload.Groups[i].ID == group.ID {
+			payload.Groups[i] = group
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		payload.Groups = append(payload.Groups, group)
+	}
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// DeleteGroup removes a group from the vault and unassigns any hosts that referenced it (F-01).
+func (a *App) DeleteGroup(groupID string) error {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.GroupRecord, 0, len(payload.Groups))
+	for _, g := range payload.Groups {
+		if g.ID != groupID {
+			filtered = append(filtered, g)
+		}
+	}
+	payload.Groups = filtered
+	for i := range payload.Hosts {
+		if payload.Hosts[i].GroupID == groupID {
+			payload.Hosts[i].GroupID = ""
+		}
+	}
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// SaveIdentity creates or updates a reusable identity credential in the encrypted vault (F-01).
+func (a *App) SaveIdentity(identity core.IdentityRecord) error {
+	if identity.ID == "" || identity.Label == "" || identity.Username == "" {
+		return errors.New("identity id, label, and username are required")
+	}
+	if identity.AuthMethod == "" {
+		identity.AuthMethod = core.AuthPassword
+	}
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	updated := false
+	for i := range payload.Identities {
+		if payload.Identities[i].ID == identity.ID {
+			// Preserve existing password if user edits label/username without re-entering password
+			if identity.Password == "" {
+				identity.Password = payload.Identities[i].Password
+			}
+			payload.Identities[i] = identity
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		payload.Identities = append(payload.Identities, identity)
+	}
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// SaveHost creates or updates a host in the encrypted vault (F-01).
+func (a *App) SaveHost(host core.HostRecord) error {
+	if host.ID == "" || host.Label == "" || host.Address == "" {
+		return errors.New("host id, label, and address are required")
+	}
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	updated := false
+	for i := range payload.Hosts {
+		if payload.Hosts[i].ID == host.ID {
+			payload.Hosts[i] = host
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		payload.Hosts = append(payload.Hosts, host)
+	}
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// DeleteHost removes a host from the encrypted vault (F-01).
+func (a *App) DeleteHost(hostID string) error {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.HostRecord, 0, len(payload.Hosts))
+	for _, h := range payload.Hosts {
+		if h.ID != hostID {
+			filtered = append(filtered, h)
+		}
+	}
+	payload.Hosts = filtered
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// ConnectSavedHost resolves a saved host's effective address, port, username, and secret identity inside Go
+// (applying group inheritance per F-01) and starts an interactive SSH PTY session.
+func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return "", err
+	}
+	resolved, err := core.ResolveEffectiveHost(hostID, payload)
+	if err != nil {
+		return "", err
+	}
+
+	sessionID, err := a.transport.Connect(a.ctx, core.SshSessionConfig{
+		HostID:   resolved.HostID,
+		Address:  resolved.Address,
+		Port:     resolved.Port,
+		Username: resolved.Username,
+		Auth:     resolved.Auth,
+		OnFirstSeenKey: func(info core.HostKeyInfo) (bool, error) {
+			return a.promptHostKeyTOFU(info)
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if size.Cols == 0 {
+		size.Cols = 80
+	}
+	if size.Rows == 0 {
+		size.Rows = 24
+	}
+
+	streams, err := a.transport.OpenShell(a.ctx, sessionID, size)
+	if err != nil {
+		_ = a.transport.Disconnect(a.ctx, sessionID)
+		return "", err
+	}
+
+	a.mu.Lock()
+	a.activeStreams[sessionID] = streams
+	a.mu.Unlock()
+
+	go a.streamReaderLoop(sessionID, streams.Stdout, true)
+	go a.streamReaderLoop(sessionID, streams.Stderr, false)
+
+	return sessionID, nil
 }
 
 func hostPromptKey(host string, port uint16) string {

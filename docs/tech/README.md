@@ -29,12 +29,20 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
 ### Bound Methods
 - `App.HealthCheck() core.AppStatus`
 - `App.InitializeVault(masterPassword string) error`
+- `App.InitializeVaultWithHello() error`
 - `App.UnlockVault(masterPassword string) error`
 - `App.ChangeVaultPassword(currentPassword, newPassword string) error`
 - `App.EnableQuickUnlock() error`
 - `App.UnlockVaultWithHello() error`
 - `App.ResetVault() error`
 - `App.LockVault() error`
+- `App.GetVaultSummary() (core.VaultSummary, error)`
+- `App.SaveGroup(group core.GroupRecord) error`
+- `App.DeleteGroup(groupID string) error`
+- `App.SaveIdentity(identity core.IdentityRecord) error`
+- `App.SaveHost(host core.HostRecord) error`
+- `App.DeleteHost(hostID string) error`
+- `App.ConnectSavedHost(hostID string, size core.TerminalSize) (string, error)`
 - `App.ConnectSSH(req core.ConnectRequest) (string, error)`
 - `App.ResolveHostKeyPrompt(host string, port uint16, trust bool) error`
 - `App.WriteTerminal(sessionID string, data string) error`

@@ -10,12 +10,28 @@ export function ConnectSSH(arg1) {
   return window['go']['main']['App']['ConnectSSH'](arg1);
 }
 
+export function ConnectSavedHost(arg1, arg2) {
+  return window['go']['main']['App']['ConnectSavedHost'](arg1, arg2);
+}
+
+export function DeleteGroup(arg1) {
+  return window['go']['main']['App']['DeleteGroup'](arg1);
+}
+
+export function DeleteHost(arg1) {
+  return window['go']['main']['App']['DeleteHost'](arg1);
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['main']['App']['DisconnectSession'](arg1);
 }
 
 export function EnableQuickUnlock() {
   return window['go']['main']['App']['EnableQuickUnlock']();
+}
+
+export function GetVaultSummary() {
+  return window['go']['main']['App']['GetVaultSummary']();
 }
 
 export function HealthCheck() {
@@ -44,6 +60,18 @@ export function ResizeTerminal(arg1, arg2, arg3) {
 
 export function ResolveHostKeyPrompt(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveHostKeyPrompt'](arg1, arg2, arg3);
+}
+
+export function SaveGroup(arg1) {
+  return window['go']['main']['App']['SaveGroup'](arg1);
+}
+
+export function SaveHost(arg1) {
+  return window['go']['main']['App']['SaveHost'](arg1);
+}
+
+export function SaveIdentity(arg1) {
+  return window['go']['main']['App']['SaveIdentity'](arg1);
 }
 
 export function UnlockVault(arg1) {

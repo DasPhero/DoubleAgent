@@ -18,6 +18,47 @@ interface AppStatusPayload {
   quickUnlockReady: boolean;
 }
 
+interface GroupDefaults {
+  port?: number;
+  username?: string;
+  identityId?: string;
+  keepaliveSecs?: number;
+}
+
+interface GroupRecord {
+  id: string;
+  name: string;
+  parentId?: string;
+  defaultSettings: GroupDefaults;
+}
+
+interface HostSummary {
+  id: string;
+  label: string;
+  address: string;
+  effectivePort: number;
+  effectiveUser: string;
+  keepaliveSecs: number;
+  groupId: string;
+  identityId: string;
+  tags: string[];
+  color: string;
+  favorite: boolean;
+}
+
+interface IdentitySummary {
+  id: string;
+  label: string;
+  username: string;
+  authMethod: string;
+}
+
+interface VaultSummary {
+  groups: GroupRecord[];
+  hosts: HostSummary[];
+  identities: IdentitySummary[];
+}
+
 interface TerminalDataPayload {
   sessionId: string;
   data: string;
@@ -33,6 +74,28 @@ interface WailsAppBindings {
   UnlockVaultWithHello: () => Promise<void>;
   ResetVault: () => Promise<void>;
   LockVault: () => Promise<void>;
+  GetVaultSummary: () => Promise<VaultSummary>;
+  SaveGroup: (group: GroupRecord) => Promise<void>;
+  DeleteGroup: (groupId: string) => Promise<void>;
+  SaveIdentity: (identity: {
+    id: string;
+    label: string;
+    username: string;
+    authMethod: string;
+    password?: string;
+  }) => Promise<void>;
+  SaveHost: (host: {
+    id: string;
+    label: string;
+    address: string;
+    port: number;
+    groupId: string;
+    identityId: string;
+    tags: string[];
+    favorite: boolean;
+  }) => Promise<void>;
+  DeleteHost: (hostId: string) => Promise<void>;
+  ConnectSavedHost: (hostId: string, size: { cols: number; rows: number }) => Promise<string>;
   ConnectSSH: (req: {
     address: string;
     port: number;
@@ -76,10 +139,37 @@ export function App(): React.JSX.Element {
 
   const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [showAddHostModal, setShowAddHostModal] = useState<boolean>(false);
+  const [showAddGroupModal, setShowAddGroupModal] = useState<boolean>(false);
+
   const [masterPassword, setMasterPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
+
+  // Vault Hosts & Groups state (F-01)
+  const [vaultSummary, setVaultSummary] = useState<VaultSummary>({
+    groups: [],
+    hosts: [],
+    identities: [],
+  });
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Add Group form state
+  const [grpName, setGrpName] = useState<string>('');
+  const [grpParentId, setGrpParentId] = useState<string>('');
+  const [grpPort, setGrpPort] = useState<string>('22');
+  const [grpUser, setGrpUser] = useState<string>('root');
+  const [grpKeepalive, setGrpKeepalive] = useState<string>('30');
+
+  // Add Host form state
+  const [hostLabel, setHostLabel] = useState<string>('');
+  const [hostAddr, setHostAddr] = useState<string>('');
+  const [hostPort, setHostPort] = useState<string>('0'); // 0 = inherit from group
+  const [hostGroupId, setHostGroupId] = useState<string>('');
+  const [hostUser, setHostUser] = useState<string>('');
+  const [hostPass, setHostPass] = useState<string>('');
+  const [hostTags, setHostTags] = useState<string>('');
 
   const [address, setAddress] = useState<string>('');
   const [port, setPort] = useState<string>('22');
@@ -87,7 +177,7 @@ export function App(): React.JSX.Element {
   const [password, setPassword] = useState<string>('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>(
-    'Ready (M0 complete: S1/S2/S3). Set up or unlock your vault, or connect to an SSH host above.'
+    'Vault is locked (Dark Crimson Theme). Unlock your vault to switch to Teal and access saved hosts.'
   );
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
@@ -108,6 +198,12 @@ export function App(): React.JSX.Element {
       setVaultInitialized(st.vaultInitialized);
       setPasswordless(st.passwordless);
       setQuickUnlockReady(st.quickUnlockReady);
+      if (!st.vaultLocked) {
+        const summary = await api.GetVaultSummary();
+        setVaultSummary(summary);
+      } else {
+        setVaultSummary({ groups: [], hosts: [], identities: [] });
+      }
     } catch {
       // Ignore during initial mount if bindings not ready
     }
@@ -151,24 +247,8 @@ export function App(): React.JSX.Element {
     };
   }, [refreshVaultState]);
 
-  const handleOpenVaultButton = async (): Promise<void> => {
+  const handleOpenVaultButton = (): void => {
     setModalError('');
-    // If the vault is in passwordless mode, unlock it directly on 1 click without showing a confusing modal!
-    if (vaultInitialized && passwordless) {
-      const api = getWailsBindings();
-      if (!api) {
-        setVaultLocked(false);
-        return;
-      }
-      try {
-        await api.UnlockVault('');
-        await refreshVaultState();
-        setStatusMessage('Vault unlocked (Passwordless Mode).');
-        return;
-      } catch {
-        // Fallback to modal if something changed
-      }
-    }
     setShowVaultModal(true);
   };
 
@@ -249,7 +329,7 @@ export function App(): React.JSX.Element {
       await refreshVaultState();
       setShowVaultModal(false);
       setMasterPassword('');
-      setStatusMessage('Vault unlocked (Argon2id + XChaCha20-Poly1305).');
+      setStatusMessage('Vault unlocked (Teal Theme Active).');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setModalError(`Unlock failed: ${msg}`);
@@ -260,6 +340,8 @@ export function App(): React.JSX.Element {
     setModalError('');
     const api = getWailsBindings();
     if (!api) {
+      setVaultLocked(false);
+      setShowVaultModal(false);
       return;
     }
     setHelloPending(true);
@@ -344,7 +426,132 @@ export function App(): React.JSX.Element {
     } else {
       setVaultLocked(true);
     }
-    setStatusMessage('Vault locked.');
+    setStatusMessage('Vault locked (Dark Crimson Theme Active).');
+  };
+
+  const handleSaveGroup = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    const newGroup: GroupRecord = {
+      id: `grp-${Date.now()}`,
+      name: grpName.trim(),
+      parentId: grpParentId || undefined,
+      defaultSettings: {
+        port: Number(grpPort) || 22,
+        username: grpUser.trim() || 'root',
+        keepaliveSecs: Number(grpKeepalive) || 30,
+      },
+    };
+    const api = getWailsBindings();
+    if (api) {
+      await api.SaveGroup(newGroup);
+      await refreshVaultState();
+    } else {
+      setVaultSummary((prev) => ({ ...prev, groups: [...prev.groups, newGroup] }));
+    }
+    setGrpName('');
+    setShowAddGroupModal(false);
+  };
+
+  const handleSaveHost = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    const idSuffix = Date.now();
+    let identityId = '';
+    const api = getWailsBindings();
+
+    if (hostUser.trim() || hostPass) {
+      identityId = `id-${idSuffix}`;
+      if (api) {
+        await api.SaveIdentity({
+          id: identityId,
+          label: `${hostLabel.trim()} Identity`,
+          username: hostUser.trim() || 'root',
+          authMethod: 'password',
+          password: hostPass,
+        });
+      }
+    }
+
+    const parsedPort = Number(hostPort) || 0;
+    const tagList = hostTags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    if (api) {
+      await api.SaveHost({
+        id: `host-${idSuffix}`,
+        label: hostLabel.trim(),
+        address: hostAddr.trim(),
+        port: parsedPort,
+        groupId: hostGroupId,
+        identityId,
+        tags: tagList,
+        favorite: false,
+      });
+      await refreshVaultState();
+    } else {
+      // Preview mode fallback resolve
+      const grp = vaultSummary.groups.find((g) => g.id === hostGroupId);
+      const effPort = parsedPort > 0 ? parsedPort : grp?.defaultSettings.port || 22;
+      const effUser = hostUser.trim() || grp?.defaultSettings.username || 'root';
+      setVaultSummary((prev) => ({
+        ...prev,
+        hosts: [
+          ...prev.hosts,
+          {
+            id: `host-${idSuffix}`,
+            label: hostLabel.trim(),
+            address: hostAddr.trim(),
+            effectivePort: effPort,
+            effectiveUser: effUser,
+            keepaliveSecs: grp?.defaultSettings.keepaliveSecs || 30,
+            groupId: hostGroupId,
+            identityId,
+            tags: tagList,
+            color: '',
+            favorite: false,
+          },
+        ],
+      }));
+    }
+
+    setHostLabel('');
+    setHostAddr('');
+    setHostPort('0');
+    setHostUser('');
+    setHostPass('');
+    setHostTags('');
+    setShowAddHostModal(false);
+  };
+
+  const handleConnectSavedHost = async (host: HostSummary): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api) {
+      setStatusMessage(`Connecting to ${host.effectiveUser}@${host.address}:${host.effectivePort}...`);
+      return;
+    }
+    setStatusMessage(`Connecting to ${host.label} (${host.effectiveUser}@${host.address}:${host.effectivePort})...`);
+    try {
+      const id = await api.ConnectSavedHost(host.id, { cols: 120, rows: 34 });
+      setSessionId(id);
+      setStatusMessage(`Connected to ${host.label}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`Connection failed: ${msg}`);
+    }
+  };
+
+  const handleDeleteHost = async (hostId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api) {
+      await api.DeleteHost(hostId);
+      await refreshVaultState();
+    } else {
+      setVaultSummary((prev) => ({
+        ...prev,
+        hosts: prev.hosts.filter((h) => h.id !== hostId),
+      }));
+    }
   };
 
   const handleConnect = async (e: React.FormEvent): Promise<void> => {
@@ -412,8 +619,23 @@ export function App(): React.JSX.Element {
     setStatusMessage('Disconnected.');
   };
 
+  const filteredHosts = vaultSummary.hosts.filter((h) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) {
+      return true;
+    }
+    return (
+      h.label.toLowerCase().includes(q) ||
+      h.address.toLowerCase().includes(q) ||
+      h.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  });
+
   return (
-    <main className="app-shell" aria-label="DoubleAgent Workspace">
+    <main
+      className={`app-shell ${vaultLocked ? 'theme-locked' : 'theme-unlocked'}`}
+      aria-label="DoubleAgent Workspace"
+    >
       <header className="app-header">
         <div className="brand-group">
           <h1>DoubleAgent</h1>
@@ -421,11 +643,7 @@ export function App(): React.JSX.Element {
             {vaultLocked ? 'Vault Locked' : passwordless ? 'Vault Unlocked (No PW)' : 'Vault Unlocked'}
           </span>
           {vaultLocked ? (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => void handleOpenVaultButton()}
-            >
+            <button type="button" className="btn-primary" onClick={handleOpenVaultButton}>
               {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
             </button>
           ) : (
@@ -492,6 +710,269 @@ export function App(): React.JSX.Element {
           )}
         </form>
       </header>
+
+      <div className="workspace-body">
+        <aside className="hosts-sidebar" aria-label="Hosts and Groups Sidebar">
+          <div className="sidebar-header">
+            <h2>Hosts &amp; Groups</h2>
+            {!vaultLocked && (
+              <div className="sidebar-actions">
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={() => setShowAddGroupModal(true)}
+                >
+                  + Group
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  onClick={() => setShowAddHostModal(true)}
+                >
+                  + Host
+                </button>
+              </div>
+            )}
+          </div>
+
+          {vaultLocked ? (
+            <div className="sidebar-locked-notice">
+              <p>Vault is locked. Unlock to view encrypted hosts, groups, and credentials.</p>
+            </div>
+          ) : (
+            <>
+              <input
+                className="sidebar-search"
+                aria-label="Filter Hosts"
+                placeholder="Search hosts, IP, tags..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <div className="sidebar-list">
+                {vaultSummary.groups.map((grp) => {
+                  const groupHosts = filteredHosts.filter((h) => h.groupId === grp.id);
+                  return (
+                    <div key={grp.id} className="group-block">
+                      <div className="group-title">
+                        <span>📁 {grp.name}</span>
+                        <small>
+                          ({grp.defaultSettings.username || 'root'}:
+                          {grp.defaultSettings.port || 22})
+                        </small>
+                      </div>
+                      {groupHosts.map((h) => (
+                        <div key={h.id} className="host-card">
+                          <div className="host-info">
+                            <strong>{h.label}</strong>
+                            <span>
+                              {h.effectiveUser}@{h.address}:{h.effectivePort}
+                            </span>
+                          </div>
+                          <div className="host-card-actions">
+                            <button
+                              type="button"
+                              className="btn-primary btn-sm"
+                              onClick={() => void handleConnectSavedHost(h)}
+                            >
+                              Connect
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger btn-sm"
+                              onClick={() => void handleDeleteHost(h.id)}
+                              aria-label={`Delete ${h.label}`}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+
+                {filteredHosts
+                  .filter((h) => !h.groupId)
+                  .map((h) => (
+                    <div key={h.id} className="host-card">
+                      <div className="host-info">
+                        <strong>{h.label}</strong>
+                        <span>
+                          {h.effectiveUser}@{h.address}:{h.effectivePort}
+                        </span>
+                      </div>
+                      <div className="host-card-actions">
+                        <button
+                          type="button"
+                          className="btn-primary btn-sm"
+                          onClick={() => void handleConnectSavedHost(h)}
+                        >
+                          Connect
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-danger btn-sm"
+                          onClick={() => void handleDeleteHost(h.id)}
+                          aria-label={`Delete ${h.label}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
+        </aside>
+
+        {sessionId ? (
+          <section className="terminal-workspace" aria-label="Active Terminal Session">
+            <TerminalView
+              sessionId={sessionId}
+              onInput={handleTerminalInput}
+              onResize={handleTerminalResize}
+              registerWriter={registerWriter}
+            />
+          </section>
+        ) : (
+          <section className="empty-state">
+            <p>{statusMessage}</p>
+          </section>
+        )}
+      </div>
+
+      {showAddGroupModal && (
+        <div className="modal-backdrop" role="dialog" aria-label="New Host Group">
+          <form className="modal-card" onSubmit={(e) => void handleSaveGroup(e)}>
+            <h2>New Host Group (F-01)</h2>
+            <p>Hosts in this group inherit its default Port, Username, and Keepalive.</p>
+            <input
+              aria-label="Group Name"
+              placeholder="Group Name (e.g. Production)"
+              value={grpName}
+              onChange={(e) => setGrpName(e.target.value)}
+              required
+              autoFocus
+            />
+            <select
+              aria-label="Parent Group"
+              value={grpParentId}
+              onChange={(e) => setGrpParentId(e.target.value)}
+            >
+              <option value="">No Parent Group (Root)</option>
+              {vaultSummary.groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            <input
+              aria-label="Default Group Port"
+              placeholder="Default Port (22)"
+              value={grpPort}
+              onChange={(e) => setGrpPort(e.target.value)}
+            />
+            <input
+              aria-label="Default Group Username"
+              placeholder="Default Username (root)"
+              value={grpUser}
+              onChange={(e) => setGrpUser(e.target.value)}
+            />
+            <input
+              aria-label="Default Keepalive Seconds"
+              placeholder="Keepalive Seconds (30)"
+              value={grpKeepalive}
+              onChange={(e) => setGrpKeepalive(e.target.value)}
+            />
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowAddGroupModal(false)}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                Save Group
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showAddHostModal && (
+        <div className="modal-backdrop" role="dialog" aria-label="New Host">
+          <form className="modal-card" onSubmit={(e) => void handleSaveHost(e)}>
+            <h2>New SSH Host (F-01)</h2>
+            <p>Leave Port at 0 or Username empty to inherit from the selected Group.</p>
+            <input
+              aria-label="Host Label"
+              placeholder="Label (e.g. Bastion EU)"
+              value={hostLabel}
+              onChange={(e) => setHostLabel(e.target.value)}
+              required
+              autoFocus
+            />
+            <input
+              aria-label="Host IP or Hostname"
+              placeholder="Address / IP (e.g. 10.10.1.50)"
+              value={hostAddr}
+              onChange={(e) => setHostAddr(e.target.value)}
+              required
+            />
+            <select
+              aria-label="Host Group"
+              value={hostGroupId}
+              onChange={(e) => setHostGroupId(e.target.value)}
+            >
+              <option value="">Ungrouped</option>
+              {vaultSummary.groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} (Default {g.defaultSettings.username || 'root'}:
+                  {g.defaultSettings.port || 22})
+                </option>
+              ))}
+            </select>
+            <input
+              aria-label="Host Port Override"
+              placeholder="Port (0 = inherit from group)"
+              value={hostPort}
+              onChange={(e) => setHostPort(e.target.value)}
+            />
+            <input
+              aria-label="Host Username Override"
+              placeholder="Username (leave empty to inherit from group)"
+              value={hostUser}
+              onChange={(e) => setHostUser(e.target.value)}
+            />
+            <input
+              aria-label="Host Password"
+              type="password"
+              placeholder="Password (stored encrypted in Vault)"
+              value={hostPass}
+              onChange={(e) => setHostPass(e.target.value)}
+            />
+            <input
+              aria-label="Host Tags"
+              placeholder="Tags (comma-separated, e.g. prod, linux)"
+              value={hostTags}
+              onChange={(e) => setHostTags(e.target.value)}
+            />
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowAddHostModal(false)}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary">
+                Save Host
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {showVaultModal && !vaultInitialized && (
         <div className="modal-backdrop" role="dialog" aria-label="Initialize Vault">
@@ -567,8 +1048,8 @@ export function App(): React.JSX.Element {
           <form className="modal-card" onSubmit={(e) => void handleVaultUnlock(e)}>
             <h2>Unlock Encrypted Vault (F-03)</h2>
             <p>
-              Unlock with <strong>Windows Hello / Security Key</strong> (PIN, Fingerprint, YubiKey) or
-              enter your <strong>Master Password</strong> below:
+              Unlock with <strong>Windows Hello / Security Key</strong> (PIN, Fingerprint, YubiKey) or{' '}
+              {passwordless ? 'click Unlock below:' : 'enter your Master Password below:'}
             </p>
             <button
               type="button"
@@ -618,7 +1099,7 @@ export function App(): React.JSX.Element {
                 Cancel
               </button>
               <button type="submit" className="btn-secondary" disabled={helloPending}>
-                Unlock with Password
+                {passwordless ? 'Unlock (No Password)' : 'Unlock with Password'}
               </button>
             </div>
           </form>
@@ -718,21 +1199,6 @@ export function App(): React.JSX.Element {
             </div>
           </div>
         </div>
-      )}
-
-      {sessionId ? (
-        <section className="terminal-workspace" aria-label="Active Terminal Session">
-          <TerminalView
-            sessionId={sessionId}
-            onInput={handleTerminalInput}
-            onResize={handleTerminalResize}
-            registerWriter={registerWriter}
-          />
-        </section>
-      ) : (
-        <section className="empty-state">
-          <p>{statusMessage}</p>
-        </section>
       )}
     </main>
   );

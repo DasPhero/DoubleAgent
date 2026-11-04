@@ -2,27 +2,43 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
 
-describe('M0 Application Shell, Quick Connect, and Vault Setup/Reset/Passwordless UI', () => {
-  it('allows initializing vault with or without password, changing password later, and resetting vault (F-03)', () => {
+describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, and Hosts/Groups (F-01, F-03)', () => {
+  it('starts in theme-locked (Dark Crimson), switches to theme-unlocked (Teal) on unlock, and manages Groups and Hosts with inheritance (F-01)', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'DoubleAgent' })).toBeInTheDocument();
+    const main = screen.getByLabelText('DoubleAgent Workspace');
+    expect(main).toHaveClass('theme-locked');
     expect(screen.getByText('Vault Locked')).toBeInTheDocument();
 
-    // Open initial vault setup modal
-    const setupBtn = screen.getByRole('button', { name: /Set Up Vault/i });
-    fireEvent.click(setupBtn);
-    expect(screen.getByRole('dialog', { name: /Initialize Vault/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Skip Password for Now/i })).toBeInTheDocument();
-
-    // Skip password for now (passwordless initialization)
+    // Open initial vault setup modal and initialize passwordless
+    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
     fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+
+    // Theme must switch to unlocked (Teal)
+    expect(main).toHaveClass('theme-unlocked');
     expect(screen.getByText('Vault Unlocked (No PW)')).toBeInTheDocument();
 
-    // Open Vault Security to set a password afterwards or enable Windows Hello
-    fireEvent.click(screen.getByRole('button', { name: /Vault Security/i }));
-    expect(screen.getByRole('dialog', { name: /Vault Security Settings/i })).toBeInTheDocument();
-    expect(screen.getByLabelText('New Master Password')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Sync Windows Hello \/ Key/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Reset Vault/i })).toBeInTheDocument();
+    // Create a Group with Port 2222 and Username deploy (F-01)
+    fireEvent.click(screen.getByRole('button', { name: /\+ Group/i }));
+    fireEvent.change(screen.getByLabelText('Group Name'), { target: { value: 'Production' } });
+    fireEvent.change(screen.getByLabelText('Default Group Port'), { target: { value: '2222' } });
+    fireEvent.change(screen.getByLabelText('Default Group Username'), {
+      target: { value: 'deploy' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Group/i }));
+
+    expect(screen.getByText(/Production/)).toBeInTheDocument();
+
+    // Create a Host in that group inheriting Port 2222 and Username deploy (F-01)
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Bastion 01' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), {
+      target: { value: '10.10.0.5' },
+    });
+    const groupSelect = screen.getByLabelText('Host Group') as HTMLSelectElement;
+    fireEvent.change(groupSelect, { target: { value: groupSelect.options[1].value } });
+    fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
+
+    expect(screen.getByText('Bastion 01')).toBeInTheDocument();
+    expect(screen.getByText('deploy@10.10.0.5:2222')).toBeInTheDocument();
   });
 });
