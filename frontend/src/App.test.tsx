@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
 
@@ -280,5 +280,77 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('button', { name: /Reset to Defaults/i }));
     expect(main).toHaveClass('theme-teal');
     fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
+  });
+
+  it('organizes Top Bar into Vault/Tools/View menus and supports Host Color Coding with expandable/collapsible Tab Groups (F-09)', () => {
+    render(<App />);
+
+    // Unlock vault
+    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+
+    // 1. Verify Top Bar Menu System
+    const vaultMenuBtn = screen.getByRole('button', { name: /Vault ▾/i });
+    const toolsMenuBtn = screen.getByRole('button', { name: /Tools ▾/i });
+    const viewMenuBtn = screen.getByRole('button', { name: /View ▾/i });
+
+    expect(vaultMenuBtn).toBeInTheDocument();
+    expect(toolsMenuBtn).toBeInTheDocument();
+    expect(viewMenuBtn).toBeInTheDocument();
+
+    // Open Tools dropdown and trigger Command Palette
+    fireEvent.click(toolsMenuBtn);
+    expect(screen.getByRole('menu', { name: 'Tools Menu' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: /Command Palette/i }));
+    expect(screen.getByRole('dialog', { name: 'Command Palette' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+
+    // 2. Create a Host with explicit Color Coding (F-09)
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Prod-Gateway' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), {
+      target: { value: '10.50.0.1' },
+    });
+    // Select Emerald Green color swatch (#10b981)
+    fireEvent.click(screen.getByRole('button', { name: 'Color #10b981' }));
+    fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
+
+    expect(screen.getByText('Prod-Gateway')).toBeInTheDocument();
+
+    // 3. Connect twice to Prod-Gateway to create 2 sessions
+    const connectBtn = screen.getByRole('button', { name: /^Connect$/i });
+    fireEvent.click(connectBtn);
+    fireEvent.click(connectBtn);
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+
+    // 4. Group Tabs by Host (F-09)
+    const groupToggleBtn = screen.getByRole('button', { name: 'Group by Host' });
+    fireEvent.click(groupToggleBtn);
+
+    // Verify Host Group container appears with session count badge (2) and host header
+    const groupContainer = screen.getByLabelText('Host Group Prod-Gateway');
+    expect(groupContainer).toBeInTheDocument();
+    expect(within(groupContainer).getAllByText('Prod-Gateway')).toHaveLength(3);
+    expect(within(groupContainer).getByText('2')).toBeInTheDocument();
+
+    // Toggle collapse on the host group
+    const groupHeader = screen.getByRole('button', { name: /Toggle Group Prod-Gateway/i });
+    fireEvent.click(groupHeader);
+
+    // Only active tab is shown when collapsed
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+
+    // Expand the host group again
+    fireEvent.click(groupHeader);
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+
+    // Ungroup tabs back to flat layout
+    const ungroupBtn = screen.getByRole('button', { name: 'Ungroup Tabs' });
+    fireEvent.click(ungroupBtn);
+    expect(screen.queryByLabelText('Host Group Prod-Gateway')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
   });
 });

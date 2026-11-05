@@ -9,6 +9,20 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
 ## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, & `F-08`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Top Bar Menu Navigation & Workspace Organization**:
+  - The top bar is organized into a clean application menu bar:
+    - **Vault ▾**: Quick access to lock/unlock, Vault Security & Windows Hello (`F-03`), and emergency Vault Reset.
+    - **Tools ▾**: Direct triggers for Command Palette (`Ctrl+K`), Keychain (`F-04`), Import `ssh_config` (`F-22`), and one-click session password injection.
+    - **View ▾**: Split pane horizontal/vertical triggers, toggle host-grouped tabs (`F-09`), and pane font zooming (`Ctrl +` / `Ctrl -` / `Ctrl 0`).
+    - **Settings ⚙**: Instant access to Global Settings (`Ctrl+,`).
+- **Host Color Coding & Tab Groups (`F-09`)**:
+  - **Host Color Tags**: Pick from 9 curated palette colors (Emerald, Sky, Amber, Rose, Violet, Cyan, Indigo, Pink, Slate) or use automatic deterministic colors in the Add Host dialog.
+  - Colors are clearly displayed as color indicator dots in the sidebar host list and as accent top-borders on open tabs.
+  - **Expandable / Collapsible Tab Groups**:
+    - Click **`⊞ Group by Host`** in the tab bar (or View menu) to cluster all sessions connected to the same host under a color-coded host header pill.
+    - Shows host session count badge (e.g. `2`).
+    - Click the group header chevron (`▾`/`▸`) to collapse all sessions of that host to save space, or expand to display all tabs side-by-side.
+    - Click **`⊟ Ungroup`** at any time to return to the standard flat tab view with drag-and-drop ordering.
 - **Global Settings & Theme Customization (`F-08`)**:
   - Open the **Global Settings** modal anytime by pressing **`Ctrl+,`** or clicking **Settings ⚙** in the top navigation bar or sidebar.
   - **Color Themes**: Choose between **Teal (Cyber Teal Default)**, **Dracula**, **One Dark**, **Nord**, **Monokai Pro**, and **Crimson**. The entire app window, borders, active focus indicators, and terminal color palette instantly switch in real-time.

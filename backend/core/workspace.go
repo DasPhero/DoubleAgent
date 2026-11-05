@@ -191,4 +191,42 @@ func CycleIndex(current, count, delta int) int {
 	return next
 }
 
+// HostTabGroup aggregates open tabs that belong to the same host (F-09).
+type HostTabGroup struct {
+	HostID    string    `json:"hostId"`
+	HostLabel string    `json:"hostLabel"`
+	Color     string    `json:"color"`
+	Tabs      []TabItem `json:"tabs"`
+}
+
+// GroupTabsByHost partitions a slice of TabItem into HostTabGroup clusters (F-09).
+// Tabs sharing the same HostID (or Title if HostID is empty) are clustered together.
+func GroupTabsByHost(tabs []TabItem) []HostTabGroup {
+	if len(tabs) == 0 {
+		return []HostTabGroup{}
+	}
+	groupMap := make(map[string]int)
+	var groups []HostTabGroup
+
+	for _, tab := range tabs {
+		key := tab.HostID
+		if key == "" {
+			key = tab.Title
+		}
+		idx, exists := groupMap[key]
+		if !exists {
+			groupMap[key] = len(groups)
+			groups = append(groups, HostTabGroup{
+				HostID:    key,
+				HostLabel: tab.Title,
+				Color:     tab.Color,
+				Tabs:      []TabItem{tab},
+			})
+		} else {
+			groups[idx].Tabs = append(groups[idx].Tabs, tab)
+		}
+	}
+	return groups
+}
+
 

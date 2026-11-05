@@ -911,3 +911,212 @@ body,
 .shortcuts-table td:first-child {
   width: 45%;
 }
+
+/* Navigation Menu Bar & Dropdowns (Top Bar Organization) */
+.nav-menu-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.nav-menu-container {
+  position: relative;
+}
+
+.nav-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background-color: rgba(15, 23, 34, 0.75);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nav-menu-trigger:hover,
+.nav-menu-trigger.active {
+  border-color: var(--accent-bright);
+  background-color: var(--accent-glow);
+  color: #f8fafc;
+}
+
+.nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1000;
+  min-width: 220px;
+  background-color: var(--bg-card);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-accent);
+  border-radius: 6px;
+  padding: 0.3rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.nav-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.42rem 0.65rem;
+  font-size: 0.78rem;
+  color: var(--text-main);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.nav-dropdown-item:hover {
+  background-color: var(--accent-glow);
+  color: var(--accent-bright);
+}
+
+.nav-dropdown-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.nav-dropdown-shortcut {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: Consolas, monospace;
+}
+
+.nav-dropdown-divider {
+  height: 1px;
+  background-color: var(--border-subtle);
+  margin: 0.25rem 0;
+}
+
+/* Host Color Coding & Swatches (F-09) */
+.host-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+  box-shadow: 0 0 5px currentColor;
+}
+
+.color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 0.2rem;
+}
+
+.color-swatch-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.color-swatch-btn:hover {
+  transform: scale(1.15);
+}
+
+.color-swatch-btn.selected {
+  border-color: #f8fafc;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.color-swatch-auto {
+  background: conic-gradient(#0ea5e9, #10b981, #f59e0b, #f43f5e, #8b5cf6, #0ea5e9);
+}
+
+/* Tab Groups (F-09) */
+.tab-group-container {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.25rem;
+  border-radius: 8px;
+  background-color: rgba(15, 23, 34, 0.45);
+  border: 1px solid var(--border-subtle);
+}
+
+.tab-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.tab-group-header:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.tab-group-badge {
+  font-size: 0.65rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+}
+
+.tab-group-chevron {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.tab-group-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.tabs-bar-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.5rem;
+}
+
+.tab-toggle-btn {
+  background-color: rgba(15, 23, 34, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.15s ease;
+}
+
+.tab-toggle-btn:hover,
+.tab-toggle-btn.active {
+  border-color: var(--accent-bright);
+  color: var(--accent-bright);
+  background-color: var(--accent-glow);
+}

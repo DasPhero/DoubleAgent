@@ -89,3 +89,33 @@ func TestM1_4_MixedNestedSplitPanesAndRemoval_F08(t *testing.T) {
 	}
 }
 
+func TestM1_4_GroupTabsByHost_F09(t *testing.T) {
+	tabs := []TabItem{
+		{ID: "t1", Title: "prod-web-01", HostID: "host-1", Color: "#0ea5e9"},
+		{ID: "t2", Title: "prod-db-01", HostID: "host-2", Color: "#f59e0b"},
+		{ID: "t3", Title: "prod-web-01 (Session 2)", HostID: "host-1", Color: "#0ea5e9"},
+		{ID: "t4", Title: "prod-web-01 (Session 3)", HostID: "host-1", Color: "#0ea5e9"},
+	}
+
+	groups := GroupTabsByHost(tabs)
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 host tab groups, got %d", len(groups))
+	}
+
+	// First group: host-1 with 3 tabs
+	if groups[0].HostID != "host-1" || len(groups[0].Tabs) != 3 || groups[0].Color != "#0ea5e9" {
+		t.Fatalf("unexpected group 0: %+v", groups[0])
+	}
+	if groups[0].Tabs[0].ID != "t1" || groups[0].Tabs[1].ID != "t3" || groups[0].Tabs[2].ID != "t4" {
+		t.Fatalf("unexpected tabs in group 0: %+v", groups[0].Tabs)
+	}
+
+	// Second group: host-2 with 1 tab
+	if groups[1].HostID != "host-2" || len(groups[1].Tabs) != 1 || groups[1].Color != "#f59e0b" {
+		t.Fatalf("unexpected group 1: %+v", groups[1])
+	}
+	if groups[1].Tabs[0].ID != "t2" {
+		t.Fatalf("unexpected tab in group 1: %+v", groups[1].Tabs)
+	}
+}
+

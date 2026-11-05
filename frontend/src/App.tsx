@@ -140,6 +140,7 @@ export type WorkspaceNode =
       type: 'pane';
       id: string;
       sessionId: string;
+      hostId?: string;
       title: string;
     }
   | {
@@ -152,14 +153,47 @@ export type WorkspaceNode =
 export interface PaneItem {
   id: string;
   sessionId: string;
+  hostId?: string;
   title: string;
 }
 
 export interface TabItem {
   id: string;
   title: string;
+  hostId?: string;
+  color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
+}
+
+export const HOST_PALETTE = [
+  '#0ea5e9', // Sky blue
+  '#10b981', // Emerald green
+  '#f59e0b', // Amber yellow
+  '#f43f5e', // Rose red
+  '#8b5cf6', // Violet purple
+  '#06b6d4', // Cyan
+  '#ec4899', // Pink
+  '#14b8a6', // Teal
+  '#eab308', // Yellow
+  '#6366f1', // Indigo
+];
+
+export function getEffectiveHostColor(
+  hostId?: string,
+  explicitColor?: string,
+  label?: string
+): string {
+  if (explicitColor && explicitColor.trim()) {
+    return explicitColor.trim();
+  }
+  const key = hostId || label || 'host-default';
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash << 5) - hash + key.charCodeAt(i);
+    hash |= 0;
+  }
+  return HOST_PALETTE[Math.abs(hash) % HOST_PALETTE.length];
 }
 
 export function collectPanes(node: WorkspaceNode | null): PaneItem[] {
@@ -167,7 +201,7 @@ export function collectPanes(node: WorkspaceNode | null): PaneItem[] {
     return [];
   }
   if (node.type === 'pane') {
-    return [{ id: node.id, sessionId: node.sessionId, title: node.title }];
+    return [{ id: node.id, sessionId: node.sessionId, hostId: node.hostId, title: node.title }];
   }
   return node.children.flatMap(collectPanes);
 }
@@ -415,6 +449,7 @@ interface WailsAppBindings {
     groupId: string;
     identityId: string;
     tags: string[];
+    color?: string;
     favorite: boolean;
   }) => Promise<void>;
   DeleteHost: (hostId: string) => Promise<void>;
@@ -522,6 +557,7 @@ export function App(): React.JSX.Element {
   const [hostKeyId, setHostKeyId] = useState<string>('');
   const [hostPass, setHostPass] = useState<string>('');
   const [hostTags, setHostTags] = useState<string>('');
+  const [hostColor, setHostColor] = useState<string>('');
 
   const [address, setAddress] = useState<string>('');
   const [port, setPort] = useState<string>('22');
@@ -534,6 +570,25 @@ export function App(): React.JSX.Element {
     'Vault is locked (Dark Crimson Theme). Unlock your vault to switch to Teal and access saved hosts.'
   );
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
+
+  // Top Bar Dropdowns & Tab Groups state (F-09)
+  const [activeDropdownMenu, setActiveDropdownMenu] = useState<'vault' | 'tools' | 'view' | null>(
+    null
+  );
+  const [groupTabsByHost, setGroupTabsByHost] = useState<boolean>(false);
+  const [collapsedHostGroups, setCollapsedHostGroups] = useState<Set<string>>(new Set());
+
+  const toggleHostGroupCollapse = (groupKey: string): void => {
+    setCollapsedHostGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  };
 
   // Global Settings state
   const [globalSettings, setGlobalSettings] = useState<AppGlobalSettings>(() =>
@@ -567,25 +622,32 @@ export function App(): React.JSX.Element {
   const focusersRef = useRef<Map<string, () => void>>(new Map());
   const tabCounterRef = useRef<number>(0);
 
-  const openSessionTab = useCallback((newSessionId: string, title: string): void => {
-    tabCounterRef.current += 1;
-    const seq = tabCounterRef.current;
-    const tabId = `tab-${seq}`;
-    const paneId = `pane-${seq}-1`;
-    const newTab: TabItem = {
-      id: tabId,
-      title,
-      rootNode: {
-        type: 'pane',
-        id: paneId,
-        sessionId: newSessionId,
+  const openSessionTab = useCallback(
+    (newSessionId: string, title: string, hostId?: string, explicitColor?: string): void => {
+      tabCounterRef.current += 1;
+      const seq = tabCounterRef.current;
+      const tabId = `tab-${seq}`;
+      const paneId = `pane-${seq}-1`;
+      const color = getEffectiveHostColor(hostId, explicitColor, title);
+      const newTab: TabItem = {
+        id: tabId,
         title,
-      },
-      activePaneId: paneId,
-    };
-    setTabs((prev) => [...prev, newTab]);
-    setActiveTabId(tabId);
-  }, []);
+        hostId,
+        color,
+        rootNode: {
+          type: 'pane',
+          id: paneId,
+          sessionId: newSessionId,
+          hostId,
+          title,
+        },
+        activePaneId: paneId,
+      };
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(tabId);
+    },
+    []
+  );
 
   const registerWriter = useCallback((id: string, writeFn: (chunk: string) => void) => {
     writersRef.current.set(id, writeFn);
@@ -707,6 +769,7 @@ export function App(): React.JSX.Element {
       } else if (e.key === 'Escape') {
         setShowCommandPalette(false);
         setShowGlobalSettingsModal(false);
+        setActiveDropdownMenu(null);
       } else if (
         (e.ctrlKey || e.metaKey) &&
         (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '_' || e.key === '0')
@@ -775,6 +838,17 @@ export function App(): React.JSX.Element {
   }, [activeTabId, activePane, globalSettings.fontSize]);
 
   useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent): void => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('.nav-menu-container')) {
+        setActiveDropdownMenu(null);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, []);
+
+  useEffect(() => {
     if (!showCommandPalette) {
       return;
     }
@@ -821,7 +895,10 @@ export function App(): React.JSX.Element {
         passphrase: '',
         size: { cols: 120, rows: 34 },
       });
-      openSessionTab(id, qc.display);
+      const matchedHost = vaultSummary.hosts.find(
+        (h) => h.address.toLowerCase() === qc.address.toLowerCase()
+      );
+      openSessionTab(id, qc.display, matchedHost?.id, matchedHost?.color);
       setPalettePassword('');
       setStatusMessage(`Connected (${qc.display})`);
     } catch (err: unknown) {
@@ -1070,6 +1147,7 @@ export function App(): React.JSX.Element {
         groupId: hostGroupId,
         identityId,
         tags: tagList,
+        color: hostColor,
         favorite: false,
       });
       await refreshVaultState();
@@ -1092,7 +1170,7 @@ export function App(): React.JSX.Element {
             groupId: hostGroupId,
             identityId,
             tags: tagList,
-            color: '',
+            color: hostColor,
             favorite: false,
           },
         ],
@@ -1105,6 +1183,7 @@ export function App(): React.JSX.Element {
     setHostUser('');
     setHostPass('');
     setHostTags('');
+    setHostColor('');
     setShowAddHostModal(false);
   };
 
@@ -1112,14 +1191,14 @@ export function App(): React.JSX.Element {
     const api = getWailsBindings();
     if (!api) {
       const previewId = `sess-preview-${host.id}-${Date.now()}`;
-      openSessionTab(previewId, host.label);
+      openSessionTab(previewId, host.label, host.id, host.color);
       setStatusMessage(`Connected to ${host.label}`);
       return;
     }
     setStatusMessage(`Connecting to ${host.label} (${host.effectiveUser}@${host.address}:${host.effectivePort})...`);
     try {
       const id = await api.ConnectSavedHost(host.id, { cols: 120, rows: 34 });
-      openSessionTab(id, host.label);
+      openSessionTab(id, host.label, host.id, host.color);
       setStatusMessage(`Connected to ${host.label}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1158,7 +1237,10 @@ export function App(): React.JSX.Element {
         passphrase: '',
         size: { cols: 120, rows: 34 },
       });
-      openSessionTab(id, `${username}@${address}:${port}`);
+      const matchedHost = vaultSummary.hosts.find(
+        (h) => h.address.toLowerCase() === address.trim().toLowerCase()
+      );
+      openSessionTab(id, `${username}@${address}:${port}`, matchedHost?.id, matchedHost?.color);
       setPassword('');
       setStatusMessage(`Connected (${username}@${address}:${port})`);
     } catch (err: unknown) {
@@ -1387,6 +1469,7 @@ export function App(): React.JSX.Element {
       type: 'pane',
       id: newPaneId,
       sessionId: newSessionId,
+      hostId: activeTab.hostId,
       title: `${activePane.title} (${direction === 'horizontal' ? 'H' : 'V'}-Split #${currentPanes.length + 1})`,
     };
     setTabs((prev) =>
@@ -1635,37 +1718,282 @@ export function App(): React.JSX.Element {
           <span className={`status-badge ${vaultLocked ? 'locked' : 'unlocked'}`}>
             {vaultLocked ? 'Vault Locked' : passwordless ? 'Vault Unlocked (No PW)' : 'Vault Unlocked'}
           </span>
-          {vaultLocked ? (
+          {vaultLocked && (
             <button type="button" className="btn-primary" onClick={handleOpenVaultButton}>
               {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
             </button>
-          ) : (
+          )}
+
+          <nav className="nav-menu-bar" aria-label="Application Menu">
+            {/* Vault Dropdown */}
+            <div className="nav-menu-container">
+              <button
+                type="button"
+                className={`nav-menu-trigger ${activeDropdownMenu === 'vault' ? 'active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'vault'}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) => (prev === 'vault' ? null : 'vault'))
+                }
+              >
+                <span>Vault</span>
+                <span style={{ fontSize: '0.65rem' }}>▾</span>
+              </button>
+              {activeDropdownMenu === 'vault' && (
+                <div className="nav-dropdown-menu" role="menu" aria-label="Vault Menu">
+                  {vaultLocked ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        handleOpenVaultButton();
+                      }}
+                    >
+                      <span>{vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleVaultLock();
+                      }}
+                    >
+                      <span>Lock Vault</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setModalError('');
+                      setShowSettingsModal(true);
+                    }}
+                  >
+                    <span>Vault Security &amp; Hello (F-03)</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleResetVault();
+                    }}
+                  >
+                    <span>Reset Vault</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Tools Dropdown */}
+            <div className="nav-menu-container">
+              <button
+                type="button"
+                className={`nav-menu-trigger ${activeDropdownMenu === 'tools' ? 'active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'tools'}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) => (prev === 'tools' ? null : 'tools'))
+                }
+              >
+                <span>Tools</span>
+                <span style={{ fontSize: '0.65rem' }}>▾</span>
+              </button>
+              {activeDropdownMenu === 'tools' && (
+                <div className="nav-dropdown-menu" role="menu" aria-label="Tools Menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setPaletteQuery('');
+                      setShowCommandPalette(true);
+                    }}
+                  >
+                    <span>Command Palette</span>
+                    <span className="nav-dropdown-shortcut">Ctrl+K</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setModalError('');
+                      setShowKeychainModal(true);
+                    }}
+                  >
+                    <span>Keychain</span>
+                    <span className="nav-dropdown-shortcut">F-04</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setModalError('');
+                      setSshConfigResult(null);
+                      setShowSSHConfigModal(true);
+                    }}
+                  >
+                    <span>Import ssh_config</span>
+                    <span className="nav-dropdown-shortcut">F-22</span>
+                  </button>
+                  {activePane && (
+                    <>
+                      <div className="nav-dropdown-divider" />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="nav-dropdown-item"
+                        onClick={() => {
+                          setActiveDropdownMenu(null);
+                          void handleInjectPassword();
+                        }}
+                      >
+                        <span>Inject Password</span>
+                        <span className="nav-dropdown-shortcut">🔑</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* View Dropdown */}
+            <div className="nav-menu-container">
+              <button
+                type="button"
+                className={`nav-menu-trigger ${activeDropdownMenu === 'view' ? 'active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'view'}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) => (prev === 'view' ? null : 'view'))
+                }
+              >
+                <span>View</span>
+                <span style={{ fontSize: '0.65rem' }}>▾</span>
+              </button>
+              {activeDropdownMenu === 'view' && (
+                <div className="nav-dropdown-menu" role="menu" aria-label="View Menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    disabled={!activePane}
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleSplitPane('horizontal');
+                    }}
+                  >
+                    <span>Split Horizontal</span>
+                    <span className="nav-dropdown-shortcut">⬌</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    disabled={!activePane}
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleSplitPane('vertical');
+                    }}
+                  >
+                    <span>Split Vertical</span>
+                    <span className="nav-dropdown-shortcut">⬍</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setGroupTabsByHost((prev) => !prev);
+                    }}
+                  >
+                    <span>Group Tabs by Host</span>
+                    <span className="nav-dropdown-shortcut">
+                      {groupTabsByHost ? '✓ Active' : 'Off'}
+                    </span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    disabled={!activePane}
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      if (activePane) {
+                        const next = changeTerminalFontSize(activePane.sessionId, +1);
+                        setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+                      }
+                    }}
+                  >
+                    <span>Zoom In Pane</span>
+                    <span className="nav-dropdown-shortcut">Ctrl +</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    disabled={!activePane}
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      if (activePane) {
+                        const next = changeTerminalFontSize(activePane.sessionId, -1);
+                        setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+                      }
+                    }}
+                  >
+                    <span>Zoom Out Pane</span>
+                    <span className="nav-dropdown-shortcut">Ctrl -</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    disabled={!activePane}
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      if (activePane) {
+                        resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
+                        setPaneFontSizes((prev) =>
+                          new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
+                        );
+                      }
+                    }}
+                  >
+                    <span>Reset Pane Zoom</span>
+                    <span className="nav-dropdown-shortcut">Ctrl 0</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Global Settings */}
             <button
               type="button"
-              className="btn-secondary"
-              onClick={() => void handleVaultLock()}
+              className="nav-menu-trigger"
+              onClick={() => setShowGlobalSettingsModal(true)}
+              title="Global Settings (Ctrl+,)"
+              aria-label="Settings ⚙"
             >
-              Lock Vault
+              <span>Settings ⚙</span>
             </button>
-          )}
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => {
-              setPaletteQuery('');
-              setShowCommandPalette(true);
-            }}
-          >
-            Command Palette (Ctrl+K)
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setShowGlobalSettingsModal(true)}
-            title="Global Settings (Ctrl+,)"
-          >
-            Settings ⚙
-          </button>
+          </nav>
         </div>
 
         <form className="quick-connect-bar" onSubmit={(e) => void handleConnect(e)}>
@@ -1805,7 +2133,16 @@ export function App(): React.JSX.Element {
                       {groupHosts.map((h) => (
                         <div key={h.id} className="host-card">
                           <div className="host-info">
-                            <strong>{h.label}</strong>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <span
+                                className="host-color-dot"
+                                style={{
+                                  backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
+                                }}
+                                title={`Host Color: ${getEffectiveHostColor(h.id, h.color, h.label)}`}
+                              />
+                              <strong>{h.label}</strong>
+                            </div>
                             <span>
                               {h.effectiveUser}@{h.address}:{h.effectivePort}
                             </span>
@@ -1838,7 +2175,16 @@ export function App(): React.JSX.Element {
                   .map((h) => (
                     <div key={h.id} className="host-card">
                       <div className="host-info">
-                        <strong>{h.label}</strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span
+                            className="host-color-dot"
+                            style={{
+                              backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
+                            }}
+                            title={`Host Color: ${getEffectiveHostColor(h.id, h.color, h.label)}`}
+                          />
+                          <strong>{h.label}</strong>
+                        </div>
                         <span>
                           {h.effectiveUser}@{h.address}:{h.effectivePort}
                         </span>
@@ -1870,51 +2216,191 @@ export function App(): React.JSX.Element {
         {tabs.length > 0 && activeTab && activePane ? (
           <section className="terminal-workspace" aria-label="Active Terminal Session">
             <div className="tabs-bar" role="tablist" aria-label="Session Tabs">
-              {tabs.map((tab) => {
-                const isActive = tab.id === activeTab.id;
-                const tabPanes = collectPanes(tab.rootNode);
-                return (
-                  <div
-                    key={tab.id}
-                    role="tab"
-                    aria-selected={isActive}
-                    aria-label={`Tab ${tab.title}`}
-                    draggable
-                    className={`tab-pill ${isActive ? 'active' : ''}`}
-                    onDragStart={() => setDraggedTabId(tab.id)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      if (draggedTabId && draggedTabId !== tab.id) {
-                        setTabs((prev) => reorderTabsLocal(prev, draggedTabId, tab.id));
+              {groupTabsByHost
+                ? (() => {
+                    const groupsMap = new Map<
+                      string,
+                      { key: string; label: string; color: string; tabs: TabItem[] }
+                    >();
+                    for (const t of tabs) {
+                      const key = t.hostId || t.title;
+                      const existing = groupsMap.get(key);
+                      if (existing) {
+                        existing.tabs.push(t);
+                      } else {
+                        groupsMap.set(key, {
+                          key,
+                          label: t.title.replace(/\s*\(.*\)$/, ''),
+                          color: t.color || getEffectiveHostColor(t.hostId, undefined, t.title),
+                          tabs: [t],
+                        });
                       }
-                      setDraggedTabId(null);
-                    }}
-                    onClick={() => {
-                      setActiveTabId(tab.id);
-                      const pane =
-                        tabPanes.find((p) => p.id === tab.activePaneId) || tabPanes[0];
-                      if (pane) {
-                        setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 50);
-                      }
-                    }}
-                  >
-                    <span className="tab-dot" />
-                    <span>{tab.title}</span>
-                    {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
-                    <button
-                      type="button"
-                      className="tab-close-btn"
-                      aria-label={`Close Tab ${tab.title}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleCloseTab(tab.id);
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
+                    }
+
+                    return Array.from(groupsMap.values()).map((grp) => {
+                      const isCollapsed = collapsedHostGroups.has(grp.key);
+                      const hasActive = grp.tabs.some((t) => t.id === activeTab.id);
+                      return (
+                        <div
+                          key={grp.key}
+                          className="tab-group-container"
+                          aria-label={`Host Group ${grp.label}`}
+                        >
+                          <button
+                            type="button"
+                            className="tab-group-header"
+                            onClick={() => toggleHostGroupCollapse(grp.key)}
+                            title={`Toggle collapse for host group ${grp.label}`}
+                            aria-label={`Toggle Group ${grp.label}`}
+                          >
+                            <span
+                              className="host-color-dot"
+                              style={{ backgroundColor: grp.color }}
+                            />
+                            <span>{grp.label}</span>
+                            <span className="tab-group-badge">{grp.tabs.length}</span>
+                            <span className={`tab-group-chevron ${isCollapsed ? 'collapsed' : ''}`}>
+                              ▾
+                            </span>
+                          </button>
+
+                          {(!isCollapsed || hasActive) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              {(isCollapsed
+                                ? grp.tabs.filter((t) => t.id === activeTab.id)
+                                : grp.tabs
+                              ).map((tab) => {
+                                const isActive = tab.id === activeTab.id;
+                                const tabPanes = collectPanes(tab.rootNode);
+                                const tabColor =
+                                  tab.color ||
+                                  getEffectiveHostColor(tab.hostId, undefined, tab.title);
+                                return (
+                                  <div
+                                    key={tab.id}
+                                    role="tab"
+                                    aria-selected={isActive}
+                                    aria-label={`Tab ${tab.title}`}
+                                    draggable
+                                    className={`tab-pill ${isActive ? 'active' : ''}`}
+                                    style={{ borderTop: `3px solid ${tabColor}` }}
+                                    onDragStart={() => setDraggedTabId(tab.id)}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={() => {
+                                      if (draggedTabId && draggedTabId !== tab.id) {
+                                        setTabs((prev) =>
+                                          reorderTabsLocal(prev, draggedTabId, tab.id)
+                                        );
+                                      }
+                                      setDraggedTabId(null);
+                                    }}
+                                    onClick={() => {
+                                      setActiveTabId(tab.id);
+                                      const pane =
+                                        tabPanes.find((p) => p.id === tab.activePaneId) ||
+                                        tabPanes[0];
+                                      if (pane) {
+                                        setTimeout(
+                                          () => focusersRef.current.get(pane.sessionId)?.(),
+                                          50
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <span
+                                      className="tab-dot"
+                                      style={{
+                                        backgroundColor: tabColor,
+                                        boxShadow: `0 0 6px ${tabColor}`,
+                                      }}
+                                    />
+                                    <span>{tab.title}</span>
+                                    {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
+                                    <button
+                                      type="button"
+                                      className="tab-close-btn"
+                                      aria-label={`Close Tab ${tab.title}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void handleCloseTab(tab.id);
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()
+                : tabs.map((tab) => {
+                    const isActive = tab.id === activeTab.id;
+                    const tabPanes = collectPanes(tab.rootNode);
+                    const tabColor =
+                      tab.color || getEffectiveHostColor(tab.hostId, undefined, tab.title);
+                    return (
+                      <div
+                        key={tab.id}
+                        role="tab"
+                        aria-selected={isActive}
+                        aria-label={`Tab ${tab.title}`}
+                        draggable
+                        className={`tab-pill ${isActive ? 'active' : ''}`}
+                        style={{ borderTop: `3px solid ${tabColor}` }}
+                        onDragStart={() => setDraggedTabId(tab.id)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (draggedTabId && draggedTabId !== tab.id) {
+                            setTabs((prev) => reorderTabsLocal(prev, draggedTabId, tab.id));
+                          }
+                          setDraggedTabId(null);
+                        }}
+                        onClick={() => {
+                          setActiveTabId(tab.id);
+                          const pane =
+                            tabPanes.find((p) => p.id === tab.activePaneId) || tabPanes[0];
+                          if (pane) {
+                            setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 50);
+                          }
+                        }}
+                      >
+                        <span
+                          className="tab-dot"
+                          style={{
+                            backgroundColor: tabColor,
+                            boxShadow: `0 0 6px ${tabColor}`,
+                          }}
+                        />
+                        <span>{tab.title}</span>
+                        {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
+                        <button
+                          type="button"
+                          className="tab-close-btn"
+                          aria-label={`Close Tab ${tab.title}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleCloseTab(tab.id);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+              <div className="tabs-bar-controls">
+                <button
+                  type="button"
+                  className={`tab-toggle-btn ${groupTabsByHost ? 'active' : ''}`}
+                  title={groupTabsByHost ? 'Switch to ungrouped flat tabs' : 'Group tabs by host (F-09)'}
+                  aria-label={groupTabsByHost ? 'Ungroup Tabs' : 'Group by Host'}
+                  onClick={() => setGroupTabsByHost((prev) => !prev)}
+                >
+                  <span>{groupTabsByHost ? '⊟ Ungroup' : '⊞ Group by Host'}</span>
+                </button>
+              </div>
             </div>
 
             <div className="terminal-toolbar">
@@ -2247,6 +2733,38 @@ export function App(): React.JSX.Element {
               value={hostTags}
               onChange={(e) => setHostTags(e.target.value)}
             />
+            <div>
+              <label
+                style={{
+                  fontSize: '0.78rem',
+                  color: 'var(--text-muted)',
+                  marginBottom: '0.2rem',
+                  display: 'block',
+                }}
+              >
+                Host Color Tag (F-09)
+              </label>
+              <div className="color-picker-row" aria-label="Host Color Swatches">
+                <button
+                  type="button"
+                  className={`color-swatch-btn color-swatch-auto ${!hostColor ? 'selected' : ''}`}
+                  title="Auto (deterministic color based on host name)"
+                  aria-label="Color Auto"
+                  onClick={() => setHostColor('')}
+                />
+                {HOST_PALETTE.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className={`color-swatch-btn ${hostColor === c ? 'selected' : ''}`}
+                    style={{ backgroundColor: c }}
+                    title={c}
+                    aria-label={`Color ${c}`}
+                    onClick={() => setHostColor(c)}
+                  />
+                ))}
+              </div>
+            </div>
             <div className="modal-actions">
               <button
                 type="button"
