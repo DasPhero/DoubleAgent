@@ -353,4 +353,76 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.queryByLabelText('Host Group Prod-Gateway')).not.toBeInTheDocument();
     expect(screen.getAllByRole('tab')).toHaveLength(2);
   });
+
+  it('supports In-Terminal Search with Regex, Match Case, Whole Word, and Navigation (F-11)', () => {
+    render(<App />);
+
+    // Unlock vault
+    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+
+    // Create a host and connect
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'SearchHost' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), {
+      target: { value: '10.0.0.99' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
+
+    const connectBtn = screen.getByRole('button', { name: /^Connect$/i });
+    fireEvent.click(connectBtn);
+
+    // 1. Open search via Find button in pane header (F-11)
+    const findBtn = screen.getByRole('button', { name: /Find in SearchHost/i });
+    fireEvent.click(findBtn);
+
+    const searchOverlay = screen.getByRole('search', { name: 'Search Bar SearchHost' });
+    expect(searchOverlay).toBeInTheDocument();
+
+    const searchInput = screen.getByLabelText('Search Terminal');
+    expect(searchInput).toBeInTheDocument();
+
+    // 2. Type search term
+    fireEvent.change(searchInput, { target: { value: 'error' } });
+    expect(searchInput).toHaveValue('error');
+
+    // 3. Toggle Match Case (Aa)
+    const matchCaseBtn = screen.getByRole('button', { name: 'Match Case' });
+    fireEvent.click(matchCaseBtn);
+    expect(matchCaseBtn).toHaveClass('active');
+
+    // 4. Toggle Whole Word (\b)
+    const wholeWordBtn = screen.getByRole('button', { name: 'Match Whole Word' });
+    fireEvent.click(wholeWordBtn);
+    expect(wholeWordBtn).toHaveClass('active');
+
+    // 5. Toggle Regular Expression (.*)
+    const regexBtn = screen.getByRole('button', { name: 'Use Regular Expression' });
+    fireEvent.click(regexBtn);
+    expect(regexBtn).toHaveClass('active');
+
+    // 6. Navigate next and previous match
+    const nextBtn = screen.getByRole('button', { name: 'Next Match' });
+    const prevBtn = screen.getByRole('button', { name: 'Previous Match' });
+    fireEvent.click(nextBtn);
+    fireEvent.click(prevBtn);
+
+    // Press Enter inside search input
+    fireEvent.keyDown(searchInput, { key: 'Enter' });
+    // Press Shift+Enter inside search input
+    fireEvent.keyDown(searchInput, { key: 'Enter', shiftKey: true });
+
+    // 7. Close search via Close button (×)
+    const closeBtn = screen.getByRole('button', { name: 'Close Search' });
+    fireEvent.click(closeBtn);
+    expect(screen.queryByRole('search', { name: 'Search Bar SearchHost' })).not.toBeInTheDocument();
+
+    // 8. Re-open search via Ctrl+F shortcut
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
+    expect(screen.getByRole('search', { name: 'Search Bar SearchHost' })).toBeInTheDocument();
+
+    // Close via Escape key
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('search', { name: 'Search Bar SearchHost' })).not.toBeInTheDocument();
+  });
 });

@@ -5,8 +5,11 @@ import {
   TerminalView,
   applySettingsToAllTerminals,
   changeTerminalFontSize,
+  clearTerminalSearch,
   disposeTerminal,
   resetTerminalFontSize,
+  searchTerminalNext,
+  searchTerminalPrevious,
 } from './components/TerminalView';
 
 const SETTINGS_STORAGE_KEY = 'doubleagent_global_settings_v1';
@@ -597,6 +600,111 @@ export function App(): React.JSX.Element {
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
 
+  // Terminal Search state (F-11)
+  const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
+  const [paneSearchStates, setPaneSearchStates] = useState<
+    Map<
+      string,
+      {
+        query: string;
+        caseSensitive: boolean;
+        wholeWord: boolean;
+        regex: boolean;
+        resultFound: boolean | null;
+      }
+    >
+  >(new Map());
+
+  const togglePaneSearch = useCallback((sid: string): void => {
+    setSearchOpenPanes((prev) => {
+      const next = new Set(prev);
+      if (next.has(sid)) {
+        next.delete(sid);
+        clearTerminalSearch(sid);
+        focusersRef.current.get(sid)?.();
+      } else {
+        next.add(sid);
+      }
+      return next;
+    });
+  }, []);
+
+  const closePaneSearch = useCallback((sid: string): void => {
+    setSearchOpenPanes((prev) => {
+      const next = new Set(prev);
+      next.delete(sid);
+      return next;
+    });
+    clearTerminalSearch(sid);
+    focusersRef.current.get(sid)?.();
+  }, []);
+
+  const updatePaneSearchState = useCallback(
+    (
+      sid: string,
+      partial: Partial<{
+        query: string;
+        caseSensitive: boolean;
+        wholeWord: boolean;
+        regex: boolean;
+        resultFound: boolean | null;
+      }>
+    ): void => {
+      setPaneSearchStates((prev) => {
+        const next = new Map(prev);
+        const curr = next.get(sid) || {
+          query: '',
+          caseSensitive: false,
+          wholeWord: false,
+          regex: false,
+          resultFound: null,
+        };
+        next.set(sid, { ...curr, ...partial });
+        return next;
+      });
+    },
+    []
+  );
+
+  const executePaneSearch = useCallback(
+    (
+      sid: string,
+      direction: 'next' | 'prev',
+      stateOverride?: Partial<{
+        query: string;
+        caseSensitive: boolean;
+        wholeWord: boolean;
+        regex: boolean;
+        resultFound: boolean | null;
+      }>
+    ): void => {
+      const curr = {
+        ...(paneSearchStates.get(sid) || {
+          query: '',
+          caseSensitive: false,
+          wholeWord: false,
+          regex: false,
+          resultFound: null,
+        }),
+        ...stateOverride,
+      };
+      if (!curr.query) {
+        clearTerminalSearch(sid);
+        updatePaneSearchState(sid, { resultFound: null });
+        return;
+      }
+      const fn = direction === 'next' ? searchTerminalNext : searchTerminalPrevious;
+      const found = fn(sid, curr.query, {
+        caseSensitive: curr.caseSensitive,
+        wholeWord: curr.wholeWord,
+        regex: curr.regex,
+        incremental: true,
+      });
+      updatePaneSearchState(sid, { resultFound: found });
+    },
+    [paneSearchStates, updatePaneSearchState]
+  );
+
   const handleUpdateSettings = (partial: Partial<AppGlobalSettings>): void => {
     setGlobalSettings((prev) => {
       const next = { ...prev, ...partial };
@@ -766,10 +874,21 @@ export function App(): React.JSX.Element {
       } else if ((e.ctrlKey || e.metaKey) && e.key === ',') {
         e.preventDefault();
         setShowGlobalSettingsModal((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        if (activePane) {
+          e.preventDefault();
+          togglePaneSearch(activePane.sessionId);
+        }
       } else if (e.key === 'Escape') {
         setShowCommandPalette(false);
         setShowGlobalSettingsModal(false);
         setActiveDropdownMenu(null);
+        if (searchOpenPanes.size > 0) {
+          for (const sid of searchOpenPanes) {
+            clearTerminalSearch(sid);
+          }
+          setSearchOpenPanes(new Set());
+        }
       } else if (
         (e.ctrlKey || e.metaKey) &&
         (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '_' || e.key === '0')
@@ -835,7 +954,7 @@ export function App(): React.JSX.Element {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeTabId, activePane, globalSettings.fontSize]);
+  }, [activeTabId, activePane, globalSettings.fontSize, togglePaneSearch, searchOpenPanes]);
 
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent): void => {
@@ -1648,6 +1767,18 @@ export function App(): React.JSX.Element {
                   +
                 </button>
               </div>
+              <button
+                type="button"
+                className={`pane-search-btn ${searchOpenPanes.has(node.sessionId) ? 'active' : ''}`}
+                aria-label={`Find in ${node.title}`}
+                title="Find in terminal (Ctrl+F)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePaneSearch(node.sessionId);
+                }}
+              >
+                🔍 Find
+              </button>
               {isPaneActive ? (
                 <span className="pane-active-indicator">● Active</span>
               ) : (
@@ -1669,6 +1800,130 @@ export function App(): React.JSX.Element {
               )}
             </div>
           </div>
+
+          {searchOpenPanes.has(node.sessionId) &&
+            (() => {
+              const searchState = paneSearchStates.get(node.sessionId) || {
+                query: '',
+                caseSensitive: false,
+                wholeWord: false,
+                regex: false,
+                resultFound: null,
+              };
+              return (
+                <div
+                  className="terminal-search-overlay"
+                  role="search"
+                  aria-label={`Search Bar ${node.title}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="search-input-wrapper">
+                    <input
+                      aria-label="Search Terminal"
+                      placeholder="Find in terminal..."
+                      autoFocus
+                      value={searchState.query}
+                      onChange={(e) => {
+                        const q = e.target.value;
+                        updatePaneSearchState(node.sessionId, { query: q });
+                        executePaneSearch(node.sessionId, 'next', { query: q });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          executePaneSearch(node.sessionId, e.shiftKey ? 'prev' : 'next');
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          closePaneSearch(node.sessionId);
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="search-nav-btn"
+                    aria-label="Previous Match"
+                    title="Previous Match (Shift+Enter)"
+                    onClick={() => executePaneSearch(node.sessionId, 'prev')}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    className="search-nav-btn"
+                    aria-label="Next Match"
+                    title="Next Match (Enter)"
+                    onClick={() => executePaneSearch(node.sessionId, 'next')}
+                  >
+                    ▼
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`search-opt-btn ${searchState.caseSensitive ? 'active' : ''}`}
+                    aria-label="Match Case"
+                    title="Match Case (Case Sensitive)"
+                    onClick={() => {
+                      const nextVal = !searchState.caseSensitive;
+                      updatePaneSearchState(node.sessionId, { caseSensitive: nextVal });
+                      executePaneSearch(node.sessionId, 'next', { caseSensitive: nextVal });
+                    }}
+                  >
+                    Aa
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`search-opt-btn ${searchState.wholeWord ? 'active' : ''}`}
+                    aria-label="Match Whole Word"
+                    title="Match Whole Word"
+                    onClick={() => {
+                      const nextVal = !searchState.wholeWord;
+                      updatePaneSearchState(node.sessionId, { wholeWord: nextVal });
+                      executePaneSearch(node.sessionId, 'next', { wholeWord: nextVal });
+                    }}
+                  >
+                    \b
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`search-opt-btn ${searchState.regex ? 'active' : ''}`}
+                    aria-label="Use Regular Expression"
+                    title="Use Regular Expression"
+                    onClick={() => {
+                      const nextVal = !searchState.regex;
+                      updatePaneSearchState(node.sessionId, { regex: nextVal });
+                      executePaneSearch(node.sessionId, 'next', { regex: nextVal });
+                    }}
+                  >
+                    .*
+                  </button>
+
+                  {searchState.query && (
+                    <span className="search-result-badge">
+                      {searchState.resultFound === true
+                        ? 'Found'
+                        : searchState.resultFound === false
+                          ? 'No match'
+                          : ''}
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    className="search-close-btn"
+                    aria-label="Close Search"
+                    title="Close Search (Escape)"
+                    onClick={() => closePaneSearch(node.sessionId)}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })()}
+
           <TerminalView
             sessionId={node.sessionId}
             onInput={handleTerminalInput}
@@ -1679,6 +1934,7 @@ export function App(): React.JSX.Element {
             onFontSizeChange={(szId, sz) =>
               setPaneFontSizes((prev) => new Map(prev.set(szId, sz)))
             }
+            onToggleSearch={togglePaneSearch}
           />
         </div>
       );
@@ -1912,6 +2168,21 @@ export function App(): React.JSX.Element {
                   >
                     <span>Split Vertical</span>
                     <span className="nav-dropdown-shortcut">⬍</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    disabled={!activePane}
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      if (activePane) {
+                        togglePaneSearch(activePane.sessionId);
+                      }
+                    }}
+                  >
+                    <span>Find in Terminal</span>
+                    <span className="nav-dropdown-shortcut">Ctrl+F</span>
                   </button>
                   <div className="nav-dropdown-divider" />
                   <button

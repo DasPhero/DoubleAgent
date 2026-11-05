@@ -23,6 +23,16 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
     - Shows host session count badge (e.g. `2`).
     - Click the group header chevron (`▾`/`▸`) to collapse all sessions of that host to save space, or expand to display all tabs side-by-side.
     - Click **`⊟ Ungroup`** at any time to return to the standard flat tab view with drag-and-drop ordering.
+- **In-Terminal Search & Match Highlighting (`F-11`)**:
+  - Press **`Ctrl + F`**, click **`🔍 Find`** in any pane header, or select **Find in Terminal** in the View menu.
+  - Floating search widget overlays in the top right of the terminal without obscuring your prompt.
+  - **Live Incremental Search**: Highlights all matching occurrences across the buffer (up to 1,000 matches) with distinctive active/passive match colors.
+  - **Search Controls**:
+    - **Previous / Next Match**: Press `Enter` or click `▼` for next match; press `Shift + Enter` or click `▲` for previous match.
+    - **Match Case (`Aa`)**: Toggle case-sensitive matching.
+    - **Whole Word (`\b`)**: Match whole words surrounded by non-word boundaries.
+    - **Regular Expression (`.*`)**: Full regex matching across the terminal scrollback buffer.
+  - **Clean Dismissal**: Press `Escape` or click `×` to close the search widget, clear highlights, and immediately return keyboard focus to the remote shell.
 - **Global Settings & Theme Customization (`F-08`)**:
   - Open the **Global Settings** modal anytime by pressing **`Ctrl+,`** or clicking **Settings ⚙** in the top navigation bar or sidebar.
   - **Color Themes**: Choose between **Teal (Cyber Teal Default)**, **Dracula**, **One Dark**, **Nord**, **Monokai Pro**, and **Crimson**. The entire app window, borders, active focus indicators, and terminal color palette instantly switch in real-time.

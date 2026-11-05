@@ -203,6 +203,73 @@ export function disposeTerminal(sessionId: string): void {
   }
 }
 
+export interface TerminalSearchOptions {
+  regex?: boolean;
+  wholeWord?: boolean;
+  caseSensitive?: boolean;
+  incremental?: boolean;
+}
+
+export function searchTerminalNext(
+  sessionId: string,
+  query: string,
+  options?: TerminalSearchOptions
+): boolean {
+  const entry = terminalPool.get(sessionId);
+  if (!entry || !query) {
+    return false;
+  }
+  return entry.searchAddon.findNext(query, {
+    regex: options?.regex,
+    wholeWord: options?.wholeWord,
+    caseSensitive: options?.caseSensitive,
+    incremental: options?.incremental ?? true,
+    decorations: {
+      matchBackground: '#334155',
+      matchBorder: '#64748b',
+      matchOverviewRuler: '#38bdf8',
+      activeMatchBackground: '#0284c7',
+      activeMatchBorder: '#38bdf8',
+      activeMatchColorOverviewRuler: '#38bdf8',
+    },
+  });
+}
+
+export function searchTerminalPrevious(
+  sessionId: string,
+  query: string,
+  options?: TerminalSearchOptions
+): boolean {
+  const entry = terminalPool.get(sessionId);
+  if (!entry || !query) {
+    return false;
+  }
+  return entry.searchAddon.findPrevious(query, {
+    regex: options?.regex,
+    wholeWord: options?.wholeWord,
+    caseSensitive: options?.caseSensitive,
+    decorations: {
+      matchBackground: '#334155',
+      matchBorder: '#64748b',
+      matchOverviewRuler: '#38bdf8',
+      activeMatchBackground: '#0284c7',
+      activeMatchBorder: '#38bdf8',
+      activeMatchColorOverviewRuler: '#38bdf8',
+    },
+  });
+}
+
+export function clearTerminalSearch(sessionId: string): void {
+  const entry = terminalPool.get(sessionId);
+  if (entry) {
+    try {
+      entry.searchAddon.clearDecorations();
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export interface TerminalViewProps {
   sessionId: string;
   onInput: (sessionId: string, data: string) => void;
@@ -211,6 +278,7 @@ export interface TerminalViewProps {
   registerFocuser?: (sessionId: string, focusFn: () => void) => void;
   settings?: AppGlobalSettings;
   onFontSizeChange?: (sessionId: string, newSize: number) => void;
+  onToggleSearch?: (sessionId: string) => void;
 }
 
 export function TerminalView({
@@ -221,6 +289,7 @@ export function TerminalView({
   registerFocuser,
   settings,
   onFontSizeChange,
+  onToggleSearch,
 }: TerminalViewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -250,7 +319,7 @@ export function TerminalView({
       });
 
       const fitAddon = new FitAddon();
-      const searchAddon = new SearchAddon();
+      const searchAddon = new SearchAddon({ highlightLimit: 1000 });
       const unicode11Addon = new Unicode11Addon();
 
       term.loadAddon(fitAddon);
@@ -270,7 +339,7 @@ export function TerminalView({
         // Ignore layout fit / matchMedia errors in headless test environments (jsdom)
       }
 
-      // Prevent Alt+Arrow, Ctrl+K, and Ctrl+, from sending raw ANSI escape sequences to the remote terminal,
+      // Prevent Alt+Arrow, Ctrl+K, Ctrl+,, and Ctrl+F from sending raw ANSI escape sequences to the remote terminal,
       // and intercept Ctrl + / - / 0 to zoom font size in the pane
       term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
         if (
@@ -286,6 +355,11 @@ export function TerminalView({
           return false;
         }
         if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+          return false;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+          e.preventDefault();
+          onToggleSearch?.(sessionId);
           return false;
         }
         if (
@@ -425,7 +499,16 @@ export function TerminalView({
       // preserve all buffer data and session logs.
       // Terminals are disposed cleanly via disposeTerminal(sessionId) upon session close.
     };
-  }, [sessionId, onInput, onResize, registerWriter, registerFocuser, settings, onFontSizeChange]);
+  }, [
+    sessionId,
+    onInput,
+    onResize,
+    registerWriter,
+    registerFocuser,
+    settings,
+    onFontSizeChange,
+    onToggleSearch,
+  ]);
 
   return (
     <div
