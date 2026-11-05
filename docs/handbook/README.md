@@ -6,12 +6,24 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, & `M1-2`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, & `M1-3`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
 - **Visual Security State (Dark Crimson Locked ↔ Dark Teal Unlocked)**:
   - When the **Vault is Locked**, the entire application displays a **Dark Crimson / Red** theme so you can see at a glance that secrets are locked.
   - As soon as you unlock the Vault, the UI transitions to the **Dark Slate + Teal** glass theme.
+- **SSH Keychain (`M1-3` — `F-04`)**:
+  - Click **Keychain (`F-04`)** in the top bar when the Vault is unlocked:
+    - Generate new **Ed25519** or **RSA-3072** SSH keypairs directly inside the encrypted Vault (with an optional passphrase).
+    - Import existing **OpenSSH PEM** or **PuTTY `.ppk`** (`v2` and `v3`) private keys.
+    - Click **Copy Public Key** on any saved key to copy its `authorized_keys` line to the clipboard.
+- **SSH Agent & Pageant Integration (`M1-3` — `F-05`)**:
+  - When adding a Host, choose **Windows OpenSSH Agent / Pageant (`F-05`)** as the authentication method to authenticate via your OS SSH agent (`\\.\pipe\openssh-ssh-agent`, Pageant shared memory, or Unix `SSH_AUTH_SOCK`) without storing the private key inside the Vault.
+- **OpenSSH `ssh_config` Import (`M1-3` — `F-22`)**:
+  - Click **Import `ssh_config`** in the top bar and paste your `~/.ssh/config`.
+  - Automatically imports `Host`, `HostName`, `User`, `Port`, `IdentityFile`, and `ProxyJump`, and displays clear warnings for any unsupported directives.
+- **One-Click Password Injection into Active Terminal Sessions**:
+  - While connected to an SSH terminal session, click **Inject Password** in the terminal toolbar to have the Go backend write the stored password directly into the remote PTY (`stdin`) for `sudo` / `su` prompts without ever exposing the password to the frontend.
 - **Command Palette & Quick Connect (`M1-2` — `F-02`)**:
   - Press **`Ctrl+K`** (or click **Command Palette (`Ctrl+K`)** in the top bar) from anywhere in the workspace.
   - **Fuzzy Search**: Type fragments or subsequences of a host's **Name** (e.g. `pw01` for `prod-web-01`), **IP/Hostname**, or **Tags** (e.g. `nginx`) and press `Enter` (or click the result) to connect immediately.

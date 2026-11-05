@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 
 	"doubleagent/backend/core"
 	dassh "doubleagent/backend/ssh"
@@ -473,4 +474,38 @@ func TestS2_InteractivePtyShellAndResize_F07(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for server to receive window-change request")
 	}
+}
+
+func TestM1_3_AgentAuthenticationWithoutKeyInVault_F05(t *testing.T) {
+	pubRaw, privRaw, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("ed25519.GenerateKey: %v", err)
+	}
+	clientPub, err := ssh.NewPublicKey(pubRaw)
+	if err != nil {
+		t.Fatalf("ssh.NewPublicKey: %v", err)
+	}
+
+	srv := startEmbeddedSSHServer(t, 2229, clientPub)
+	keyring := agent.NewKeyring()
+	if err := keyring.Add(agent.AddedKey{PrivateKey: privRaw}); err != nil {
+		t.Fatalf("keyring.Add: %v", err)
+	}
+
+	transport := dassh.NewTransportWithDialer(nil, srv.dial)
+	transport.SetAgentSignersFunc(keyring.Signers)
+
+	sessID, err := transport.Connect(context.Background(), core.SshSessionConfig{
+		Address:  srv.addr,
+		Port:     srv.port,
+		Username: "agent-user",
+		Auth: core.SshAuthConfig{
+			Method: core.AuthAgent,
+		},
+		OnFirstSeenKey: func(_ core.HostKeyInfo) (bool, error) { return true, nil },
+	})
+	if err != nil {
+		t.Fatalf("Connect via AuthAgent (F-05) failed: %v", err)
+	}
+	_ = transport.Disconnect(context.Background(), sessID)
 }

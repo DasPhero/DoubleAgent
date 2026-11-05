@@ -30,9 +30,11 @@ type App struct {
 	vaultStore core.SecretStore
 	emit       EventEmitter
 
-	mu            sync.Mutex
-	activeStreams map[string]*core.SshShellStreams
-	pendingKeys   map[string]chan bool
+	mu               sync.Mutex
+	activeStreams    map[string]*core.SshShellStreams
+	sessionHostID    map[string]string
+	sessionPasswords map[string]string
+	pendingKeys      map[string]chan bool
 }
 
 func defaultVaultPath() string {
@@ -72,12 +74,14 @@ func NewAppWithDependencies(
 	}
 
 	app := &App{
-		ctx:           context.Background(),
-		transport:     transport,
-		knownHosts:    kh,
-		emit:          emit,
-		activeStreams: make(map[string]*core.SshShellStreams),
-		pendingKeys:   make(map[string]chan bool),
+		ctx:              context.Background(),
+		transport:        transport,
+		knownHosts:       kh,
+		emit:             emit,
+		activeStreams:    make(map[string]*core.SshShellStreams),
+		sessionHostID:    make(map[string]string),
+		sessionPasswords: make(map[string]string),
+		pendingKeys:      make(map[string]chan bool),
 	}
 
 	if vaultStore == nil {
@@ -319,6 +323,134 @@ func (a *App) DeleteHost(hostID string) error {
 	return a.vaultStore.SavePayload(a.ctx, payload)
 }
 
+// GenerateSSHKey generates an Ed25519 or RSA-3072 SSH keypair inside the Go process, saves the encrypted private key
+// inside the Vault, and returns the non-secret SshKeySummary (F-04, Golden Rule 2).
+func (a *App) GenerateSSHKey(label, keyType, passphrase string) (core.SshKeySummary, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.SshKeySummary{}, err
+	}
+	rec, err := ssh.GenerateKeyPair(label, keyType, passphrase)
+	if err != nil {
+		return core.SshKeySummary{}, err
+	}
+	payload.Keys = append(payload.Keys, rec)
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return core.SshKeySummary{}, err
+	}
+	return core.SshKeySummary{
+		ID:          rec.ID,
+		Label:       rec.Label,
+		Type:        rec.Type,
+		PublicKey:   rec.PublicKey,
+		Fingerprint: rec.Fingerprint,
+	}, nil
+}
+
+// ImportSSHKey imports an OpenSSH PEM or PuTTY .ppk (v2/v3) private key into the encrypted Vault
+// and returns the non-secret SshKeySummary (F-04, Golden Rule 2).
+func (a *App) ImportSSHKey(label, rawPrivateKey, passphrase string) (core.SshKeySummary, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.SshKeySummary{}, err
+	}
+	rec, err := ssh.ImportPrivateKey(label, rawPrivateKey, passphrase)
+	if err != nil {
+		return core.SshKeySummary{}, err
+	}
+	payload.Keys = append(payload.Keys, rec)
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return core.SshKeySummary{}, err
+	}
+	return core.SshKeySummary{
+		ID:          rec.ID,
+		Label:       rec.Label,
+		Type:        rec.Type,
+		PublicKey:   rec.PublicKey,
+		Fingerprint: rec.Fingerprint,
+	}, nil
+}
+
+// DeleteSSHKey removes a key from the encrypted Vault (F-04).
+func (a *App) DeleteSSHKey(keyID string) error {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.SshKeyRecord, 0, len(payload.Keys))
+	for _, k := range payload.Keys {
+		if k.ID != keyID {
+			filtered = append(filtered, k)
+		}
+	}
+	payload.Keys = filtered
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// ImportSSHConfig parses an OpenSSH config file (Host, HostName, User, Port, IdentityFile, ProxyJump),
+// saves the imported hosts and identities into the encrypted Vault, and returns warnings for any unknown directives (F-22).
+func (a *App) ImportSSHConfig(configContent string) (core.SSHConfigParseResult, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.SSHConfigParseResult{}, err
+	}
+	parsed := core.ParseSSHConfig(configContent)
+	nowNano := time.Now().UTC().UnixNano()
+
+	for idx, entry := range parsed.Entries {
+		idSuffix := fmt.Sprintf("%d-%d", nowNano, idx)
+		user := entry.User
+		if user == "" {
+			user = "root"
+		}
+		identityID := fmt.Sprintf("id-sshcfg-%s", idSuffix)
+		authMethod := core.AuthAgent
+		var keyID string
+
+		// If IdentityFile is specified and readable on disk, import it into the Vault automatically
+		if entry.IdentityFile != "" {
+			expandedPath := entry.IdentityFile
+			if len(expandedPath) >= 2 && expandedPath[:2] == "~/" {
+				if home, err := os.UserHomeDir(); err == nil {
+					expandedPath = filepath.Join(home, expandedPath[2:])
+				}
+			}
+			if rawKeyBytes, err := os.ReadFile(expandedPath); err == nil {
+				if keyRec, err := ssh.ImportPrivateKey(entry.HostAlias+" Key", string(rawKeyBytes), ""); err == nil {
+					payload.Keys = append(payload.Keys, keyRec)
+					keyID = keyRec.ID
+					authMethod = core.AuthPrivateKey
+				}
+			}
+		}
+
+		payload.Identities = append(payload.Identities, core.IdentityRecord{
+			ID:         identityID,
+			Label:      entry.HostAlias + " Identity",
+			Username:   user,
+			AuthMethod: authMethod,
+			KeyID:      keyID,
+		})
+
+		payload.Hosts = append(payload.Hosts, core.HostRecord{
+			ID:         fmt.Sprintf("host-sshcfg-%s", idSuffix),
+			Label:      entry.HostAlias,
+			Address:    entry.HostName,
+			Port:       entry.Port,
+			IdentityID: identityID,
+			Tags:       []string{"ssh_config"},
+			JumpChain:  entry.ProxyJump,
+		})
+	}
+
+	if len(parsed.Entries) > 0 {
+		if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+			return core.SSHConfigParseResult{}, err
+		}
+	}
+	return parsed, nil
+}
+
 // ConnectSavedHost resolves a saved host's effective address, port, username, and secret identity inside Go
 // (applying group inheritance per F-01) and starts an interactive SSH PTY session.
 func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, error) {
@@ -360,6 +492,10 @@ func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, e
 
 	a.mu.Lock()
 	a.activeStreams[sessionID] = streams
+	a.sessionHostID[sessionID] = hostID
+	if resolved.Auth.Password != "" {
+		a.sessionPasswords[sessionID] = resolved.Auth.Password
+	}
 	a.mu.Unlock()
 
 	go a.streamReaderLoop(sessionID, streams.Stdout, true)
@@ -373,7 +509,7 @@ func hostPromptKey(host string, port uint16) string {
 }
 
 // ConnectSSH opens an SSH connection, verifies the host key (prompting the user on first-seen TOFU),
-// starts an interactive PTY shell, and streams sanitized output events to the frontend (F-01, F-06, F-07).
+// starts an interactive PTY shell, and streams sanitized output events to the frontend (F-01, F-05, F-06, F-07).
 func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 	a.vaultStore.Touch()
 
@@ -383,7 +519,11 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 	}
 
 	var authCfg core.SshAuthConfig
-	if req.PrivateKey != "" {
+	if req.UseAgent {
+		authCfg = core.SshAuthConfig{
+			Method: core.AuthAgent,
+		}
+	} else if req.PrivateKey != "" {
 		authCfg = core.SshAuthConfig{
 			Method:     core.AuthPrivateKey,
 			PrivateKey: []byte(req.PrivateKey),
@@ -425,6 +565,9 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 
 	a.mu.Lock()
 	a.activeStreams[sessionID] = streams
+	if req.Password != "" {
+		a.sessionPasswords[sessionID] = req.Password
+	}
 	a.mu.Unlock()
 
 	go a.streamReaderLoop(sessionID, streams.Stdout, true)
@@ -496,10 +639,44 @@ func (a *App) ResizeTerminal(sessionID string, cols uint16, rows uint16) error {
 	})
 }
 
+// InjectSessionPassword injects the active session's password (resolved inside the Go process from the
+// encrypted Vault or active session state) directly into the remote PTY stdin without exposing it to the frontend (Golden Rule 2).
+func (a *App) InjectSessionPassword(sessionID string) error {
+	a.vaultStore.Touch()
+
+	a.mu.Lock()
+	streams, ok := a.activeStreams[sessionID]
+	hostID := a.sessionHostID[sessionID]
+	cachedPW := a.sessionPasswords[sessionID]
+	a.mu.Unlock()
+
+	if !ok || streams == nil || streams.Stdin == nil {
+		return core.ErrSessionNotFound
+	}
+
+	secret := cachedPW
+	if secret == "" && hostID != "" {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			if resolved, err := core.ResolveEffectiveHost(hostID, payload); err == nil {
+				secret = resolved.Auth.Password
+			}
+		}
+	}
+
+	if secret == "" {
+		return errors.New("no password stored for this session")
+	}
+
+	_, err := io.WriteString(streams.Stdin, secret+"\n")
+	return err
+}
+
 // DisconnectSession closes the active SSH session and removes its stream reference.
 func (a *App) DisconnectSession(sessionID string) error {
 	a.mu.Lock()
 	delete(a.activeStreams, sessionID)
+	delete(a.sessionHostID, sessionID)
+	delete(a.sessionPasswords, sessionID)
 	a.mu.Unlock()
 	return a.transport.Disconnect(a.ctx, sessionID)
 }
@@ -524,6 +701,8 @@ func (a *App) streamReaderLoop(sessionID string, r io.Reader, emitExitOnEOF bool
 			if emitExitOnEOF {
 				a.mu.Lock()
 				delete(a.activeStreams, sessionID)
+				delete(a.sessionHostID, sessionID)
+				delete(a.sessionPasswords, sessionID)
 				a.mu.Unlock()
 				a.emit(a.ctx, "terminal:exit", core.TerminalExitEvent{
 					SessionID: sessionID,

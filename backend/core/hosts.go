@@ -32,6 +32,7 @@ type HostSummary struct {
 	GroupID       string   `json:"groupId"`
 	IdentityID    string   `json:"identityId"`
 	Tags          []string `json:"tags"`
+	JumpChain     []string `json:"jumpChain"`
 	Color         string   `json:"color"`
 	Favorite      bool     `json:"favorite"`
 }
@@ -42,13 +43,25 @@ type IdentitySummary struct {
 	Label      string         `json:"label"`
 	Username   string         `json:"username"`
 	AuthMethod AuthMethodType `json:"authMethod"`
+	KeyID      string         `json:"keyId,omitempty"`
 }
 
-// VaultSummary aggregates non-secret groups, hosts (with inherited values resolved), and identities for the UI.
+// SshKeySummary is a non-secret view of a saved SSH keypair exposed to the frontend UI (F-04, Golden Rule 2).
+// PrivateKey and Passphrase never leave the Go process.
+type SshKeySummary struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Type        string `json:"type"`
+	PublicKey   string `json:"publicKey"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// VaultSummary aggregates non-secret groups, hosts (with inherited values resolved), identities, and public keys for the UI.
 type VaultSummary struct {
 	Groups     []GroupRecord     `json:"groups"`
 	Hosts      []HostSummary     `json:"hosts"`
 	Identities []IdentitySummary `json:"identities"`
+	Keys       []SshKeySummary   `json:"keys"`
 }
 
 // ResolveEffectiveHost computes the effective Port, Username, IdentityID, KeepaliveSecs, and SshAuthConfig
@@ -160,6 +173,18 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			Label:      id.Label,
 			Username:   id.Username,
 			AuthMethod: id.AuthMethod,
+			KeyID:      id.KeyID,
+		})
+	}
+
+	keys := make([]SshKeySummary, 0, len(payload.Keys))
+	for _, k := range payload.Keys {
+		keys = append(keys, SshKeySummary{
+			ID:          k.ID,
+			Label:       k.Label,
+			Type:        k.Type,
+			PublicKey:   k.PublicKey,
+			Fingerprint: k.Fingerprint,
 		})
 	}
 
@@ -180,6 +205,10 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		if tags == nil {
 			tags = []string{}
 		}
+		jumpChain := h.JumpChain
+		if jumpChain == nil {
+			jumpChain = []string{}
+		}
 		hosts = append(hosts, HostSummary{
 			ID:            h.ID,
 			Label:         h.Label,
@@ -190,6 +219,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			GroupID:       h.GroupID,
 			IdentityID:    effIdentity,
 			Tags:          tags,
+			JumpChain:     jumpChain,
 			Color:         h.Color,
 			Favorite:      h.Favorite,
 		})
@@ -199,5 +229,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		Groups:     groups,
 		Hosts:      hosts,
 		Identities: identities,
+		Keys:       keys,
 	}
 }
+

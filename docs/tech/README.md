@@ -43,8 +43,13 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
 - `App.SaveIdentity(identity core.IdentityRecord) error`
 - `App.SaveHost(host core.HostRecord) error`
 - `App.DeleteHost(hostID string) error`
+- `App.GenerateSSHKey(label, keyType, passphrase string) (core.SshKeySummary, error)`
+- `App.ImportSSHKey(label, rawPrivateKey, passphrase string) (core.SshKeySummary, error)`
+- `App.DeleteSSHKey(keyID string) error`
+- `App.ImportSSHConfig(configContent string) (core.SSHConfigParseResult, error)`
 - `App.ConnectSavedHost(hostID string, size core.TerminalSize) (string, error)`
 - `App.ConnectSSH(req core.ConnectRequest) (string, error)`
+- `App.InjectSessionPassword(sessionID string) error`
 - `App.ResolveHostKeyPrompt(host string, port uint16, trust bool) error`
 - `App.WriteTerminal(sessionID string, data string) error`
 - `App.ResizeTerminal(sessionID string, cols uint16, rows uint16) error`

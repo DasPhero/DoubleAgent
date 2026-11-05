@@ -29,7 +29,7 @@ type AppStatus struct {
 	QuickUnlockReady bool   `json:"quickUnlockReady"`
 }
 
-// ConnectRequest represents the frontend-bound parameters for starting an SSH terminal session (S1, F-01, F-07).
+// ConnectRequest represents the frontend-bound parameters for starting an SSH terminal session (S1, F-01, F-05, F-07).
 type ConnectRequest struct {
 	Address    string       `json:"address"`
 	Port       uint16       `json:"port"`
@@ -37,6 +37,7 @@ type ConnectRequest struct {
 	Password   string       `json:"password"`
 	PrivateKey string       `json:"privateKey"`
 	Passphrase string       `json:"passphrase"`
+	UseAgent   bool         `json:"useAgent,omitempty"`
 	Size       TerminalSize `json:"size"`
 }
 

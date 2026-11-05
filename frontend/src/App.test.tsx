@@ -88,4 +88,44 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect((screen.getByLabelText('Port') as HTMLInputElement).value).toBe('2222');
     expect((screen.getByLabelText('Username') as HTMLInputElement).value).toBe('admin');
   });
+
+  it('manages Keychain generation/import/copy public key (F-04), Agent auth (F-05), and imports ssh_config with unknown directive warnings (F-22)', () => {
+    render(<App />);
+
+    // Unlock vault
+    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+
+    // Open Keychain (F-04) and generate Ed25519 key
+    fireEvent.click(screen.getByRole('button', { name: /Keychain \(F-04\)/i }));
+    fireEvent.change(screen.getByLabelText('Key Label'), { target: { value: 'Laptop Ed25519' } });
+    fireEvent.click(screen.getByRole('button', { name: /Generate Keypair/i }));
+
+    expect(screen.getByText(/Laptop Ed25519 \(ed25519\)/i)).toBeInTheDocument();
+
+    // Copy Public Key (F-04)
+    fireEvent.click(screen.getByRole('button', { name: /Copy Public Key/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
+
+    // Open Import ssh_config (F-22)
+    fireEvent.click(screen.getByRole('button', { name: /Import ssh_config/i }));
+    fireEvent.change(screen.getByLabelText('SSH Config Content'), {
+      target: {
+        value: `Host jump-eu
+  HostName 198.51.100.7
+  User secops
+  Port 2202
+  ForwardX11 yes`,
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Parse & Import Config/i }));
+
+    // Verify unknown directive warning is reported (F-22)
+    expect(screen.getByLabelText('SSH Config Warnings')).toHaveTextContent('ForwardX11');
+    fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
+
+    // Verify imported host appears in sidebar
+    expect(screen.getByText('jump-eu')).toBeInTheDocument();
+    expect(screen.getByText('secops@198.51.100.7:2202')).toBeInTheDocument();
+  });
 });

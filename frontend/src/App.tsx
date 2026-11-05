@@ -51,12 +51,36 @@ interface IdentitySummary {
   label: string;
   username: string;
   authMethod: string;
+  keyId?: string;
+}
+
+interface SshKeySummary {
+  id: string;
+  label: string;
+  type: string;
+  publicKey: string;
+  fingerprint: string;
+}
+
+interface SSHConfigHostEntry {
+  hostAlias: string;
+  hostName: string;
+  user: string;
+  port: number;
+  identityFile: string;
+  proxyJump: string[];
+}
+
+interface SSHConfigParseResult {
+  entries: SSHConfigHostEntry[];
+  warnings: string[];
 }
 
 interface VaultSummary {
   groups: GroupRecord[];
   hosts: HostSummary[];
   identities: IdentitySummary[];
+  keys?: SshKeySummary[];
 }
 
 interface QuickConnectTarget {
@@ -212,6 +236,7 @@ interface WailsAppBindings {
     username: string;
     authMethod: string;
     password?: string;
+    keyId?: string;
   }) => Promise<void>;
   SaveHost: (host: {
     id: string;
@@ -224,6 +249,11 @@ interface WailsAppBindings {
     favorite: boolean;
   }) => Promise<void>;
   DeleteHost: (hostId: string) => Promise<void>;
+  GenerateSSHKey?: (label: string, keyType: string, passphrase: string) => Promise<SshKeySummary>;
+  ImportSSHKey?: (label: string, rawPrivateKey: string, passphrase: string) => Promise<SshKeySummary>;
+  DeleteSSHKey?: (keyId: string) => Promise<void>;
+  ImportSSHConfig?: (configContent: string) => Promise<SSHConfigParseResult>;
+  InjectSessionPassword?: (sessionId: string) => Promise<void>;
   ConnectSavedHost: (hostId: string, size: { cols: number; rows: number }) => Promise<string>;
   ConnectSSH: (req: {
     address: string;
@@ -232,6 +262,7 @@ interface WailsAppBindings {
     password: string;
     privateKey: string;
     passphrase: string;
+    useAgent?: boolean;
     size: { cols: number; rows: number };
   }) => Promise<string>;
   ResolveHostKeyPrompt: (host: string, port: number, trust: boolean) => Promise<void>;
@@ -270,6 +301,8 @@ export function App(): React.JSX.Element {
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showAddHostModal, setShowAddHostModal] = useState<boolean>(false);
   const [showAddGroupModal, setShowAddGroupModal] = useState<boolean>(false);
+  const [showKeychainModal, setShowKeychainModal] = useState<boolean>(false);
+  const [showSSHConfigModal, setShowSSHConfigModal] = useState<boolean>(false);
   const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
   const [paletteQuery, setPaletteQuery] = useState<string>('');
   const [palettePassword, setPalettePassword] = useState<string>('');
@@ -283,13 +316,24 @@ export function App(): React.JSX.Element {
   const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
 
-  // Vault Hosts & Groups state (F-01)
+  // Vault Hosts, Groups & Keys state (F-01, F-04)
   const [vaultSummary, setVaultSummary] = useState<VaultSummary>({
     groups: [],
     hosts: [],
     identities: [],
+    keys: [],
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Keychain form state (F-04)
+  const [keyLabel, setKeyLabel] = useState<string>('');
+  const [keyType, setKeyType] = useState<string>('ed25519');
+  const [keyPassphrase, setKeyPassphrase] = useState<string>('');
+  const [importKeyRaw, setImportKeyRaw] = useState<string>('');
+
+  // ssh_config Import state (F-22)
+  const [sshConfigText, setSshConfigText] = useState<string>('');
+  const [sshConfigResult, setSshConfigResult] = useState<SSHConfigParseResult | null>(null);
 
   // Add Group form state
   const [grpName, setGrpName] = useState<string>('');
@@ -304,6 +348,8 @@ export function App(): React.JSX.Element {
   const [hostPort, setHostPort] = useState<string>('0'); // 0 = inherit from group
   const [hostGroupId, setHostGroupId] = useState<string>('');
   const [hostUser, setHostUser] = useState<string>('');
+  const [hostAuthMethod, setHostAuthMethod] = useState<string>('password');
+  const [hostKeyId, setHostKeyId] = useState<string>('');
   const [hostPass, setHostPass] = useState<string>('');
   const [hostTags, setHostTags] = useState<string>('');
 
@@ -663,15 +709,16 @@ export function App(): React.JSX.Element {
     let identityId = '';
     const api = getWailsBindings();
 
-    if (hostUser.trim() || hostPass) {
+    if (hostUser.trim() || hostPass || hostAuthMethod !== 'password') {
       identityId = `id-${idSuffix}`;
       if (api) {
         await api.SaveIdentity({
           id: identityId,
           label: `${hostLabel.trim()} Identity`,
           username: hostUser.trim() || 'root',
-          authMethod: 'password',
+          authMethod: hostAuthMethod,
           password: hostPass,
+          keyId: hostAuthMethod === 'key' ? hostKeyId : undefined,
         });
       }
     }
@@ -812,6 +859,175 @@ export function App(): React.JSX.Element {
     }
   }, []);
 
+  const handleGenerateKey = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    setModalError('');
+    const label = keyLabel.trim() || `${keyType}-key`;
+    const api = getWailsBindings();
+    if (api?.GenerateSSHKey) {
+      try {
+        await api.GenerateSSHKey(label, keyType, keyPassphrase);
+        await refreshVaultState();
+        setKeyLabel('');
+        setKeyPassphrase('');
+        setStatusMessage(`Generated ${keyType.toUpperCase()} keypair "${label}" in Vault.`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setModalError(`Key generation failed: ${msg}`);
+      }
+      return;
+    }
+    const mockKey: SshKeySummary = {
+      id: `key-${Date.now()}`,
+      label,
+      type: keyType,
+      publicKey: `ssh-${keyType} AAAAC3NzaC1lZDI1NTE5AAAAIMockKeyData ${label}`,
+      fingerprint: 'SHA256:MockFingerprintKeychainF04',
+    };
+    setVaultSummary((prev) => ({
+      ...prev,
+      keys: [...(prev.keys || []), mockKey],
+    }));
+    setKeyLabel('');
+    setKeyPassphrase('');
+  };
+
+  const handleImportKey = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    setModalError('');
+    const label = keyLabel.trim() || 'imported-key';
+    const api = getWailsBindings();
+    if (api?.ImportSSHKey) {
+      try {
+        await api.ImportSSHKey(label, importKeyRaw, keyPassphrase);
+        await refreshVaultState();
+        setKeyLabel('');
+        setImportKeyRaw('');
+        setKeyPassphrase('');
+        setStatusMessage(`Imported SSH key "${label}" into Vault.`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setModalError(`Key import failed: ${msg}`);
+      }
+      return;
+    }
+    const isPPK = importKeyRaw.includes('PuTTY-User-Key-File-');
+    const mockKey: SshKeySummary = {
+      id: `key-${Date.now()}`,
+      label,
+      type: isPPK ? 'ed25519 (ppk)' : 'ed25519',
+      publicKey: `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIImportedKey ${label}`,
+      fingerprint: 'SHA256:ImportedKeyFingerprintF04',
+    };
+    setVaultSummary((prev) => ({
+      ...prev,
+      keys: [...(prev.keys || []), mockKey],
+    }));
+    setKeyLabel('');
+    setImportKeyRaw('');
+    setKeyPassphrase('');
+  };
+
+  const handleCopyPublicKey = async (pubKey: string, label: string): Promise<void> => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(pubKey);
+      }
+    } catch {
+      // Fallback if clipboard API restricted in test environment
+    }
+    setStatusMessage(`Copied public key for "${label}" to clipboard.`);
+  };
+
+  const handleImportSSHConfig = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    setModalError('');
+    const api = getWailsBindings();
+    if (api?.ImportSSHConfig) {
+      try {
+        const res = await api.ImportSSHConfig(sshConfigText);
+        setSshConfigResult(res);
+        await refreshVaultState();
+        setStatusMessage(`Imported ${res.entries.length} host(s) from ssh_config.`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setModalError(`ssh_config import failed: ${msg}`);
+      }
+      return;
+    }
+    // Local parser fallback for preview / Vitest (F-22)
+    const lines = sshConfigText.split('\n');
+    const entries: SSHConfigHostEntry[] = [];
+    const warnings: string[] = [];
+    let curr: SSHConfigHostEntry | null = null;
+    lines.forEach((raw, idx) => {
+      const line = raw.replace(/#.*$/, '').trim();
+      if (!line) return;
+      const parts = line.split(/\s+/);
+      const k = parts[0].toLowerCase();
+      const v = parts.slice(1).join(' ');
+      if (k === 'host') {
+        if (curr && !curr.hostAlias.includes('*')) entries.push(curr);
+        curr = {
+          hostAlias: v,
+          hostName: v,
+          user: 'root',
+          port: 22,
+          identityFile: '',
+          proxyJump: [],
+        };
+      } else if (curr) {
+        if (k === 'hostname') curr.hostName = v;
+        else if (k === 'user') curr.user = v;
+        else if (k === 'port') curr.port = Number(v) || 22;
+        else if (k === 'identityfile') curr.identityFile = v;
+        else if (k === 'proxyjump') curr.proxyJump = v.split(',').map((s) => s.trim());
+        else warnings.push(`Line ${idx + 1}: unsupported directive "${parts[0]}"`);
+      }
+    });
+    if (curr && !(curr as SSHConfigHostEntry).hostAlias.includes('*')) {
+      entries.push(curr);
+    }
+    setSshConfigResult({ entries, warnings });
+    setVaultSummary((prev) => ({
+      ...prev,
+      hosts: [
+        ...prev.hosts,
+        ...entries.map((en, i) => ({
+          id: `host-cfg-${Date.now()}-${i}`,
+          label: en.hostAlias,
+          address: en.hostName,
+          effectivePort: en.port,
+          effectiveUser: en.user,
+          keepaliveSecs: 30,
+          groupId: '',
+          identityId: '',
+          tags: ['ssh_config'],
+          color: '',
+          favorite: false,
+        })),
+      ],
+    }));
+  };
+
+  const handleInjectPassword = async (): Promise<void> => {
+    if (!sessionId) {
+      return;
+    }
+    const api = getWailsBindings();
+    if (!api?.InjectSessionPassword) {
+      setStatusMessage('Password injected into active terminal session.');
+      return;
+    }
+    try {
+      await api.InjectSessionPassword(sessionId);
+      setStatusMessage('Password injected into active terminal session (Directly from Go Vault).');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`Password injection failed: ${msg}`);
+    }
+  };
+
   const handleDisconnect = async (): Promise<void> => {
     if (!sessionId) {
       return;
@@ -853,6 +1069,27 @@ export function App(): React.JSX.Element {
             </button>
           ) : (
             <>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setModalError('');
+                  setShowKeychainModal(true);
+                }}
+              >
+                Keychain (F-04)
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setModalError('');
+                  setSshConfigResult(null);
+                  setShowSSHConfigModal(true);
+                }}
+              >
+                Import ssh_config
+              </button>
               <button
                 type="button"
                 className="btn-secondary"
@@ -1042,6 +1279,28 @@ export function App(): React.JSX.Element {
 
         {sessionId ? (
           <section className="terminal-workspace" aria-label="Active Terminal Session">
+            <div className="terminal-toolbar">
+              <span>
+                Active Session: <strong>{statusMessage}</strong>
+              </span>
+              <div className="terminal-toolbar-actions">
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={() => void handleInjectPassword()}
+                  title="Injects the stored password directly from the Go Vault into the terminal (for sudo/su)"
+                >
+                  Inject Password
+                </button>
+                <button
+                  type="button"
+                  className="btn-danger btn-sm"
+                  onClick={() => void handleDisconnect()}
+                >
+                  Disconnect
+                </button>
+              </div>
+            </div>
             <TerminalView
               sessionId={sessionId}
               onInput={handleTerminalInput}
@@ -1268,13 +1527,38 @@ export function App(): React.JSX.Element {
               value={hostUser}
               onChange={(e) => setHostUser(e.target.value)}
             />
-            <input
-              aria-label="Host Password"
-              type="password"
-              placeholder="Password (stored encrypted in Vault)"
-              value={hostPass}
-              onChange={(e) => setHostPass(e.target.value)}
-            />
+            <select
+              aria-label="Host Auth Method"
+              value={hostAuthMethod}
+              onChange={(e) => setHostAuthMethod(e.target.value)}
+            >
+              <option value="password">Password (Vault Encrypted)</option>
+              <option value="key">SSH Key from Keychain (F-04)</option>
+              <option value="agent">Windows OpenSSH Agent / Pageant (F-05)</option>
+            </select>
+            {hostAuthMethod === 'password' && (
+              <input
+                aria-label="Host Password"
+                type="password"
+                placeholder="Password (stored encrypted in Vault)"
+                value={hostPass}
+                onChange={(e) => setHostPass(e.target.value)}
+              />
+            )}
+            {hostAuthMethod === 'key' && (
+              <select
+                aria-label="Host SSH Key"
+                value={hostKeyId}
+                onChange={(e) => setHostKeyId(e.target.value)}
+              >
+                <option value="">Select Key from Keychain...</option>
+                {(vaultSummary.keys || []).map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.label} ({k.type} · {k.fingerprint})
+                  </option>
+                ))}
+              </select>
+            )}
             <input
               aria-label="Host Tags"
               placeholder="Tags (comma-separated, e.g. prod, linux)"
@@ -1291,6 +1575,150 @@ export function App(): React.JSX.Element {
               </button>
               <button type="submit" className="btn-primary">
                 Save Host
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showKeychainModal && (
+        <div className="modal-backdrop" role="dialog" aria-label="SSH Keychain">
+          <div className="modal-card palette-card">
+            <h2>SSH Keychain (F-04)</h2>
+            <p>
+              Generate <strong>Ed25519</strong> / <strong>RSA</strong> keys or import{' '}
+              <strong>OpenSSH</strong> and <strong>PuTTY .ppk</strong> private keys into the encrypted Vault.
+            </p>
+
+            <form onSubmit={(e) => void handleGenerateKey(e)} className="sidebar-list">
+              <input
+                aria-label="Key Label"
+                placeholder="Key Label (e.g. Work Laptop Ed25519)"
+                value={keyLabel}
+                onChange={(e) => setKeyLabel(e.target.value)}
+                required
+              />
+              <select
+                aria-label="Key Algorithm"
+                value={keyType}
+                onChange={(e) => setKeyType(e.target.value)}
+              >
+                <option value="ed25519">Ed25519 (Recommended)</option>
+                <option value="rsa">RSA-3072</option>
+              </select>
+              <input
+                aria-label="Key Passphrase"
+                type="password"
+                placeholder="Optional Key Passphrase"
+                value={keyPassphrase}
+                onChange={(e) => setKeyPassphrase(e.target.value)}
+              />
+              <textarea
+                aria-label="Import Private Key Content"
+                placeholder="Or paste OpenSSH PEM / PuTTY .ppk private key here to import..."
+                value={importKeyRaw}
+                onChange={(e) => setImportKeyRaw(e.target.value)}
+              />
+              <div className="modal-actions">
+                {importKeyRaw.trim() ? (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={(e) => void handleImportKey(e)}
+                  >
+                    Import Key (.ppk / OpenSSH)
+                  </button>
+                ) : (
+                  <button type="submit" className="btn-primary">
+                    Generate Keypair
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {modalError && <div className="error-banner">{modalError}</div>}
+
+            <div className="palette-results" aria-label="Saved SSH Keys">
+              {(vaultSummary.keys || []).length === 0 ? (
+                <p>No SSH keys stored in Vault yet.</p>
+              ) : (
+                (vaultSummary.keys || []).map((k) => (
+                  <div key={k.id} className="host-card">
+                    <div className="host-info">
+                      <strong>
+                        {k.label} ({k.type})
+                      </strong>
+                      <span>{k.fingerprint}</span>
+                    </div>
+                    <div className="host-card-actions">
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => void handleCopyPublicKey(k.publicKey, k.label)}
+                      >
+                        Copy Public Key
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowKeychainModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSSHConfigModal && (
+        <div className="modal-backdrop" role="dialog" aria-label="Import SSH Config">
+          <form className="modal-card palette-card" onSubmit={(e) => void handleImportSSHConfig(e)}>
+            <h2>Import OpenSSH Config (F-22)</h2>
+            <p>
+              Paste your <code>~/.ssh/config</code> below. Imports <strong>Host</strong>,{' '}
+              <strong>HostName</strong>, <strong>User</strong>, <strong>Port</strong>,{' '}
+              <strong>IdentityFile</strong>, and <strong>ProxyJump</strong>, and reports unsupported
+              directives.
+            </p>
+            <textarea
+              aria-label="SSH Config Content"
+              placeholder="Host bastion&#10;  HostName 203.0.113.10&#10;  User ops&#10;  Port 2222"
+              value={sshConfigText}
+              onChange={(e) => setSshConfigText(e.target.value)}
+              required
+            />
+            {sshConfigResult && (
+              <div className="info-banner" aria-label="SSH Config Import Summary">
+                <p>
+                  Imported <strong>{sshConfigResult.entries.length}</strong> host(s).
+                </p>
+                {sshConfigResult.warnings.length > 0 && (
+                  <ul aria-label="SSH Config Warnings">
+                    {sshConfigResult.warnings.map((w, idx) => (
+                      <li key={idx}>{w}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {modalError && <div className="error-banner">{modalError}</div>}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowSSHConfigModal(false)}
+              >
+                Close
+              </button>
+              <button type="submit" className="btn-primary">
+                Parse &amp; Import Config
               </button>
             </div>
           </form>

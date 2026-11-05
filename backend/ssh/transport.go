@@ -143,10 +143,11 @@ type DialFunc func(ctx context.Context, network, addr string, timeout time.Durat
 
 // Transport implements core.SshTransport on top of golang.org/x/crypto/ssh.
 type Transport struct {
-	mu         sync.RWMutex
-	knownHosts *KnownHostsStore
-	dial       DialFunc
-	sessions   map[string]*activeSession
+	mu           sync.RWMutex
+	knownHosts   *KnownHostsStore
+	dial         DialFunc
+	agentSigners func() ([]ssh.Signer, error)
+	sessions     map[string]*activeSession
 }
 
 // NewTransport constructs a new SSH Transport instance with the default TCP dialer.
@@ -166,10 +167,18 @@ func NewTransportWithDialer(knownHosts *KnownHostsStore, dial DialFunc) *Transpo
 		}
 	}
 	return &Transport{
-		knownHosts: knownHosts,
-		dial:       dial,
-		sessions:   make(map[string]*activeSession),
+		knownHosts:   knownHosts,
+		dial:         dial,
+		agentSigners: DefaultAgentSigners,
+		sessions:     make(map[string]*activeSession),
 	}
+}
+
+// SetAgentSignersFunc overrides the SSH agent signer provider (used for testing F-05).
+func (t *Transport) SetAgentSignersFunc(fn func() ([]ssh.Signer, error)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.agentSigners = fn
 }
 
 // Ensure Transport satisfies core.SshTransport at compile time.
@@ -185,7 +194,11 @@ func (t *Transport) Connect(ctx context.Context, cfg core.SshSessionConfig) (str
 		port = 22
 	}
 
-	authMethod, err := buildAuthMethod(cfg.Auth)
+	t.mu.RLock()
+	agentFn := t.agentSigners
+	t.mu.RUnlock()
+
+	authMethod, err := buildAuthMethod(cfg.Auth, agentFn)
 	if err != nil {
 		return "", err
 	}
@@ -375,7 +388,7 @@ func (t *Transport) getSession(sessionID string) (*activeSession, error) {
 	return sess, nil
 }
 
-func buildAuthMethod(auth core.SshAuthConfig) (ssh.AuthMethod, error) {
+func buildAuthMethod(auth core.SshAuthConfig, agentFn func() ([]ssh.Signer, error)) (ssh.AuthMethod, error) {
 	switch auth.Method {
 	case core.AuthPassword:
 		if auth.Password == "" {
@@ -400,6 +413,16 @@ func buildAuthMethod(auth core.SshAuthConfig) (ssh.AuthMethod, error) {
 			return nil, fmt.Errorf("parse private key: %w", err)
 		}
 		return ssh.PublicKeys(signer), nil
+
+	case core.AuthAgent:
+		if agentFn == nil {
+			agentFn = DefaultAgentSigners
+		}
+		signers, err := agentFn()
+		if err != nil {
+			return nil, err
+		}
+		return ssh.PublicKeys(signers...), nil
 
 	case core.AuthKeyboardInteractive:
 		if auth.Interactive == nil {
