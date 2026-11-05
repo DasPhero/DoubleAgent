@@ -110,3 +110,45 @@ func TestSerial_AutoDetect_F23(t *testing.T) {
 	t.Logf("AutoDetect result: %+v", resEmpty)
 }
 
+func TestSerial_HardwareIdentification_F23(t *testing.T) {
+	testCases := []struct {
+		hwID         string
+		expectedChip string
+		expectedType string
+	}{
+		{"USB\\VID_303A&PID_1001&REV_0102", "ESP32-S3/C3 (USB JTAG / Serial CDC)", "Microcontroller"},
+		{"USB\\VID_1A86&PID_7523", "WCH CH340 USB-to-Serial", "USB-UART Adapter"},
+		{"USB\\VID_1A86&PID_55D3", "WCH CH343 High-Speed USB-Serial", "USB-UART Adapter"},
+		{"USB\\VID_1A86&PID_55D4", "WCH CH347 High-Speed USB UART/SPI/I2C/JTAG", "Multi-Protocol Bridge"},
+		{"USB\\VID_10C4&PID_EA60", "Silicon Labs CP2102/CP2104 USB-to-UART Bridge", "USB-UART Adapter"},
+		{"USB\\VID_0403&PID_6001", "FTDI FT232R USB-to-UART", "USB-UART Adapter"},
+		{"USB\\VID_0403&PID_6014", "FTDI FT232H Single High-Speed USB UART/SPI/I2C (MPSSE)", "Multi-Protocol Bridge"},
+		{"USB\\VID_2341&PID_0043", "Arduino Uno (CDC-ACM)", "Microcontroller"},
+		{"USB\\VID_2E8A&PID_0003", "Raspberry Pi Pico (RP2040 CDC)", "Microcontroller"},
+		{"USB\\VID_0483&PID_5740", "STM32 Virtual COM Port", "Microcontroller"},
+		{"UNKNOWN_DEVICE_ID", "", "Serial Device"},
+	}
+
+	for _, tc := range testCases {
+		chip, devType, _ := identifyDeviceByHardwareID(tc.hwID)
+		if chip != tc.expectedChip {
+			t.Errorf("for hwID %s: expected chip %q, got %q", tc.hwID, tc.expectedChip, chip)
+		}
+		if devType != tc.expectedType {
+			t.Errorf("for hwID %s: expected type %q, got %q", tc.hwID, tc.expectedType, devType)
+		}
+	}
+
+	// Test stripInfPrefix
+	infTest := "@oem179.inf,%ch343ser.devicedesc%;USB-Enhanced-SERIAL CH343"
+	stripped := stripInfPrefix(infTest)
+	if stripped != "USB-Enhanced-SERIAL CH343" {
+		t.Errorf("expected 'USB-Enhanced-SERIAL CH343', got %q", stripped)
+	}
+
+	normal := "Silicon Labs CP210x"
+	if stripInfPrefix(normal) != normal {
+		t.Errorf("expected unchaged string for normal name, got %q", stripInfPrefix(normal))
+	}
+}
+

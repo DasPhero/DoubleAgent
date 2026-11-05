@@ -49,10 +49,15 @@ type SerialConfig struct {
 	LineEnding  string            `json:"lineEnding"`  // "crlf", "lf", "cr"
 }
 
-// SerialPortInfo describes a detected serial/COM port on the operating system.
+// SerialPortInfo describes a detected serial/COM port on the operating system with rich hardware metadata.
 type SerialPortInfo struct {
-	Port        string `json:"port"`        // e.g. "COM3"
-	Description string `json:"description"` // e.g. "USB Serial Device" or "Silicon Labs CP210x"
+	Port         string `json:"port"`         // e.g. "COM3"
+	Description  string `json:"description"`  // e.g. "Silicon Labs CP210x USB to UART Bridge"
+	Manufacturer string `json:"manufacturer"` // e.g. "Silicon Laboratories", "wch.cn", "FTDI"
+	HardwareID   string `json:"hardwareId"`   // e.g. "USB\VID_10C4&PID_EA60"
+	DeviceType   string `json:"deviceType"`   // e.g. "USB-UART Adapter", "Microcontroller", "Motherboard Port"
+	IsUSB        bool   `json:"isUsb"`        // True if connected via USB
+	IsConnected  bool   `json:"isConnected"`  // True if a physical device is detected/accessible
 }
 
 // SerialAutoDetectResult represents the result of automatic serial port & baud rate probing.

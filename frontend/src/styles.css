@@ -139,7 +139,7 @@ body,
 
 .app-header {
   position: relative;
-  z-index: 500;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -992,7 +992,7 @@ body,
   align-items: center;
   gap: 0.3rem;
   position: relative;
-  z-index: 501;
+  z-index: 10000;
 }
 
 .nav-menu-container {
@@ -1023,9 +1023,10 @@ body,
 
 .nav-dropdown-menu {
   position: absolute;
-  top: calc(100% + 2px);
+  top: 100%;
   left: 0;
-  z-index: 1000;
+  margin-top: 1px;
+  z-index: 10001;
   min-width: 220px;
   background-color: var(--bg-card);
   backdrop-filter: blur(14px);
@@ -1041,10 +1042,11 @@ body,
 .nav-dropdown-menu::before {
   content: '';
   position: absolute;
-  top: -8px;
-  left: 0;
-  right: 0;
-  height: 8px;
+  top: -12px;
+  left: -10px;
+  right: -10px;
+  height: 14px;
+  pointer-events: auto;
 }
 
 .nav-dropdown-item {
@@ -1504,6 +1506,99 @@ body,
   padding: 0.2rem 0.5rem;
   margin-top: 0.25rem;
   display: inline-block;
+}
+
+/* Serial Connected Hardware Card */
+.serial-hardware-card {
+  margin-top: 0.6rem;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid var(--border-accent);
+  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.serial-hw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.serial-hw-badge {
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  padding: 0.12rem 0.45rem;
+}
+
+.serial-hw-badge.connected {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.serial-hw-badge.offline {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.serial-hw-type {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.serial-hw-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.serial-hw-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.serial-hw-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.serial-hw-val {
+  color: var(--text-main);
+  word-break: break-all;
+}
+
+.serial-hw-val.font-mono {
+  font-family: Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--accent-text);
+}
+
+.serial-no-ports-banner {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 6px;
+  color: #fbbf24;
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 /* Saleae-style Signal & Logic Analyzer */

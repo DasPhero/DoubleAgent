@@ -18,10 +18,16 @@
   - Local shell execution engine in `backend/pty` with full interactive streaming for PowerShell (`powershell.exe`), Command Prompt (`cmd.exe`), and WSL (`wsl.exe`).
   - Pure Go Windows COM port enumeration (`HARDWARE\DEVICEMAP\SERIALCOMM`) and hardware driver in `backend/serial` using Windows DCB, `COMMTIMEOUTS`, `EscapeCommFunction`, and `SetCommBreak`.
   - Configurable Baud rates (9,600 to 2,000,000), Data Bits (5-8), Parity, Stop Bits, Flow Control, Line Endings, and Local Echo.
-  - **Serial Auto-Detect**: Added `AutoDetectSerial` probing port accessibility and analyzing ASCII response / framing stability to auto-configure optimal baud rates.
+  - **Serial Auto-Detect & Rich Hardware Detection**:
+    - Added `AutoDetectSerial` probing port accessibility and analyzing ASCII response / framing stability.
+    - Deep Windows Registry enumeration (`SYSTEM\CurrentControlSet\Enum\USB`, `FTDIBUS`, `ACPI`, and `SERIALCOMM`) resolving device friendly names, hardware IDs (VID/PID), vendors, and connected status.
+    - Hardware chip identification for FTDI (FT232R, FT2232H, FT232H), Silicon Labs (CP2102/CP2104/CP2105/CP2108/CP2112), QinHeng (WCH CH340, CH341, CH343, CH347, CH9102), Espressif (ESP32-S3/C3/S2), Arduino (Uno, Mega, Leonardo, Micro, Nano Every), Raspberry Pi Pico (RP2040/RP2350), STMicroelectronics (STM32 VCP, ST-Link), and debug probes.
+    - Categorized COM port dropdown with distinct `🟢 Active Connected Devices` vs `⚪ Offline Ports`, along with a detailed live hardware information card.
   - **Saleae-style Signal & Logic Analyzer**: Real-time digital waveform visualizer with UART 8N1 bit synthesis, decoded character bubbles (`'A' 0x41`), timing grid, pause/live, zoom, and channel toggles (RX, TX, DTR, RTS).
+  - **Menu Stacking & Hover Interaction Fixes**:
+    - Fixed top bar dropdown menu z-index stacking (`z-index: 10000+`) ensuring dropdowns always render strictly on top of the sidebar and workspace contents.
+    - Resolved hover flicker/premature close bug when approaching menu triggers from below by removing redundant child event listeners, adding an invisible pointer bridge (`::before`), updating close debounce timeout to 300ms, and maintaining active state on `onMouseMove`.
   - **Collapsible Sidebar**: Collapsible via header button `◀` / `▶` and shortcut `Ctrl+B`.
-  - **Top Bar Hoverable Dropdowns**: Layered comfortably in front of the sidebar with high z-index and smooth hover transitions.
   - **Immediate Startup Unlocked**: Starts unlocked out of the box in Teal theme with auto-initialized/unlocked passwordless vault.
   - Unit & integration tests in `backend/pty`, `backend/serial`, and `frontend/src/App.test.tsx`.
   - Standalone binary verified with `wails build`.

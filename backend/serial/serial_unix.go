@@ -69,21 +69,35 @@ func (p *unixSerialPort) Close() error {
 }
 
 func listPlatformPorts() ([]core.SerialPortInfo, error) {
-	patterns := []string{
-		"/dev/ttyUSB*",
-		"/dev/ttyACM*",
-		"/dev/ttyS*",
-		"/dev/cu.*",
+	patterns := []struct {
+		glob       string
+		isUSB      bool
+		deviceType string
+	}{
+		{"/dev/ttyUSB*", true, "USB-UART Adapter"},
+		{"/dev/ttyACM*", true, "USB CDC Modem/ACM"},
+		{"/dev/ttyS*", false, "Serial Port"},
+		{"/dev/cu.*", true, "Serial Device"},
 	}
 
 	var ports []core.SerialPortInfo
-	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
+	for _, p := range patterns {
+		matches, err := filepath.Glob(p.glob)
 		if err == nil {
 			for _, m := range matches {
+				base := filepath.Base(m)
+				desc := fmt.Sprintf("Serial Port (%s)", base)
+				if p.isUSB {
+					desc = fmt.Sprintf("USB-Serial Device (%s)", base)
+				}
 				ports = append(ports, core.SerialPortInfo{
-					Port:        m,
-					Description: fmt.Sprintf("Serial Port (%s)", filepath.Base(m)),
+					Port:         m,
+					Description:  desc,
+					Manufacturer: "System Device",
+					HardwareID:   m,
+					DeviceType:   p.deviceType,
+					IsUSB:        p.isUSB,
+					IsConnected:  true,
 				})
 			}
 		}

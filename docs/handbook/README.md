@@ -85,6 +85,19 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
   - **Keyboard Focus Navigation**:
     - Press **`Alt+ArrowLeft`** / **`Alt+ArrowRight`** to navigate between open **Tabs**.
     - Press **`Alt+ArrowUp`** / **`Alt+ArrowDown`** (or click **Next Pane ⇥**) to cycle keyboard focus between **Split Panes** without sending raw terminal escape characters (`A`, `B`, `C`, `D`).
+- **Local Terminals & Hardware Serial / UART Console with Auto-Detect & Logic Analyzer (`F-23`)**:
+  - **Local PTY Terminals**: Launch native PowerShell (`powershell.exe`), Command Prompt (`cmd.exe`), or WSL (`wsl.exe`) local shells from the **Tools ▾** menu.
+  - **Hardware Serial / UART Console**:
+    - Select detected COM ports with intelligent hardware identification (FTDI, CP210x, CH340/CH341/CH343/CH347, ESP32, Arduino, Raspberry Pi Pico, STM32 VCP).
+    - Port dropdown categorizes active connected devices (`🟢 Connected & Active Hardware`) vs offline/dormant ports, displaying full Vendor, Hardware ID (VID/PID), and connection status.
+    - Click **⚡ Auto Detect Port & Baud** to automatically test COM ports and probe candidate baud rates (from 9,600 to 2,000,000 baud) for valid character framing.
+    - Real-time line controls for DTR, RTS, and manual Break signals (`SetCommBreak`).
+  - **Saleae-style Signal & Logic Analyzer**:
+    - Click **📊 Signal Analyzer** on any active serial tab to open an embedded digital logic analyzer canvas.
+    - Synthesizes and captures digital bit waveforms for RX, TX, DTR, and RTS signals with timing grids, zoom/pan navigation, and decoded protocol bubble overlays (e.g. `'A' 0x41`).
+- **Collapsible Sidebar & Hover Navigation**:
+  - Collapse the left Hosts & Groups sidebar with **`Ctrl+B`** or the header toggle button (`◀`/`▶`) for maximum terminal workspace.
+  - Hover over header menus (**Vault ▾**, **Tools ▾**, **View ▾**) with seamless hit-testing bridges and stable debounced navigation.
 - **SSH Keychain (`M1-3` — `F-04`)**:
   - Click **Keychain (`F-04`)** in the top bar when the Vault is unlocked:
     - Generate new **Ed25519** or **RSA-3072** SSH keypairs directly inside the encrypted Vault (with an optional passphrase).

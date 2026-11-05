@@ -442,6 +442,11 @@ export namespace core {
 	export class SerialPortInfo {
 	    port: string;
 	    description: string;
+	    manufacturer: string;
+	    hardwareId: string;
+	    deviceType: string;
+	    isUsb: boolean;
+	    isConnected: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SerialPortInfo(source);
@@ -451,6 +456,11 @@ export namespace core {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.port = source["port"];
 	        this.description = source["description"];
+	        this.manufacturer = source["manufacturer"];
+	        this.hardwareId = source["hardwareId"];
+	        this.deviceType = source["deviceType"];
+	        this.isUsb = source["isUsb"];
+	        this.isConnected = source["isConnected"];
 	    }
 	}
 	export class SshKeySummary {

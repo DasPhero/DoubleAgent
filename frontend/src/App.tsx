@@ -512,6 +512,11 @@ export interface SerialConfig {
 export interface SerialPortInfo {
   port: string;
   description: string;
+  manufacturer?: string;
+  hardwareId?: string;
+  deviceType?: string;
+  isUsb?: boolean;
+  isConnected?: boolean;
 }
 
 interface WailsRuntime {
@@ -557,6 +562,13 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     setActiveDropdownMenu(menu);
   };
 
+  const handleMenuMove = (): void => {
+    if (menuCloseTimerRef.current !== null) {
+      window.clearTimeout(menuCloseTimerRef.current);
+      menuCloseTimerRef.current = null;
+    }
+  };
+
   const handleMenuLeave = (): void => {
     if (menuCloseTimerRef.current !== null) {
       window.clearTimeout(menuCloseTimerRef.current);
@@ -564,7 +576,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     menuCloseTimerRef.current = window.setTimeout(() => {
       setActiveDropdownMenu(null);
       menuCloseTimerRef.current = null;
-    }, 150);
+    }, 300);
   };
 
   const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
@@ -1728,8 +1740,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       try {
         const ports = await api.ListSerialPorts();
         setSerialPorts(ports);
-        if (ports.length > 0 && !ports.some((p) => p.port === serialConfig.port)) {
-          setSerialConfig((prev) => ({ ...prev, port: ports[0].port }));
+        if (ports.length > 0) {
+          const active = ports.find((p) => p.isConnected);
+          if (!ports.some((p) => p.port === serialConfig.port)) {
+            setSerialConfig((prev) => ({ ...prev, port: active ? active.port : ports[0].port }));
+          }
         }
       } catch {
         // ignore
@@ -2350,6 +2365,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             <div
               className="nav-menu-container"
               onMouseEnter={() => handleMenuEnter('vault')}
+              onMouseMove={handleMenuMove}
               onMouseLeave={handleMenuLeave}
             >
               <button
@@ -2369,8 +2385,6 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   className="nav-dropdown-menu"
                   role="menu"
                   aria-label="Vault Menu"
-                  onMouseEnter={() => handleMenuEnter('vault')}
-                  onMouseLeave={handleMenuLeave}
                 >
                   {vaultLocked ? (
                     <button
@@ -2429,6 +2443,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             <div
               className="nav-menu-container"
               onMouseEnter={() => handleMenuEnter('tools')}
+              onMouseMove={handleMenuMove}
               onMouseLeave={handleMenuLeave}
             >
               <button
@@ -2448,8 +2463,6 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   className="nav-dropdown-menu"
                   role="menu"
                   aria-label="Tools Menu"
-                  onMouseEnter={() => handleMenuEnter('tools')}
-                  onMouseLeave={handleMenuLeave}
                 >
                   <button
                     type="button"
@@ -2568,6 +2581,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             <div
               className="nav-menu-container"
               onMouseEnter={() => handleMenuEnter('view')}
+              onMouseMove={handleMenuMove}
               onMouseLeave={handleMenuLeave}
             >
               <button
@@ -2587,8 +2601,6 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   className="nav-dropdown-menu"
                   role="menu"
                   aria-label="View Menu"
-                  onMouseEnter={() => handleMenuEnter('view')}
-                  onMouseLeave={handleMenuLeave}
                 >
                   <button
                     type="button"
@@ -4156,11 +4168,28 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         setSerialConfig((prev) => ({ ...prev, port: e.target.value }))
                       }
                     >
-                      {serialPorts.map((p) => (
-                        <option key={p.port} value={p.port}>
-                          {p.port} — {p.description}
-                        </option>
-                      ))}
+                      {serialPorts.some((p) => p.isConnected) && (
+                        <optgroup label="🟢 Connected & Active Hardware">
+                          {serialPorts
+                            .filter((p) => p.isConnected)
+                            .map((p) => (
+                              <option key={p.port} value={p.port}>
+                                {p.port} — {p.description} {p.isUsb ? '(USB 🟢)' : '(Active 🟢)'}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {serialPorts.some((p) => !p.isConnected) && (
+                        <optgroup label="⚪ Available / Offline Ports">
+                          {serialPorts
+                            .filter((p) => !p.isConnected)
+                            .map((p) => (
+                              <option key={p.port} value={p.port}>
+                                {p.port} — {p.description || 'Serial Port'} (Offline)
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
                     </select>
                   ) : (
                     <input
@@ -4185,7 +4214,62 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     {serialLoading ? '...' : '🔄 Refresh'}
                   </button>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+
+                {(() => {
+                  const selectedPortInfo = serialPorts.find((p) => p.port === serialConfig.port);
+                  if (selectedPortInfo) {
+                    return (
+                      <div className="serial-hardware-card">
+                        <div className="serial-hw-header">
+                          <span
+                            className={`serial-hw-badge ${
+                              selectedPortInfo.isConnected ? 'connected' : 'offline'
+                            }`}
+                          >
+                            {selectedPortInfo.isConnected
+                              ? '● Connected & Active'
+                              : '○ Offline / No Device'}
+                          </span>
+                          <span className="serial-hw-type">
+                            {selectedPortInfo.deviceType || 'Serial Port'}
+                          </span>
+                        </div>
+                        <div className="serial-hw-body">
+                          <div className="serial-hw-row">
+                            <span className="serial-hw-label">Hardware:</span>
+                            <span className="serial-hw-val">{selectedPortInfo.description}</span>
+                          </div>
+                          {selectedPortInfo.manufacturer && (
+                            <div className="serial-hw-row">
+                              <span className="serial-hw-label">Vendor:</span>
+                              <span className="serial-hw-val">
+                                {selectedPortInfo.manufacturer}
+                              </span>
+                            </div>
+                          )}
+                          {selectedPortInfo.hardwareId && (
+                            <div className="serial-hw-row">
+                              <span className="serial-hw-label">Hardware ID:</span>
+                              <span className="serial-hw-val font-mono">
+                                {selectedPortInfo.hardwareId}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (serialPorts.length === 0) {
+                    return (
+                      <div className="serial-no-ports-banner">
+                        ℹ No active hardware detected. Connect your USB-UART adapter (FTDI, CP210x, CH340), Arduino, ESP32, or Raspberry Pi Pico, and click <strong>🔄 Refresh</strong>.
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="serial-autodetect-btn"
