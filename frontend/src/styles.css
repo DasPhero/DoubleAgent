@@ -333,6 +333,45 @@
   color: #f87171;
 }
 
+.workspace-tabs-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  position: relative;
+  width: 100%;
+}
+
+.tab-content-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.split-container {
+  flex: 1;
+  display: flex;
+  gap: 0.45rem;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.split-container.split-horizontal {
+  flex-direction: row;
+}
+
+.split-container.split-vertical {
+  flex-direction: column;
+}
+
 .split-grid {
   flex: 1;
   display: flex;
@@ -380,6 +419,38 @@
 
 .split-pane.active .split-pane-header {
   color: var(--accent-text);
+}
+
+.pane-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.pane-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.pane-close-btn:hover {
+  color: #f87171;
+}
+
+.pane-active-indicator {
+  font-weight: 600;
+  color: var(--accent-bright);
+}
+
+.pane-inactive-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.8;
 }
 
 .terminal-toolbar {

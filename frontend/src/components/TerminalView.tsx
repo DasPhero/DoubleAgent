@@ -53,11 +53,30 @@ export function TerminalView({
 
     try {
       term.open(container);
-      fitAddon.fit();
+      if (container.clientWidth > 0 && container.clientHeight > 0) {
+        fitAddon.fit();
+      }
       term.focus();
     } catch {
       // Ignore layout fit / matchMedia errors in headless test environments (jsdom)
     }
+
+    // Prevent Alt+Arrow and Ctrl+K from sending raw ANSI escape sequences (such as ABCD) to the remote terminal
+    term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+      if (
+        e.altKey &&
+        (e.key === 'ArrowUp' ||
+          e.key === 'ArrowDown' ||
+          e.key === 'ArrowLeft' ||
+          e.key === 'ArrowRight')
+      ) {
+        return false;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        return false;
+      }
+      return true;
+    });
 
     if (registerWriter) {
       registerWriter(sessionId, (chunk: string) => {
@@ -69,11 +88,28 @@ export function TerminalView({
     if (registerFocuser) {
       registerFocuser(sessionId, () => {
         try {
+          if (container.clientWidth > 0 && container.clientHeight > 0) {
+            fitAddon.fit();
+          }
           term.focus();
         } catch {
           // Ignore in headless test environment
         }
       });
+    }
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        if (container.clientWidth > 0 && container.clientHeight > 0) {
+          try {
+            fitAddon.fit();
+          } catch {
+            // Ignore layout fit error
+          }
+        }
+      });
+      resizeObserver.observe(container);
     }
 
     const dataDisposable = term.onData((data: string) => {
@@ -95,6 +131,7 @@ export function TerminalView({
 
     return () => {
       window.removeEventListener('resize', handleWindowResize);
+      resizeObserver?.disconnect();
       dataDisposable.dispose();
       resizeDisposable.dispose();
       term.dispose();

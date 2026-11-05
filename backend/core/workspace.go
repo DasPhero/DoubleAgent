@@ -5,9 +5,28 @@ type SplitDirection string
 
 const (
 	SplitNone       SplitDirection = "none"
-	SplitHorizontal SplitDirection = "horizontal" // Side-by-side columns
-	SplitVertical   SplitDirection = "vertical"   // Stacked rows
+	SplitHorizontal SplitDirection = "horizontal" // Side-by-side columns (row)
+	SplitVertical   SplitDirection = "vertical"   // Stacked rows (column)
 )
+
+// WorkspaceNodeType defines whether a node is a leaf terminal pane or an internal split container.
+type WorkspaceNodeType string
+
+const (
+	NodeTypePane  WorkspaceNodeType = "pane"
+	NodeTypeSplit WorkspaceNodeType = "split"
+)
+
+// WorkspaceNode represents either a single leaf terminal pane or a nested split container (F-08).
+type WorkspaceNode struct {
+	Type      WorkspaceNodeType `json:"type"`
+	ID        string            `json:"id"`
+	SessionID string            `json:"sessionId,omitempty"`
+	HostID    string            `json:"hostId,omitempty"`
+	Title     string            `json:"title,omitempty"`
+	Direction SplitDirection    `json:"direction,omitempty"`
+	Children  []*WorkspaceNode  `json:"children,omitempty"`
+}
 
 // PaneItem represents a single terminal pane inside a tab (F-08).
 type PaneItem struct {
@@ -17,15 +36,130 @@ type PaneItem struct {
 	Title     string `json:"title"`
 }
 
-// TabItem represents an open terminal tab containing one or more split panes (F-08, Spec Section 8).
+// TabItem represents an open terminal tab containing an arbitrary nested split tree of panes (F-08).
 type TabItem struct {
 	ID           string         `json:"id"`
 	Title        string         `json:"title"`
 	HostID       string         `json:"hostId,omitempty"`
 	Color        string         `json:"color,omitempty"`
-	SplitDir     SplitDirection `json:"splitDir"`
-	Panes        []PaneItem     `json:"panes"`
+	SplitDir     SplitDirection `json:"splitDir,omitempty"`
+	Panes        []PaneItem     `json:"panes,omitempty"`
+	RootNode     *WorkspaceNode `json:"rootNode,omitempty"`
 	ActivePaneID string         `json:"activePaneId"`
+}
+
+// SplitPaneInTree splits targetPaneID inside root by adding newPane in direction dir.
+// If root or a child split already shares the same direction, newPane is appended as a sibling;
+// otherwise, the target pane is replaced by a new split container holding both panes.
+func SplitPaneInTree(root *WorkspaceNode, targetPaneID string, newPane *WorkspaceNode, dir SplitDirection) *WorkspaceNode {
+	if root == nil || newPane == nil {
+		return root
+	}
+	if root.Type == NodeTypePane {
+		if root.ID == targetPaneID {
+			return &WorkspaceNode{
+				Type:      NodeTypeSplit,
+				ID:        "split-" + newPane.ID,
+				Direction: dir,
+				Children:  []*WorkspaceNode{root, newPane},
+			}
+		}
+		return root
+	}
+
+	// Internal split container: inspect direct children first
+	var newChildren []*WorkspaceNode
+	for _, child := range root.Children {
+		if child.Type == NodeTypePane && child.ID == targetPaneID {
+			if root.Direction == dir {
+				newChildren = append(newChildren, child, newPane)
+			} else {
+				newChildren = append(newChildren, &WorkspaceNode{
+					Type:      NodeTypeSplit,
+					ID:        "split-" + newPane.ID,
+					Direction: dir,
+					Children:  []*WorkspaceNode{child, newPane},
+				})
+			}
+		} else {
+			newChildren = append(newChildren, SplitPaneInTree(child, targetPaneID, newPane, dir))
+		}
+	}
+	root.Children = newChildren
+	return root
+}
+
+// RemovePaneFromTree removes targetPaneID from the tree.
+// If an internal split is left with only 1 child, it collapses into that child.
+// If no panes remain, nil is returned.
+func RemovePaneFromTree(root *WorkspaceNode, targetPaneID string) *WorkspaceNode {
+	if root == nil {
+		return nil
+	}
+	if root.Type == NodeTypePane {
+		if root.ID == targetPaneID {
+			return nil
+		}
+		return root
+	}
+
+	var remaining []*WorkspaceNode
+	for _, child := range root.Children {
+		updated := RemovePaneFromTree(child, targetPaneID)
+		if updated != nil {
+			remaining = append(remaining, updated)
+		}
+	}
+
+	if len(remaining) == 0 {
+		return nil
+	}
+	if len(remaining) == 1 {
+		return remaining[0]
+	}
+	root.Children = remaining
+	return root
+}
+
+// CollectPanes traverses a workspace tree and returns all leaf panes in visual order.
+func CollectPanes(root *WorkspaceNode) []PaneItem {
+	if root == nil {
+		return nil
+	}
+	if root.Type == NodeTypePane {
+		return []PaneItem{{
+			ID:        root.ID,
+			SessionID: root.SessionID,
+			HostID:    root.HostID,
+			Title:     root.Title,
+		}}
+	}
+	var out []PaneItem
+	for _, child := range root.Children {
+		out = append(out, CollectPanes(child)...)
+	}
+	return out
+}
+
+// FindPane searches the tree for a specific pane by ID.
+func FindPane(root *WorkspaceNode, paneID string) *PaneItem {
+	if root == nil {
+		return nil
+	}
+	if root.Type == NodeTypePane && root.ID == paneID {
+		return &PaneItem{
+			ID:        root.ID,
+			SessionID: root.SessionID,
+			HostID:    root.HostID,
+			Title:     root.Title,
+		}
+	}
+	for _, child := range root.Children {
+		if found := FindPane(child, paneID); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 // ReorderTabs moves a tab from fromIndex to toIndex (used for drag-and-drop tab reordering per F-08).
@@ -56,3 +190,5 @@ func CycleIndex(current, count, delta int) int {
 	}
 	return next
 }
+
+

@@ -104,6 +104,20 @@ interface CommandPaletteResponse {
 
 export type SplitDirection = 'none' | 'horizontal' | 'vertical';
 
+export type WorkspaceNode =
+  | {
+      type: 'pane';
+      id: string;
+      sessionId: string;
+      title: string;
+    }
+  | {
+      type: 'split';
+      id: string;
+      direction: 'horizontal' | 'vertical';
+      children: WorkspaceNode[];
+    };
+
 export interface PaneItem {
   id: string;
   sessionId: string;
@@ -113,9 +127,95 @@ export interface PaneItem {
 export interface TabItem {
   id: string;
   title: string;
-  splitDir: SplitDirection;
-  panes: PaneItem[];
+  rootNode: WorkspaceNode;
   activePaneId: string;
+}
+
+export function collectPanes(node: WorkspaceNode | null): PaneItem[] {
+  if (!node) {
+    return [];
+  }
+  if (node.type === 'pane') {
+    return [{ id: node.id, sessionId: node.sessionId, title: node.title }];
+  }
+  return node.children.flatMap(collectPanes);
+}
+
+export function findPane(node: WorkspaceNode | null, paneId: string): PaneItem | null {
+  if (!node) {
+    return null;
+  }
+  if (node.type === 'pane') {
+    return node.id === paneId ? node : null;
+  }
+  for (const child of node.children) {
+    const found = findPane(child, paneId);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+export function splitPaneInTree(
+  root: WorkspaceNode,
+  targetPaneId: string,
+  newPane: WorkspaceNode,
+  direction: 'horizontal' | 'vertical'
+): WorkspaceNode {
+  if (root.type === 'pane') {
+    if (root.id === targetPaneId) {
+      return {
+        type: 'split',
+        id: `split-${newPane.id}`,
+        direction,
+        children: [root, newPane],
+      };
+    }
+    return root;
+  }
+
+  const newChildren: WorkspaceNode[] = [];
+  for (const child of root.children) {
+    if (child.type === 'pane' && child.id === targetPaneId) {
+      if (root.direction === direction) {
+        newChildren.push(child, newPane);
+      } else {
+        newChildren.push({
+          type: 'split',
+          id: `split-${newPane.id}`,
+          direction,
+          children: [child, newPane],
+        });
+      }
+    } else {
+      newChildren.push(splitPaneInTree(child, targetPaneId, newPane, direction));
+    }
+  }
+  return { ...root, children: newChildren };
+}
+
+export function removePaneFromTree(
+  root: WorkspaceNode,
+  targetPaneId: string
+): WorkspaceNode | null {
+  if (root.type === 'pane') {
+    return root.id === targetPaneId ? null : root;
+  }
+  const remaining: WorkspaceNode[] = [];
+  for (const child of root.children) {
+    const updated = removePaneFromTree(child, targetPaneId);
+    if (updated !== null) {
+      remaining.push(updated);
+    }
+  }
+  if (remaining.length === 0) {
+    return null;
+  }
+  if (remaining.length === 1) {
+    return remaining[0];
+  }
+  return { ...root, children: remaining };
 }
 
 function reorderTabsLocal(tabs: TabItem[], fromId: string, toId: string): TabItem[] {
@@ -405,8 +505,9 @@ export function App(): React.JSX.Element {
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0] || null;
+  const activeTabPanes = activeTab ? collectPanes(activeTab.rootNode) : [];
   const activePane =
-    activeTab?.panes.find((p) => p.id === activeTab.activePaneId) || activeTab?.panes[0] || null;
+    activeTabPanes.find((p) => p.id === activeTab?.activePaneId) || activeTabPanes[0] || null;
   const sessionId = activePane?.sessionId || null;
 
   const writersRef = useRef<Map<string, (chunk: string) => void>>(new Map());
@@ -421,8 +522,12 @@ export function App(): React.JSX.Element {
     const newTab: TabItem = {
       id: tabId,
       title,
-      splitDir: 'none',
-      panes: [{ id: paneId, sessionId: newSessionId, title }],
+      rootNode: {
+        type: 'pane',
+        id: paneId,
+        sessionId: newSessionId,
+        title,
+      },
       activePaneId: paneId,
     };
     setTabs((prev) => [...prev, newTab]);
@@ -480,27 +585,41 @@ export function App(): React.JSX.Element {
     });
 
     const offExit = rt.EventsOn('terminal:exit', (raw: unknown) => {
-      const exitedId = typeof raw === 'string' ? raw : '';
+      let exitedId = '';
+      if (typeof raw === 'string') {
+        exitedId = raw;
+      } else if (raw && typeof raw === 'object') {
+        const obj = raw as Record<string, unknown>;
+        exitedId = (obj.sessionId || obj.sessionID || '') as string;
+      }
+      if (!exitedId) {
+        return;
+      }
+      writersRef.current.delete(exitedId);
+      focusersRef.current.delete(exitedId);
       setTabs((prev) => {
-        if (!exitedId) {
-          return [];
-        }
-        return prev
-          .map((t) => {
-            const remaining = t.panes.filter((p) => p.sessionId !== exitedId);
-            if (remaining.length === 0) {
-              return null;
-            }
-            return {
+        const nextTabs: TabItem[] = [];
+        for (const t of prev) {
+          const panes = collectPanes(t.rootNode);
+          const matchingPane = panes.find((p) => p.sessionId === exitedId);
+          if (!matchingPane) {
+            nextTabs.push(t);
+            continue;
+          }
+          const newRoot = removePaneFromTree(t.rootNode, matchingPane.id);
+          if (newRoot) {
+            const remainingPanes = collectPanes(newRoot);
+            const nextActiveId = remainingPanes.some((p) => p.id === t.activePaneId)
+              ? t.activePaneId
+              : remainingPanes[0]?.id || '';
+            nextTabs.push({
               ...t,
-              splitDir: remaining.length === 1 ? ('none' as SplitDirection) : t.splitDir,
-              panes: remaining,
-              activePaneId: remaining.some((p) => p.id === t.activePaneId)
-                ? t.activePaneId
-                : remaining[0].id,
-            };
-          })
-          .filter((t): t is TabItem => t !== null);
+              rootNode: newRoot,
+              activePaneId: nextActiveId,
+            });
+          }
+        }
+        return nextTabs;
       });
       setStatusMessage('SSH session disconnected.');
     });
@@ -536,10 +655,11 @@ export function App(): React.JSX.Element {
             const idx = currentTabs.findIndex((t) => t.id === currId);
             const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, currentTabs.length, delta);
             const nextTab = currentTabs[nextIdx];
+            const panes = collectPanes(nextTab.rootNode);
             const pane =
-              nextTab.panes.find((p) => p.id === nextTab.activePaneId) || nextTab.panes[0];
+              panes.find((p) => p.id === nextTab.activePaneId) || panes[0];
             if (pane) {
-              setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 0);
+              setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 50);
             }
             return nextTab.id;
           });
@@ -550,14 +670,18 @@ export function App(): React.JSX.Element {
         const delta = e.key === 'ArrowDown' ? 1 : -1;
         setTabs((currentTabs) =>
           currentTabs.map((t) => {
-            if (t.id !== activeTabId || t.panes.length <= 1) {
+            if (t.id !== activeTabId) {
               return t;
             }
-            const idx = t.panes.findIndex((p) => p.id === t.activePaneId);
-            const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, t.panes.length, delta);
-            const nextPane = t.panes[nextIdx];
+            const panes = collectPanes(t.rootNode);
+            if (panes.length <= 1) {
+              return t;
+            }
+            const idx = panes.findIndex((p) => p.id === t.activePaneId);
+            const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, panes.length, delta);
+            const nextPane = panes[nextIdx];
             if (nextPane) {
-              setTimeout(() => focusersRef.current.get(nextPane.sessionId)?.(), 0);
+              setTimeout(() => focusersRef.current.get(nextPane.sessionId)?.(), 50);
             }
             return { ...t, activePaneId: nextPane.id };
           })
@@ -1164,7 +1288,7 @@ export function App(): React.JSX.Element {
       return;
     }
     const api = getWailsBindings();
-    let newSessionId = `sess-split-${Date.now()}-${activeTab.panes.length + 1}`;
+    let newSessionId = `sess-split-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     if (api?.DuplicateSession) {
       try {
         newSessionId = await api.DuplicateSession(activePane.sessionId, { cols: 120, rows: 34 });
@@ -1176,36 +1300,88 @@ export function App(): React.JSX.Element {
     }
     tabCounterRef.current += 1;
     const newPaneId = `pane-${tabCounterRef.current}`;
-    const newPane: PaneItem = {
+    const currentPanes = collectPanes(activeTab.rootNode);
+    const newPane: WorkspaceNode = {
+      type: 'pane',
       id: newPaneId,
       sessionId: newSessionId,
-      title: `${activePane.title} (${direction === 'horizontal' ? 'H' : 'V'}-Split #${activeTab.panes.length + 1})`,
+      title: `${activePane.title} (${direction === 'horizontal' ? 'H' : 'V'}-Split #${currentPanes.length + 1})`,
     };
     setTabs((prev) =>
-      prev.map((t) =>
-        t.id === activeTab.id
-          ? {
-              ...t,
-              splitDir: direction,
-              panes: [...t.panes, newPane],
-              activePaneId: newPaneId,
-            }
-          : t
-      )
+      prev.map((t) => {
+        if (t.id !== activeTab.id) {
+          return t;
+        }
+        const updatedRoot = splitPaneInTree(t.rootNode, activePane.id, newPane, direction);
+        return {
+          ...t,
+          rootNode: updatedRoot,
+          activePaneId: newPaneId,
+        };
+      })
     );
     setStatusMessage(
-      `Split ${direction} created (${activeTab.panes.length + 1} panes in ${activeTab.title}).`
+      `Split ${direction} created (${currentPanes.length + 1} panes in ${activeTab.title}).`
     );
-    setTimeout(() => focusersRef.current.get(newSessionId)?.(), 0);
+    setTimeout(() => focusersRef.current.get(newSessionId)?.(), 50);
+  };
+
+  const handleClosePane = async (tabId: string, paneId: string): Promise<void> => {
+    const targetTab = tabs.find((t) => t.id === tabId);
+    if (!targetTab) {
+      return;
+    }
+    const targetPane = findPane(targetTab.rootNode, paneId);
+    if (targetPane) {
+      writersRef.current.delete(targetPane.sessionId);
+      focusersRef.current.delete(targetPane.sessionId);
+      const api = getWailsBindings();
+      if (api) {
+        void api.DisconnectSession(targetPane.sessionId);
+      }
+    }
+    setTabs((prev) => {
+      const nextTabs: TabItem[] = [];
+      for (const t of prev) {
+        if (t.id !== tabId) {
+          nextTabs.push(t);
+          continue;
+        }
+        const newRoot = removePaneFromTree(t.rootNode, paneId);
+        if (newRoot) {
+          const remainingPanes = collectPanes(newRoot);
+          const nextActiveId = remainingPanes.some((p) => p.id === t.activePaneId)
+            ? t.activePaneId
+            : remainingPanes[0]?.id || '';
+          nextTabs.push({
+            ...t,
+            rootNode: newRoot,
+            activePaneId: nextActiveId,
+          });
+        }
+      }
+      return nextTabs;
+    });
+    if (activeTabId === tabId) {
+      const newRoot = removePaneFromTree(targetTab.rootNode, paneId);
+      if (!newRoot) {
+        const remainingTabs = tabs.filter((t) => t.id !== tabId);
+        setActiveTabId(remainingTabs[0]?.id || null);
+      }
+    }
   };
 
   const handleCyclePaneFocus = (): void => {
-    if (!activeTab || activeTab.panes.length <= 1) {
+    if (!activeTab) {
       return;
     }
-    const idx = activeTab.panes.findIndex((p) => p.id === activeTab.activePaneId);
-    const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, activeTab.panes.length, 1);
-    const nextPane = activeTab.panes[nextIdx];
+    const panes = collectPanes(activeTab.rootNode);
+    if (panes.length <= 1) {
+      return;
+    }
+    const idx = panes.findIndex((p) => p.id === activeTab.activePaneId);
+    const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, panes.length, 1);
+    const nextPane = panes[nextIdx];
     setTabs((prev) =>
       prev.map((t) => (t.id === activeTab.id ? { ...t, activePaneId: nextPane.id } : t))
     );
@@ -1217,10 +1393,13 @@ export function App(): React.JSX.Element {
     if (!target) {
       return;
     }
+    const targetPanes = collectPanes(target.rootNode);
     const api = getWailsBindings();
-    if (api) {
-      for (const p of target.panes) {
-        await api.DisconnectSession(p.sessionId);
+    for (const p of targetPanes) {
+      writersRef.current.delete(p.sessionId);
+      focusersRef.current.delete(p.sessionId);
+      if (api) {
+        void api.DisconnectSession(p.sessionId);
       }
     }
     const remaining = tabs.filter((t) => t.id !== tabId);
@@ -1234,30 +1413,73 @@ export function App(): React.JSX.Element {
     if (!activeTab || !activePane) {
       return;
     }
-    const api = getWailsBindings();
-    if (api) {
-      await api.DisconnectSession(activePane.sessionId);
-    }
-    setTabs((prev) =>
-      prev
-        .map((t) => {
-          if (t.id !== activeTab.id) {
-            return t;
-          }
-          const remainingPanes = t.panes.filter((p) => p.id !== activePane.id);
-          if (remainingPanes.length === 0) {
-            return null;
-          }
-          return {
-            ...t,
-            splitDir: remainingPanes.length === 1 ? ('none' as SplitDirection) : t.splitDir,
-            panes: remainingPanes,
-            activePaneId: remainingPanes[0].id,
-          };
-        })
-        .filter((t): t is TabItem => t !== null)
-    );
+    await handleClosePane(activeTab.id, activePane.id);
     setStatusMessage('Disconnected.');
+  };
+
+  const renderWorkspaceNode = (
+    node: WorkspaceNode,
+    tab: TabItem,
+    totalPanes: number
+  ): React.JSX.Element => {
+    if (node.type === 'pane') {
+      const isPaneActive = node.id === tab.activePaneId;
+      return (
+        <div
+          key={node.id}
+          className={`split-pane ${isPaneActive ? 'active' : ''}`}
+          aria-label={`Pane ${node.title}`}
+          onClick={() => {
+            setTabs((prev) =>
+              prev.map((t) => (t.id === tab.id ? { ...t, activePaneId: node.id } : t))
+            );
+            focusersRef.current.get(node.sessionId)?.();
+          }}
+        >
+          <div className="split-pane-header">
+            <span>{node.title}</span>
+            <div className="pane-header-actions">
+              {isPaneActive ? (
+                <span className="pane-active-indicator">● Active</span>
+              ) : (
+                <span className="pane-inactive-hint">Click to focus</span>
+              )}
+              {totalPanes > 1 && (
+                <button
+                  type="button"
+                  className="pane-close-btn"
+                  aria-label={`Close Pane ${node.title}`}
+                  title="Close Split Pane"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleClosePane(tab.id, node.id);
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+          <TerminalView
+            sessionId={node.sessionId}
+            onInput={handleTerminalInput}
+            onResize={handleTerminalResize}
+            registerWriter={registerWriter}
+            registerFocuser={registerFocuser}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={node.id}
+        className={`split-container split-${node.direction}`}
+        aria-label={`Split Container ${node.direction}`}
+      >
+        {node.children.map((child) => renderWorkspaceNode(child, tab, totalPanes))}
+      </div>
+    );
   };
 
   const filteredHosts = vaultSummary.hosts.filter((h) => {
@@ -1499,11 +1721,12 @@ export function App(): React.JSX.Element {
           )}
         </aside>
 
-        {activeTab && activePane ? (
+        {tabs.length > 0 && activeTab && activePane ? (
           <section className="terminal-workspace" aria-label="Active Terminal Session">
             <div className="tabs-bar" role="tablist" aria-label="Session Tabs">
               {tabs.map((tab) => {
                 const isActive = tab.id === activeTab.id;
+                const tabPanes = collectPanes(tab.rootNode);
                 return (
                   <div
                     key={tab.id}
@@ -1523,15 +1746,15 @@ export function App(): React.JSX.Element {
                     onClick={() => {
                       setActiveTabId(tab.id);
                       const pane =
-                        tab.panes.find((p) => p.id === tab.activePaneId) || tab.panes[0];
+                        tabPanes.find((p) => p.id === tab.activePaneId) || tabPanes[0];
                       if (pane) {
-                        setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 0);
+                        setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 50);
                       }
                     }}
                   >
                     <span className="tab-dot" />
                     <span>{tab.title}</span>
-                    {tab.panes.length > 1 && <small>({tab.panes.length})</small>}
+                    {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
                     <button
                       type="button"
                       className="tab-close-btn"
@@ -1559,7 +1782,7 @@ export function App(): React.JSX.Element {
                   aria-label="Split Horizontal"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => void handleSplitPane('horizontal')}
-                  title="Split active tab horizontally (side-by-side)"
+                  title="Split active pane horizontally (side-by-side)"
                 >
                   Split ⬌
                 </button>
@@ -1569,11 +1792,11 @@ export function App(): React.JSX.Element {
                   aria-label="Split Vertical"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => void handleSplitPane('vertical')}
-                  title="Split active tab vertically (stacked)"
+                  title="Split active pane vertically (stacked)"
                 >
                   Split ⬍
                 </button>
-                {activeTab.panes.length > 1 && (
+                {activeTabPanes.length > 1 && (
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
@@ -1604,45 +1827,18 @@ export function App(): React.JSX.Element {
               </div>
             </div>
 
-            <div
-              className={`split-grid ${
-                activeTab.splitDir === 'horizontal'
-                  ? 'split-horizontal'
-                  : activeTab.splitDir === 'vertical'
-                    ? 'split-vertical'
-                    : ''
-              }`}
-              aria-label="Terminal Split Grid"
-            >
-              {activeTab.panes.map((pane) => {
-                const isPaneActive = pane.id === activePane.id;
+            <div className="workspace-tabs-content" aria-label="Terminal Split Grid">
+              {tabs.map((tab) => {
+                const isCurrentTab = tab.id === activeTab.id;
+                const tabPanes = collectPanes(tab.rootNode);
                 return (
                   <div
-                    key={pane.id}
-                    className={`split-pane ${isPaneActive ? 'active' : ''}`}
-                    aria-label={`Pane ${pane.title}`}
-                    onClick={() => {
-                      setTabs((prev) =>
-                        prev.map((t) =>
-                          t.id === activeTab.id ? { ...t, activePaneId: pane.id } : t
-                        )
-                      );
-                      focusersRef.current.get(pane.sessionId)?.();
-                    }}
+                    key={tab.id}
+                    className="tab-content-panel"
+                    style={{ display: isCurrentTab ? 'flex' : 'none' }}
+                    aria-hidden={!isCurrentTab}
                   >
-                    {activeTab.panes.length > 1 && (
-                      <div className="split-pane-header">
-                        <span>{pane.title}</span>
-                        <span>{isPaneActive ? '● Focused (Alt+↑/↓)' : 'Click to focus'}</span>
-                      </div>
-                    )}
-                    <TerminalView
-                      sessionId={pane.sessionId}
-                      onInput={handleTerminalInput}
-                      onResize={handleTerminalResize}
-                      registerWriter={registerWriter}
-                      registerFocuser={registerFocuser}
-                    />
+                    {renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)}
                   </div>
                 );
               })}

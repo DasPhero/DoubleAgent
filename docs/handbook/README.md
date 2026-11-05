@@ -12,13 +12,17 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
 - **Visual Security State (Dark Crimson Locked ↔ Dark Teal Unlocked)**:
   - When the **Vault is Locked**, the entire application displays a **Dark Crimson / Red** theme so you can see at a glance that secrets are locked.
   - As soon as you unlock the Vault, the UI transitions to the **Dark Slate + Teal** glass theme.
-- **Multi-Session Tabs & Split Panes (`F-08`)**:
-  - Connecting to multiple hosts opens each session in its own **Tab** in the top tab bar above the terminal.
+- **Multi-Session Tabs & Arbitrary Mixed Split Panes (`F-08`)**:
+  - Connecting to multiple hosts (or multiple times to the same host) opens each session in its own **Tab** in the top tab bar.
+  - **Preserved Terminal Logs**: When switching between tabs, all background sessions remain mounted and active in the system WebView. Running logs, command outputs, and the 10,000-line scrollback buffer are completely preserved without ever clearing.
   - **Drag-and-Drop Reordering**: Drag any tab pill left or right to reorder your open sessions.
-  - **Horizontal & Vertical Splitting**: Click **Split ⬌** (`Split Horizontal`) or **Split ⬍** (`Split Vertical`) in the terminal toolbar to open an additional shell on the same host side-by-side or stacked.
+  - **Mixed Nested Splitting**:
+    - Click **Split ⬌** (`Split Horizontal`) or **Split ⬍** (`Split Vertical`) to divide any active pane.
+    - Supports arbitrary nested combinations (e.g. splitting horizontally and then splitting the left pane vertically creates two stacked panes on the left alongside a full-height pane on the right).
+  - **Close Individual Panes**: Every pane in a split grid has its own **`×`** close button in its header, allowing individual panes to be closed independently. When all panes in a tab are closed, the tab automatically closes.
   - **Keyboard Focus Navigation**:
-    - Press **`Alt+ArrowLeft`** / **`Alt+ArrowRight`** to switch between open **Tabs** via keyboard.
-    - Press **`Alt+ArrowUp`** / **`Alt+ArrowDown`** (or click **Next Pane ⇥**) to cycle keyboard focus across **Split Panes** within the active tab.
+    - Press **`Alt+ArrowLeft`** / **`Alt+ArrowRight`** to navigate between open **Tabs**.
+    - Press **`Alt+ArrowUp`** / **`Alt+ArrowDown`** (or click **Next Pane ⇥**) to cycle keyboard focus between **Split Panes** without sending raw terminal escape characters (`A`, `B`, `C`, `D`).
 - **SSH Keychain (`M1-3` — `F-04`)**:
   - Click **Keychain (`F-04`)** in the top bar when the Vault is unlocked:
     - Generate new **Ed25519** or **RSA-3072** SSH keypairs directly inside the encrypted Vault (with an optional passphrase).

@@ -10,9 +10,9 @@
 - **`M1-2` (`F-02` — Command Palette `Ctrl+K` & Quick Connect)**: Completed (`a98ac3d`).
 - **`M1-3` (`F-04`, `F-05`, `F-22` + Password Injection)**: Completed (`77b6d0e`, `e4ece51`).
 - **`M1-4` Part 1 (`F-08` — Multi-Session Tabs & Split Panes)**:
-  - Implemented workspace tab/pane domain models and reordering/cycling helpers in [`backend/core/workspace.go`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/backend/core/workspace.go) + [`backend/core/workspace_test.go`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/backend/core/workspace_test.go) (`TestM1_4_ReorderTabsAndKeyboardCycle_F08`).
-  - Bound `App.DuplicateSession(sessionID string, size core.TerminalSize) (string, error)` in [`app.go`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/app.go) so splitting a pane opens a fresh shell on the same host without exposing credentials to the frontend.
-  - Added multi-tab bar with drag-and-drop tab reordering, horizontal/vertical split panes (`Split ⬌` / `Split ⬍`), and keyboard focus cycling (`Alt+ArrowLeft`/`Alt+ArrowRight` for tabs, `Alt+ArrowUp`/`Alt+ArrowDown` for split panes) in [`frontend/src/App.tsx`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/frontend/src/App.tsx), verified by Vitest in [`frontend/src/App.test.tsx`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/frontend/src/App.test.tsx).
+  - Implemented workspace tab/pane domain models and tree helpers in [`backend/core/workspace.go`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/backend/core/workspace.go) + [`backend/core/workspace_test.go`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/backend/core/workspace_test.go) (`TestM1_4_MixedNestedSplitPanesAndRemoval_F08`).
+  - Bound `App.DuplicateSession(sessionID string, size core.TerminalSize) (string, error)` in [`app.go`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/app.go) so splitting an active pane opens a fresh shell on the same host directly in Go.
+  - Multi-tab bar with drag-and-drop tab reordering, independent session exits that never wipe unaffected tabs, arbitrary mixed nested horizontal/vertical splits (e.g. 2 stacked on the left, 1 full-height on the right), individual split pane close buttons (`×`), persistent DOM mounting preserving terminal logs across tab switching, and `term.attachCustomKeyEventHandler` bypassing Alt-arrow key leakage (`A`, `B`, `C`, `D`). Tested in [`frontend/src/App.test.tsx`](file:///c:/Users/NikoS/OneDrive/Desktop/DoubleAgent3/frontend/src/App.test.tsx).
 
 ## In Progress
 - None (`F-08` gate closing with `wails build`).

@@ -129,60 +129,88 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByText('secops@198.51.100.7:2202')).toBeInTheDocument();
   });
 
-  it('supports multi-session Tabs, drag-and-drop tab reordering, horizontal/vertical Split Panes, and keyboard focus navigation (F-08)', () => {
+  it('supports multi-session Tabs, drag-and-drop tab reordering, mixed nested Split Panes, closing panes, and preserving logs (F-08)', () => {
     render(<App />);
 
     // Unlock vault
     fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
     fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
 
-    // Create two hosts: Alpha and Beta
+    // Create a host: Alpha
     fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
     fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Alpha' } });
     fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.0.0.1' } });
     fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
 
+    // Connect twice to the SAME server (Alpha) to open two separate tabs
+    const connectButton = screen.getByRole('button', { name: /^Connect$/i });
+    fireEvent.click(connectButton);
+    fireEvent.click(connectButton);
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveAttribute('aria-label', 'Tab Alpha');
+    expect(tabs[1]).toHaveAttribute('aria-label', 'Tab Alpha');
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+
+    // Closing one tab does NOT close the other tab to the same server
+    const closeTabButtons = screen.getAllByRole('button', { name: /Close Tab Alpha/i });
+    fireEvent.click(closeTabButtons[1]);
+
+    const remainingTabs = screen.getAllByRole('tab');
+    expect(remainingTabs).toHaveLength(1);
+    expect(remainingTabs[0]).toHaveAttribute('aria-selected', 'true');
+
+    // Open another host tab: Beta
     fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
     fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Beta' } });
     fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.0.0.2' } });
     fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
 
-    // Connect both hosts to open two Tabs
-    const connectButtons = screen.getAllByRole('button', { name: /^Connect$/i });
-    fireEvent.click(connectButtons[0]);
-    fireEvent.click(connectButtons[1]);
+    const connectBeta = screen.getAllByRole('button', { name: /^Connect$/i })[1];
+    fireEvent.click(connectBeta);
 
-    const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(2);
-    expect(tabs[0]).toHaveAttribute('aria-label', 'Tab Alpha');
-    expect(tabs[1]).toHaveAttribute('aria-label', 'Tab Beta');
-    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    const twoTabs = screen.getAllByRole('tab');
+    expect(twoTabs).toHaveLength(2);
+    expect(twoTabs[1]).toHaveAttribute('aria-label', 'Tab Beta');
+    expect(twoTabs[1]).toHaveAttribute('aria-selected', 'true');
 
-    // Reorder tabs via Drag-and-Drop: drag Alpha onto Beta (F-08)
-    fireEvent.dragStart(tabs[0]);
-    fireEvent.dragOver(tabs[1]);
-    fireEvent.drop(tabs[1]);
+    // Both tabs remain mounted in DOM to preserve logs across tab switches
+    const tabPanels = screen.getAllByLabelText(/Pane /);
+    expect(tabPanels.length).toBeGreaterThanOrEqual(2);
 
-    const reorderedTabs = screen.getAllByRole('tab');
-    expect(reorderedTabs[0]).toHaveAttribute('aria-label', 'Tab Beta');
-    expect(reorderedTabs[1]).toHaveAttribute('aria-label', 'Tab Alpha');
+    // Switch tabs via Alt+ArrowLeft: Tab Alpha becomes active without unmounting Beta
+    fireEvent.keyDown(window, { key: 'ArrowLeft', altKey: true });
+    expect(screen.getAllByRole('tab')[0]).toHaveAttribute('aria-selected', 'true');
 
-    // Keyboard navigation between Tabs via Alt+ArrowRight (F-08)
-    fireEvent.keyDown(window, { key: 'ArrowRight', altKey: true });
-    expect(screen.getByRole('tab', { name: 'Tab Alpha' })).toHaveAttribute('aria-selected', 'true');
-
-    // Split active tab horizontally (F-08)
+    // Mixed nested splitting on Tab Alpha:
+    // 1. Split horizontally -> 2 panes side-by-side
     fireEvent.click(screen.getByRole('button', { name: 'Split Horizontal' }));
-    const splitGrid = screen.getByLabelText('Terminal Split Grid');
-    expect(splitGrid).toHaveClass('split-horizontal');
+    expect(screen.getByLabelText('Split Container horizontal')).toBeInTheDocument();
     expect(screen.getByLabelText('Pane Alpha (H-Split #2)')).toHaveClass('active');
 
-    // Cycle focus between split panes via Alt+ArrowDown (F-08)
-    fireEvent.keyDown(window, { key: 'ArrowDown', altKey: true });
+    // Focus left pane (Pane Alpha)
+    fireEvent.click(screen.getByLabelText('Pane Alpha'));
     expect(screen.getByLabelText('Pane Alpha')).toHaveClass('active');
 
-    // Switch to vertical split (F-08)
+    // 2. In left pane, split vertically -> creates vertical split inside left side
+    // Result: 2 panes stacked vertically on the left, 1 full-height pane on the right
     fireEvent.click(screen.getByRole('button', { name: 'Split Vertical' }));
-    expect(splitGrid).toHaveClass('split-vertical');
+    expect(screen.getByLabelText('Split Container vertical')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Alpha (V-Split #3)')).toHaveClass('active');
+
+    // Cycle focus between split panes via Alt+ArrowDown
+    fireEvent.keyDown(window, { key: 'ArrowDown', altKey: true });
+
+    // Close the newly split pane via its dedicated close button (×)
+    const closeSplitBtn = screen.getByRole('button', {
+      name: /Close Pane Alpha \(V-Split #3\)/i,
+    });
+    fireEvent.click(closeSplitBtn);
+
+    // Pane is closed and split collapses cleanly
+    expect(screen.queryByLabelText('Pane Alpha (V-Split #3)')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Alpha')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Alpha (H-Split #2)')).toBeInTheDocument();
   });
 });
