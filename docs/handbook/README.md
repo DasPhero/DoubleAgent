@@ -6,9 +6,30 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, & `F-08`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, & `F-23`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Local Terminals & Hardware Serial / UART Console (`F-23`)**:
+  - **Local PTY Terminals (PowerShell, Command Prompt, WSL)**:
+    - Open local terminals directly inside DoubleAgent tabs from **Tools ▾**:
+      - **Local Shell (PowerShell)**: Launches `powershell.exe` with interactive streaming.
+      - **Local Shell (Command Prompt)**: Launches `cmd.exe`.
+      - **Local Shell (WSL Linux)**: Launches `wsl.exe` for your default Linux distribution.
+    - Local sessions integrate seamlessly with the Tab manager, Split Panes, per-pane font zoom, and in-terminal search (`Ctrl+F`).
+  - **Hardware Serial / UART / RS-232 / USB Console (`F-23`)**:
+    - Connect to microcontrollers, embedded boards, network switches, routers, and serial devices via COM ports on Windows (`COM1`–`COM256`) and `/dev/ttyUSB*` / `/dev/ttyS*` on Linux.
+    - **Port Detection**: Automatic hardware port enumeration with a one-click **`🔄 Refresh`** button.
+    - **Baud Rates**: Select standard rates (`9600`, `19200`, `38400`, `57600`, `115200`, `230400`, `460800`, `921600`, up to `2000000` baud).
+    - **Configurable Parameters**:
+      - **Data Bits**: 5, 6, 7, or 8 bits.
+      - **Parity**: None (N), Odd (O), Even (E), Mark (M), Space (S).
+      - **Stop Bits**: 1, 1.5, or 2 stop bits.
+      - **Flow Control**: None, Hardware (RTS/CTS), or Software (XON/XOFF).
+      - **Line Endings**: CRLF (`\r\n`), LF (`\n`), or CR (`\r`).
+      - **Local Echo**: Configurable client-side echo for devices that do not echo typed characters.
+    - **Hardware Pin Controls & Break Signal**:
+      - Toggle **DTR** (Data Terminal Ready) and **RTS** (Request to Send) pin states directly from the pane header in real-time.
+      - Send a hardware **`⚡ Break`** condition signal for microcontroller reset or ROM monitor entry.
 - **Top Bar Menu Navigation & Workspace Organization**:
   - The top bar is organized into a clean application menu bar:
     - **Vault ▾**: Quick access to lock/unlock, Vault Security & Windows Hello (`F-03`), and emergency Vault Reset.

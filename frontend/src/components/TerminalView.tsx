@@ -293,14 +293,27 @@ export function TerminalView({
 }: TerminalViewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  const onInputRef = useRef(onInput);
+  onInputRef.current = onInput;
+  const onResizeRef = useRef(onResize);
+  onResizeRef.current = onResize;
+  const onFontSizeChangeRef = useRef(onFontSizeChange);
+  onFontSizeChangeRef.current = onFontSizeChange;
+  const onToggleSearchRef = useRef(onToggleSearch);
+  onToggleSearchRef.current = onToggleSearch;
+  const registerWriterRef = useRef(registerWriter);
+  registerWriterRef.current = registerWriter;
+  const registerFocuserRef = useRef(registerFocuser);
+  registerFocuserRef.current = registerFocuser;
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) {
       return;
     }
 
-    inputCallbacks.set(sessionId, (data: string) => onInput(sessionId, data));
-    resizeCallbacks.set(sessionId, (cols: number, rows: number) => onResize(sessionId, cols, rows));
+    inputCallbacks.set(sessionId, (data: string) => onInputRef.current(sessionId, data));
+    resizeCallbacks.set(sessionId, (cols: number, rows: number) => onResizeRef.current(sessionId, cols, rows));
 
     const cfg = settings || DEFAULT_SETTINGS;
     let entry = terminalPool.get(sessionId);
@@ -359,7 +372,7 @@ export function TerminalView({
         }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
           e.preventDefault();
-          onToggleSearch?.(sessionId);
+          onToggleSearchRef.current?.(sessionId);
           return false;
         }
         if (
@@ -369,13 +382,13 @@ export function TerminalView({
           e.preventDefault();
           if (e.key === '=' || e.key === '+') {
             const next = changeTerminalFontSize(sessionId, +1);
-            onFontSizeChange?.(sessionId, next);
+            onFontSizeChangeRef.current?.(sessionId, next);
           } else if (e.key === '-' || e.key === '_') {
             const next = changeTerminalFontSize(sessionId, -1);
-            onFontSizeChange?.(sessionId, next);
+            onFontSizeChangeRef.current?.(sessionId, next);
           } else if (e.key === '0') {
             resetTerminalFontSize(sessionId, cfg.fontSize);
-            onFontSizeChange?.(sessionId, cfg.fontSize);
+            onFontSizeChangeRef.current?.(sessionId, cfg.fontSize);
           }
           return false;
         }
@@ -412,6 +425,7 @@ export function TerminalView({
         if (container.clientWidth > 0 && container.clientHeight > 0) {
           entry?.fitAddon.fit();
           entry?.term.refresh(0, entry.term.rows - 1);
+          entry?.term.scrollToBottom();
         }
       } catch {
         // Ignore layout fit error in headless test environment
@@ -427,19 +441,20 @@ export function TerminalView({
       // Ignore in headless test environment
     }
 
-    if (registerWriter) {
-      registerWriter(sessionId, (chunk: string) => {
+    if (registerWriterRef.current) {
+      registerWriterRef.current(sessionId, (chunk: string) => {
         // Golden Rule 2: Terminal output is strictly written to xterm.js, never innerHTML.
         entry?.term.write(chunk);
       });
     }
 
-    if (registerFocuser) {
-      registerFocuser(sessionId, () => {
+    if (registerFocuserRef.current) {
+      registerFocuserRef.current(sessionId, () => {
         try {
           if (container.clientWidth > 0 && container.clientHeight > 0) {
             entry?.fitAddon.fit();
             entry?.term.refresh(0, entry.term.rows - 1);
+            entry?.term.scrollToBottom();
           }
           entry?.term.focus();
         } catch {
@@ -455,7 +470,7 @@ export function TerminalView({
         e.preventDefault();
         const delta = e.deltaY < 0 ? 1 : -1;
         const next = changeTerminalFontSize(sessionId, delta);
-        onFontSizeChange?.(sessionId, next);
+        onFontSizeChangeRef.current?.(sessionId, next);
       }
     };
     container.addEventListener('wheel', handleWheel, { passive: false });
@@ -466,6 +481,7 @@ export function TerminalView({
         if (container.clientWidth > 0 && container.clientHeight > 0) {
           try {
             entry?.fitAddon.fit();
+            entry?.term.scrollToBottom();
           } catch {
             // Ignore layout fit error
           }
@@ -478,6 +494,7 @@ export function TerminalView({
       try {
         if (container.clientWidth > 0 && container.clientHeight > 0) {
           entry?.fitAddon.fit();
+          entry?.term.scrollToBottom();
         }
       } catch {
         // Ignore in headless test environment
@@ -499,16 +516,7 @@ export function TerminalView({
       // preserve all buffer data and session logs.
       // Terminals are disposed cleanly via disposeTerminal(sessionId) upon session close.
     };
-  }, [
-    sessionId,
-    onInput,
-    onResize,
-    registerWriter,
-    registerFocuser,
-    settings,
-    onFontSizeChange,
-    onToggleSearch,
-  ]);
+  }, [sessionId, settings]);
 
   return (
     <div

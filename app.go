@@ -14,6 +14,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"doubleagent/backend/core"
+	"doubleagent/backend/pty"
+	"doubleagent/backend/serial"
 	"doubleagent/backend/ssh"
 	"doubleagent/backend/vault"
 )
@@ -32,6 +34,8 @@ type App struct {
 
 	mu               sync.Mutex
 	activeStreams    map[string]*core.SshShellStreams
+	localSessions    map[string]pty.Session
+	serialSessions   map[string]serial.Port
 	sessionHostID    map[string]string
 	sessionPasswords map[string]string
 	sessionRequests  map[string]core.ConnectRequest
@@ -80,6 +84,8 @@ func NewAppWithDependencies(
 		knownHosts:       kh,
 		emit:             emit,
 		activeStreams:    make(map[string]*core.SshShellStreams),
+		localSessions:    make(map[string]pty.Session),
+		serialSessions:   make(map[string]serial.Port),
 		sessionHostID:    make(map[string]string),
 		sessionPasswords: make(map[string]string),
 		sessionRequests:  make(map[string]core.ConnectRequest),
@@ -579,14 +585,21 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 	return sessionID, nil
 }
 
-// DuplicateSession opens a parallel SSH PTY session to the same host as an existing session
-// (used when splitting a pane horizontally or vertically per F-08).
+// DuplicateSession opens a parallel SSH, local shell, or fails for serial (used when splitting a pane horizontally or vertically per F-08).
 func (a *App) DuplicateSession(sessionID string, size core.TerminalSize) (string, error) {
 	a.mu.Lock()
+	locSess, isLocal := a.localSessions[sessionID]
+	_, isSerial := a.serialSessions[sessionID]
 	hostID := a.sessionHostID[sessionID]
 	req, hasReq := a.sessionRequests[sessionID]
 	a.mu.Unlock()
 
+	if isLocal && locSess != nil {
+		return a.OpenLocalTerminal(locSess.ShellType(), size)
+	}
+	if isSerial {
+		return "", errors.New("cannot duplicate serial connection; port is already open")
+	}
 	if hostID != "" {
 		return a.ConnectSavedHost(hostID, size)
 	}
@@ -639,21 +652,113 @@ func (a *App) ResolveHostKeyPrompt(host string, port uint16, trust bool) error {
 	return nil
 }
 
-// WriteTerminal writes user keystrokes from xterm.js into the active SSH shell stdin (F-07).
+// OpenLocalTerminal starts a local pseudo-terminal shell (PowerShell, CMD, WSL) per F-23.
+func (a *App) OpenLocalTerminal(shellType string, size core.TerminalSize) (string, error) {
+	sess, err := pty.StartShell(a.ctx, shellType, size)
+	if err != nil {
+		return "", err
+	}
+
+	sessionID := sess.ID()
+	a.mu.Lock()
+	a.localSessions[sessionID] = sess
+	a.mu.Unlock()
+
+	go a.streamReaderLoop(sessionID, sess.Stdout(), true)
+	return sessionID, nil
+}
+
+// ListSerialPorts returns detected hardware and virtual serial/COM ports.
+func (a *App) ListSerialPorts() ([]core.SerialPortInfo, error) {
+	return serial.ListPorts()
+}
+
+// ConnectSerial opens an interactive serial/UART/RS-232/USB-CDC port console.
+func (a *App) ConnectSerial(cfg core.SerialConfig) (string, error) {
+	port, err := serial.Open(a.ctx, cfg)
+	if err != nil {
+		return "", err
+	}
+
+	sessionID := port.ID()
+	a.mu.Lock()
+	a.serialSessions[sessionID] = port
+	a.mu.Unlock()
+
+	go a.streamReaderLoop(sessionID, port, true)
+	return sessionID, nil
+}
+
+// SetSerialDTR controls the Data Terminal Ready pin state.
+func (a *App) SetSerialDTR(sessionID string, state bool) error {
+	a.mu.Lock()
+	port, ok := a.serialSessions[sessionID]
+	a.mu.Unlock()
+	if !ok || port == nil {
+		return core.ErrSessionNotFound
+	}
+	return port.SetDTR(state)
+}
+
+// SetSerialRTS controls the Request To Send pin state.
+func (a *App) SetSerialRTS(sessionID string, state bool) error {
+	a.mu.Lock()
+	port, ok := a.serialSessions[sessionID]
+	a.mu.Unlock()
+	if !ok || port == nil {
+		return core.ErrSessionNotFound
+	}
+	return port.SetRTS(state)
+}
+
+// SendSerialBreak sends a hardware line break on the serial port.
+func (a *App) SendSerialBreak(sessionID string) error {
+	a.mu.Lock()
+	port, ok := a.serialSessions[sessionID]
+	a.mu.Unlock()
+	if !ok || port == nil {
+		return core.ErrSessionNotFound
+	}
+	return port.SendBreak()
+}
+
+// WriteTerminal writes user keystrokes from xterm.js into the active SSH, local shell, or serial port stdin (F-07, F-23).
 func (a *App) WriteTerminal(sessionID string, data string) error {
 	a.vaultStore.Touch()
 	a.mu.Lock()
-	streams, ok := a.activeStreams[sessionID]
+	locSess, isLocal := a.localSessions[sessionID]
+	serPort, isSerial := a.serialSessions[sessionID]
+	streams, isSSH := a.activeStreams[sessionID]
 	a.mu.Unlock()
-	if !ok || streams == nil || streams.Stdin == nil {
-		return core.ErrSessionNotFound
+
+	if isLocal && locSess != nil {
+		_, err := io.WriteString(locSess.Stdin(), data)
+		return err
 	}
-	_, err := io.WriteString(streams.Stdin, data)
-	return err
+	if isSerial && serPort != nil {
+		_, err := serPort.Write([]byte(data))
+		return err
+	}
+	if isSSH && streams != nil && streams.Stdin != nil {
+		_, err := io.WriteString(streams.Stdin, data)
+		return err
+	}
+	return core.ErrSessionNotFound
 }
 
-// ResizeTerminal updates the remote PTY window size when xterm.js resizes (F-07).
+// ResizeTerminal updates the terminal window size when xterm.js resizes (F-07, F-23).
 func (a *App) ResizeTerminal(sessionID string, cols uint16, rows uint16) error {
+	a.mu.Lock()
+	locSess, isLocal := a.localSessions[sessionID]
+	_, isSerial := a.serialSessions[sessionID]
+	a.mu.Unlock()
+
+	if isLocal && locSess != nil {
+		return locSess.Resize(core.TerminalSize{Cols: cols, Rows: rows})
+	}
+	if isSerial {
+		return nil
+	}
 	return a.transport.ResizeShell(a.ctx, sessionID, core.TerminalSize{
 		Cols: cols,
 		Rows: rows,
@@ -692,14 +797,25 @@ func (a *App) InjectSessionPassword(sessionID string) error {
 	return err
 }
 
-// DisconnectSession closes the active SSH session and removes its stream reference.
+// DisconnectSession closes the active SSH session, local shell, or serial port and removes its stream reference.
 func (a *App) DisconnectSession(sessionID string) error {
 	a.mu.Lock()
+	locSess, isLocal := a.localSessions[sessionID]
+	delete(a.localSessions, sessionID)
+	serPort, isSerial := a.serialSessions[sessionID]
+	delete(a.serialSessions, sessionID)
 	delete(a.activeStreams, sessionID)
 	delete(a.sessionHostID, sessionID)
 	delete(a.sessionPasswords, sessionID)
 	delete(a.sessionRequests, sessionID)
 	a.mu.Unlock()
+
+	if isLocal && locSess != nil {
+		return locSess.Close()
+	}
+	if isSerial && serPort != nil {
+		return serPort.Close()
+	}
 	return a.transport.Disconnect(a.ctx, sessionID)
 }
 
@@ -723,6 +839,8 @@ func (a *App) streamReaderLoop(sessionID string, r io.Reader, emitExitOnEOF bool
 			if emitExitOnEOF {
 				a.mu.Lock()
 				delete(a.activeStreams, sessionID)
+				delete(a.localSessions, sessionID)
+				delete(a.serialSessions, sessionID)
 				delete(a.sessionHostID, sessionID)
 				delete(a.sessionPasswords, sessionID)
 				delete(a.sessionRequests, sessionID)

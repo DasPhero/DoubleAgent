@@ -389,6 +389,50 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class SerialConfig {
+	    port: string;
+	    baudRate: number;
+	    dataBits: number;
+	    parity: string;
+	    stopBits: string;
+	    flowControl: string;
+	    dtr: boolean;
+	    rts: boolean;
+	    localEcho: boolean;
+	    lineEnding: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SerialConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.baudRate = source["baudRate"];
+	        this.dataBits = source["dataBits"];
+	        this.parity = source["parity"];
+	        this.stopBits = source["stopBits"];
+	        this.flowControl = source["flowControl"];
+	        this.dtr = source["dtr"];
+	        this.rts = source["rts"];
+	        this.localEcho = source["localEcho"];
+	        this.lineEnding = source["lineEnding"];
+	    }
+	}
+	export class SerialPortInfo {
+	    port: string;
+	    description: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SerialPortInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.description = source["description"];
+	    }
+	}
 	export class SshKeySummary {
 	    id: string;
 	    label: string;

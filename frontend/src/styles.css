@@ -1254,3 +1254,137 @@ body,
 .search-close-btn:hover {
   color: #f87171;
 }
+
+/* Serial / UART & Hardware Console Controls (F-23) */
+.serial-pin-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.serial-pin-btn {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-family: Consolas, monospace;
+  font-weight: 700;
+  padding: 0.05rem 0.3rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.serial-pin-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.serial-pin-btn.active {
+  background: rgba(45, 212, 191, 0.15);
+  border-color: var(--accent-bright);
+  color: var(--accent-bright);
+  box-shadow: 0 0 4px var(--accent-glow);
+}
+
+.serial-break-btn {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 3px;
+  color: #facc15;
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 0.05rem 0.35rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.serial-break-btn:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #facc15;
+  color: #fef08a;
+}
+
+.serial-port-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.serial-port-row select {
+  flex: 1;
+}
+
+.serial-refresh-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-accent);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.serial-refresh-btn:hover {
+  border-color: var(--accent-bright);
+  color: var(--accent-bright);
+}
+
+.form-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.form-grid-3col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.advanced-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-bright);
+  font-size: 0.76rem;
+  cursor: pointer;
+  text-align: left;
+  padding: 0.2rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: fit-content;
+}
+
+.advanced-toggle-btn:hover {
+  text-decoration: underline;
+}
+
+.advanced-serial-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  background-color: rgba(9, 13, 20, 0.5);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  margin-top: 0.2rem;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+

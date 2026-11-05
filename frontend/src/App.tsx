@@ -420,6 +420,7 @@ function searchHostsFuzzyLocal(hosts: HostSummary[], query: string): HostSearchR
 interface TerminalDataPayload {
   sessionId: string;
   data: string;
+  sessionID?: string;
 }
 
 interface WailsAppBindings {
@@ -477,6 +478,30 @@ interface WailsAppBindings {
   WriteTerminal: (sessionId: string, data: string) => Promise<void>;
   ResizeTerminal: (sessionId: string, cols: number, rows: number) => Promise<void>;
   DisconnectSession: (sessionId: string) => Promise<void>;
+  OpenLocalTerminal?: (shellType: string, size: { cols: number; rows: number }) => Promise<string>;
+  ListSerialPorts?: () => Promise<SerialPortInfo[]>;
+  ConnectSerial?: (cfg: SerialConfig) => Promise<string>;
+  SetSerialDTR?: (sessionId: string, state: boolean) => Promise<void>;
+  SetSerialRTS?: (sessionId: string, state: boolean) => Promise<void>;
+  SendSerialBreak?: (sessionId: string) => Promise<void>;
+}
+
+export interface SerialConfig {
+  port: string;
+  baudRate: number;
+  dataBits: number;
+  parity: 'none' | 'odd' | 'even' | 'mark' | 'space';
+  stopBits: '1' | '1.5' | '2';
+  flowControl: 'none' | 'hardware' | 'software';
+  dtr: boolean;
+  rts: boolean;
+  localEcho: boolean;
+  lineEnding: string;
+}
+
+export interface SerialPortInfo {
+  port: string;
+  description: string;
 }
 
 interface WailsRuntime {
@@ -592,6 +617,27 @@ export function App(): React.JSX.Element {
       return next;
     });
   };
+
+  // Serial / UART and Local Terminal State (F-23)
+  const [showSerialModal, setShowSerialModal] = useState<boolean>(false);
+  const [serialPorts, setSerialPorts] = useState<SerialPortInfo[]>([]);
+  const [serialLoading, setSerialLoading] = useState<boolean>(false);
+  const [showSerialAdvanced, setShowSerialAdvanced] = useState<boolean>(false);
+  const [serialConfig, setSerialConfig] = useState<SerialConfig>({
+    port: 'COM1',
+    baudRate: 115200,
+    dataBits: 8,
+    parity: 'none',
+    stopBits: '1',
+    flowControl: 'none',
+    dtr: true,
+    rts: true,
+    localEcho: false,
+    lineEnding: 'crlf',
+  });
+  const [serialPinStates, setSerialPinStates] = useState<
+    Map<string, { dtr: boolean; rts: boolean }>
+  >(new Map());
 
   // Global Settings state
   const [globalSettings, setGlobalSettings] = useState<AppGlobalSettings>(() =>
@@ -727,6 +773,7 @@ export function App(): React.JSX.Element {
   const sessionId = activePane?.sessionId || null;
 
   const writersRef = useRef<Map<string, (chunk: string) => void>>(new Map());
+  const pendingDataBuffers = useRef<Map<string, string[]>>(new Map());
   const focusersRef = useRef<Map<string, () => void>>(new Map());
   const tabCounterRef = useRef<number>(0);
 
@@ -759,6 +806,13 @@ export function App(): React.JSX.Element {
 
   const registerWriter = useCallback((id: string, writeFn: (chunk: string) => void) => {
     writersRef.current.set(id, writeFn);
+    const buffered = pendingDataBuffers.current.get(id);
+    if (buffered && buffered.length > 0) {
+      for (const chunk of buffered) {
+        writeFn(chunk);
+      }
+      pendingDataBuffers.current.delete(id);
+    }
   }, []);
 
   const registerFocuser = useCallback((id: string, focusFn: () => void) => {
@@ -796,9 +850,15 @@ export function App(): React.JSX.Element {
 
     const offData = rt.EventsOn('terminal:data', (raw: unknown) => {
       const payload = raw as TerminalDataPayload;
-      const writer = writersRef.current.get(payload.sessionId);
+      const sid = payload.sessionId || payload.sessionID || '';
+      const writer = writersRef.current.get(sid);
       if (writer) {
         writer(payload.data);
+      } else if (sid) {
+        // Buffer incoming data so prompts or login banners arriving before TerminalView mounts are never lost
+        const buf = pendingDataBuffers.current.get(sid) || [];
+        buf.push(payload.data);
+        pendingDataBuffers.current.set(sid, buf);
       }
     });
 
@@ -819,6 +879,7 @@ export function App(): React.JSX.Element {
         return;
       }
       writersRef.current.delete(exitedId);
+      pendingDataBuffers.current.delete(exitedId);
       focusersRef.current.delete(exitedId);
       disposeTerminal(exitedId);
       setPaneFontSizes((prev) => {
@@ -1394,6 +1455,10 @@ export function App(): React.JSX.Element {
     }
   }, []);
 
+  const handleFontSizeChange = useCallback((szId: string, sz: number): void => {
+    setPaneFontSizes((prev) => new Map(prev.set(szId, sz)));
+  }, []);
+
   const handleGenerateKey = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setModalError('');
@@ -1566,6 +1631,121 @@ export function App(): React.JSX.Element {
     }
   };
 
+  const handleOpenLocalTerminal = async (shellType: string): Promise<void> => {
+    const api = getWailsBindings();
+    let sid = `local-${shellType}-${Date.now()}`;
+    if (api?.OpenLocalTerminal) {
+      try {
+        sid = await api.OpenLocalTerminal(shellType, { cols: 120, rows: 34 });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Failed to launch ${shellType}: ${msg}`);
+        return;
+      }
+    }
+    const title =
+      shellType === 'cmd'
+        ? 'Local (CMD)'
+        : shellType === 'wsl'
+          ? 'Local (WSL)'
+          : 'Local (PowerShell)';
+    openSessionTab(sid, title, undefined, '#10b981');
+    setStatusMessage(`Started ${title} session.`);
+  };
+
+  const handleRefreshSerialPorts = async (): Promise<void> => {
+    setSerialLoading(true);
+    const api = getWailsBindings();
+    if (api?.ListSerialPorts) {
+      try {
+        const ports = await api.ListSerialPorts();
+        setSerialPorts(ports);
+        if (ports.length > 0 && !ports.some((p) => p.port === serialConfig.port)) {
+          setSerialConfig((prev) => ({ ...prev, port: ports[0].port }));
+        }
+      } catch {
+        // ignore
+      }
+    }
+    setSerialLoading(false);
+  };
+
+  const handleOpenSerialModal = async (): Promise<void> => {
+    setModalError('');
+    setShowSerialModal(true);
+    await handleRefreshSerialPorts();
+  };
+
+  const handleConnectSerial = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    setModalError('');
+    const api = getWailsBindings();
+    let sid = `serial-${serialConfig.port}-${Date.now()}`;
+    if (api?.ConnectSerial) {
+      try {
+        sid = await api.ConnectSerial(serialConfig);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setModalError(`Failed to connect to ${serialConfig.port}: ${msg}`);
+        return;
+      }
+    }
+    const title = `Serial (${serialConfig.port} @ ${serialConfig.baudRate})`;
+    openSessionTab(sid, title, undefined, '#f59e0b');
+    setSerialPinStates((prev) =>
+      new Map(prev).set(sid, { dtr: serialConfig.dtr, rts: serialConfig.rts })
+    );
+    setShowSerialModal(false);
+    setStatusMessage(`Connected to ${serialConfig.port} at ${serialConfig.baudRate} baud.`);
+  };
+
+  const handleToggleDTR = async (sid: string): Promise<void> => {
+    const current = serialPinStates.get(sid) || { dtr: true, rts: true };
+    const nextState = !current.dtr;
+    const api = getWailsBindings();
+    if (api?.SetSerialDTR) {
+      try {
+        await api.SetSerialDTR(sid, nextState);
+      } catch {
+        // ignore
+      }
+    }
+    setSerialPinStates((prev) =>
+      new Map(prev).set(sid, { ...current, dtr: nextState })
+    );
+  };
+
+  const handleToggleRTS = async (sid: string): Promise<void> => {
+    const current = serialPinStates.get(sid) || { dtr: true, rts: true };
+    const nextState = !current.rts;
+    const api = getWailsBindings();
+    if (api?.SetSerialRTS) {
+      try {
+        await api.SetSerialRTS(sid, nextState);
+      } catch {
+        // ignore
+      }
+    }
+    setSerialPinStates((prev) =>
+      new Map(prev).set(sid, { ...current, rts: nextState })
+    );
+  };
+
+  const handleSendSerialBreak = async (sid: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.SendSerialBreak) {
+      try {
+        await api.SendSerialBreak(sid);
+        setStatusMessage(`Sent break signal on ${sid}.`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Break failed: ${msg}`);
+      }
+    } else {
+      setStatusMessage(`Sent break signal on ${sid}.`);
+    }
+  };
+
   const handleSplitPane = async (direction: 'horizontal' | 'vertical'): Promise<void> => {
     if (!activeTab || !activePane) {
       return;
@@ -1584,12 +1764,17 @@ export function App(): React.JSX.Element {
     tabCounterRef.current += 1;
     const newPaneId = `pane-${tabCounterRef.current}`;
     const currentPanes = collectPanes(activeTab.rootNode);
+    const baseTitle =
+      activeTab.title
+        .replace(/\s*\([^)]*Split[^)]*\)/gi, '')
+        .trim() || activeTab.title;
+    const splitLabel = direction === 'horizontal' ? 'H' : 'V';
     const newPane: WorkspaceNode = {
       type: 'pane',
       id: newPaneId,
       sessionId: newSessionId,
       hostId: activeTab.hostId,
-      title: `${activePane.title} (${direction === 'horizontal' ? 'H' : 'V'}-Split #${currentPanes.length + 1})`,
+      title: `${baseTitle} (${splitLabel}-Split #${currentPanes.length + 1})`,
     };
     setTabs((prev) =>
       prev.map((t) => {
@@ -1618,6 +1803,7 @@ export function App(): React.JSX.Element {
     const targetPane = findPane(targetTab.rootNode, paneId);
     if (targetPane) {
       writersRef.current.delete(targetPane.sessionId);
+      pendingDataBuffers.current.delete(targetPane.sessionId);
       focusersRef.current.delete(targetPane.sessionId);
       disposeTerminal(targetPane.sessionId);
       setPaneFontSizes((prev) => {
@@ -1687,6 +1873,7 @@ export function App(): React.JSX.Element {
     const api = getWailsBindings();
     for (const p of targetPanes) {
       writersRef.current.delete(p.sessionId);
+      pendingDataBuffers.current.delete(p.sessionId);
       focusersRef.current.delete(p.sessionId);
       disposeTerminal(p.sessionId);
       setPaneFontSizes((prev) => {
@@ -1736,6 +1923,46 @@ export function App(): React.JSX.Element {
           <div className="split-pane-header">
             <span>{node.title}</span>
             <div className="pane-header-actions">
+              {node.sessionId.startsWith('serial-') && (
+                <div className="serial-pin-controls">
+                  <button
+                    type="button"
+                    className={`serial-pin-btn ${(serialPinStates.get(node.sessionId)?.dtr ?? true) ? 'active' : ''}`}
+                    title="Toggle DTR (Data Terminal Ready)"
+                    aria-label={`Toggle DTR for ${node.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleToggleDTR(node.sessionId);
+                    }}
+                  >
+                    DTR
+                  </button>
+                  <button
+                    type="button"
+                    className={`serial-pin-btn ${(serialPinStates.get(node.sessionId)?.rts ?? true) ? 'active' : ''}`}
+                    title="Toggle RTS (Request To Send)"
+                    aria-label={`Toggle RTS for ${node.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleToggleRTS(node.sessionId);
+                    }}
+                  >
+                    RTS
+                  </button>
+                  <button
+                    type="button"
+                    className="serial-break-btn"
+                    title="Send hardware Break signal"
+                    aria-label={`Send Break for ${node.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleSendSerialBreak(node.sessionId);
+                    }}
+                  >
+                    ⚡ Break
+                  </button>
+                </div>
+              )}
               <div className="pane-zoom-group">
                 <button
                   type="button"
@@ -1931,9 +2158,7 @@ export function App(): React.JSX.Element {
             registerWriter={registerWriter}
             registerFocuser={registerFocuser}
             settings={globalSettings}
-            onFontSizeChange={(szId, sz) =>
-              setPaneFontSizes((prev) => new Map(prev.set(szId, sz)))
-            }
+            onFontSizeChange={handleFontSizeChange}
             onToggleSearch={togglePaneSearch}
           />
         </div>
@@ -2105,6 +2330,58 @@ export function App(): React.JSX.Element {
                   >
                     <span>Import ssh_config</span>
                     <span className="nav-dropdown-shortcut">F-22</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
+                  <div className="nav-dropdown-header">Local Terminals (F-23)</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleOpenLocalTerminal('powershell');
+                    }}
+                  >
+                    <span>Local Shell (PowerShell)</span>
+                    <span className="nav-dropdown-shortcut">⚡ pwsh</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleOpenLocalTerminal('cmd');
+                    }}
+                  >
+                    <span>Local Shell (Command Prompt)</span>
+                    <span className="nav-dropdown-shortcut">cmd</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleOpenLocalTerminal('wsl');
+                    }}
+                  >
+                    <span>Local Shell (WSL Linux)</span>
+                    <span className="nav-dropdown-shortcut">🐧 wsl</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
+                  <div className="nav-dropdown-header">Hardware Serial (F-23)</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleOpenSerialModal();
+                    }}
+                  >
+                    <span>Serial / UART Console (COM)</span>
+                    <span className="nav-dropdown-shortcut">🔌 COM</span>
                   </button>
                   {activePane && (
                     <>
@@ -3634,6 +3911,251 @@ export function App(): React.JSX.Element {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {showSerialModal && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Serial Connection"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowSerialModal(false);
+            }
+          }}
+        >
+          <div className="modal-card">
+            <h2>Serial / UART Console Connection (F-23)</h2>
+            <form onSubmit={(e) => void handleConnectSerial(e)}>
+              {modalError && <p className="status-banner error">{modalError}</p>}
+
+              <label htmlFor="serial-port-select">
+                Port / Device
+                <div className="serial-port-row">
+                  {serialPorts.length > 0 ? (
+                    <select
+                      id="serial-port-select"
+                      aria-label="Serial Port Select"
+                      value={serialConfig.port}
+                      onChange={(e) =>
+                        setSerialConfig((prev) => ({ ...prev, port: e.target.value }))
+                      }
+                    >
+                      {serialPorts.map((p) => (
+                        <option key={p.port} value={p.port}>
+                          {p.port} — {p.description}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id="serial-port-select"
+                      aria-label="Serial Port Name"
+                      type="text"
+                      placeholder="e.g. COM1 or /dev/ttyUSB0"
+                      value={serialConfig.port}
+                      onChange={(e) =>
+                        setSerialConfig((prev) => ({ ...prev, port: e.target.value }))
+                      }
+                      required
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className="serial-refresh-btn"
+                    onClick={() => void handleRefreshSerialPorts()}
+                    title="Refresh detected serial ports"
+                    disabled={serialLoading}
+                  >
+                    {serialLoading ? '...' : '🔄 Refresh'}
+                  </button>
+                </div>
+              </label>
+
+              <div className="form-grid-2col">
+                <label htmlFor="serial-baud-rate">
+                  Baud Rate
+                  <select
+                    id="serial-baud-rate"
+                    aria-label="Baud Rate"
+                    value={serialConfig.baudRate}
+                    onChange={(e) =>
+                      setSerialConfig((prev) => ({
+                        ...prev,
+                        baudRate: Number(e.target.value) || 115200,
+                      }))
+                    }
+                  >
+                    {[9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600, 2000000].map(
+                      (b) => (
+                        <option key={b} value={b}>
+                          {b} baud
+                        </option>
+                      )
+                    )}
+                  </select>
+                </label>
+
+                <label htmlFor="serial-line-ending">
+                  Line Ending
+                  <select
+                    id="serial-line-ending"
+                    aria-label="Line Ending"
+                    value={serialConfig.lineEnding}
+                    onChange={(e) =>
+                      setSerialConfig((prev) => ({ ...prev, lineEnding: e.target.value }))
+                    }
+                  >
+                    <option value="crlf">CRLF (\r\n)</option>
+                    <option value="lf">LF (\n)</option>
+                    <option value="cr">CR (\r)</option>
+                  </select>
+                </label>
+              </div>
+
+              <button
+                type="button"
+                className="advanced-toggle-btn"
+                onClick={() => setShowSerialAdvanced((prev) => !prev)}
+              >
+                <span>{showSerialAdvanced ? '▼' : '►'}</span>
+                <span>Advanced Parameters (Data Bits, Parity, Stop Bits, Flow Control)</span>
+              </button>
+
+              {showSerialAdvanced && (
+                <div className="advanced-serial-panel">
+                  <div className="form-grid-3col">
+                    <label htmlFor="serial-data-bits">
+                      Data Bits
+                      <select
+                        id="serial-data-bits"
+                        aria-label="Data Bits"
+                        value={serialConfig.dataBits}
+                        onChange={(e) =>
+                          setSerialConfig((prev) => ({
+                            ...prev,
+                            dataBits: Number(e.target.value) || 8,
+                          }))
+                        }
+                      >
+                        <option value={8}>8 bits (standard)</option>
+                        <option value={7}>7 bits</option>
+                        <option value={6}>6 bits</option>
+                        <option value={5}>5 bits</option>
+                      </select>
+                    </label>
+
+                    <label htmlFor="serial-parity">
+                      Parity
+                      <select
+                        id="serial-parity"
+                        aria-label="Parity"
+                        value={serialConfig.parity}
+                        onChange={(e) =>
+                          setSerialConfig((prev) => ({
+                            ...prev,
+                            parity: e.target.value as SerialConfig['parity'],
+                          }))
+                        }
+                      >
+                        <option value="none">None (N)</option>
+                        <option value="odd">Odd (O)</option>
+                        <option value="even">Even (E)</option>
+                        <option value="mark">Mark (M)</option>
+                        <option value="space">Space (S)</option>
+                      </select>
+                    </label>
+
+                    <label htmlFor="serial-stop-bits">
+                      Stop Bits
+                      <select
+                        id="serial-stop-bits"
+                        aria-label="Stop Bits"
+                        value={serialConfig.stopBits}
+                        onChange={(e) =>
+                          setSerialConfig((prev) => ({
+                            ...prev,
+                            stopBits: e.target.value as SerialConfig['stopBits'],
+                          }))
+                        }
+                      >
+                        <option value="1">1 stop bit</option>
+                        <option value="1.5">1.5 stop bits</option>
+                        <option value="2">2 stop bits</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <label htmlFor="serial-flow-control">
+                    Flow Control
+                    <select
+                      id="serial-flow-control"
+                      aria-label="Flow Control"
+                      value={serialConfig.flowControl}
+                      onChange={(e) =>
+                        setSerialConfig((prev) => ({
+                          ...prev,
+                          flowControl: e.target.value as SerialConfig['flowControl'],
+                        }))
+                      }
+                    >
+                      <option value="none">None</option>
+                      <option value="hardware">Hardware (RTS / CTS)</option>
+                      <option value="software">Software (XON / XOFF)</option>
+                    </select>
+                  </label>
+
+                  <div className="checkbox-row">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={serialConfig.dtr}
+                        onChange={(e) =>
+                          setSerialConfig((prev) => ({ ...prev, dtr: e.target.checked }))
+                        }
+                      />
+                      Initial DTR ON
+                    </label>
+
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={serialConfig.rts}
+                        onChange={(e) =>
+                          setSerialConfig((prev) => ({ ...prev, rts: e.target.checked }))
+                        }
+                      />
+                      Initial RTS ON
+                    </label>
+
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={serialConfig.localEcho}
+                        onChange={(e) =>
+                          setSerialConfig((prev) => ({ ...prev, localEcho: e.target.checked }))
+                        }
+                      />
+                      Local Echo
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-actions" style={{ marginTop: '0.8rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowSerialModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  Connect Serial
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

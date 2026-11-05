@@ -14,6 +14,10 @@ export function ConnectSavedHost(arg1, arg2) {
   return window['go']['main']['App']['ConnectSavedHost'](arg1, arg2);
 }
 
+export function ConnectSerial(arg1) {
+  return window['go']['main']['App']['ConnectSerial'](arg1);
+}
+
 export function DeleteGroup(arg1) {
   return window['go']['main']['App']['DeleteGroup'](arg1);
 }
@@ -70,8 +74,16 @@ export function InjectSessionPassword(arg1) {
   return window['go']['main']['App']['InjectSessionPassword'](arg1);
 }
 
+export function ListSerialPorts() {
+  return window['go']['main']['App']['ListSerialPorts']();
+}
+
 export function LockVault() {
   return window['go']['main']['App']['LockVault']();
+}
+
+export function OpenLocalTerminal(arg1, arg2) {
+  return window['go']['main']['App']['OpenLocalTerminal'](arg1, arg2);
 }
 
 export function ResetVault() {
@@ -100,6 +112,18 @@ export function SaveIdentity(arg1) {
 
 export function SearchCommandPalette(arg1) {
   return window['go']['main']['App']['SearchCommandPalette'](arg1);
+}
+
+export function SendSerialBreak(arg1) {
+  return window['go']['main']['App']['SendSerialBreak'](arg1);
+}
+
+export function SetSerialDTR(arg1, arg2) {
+  return window['go']['main']['App']['SetSerialDTR'](arg1, arg2);
+}
+
+export function SetSerialRTS(arg1, arg2) {
+  return window['go']['main']['App']['SetSerialRTS'](arg1, arg2);
 }
 
 export function UnlockVault(arg1) {

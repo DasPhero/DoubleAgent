@@ -425,4 +425,106 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('search', { name: 'Search Bar SearchHost' })).not.toBeInTheDocument();
   });
+
+  it('supports Local PTY Terminals (PowerShell, CMD, WSL) and Hardware Serial / UART Console (F-23)', () => {
+    render(<App />);
+
+    // Unlock vault
+    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+
+    // 1. Open Local PowerShell terminal via Tools Menu
+    const toolsBtn = screen.getByRole('button', { name: /Tools ▾/i });
+    fireEvent.click(toolsBtn);
+
+    const pwshItem = screen.getByRole('menuitem', { name: /Local Shell \(PowerShell\)/i });
+    fireEvent.click(pwshItem);
+
+    // Verify Tab is created
+    expect(screen.getByRole('tab', { name: 'Tab Local (PowerShell)' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Local (PowerShell)')).toBeInTheDocument();
+
+    // 2. Split pane on Local Terminal: ensure title does not stack recursively
+    fireEvent.click(screen.getByRole('button', { name: 'Split Horizontal' }));
+    expect(screen.getByLabelText('Pane Local (PowerShell) (H-Split #2)')).toBeInTheDocument();
+
+    // Split again: should be V-Split #3 based on root title, not stacked
+    fireEvent.click(screen.getByRole('button', { name: 'Split Vertical' }));
+    expect(screen.getByLabelText('Pane Local (PowerShell) (V-Split #3)')).toBeInTheDocument();
+
+    // 3. Open Local Command Prompt (CMD) via Tools Menu
+    fireEvent.click(toolsBtn);
+    const cmdItem = screen.getByRole('menuitem', { name: /Local Shell \(Command Prompt\)/i });
+    fireEvent.click(cmdItem);
+
+    expect(screen.getByRole('tab', { name: 'Tab Local (CMD)' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Local (CMD)')).toBeInTheDocument();
+
+    // 4. Open Serial / UART Console Connection Modal (F-23)
+    fireEvent.click(toolsBtn);
+    const serialItem = screen.getByRole('menuitem', { name: /Serial \/ UART Console \(COM\)/i });
+    fireEvent.click(serialItem);
+
+    expect(screen.getByRole('dialog', { name: 'Serial Connection' })).toBeInTheDocument();
+    expect(screen.getByText('Serial / UART Console Connection (F-23)')).toBeInTheDocument();
+
+    // Refresh detected ports button exists
+    const refreshBtn = screen.getByRole('button', { name: /Refresh/i });
+    expect(refreshBtn).toBeInTheDocument();
+    fireEvent.click(refreshBtn);
+
+    // Set port name
+    const portInput = screen.getByLabelText('Serial Port Name');
+    fireEvent.change(portInput, { target: { value: 'COM4' } });
+
+    // Change Baud Rate to 115200
+    const baudSelect = screen.getByLabelText('Baud Rate');
+    fireEvent.change(baudSelect, { target: { value: '115200' } });
+
+    // Toggle Advanced Parameters
+    const advToggle = screen.getByRole('button', {
+      name: /Advanced Parameters/i,
+    });
+    fireEvent.click(advToggle);
+
+    expect(screen.getByLabelText('Data Bits')).toBeInTheDocument();
+    expect(screen.getByLabelText('Parity')).toBeInTheDocument();
+    expect(screen.getByLabelText('Stop Bits')).toBeInTheDocument();
+    expect(screen.getByLabelText('Flow Control')).toBeInTheDocument();
+
+    // Configure advanced parameters
+    fireEvent.change(screen.getByLabelText('Data Bits'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Parity'), { target: { value: 'none' } });
+    fireEvent.change(screen.getByLabelText('Stop Bits'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Flow Control'), { target: { value: 'hardware' } });
+
+    // Submit connection form
+    fireEvent.click(screen.getByRole('button', { name: /Connect Serial/i }));
+
+    // Verify modal closes and serial session tab is open
+    expect(screen.queryByRole('dialog', { name: 'Serial Connection' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Tab Serial (COM4 @ 115200)' })).toBeInTheDocument();
+
+    // Verify Serial Hardware Pin Controls (DTR, RTS, Break) exist in the pane header
+    const dtrBtn = screen.getByRole('button', { name: 'Toggle DTR for Serial (COM4 @ 115200)' });
+    const rtsBtn = screen.getByRole('button', { name: 'Toggle RTS for Serial (COM4 @ 115200)' });
+    const breakBtn = screen.getByRole('button', { name: 'Send Break for Serial (COM4 @ 115200)' });
+
+    expect(dtrBtn).toBeInTheDocument();
+    expect(rtsBtn).toBeInTheDocument();
+    expect(breakBtn).toBeInTheDocument();
+
+    // Toggle DTR and RTS
+    expect(dtrBtn).toHaveClass('active');
+    fireEvent.click(dtrBtn);
+    expect(dtrBtn).not.toHaveClass('active');
+
+    expect(rtsBtn).toHaveClass('active');
+    fireEvent.click(rtsBtn);
+    expect(rtsBtn).not.toHaveClass('active');
+
+    // Click Break
+    fireEvent.click(breakBtn);
+    expect(screen.getByText(/Sent break signal/i)).toBeInTheDocument();
+  });
 });

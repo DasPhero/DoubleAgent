@@ -8,6 +8,8 @@ export function ConnectSSH(arg1:core.ConnectRequest):Promise<string>;
 
 export function ConnectSavedHost(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
+export function ConnectSerial(arg1:core.SerialConfig):Promise<string>;
+
 export function DeleteGroup(arg1:string):Promise<void>;
 
 export function DeleteHost(arg1:string):Promise<void>;
@@ -36,7 +38,11 @@ export function InitializeVaultWithHello():Promise<void>;
 
 export function InjectSessionPassword(arg1:string):Promise<void>;
 
+export function ListSerialPorts():Promise<Array<core.SerialPortInfo>>;
+
 export function LockVault():Promise<void>;
+
+export function OpenLocalTerminal(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
 export function ResetVault():Promise<void>;
 
@@ -51,6 +57,12 @@ export function SaveHost(arg1:core.HostRecord):Promise<void>;
 export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
 
 export function SearchCommandPalette(arg1:string):Promise<core.CommandPaletteResponse>;
+
+export function SendSerialBreak(arg1:string):Promise<void>;
+
+export function SetSerialDTR(arg1:string,arg2:boolean):Promise<void>;
+
+export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
 
 export function UnlockVault(arg1:string):Promise<void>;
 
