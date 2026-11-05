@@ -667,7 +667,7 @@ func (a *App) InjectSessionPassword(sessionID string) error {
 		return errors.New("no password stored for this session")
 	}
 
-	_, err := io.WriteString(streams.Stdin, secret+"\n")
+	_, err := io.WriteString(streams.Stdin, secret)
 	return err
 }
 

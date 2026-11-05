@@ -10,6 +10,7 @@ export interface TerminalViewProps {
   onInput: (sessionId: string, data: string) => void;
   onResize: (sessionId: string, cols: number, rows: number) => void;
   registerWriter?: (sessionId: string, writeFn: (chunk: string) => void) => void;
+  registerFocuser?: (sessionId: string, focusFn: () => void) => void;
 }
 
 export function TerminalView({
@@ -17,6 +18,7 @@ export function TerminalView({
   onInput,
   onResize,
   registerWriter,
+  registerFocuser,
 }: TerminalViewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -53,6 +55,7 @@ export function TerminalView({
 
     try {
       fitAddon.fit();
+      term.focus();
     } catch {
       // Ignore layout fit errors in headless test environments (jsdom)
     }
@@ -61,6 +64,16 @@ export function TerminalView({
       registerWriter(sessionId, (chunk: string) => {
         // Golden Rule 2: Terminal output is strictly written to xterm.js, never innerHTML.
         term.write(chunk);
+      });
+    }
+
+    if (registerFocuser) {
+      registerFocuser(sessionId, () => {
+        try {
+          term.focus();
+        } catch {
+          // Ignore in headless test environment
+        }
       });
     }
 
@@ -87,7 +100,7 @@ export function TerminalView({
       resizeDisposable.dispose();
       term.dispose();
     };
-  }, [sessionId, onInput, onResize, registerWriter]);
+  }, [sessionId, onInput, onResize, registerWriter, registerFocuser]);
 
   return (
     <div

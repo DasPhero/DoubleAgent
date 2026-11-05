@@ -364,9 +364,14 @@ export function App(): React.JSX.Element {
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
   const writersRef = useRef<Map<string, (chunk: string) => void>>(new Map());
+  const focusersRef = useRef<Map<string, () => void>>(new Map());
 
   const registerWriter = useCallback((id: string, writeFn: (chunk: string) => void) => {
     writersRef.current.set(id, writeFn);
+  }, []);
+
+  const registerFocuser = useCallback((id: string, focusFn: () => void) => {
+    focusersRef.current.set(id, focusFn);
   }, []);
 
   const refreshVaultState = useCallback(async (): Promise<void> => {
@@ -1016,15 +1021,18 @@ export function App(): React.JSX.Element {
     }
     const api = getWailsBindings();
     if (!api?.InjectSessionPassword) {
-      setStatusMessage('Password injected into active terminal session.');
+      setStatusMessage('Password injected into active terminal session (no newline).');
+      focusersRef.current.get(sessionId)?.();
       return;
     }
     try {
       await api.InjectSessionPassword(sessionId);
-      setStatusMessage('Password injected into active terminal session (Directly from Go Vault).');
+      setStatusMessage('Password injected into active terminal session (no newline).');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setStatusMessage(`Password injection failed: ${msg}`);
+    } finally {
+      focusersRef.current.get(sessionId)?.();
     }
   };
 
@@ -1068,46 +1076,13 @@ export function App(): React.JSX.Element {
               {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
             </button>
           ) : (
-            <>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setModalError('');
-                  setShowKeychainModal(true);
-                }}
-              >
-                Keychain (F-04)
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setModalError('');
-                  setSshConfigResult(null);
-                  setShowSSHConfigModal(true);
-                }}
-              >
-                Import ssh_config
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setModalError('');
-                  setShowSettingsModal(true);
-                }}
-              >
-                Vault Security
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => void handleVaultLock()}
-              >
-                Lock Vault
-              </button>
-            </>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => void handleVaultLock()}
+            >
+              Lock Vault
+            </button>
           )}
           <button
             type="button"
@@ -1165,6 +1140,41 @@ export function App(): React.JSX.Element {
 
       <div className="workspace-body">
         <aside className="hosts-sidebar" aria-label="Hosts and Groups Sidebar">
+          {!vaultLocked && (
+            <nav className="sidebar-menu-grid" aria-label="Workspace Modules">
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  setModalError('');
+                  setShowKeychainModal(true);
+                }}
+              >
+                Keychain (F-04)
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  setModalError('');
+                  setSshConfigResult(null);
+                  setShowSSHConfigModal(true);
+                }}
+              >
+                Import ssh_config
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => {
+                  setModalError('');
+                  setShowSettingsModal(true);
+                }}
+              >
+                Vault Security
+              </button>
+            </nav>
+          )}
           <div className="sidebar-header">
             <h2>Hosts &amp; Groups</h2>
             {!vaultLocked && (
@@ -1287,8 +1297,9 @@ export function App(): React.JSX.Element {
                 <button
                   type="button"
                   className="btn-secondary btn-sm"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => void handleInjectPassword()}
-                  title="Injects the stored password directly from the Go Vault into the terminal (for sudo/su)"
+                  title="Injects the stored password directly from the Go Vault into the terminal without pressing Enter"
                 >
                   Inject Password
                 </button>
@@ -1306,6 +1317,7 @@ export function App(): React.JSX.Element {
               onInput={handleTerminalInput}
               onResize={handleTerminalResize}
               registerWriter={registerWriter}
+              registerFocuser={registerFocuser}
             />
           </section>
         ) : (

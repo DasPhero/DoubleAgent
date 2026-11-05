@@ -194,6 +194,14 @@
   gap: 0.35rem;
 }
 
+.sidebar-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .sidebar-locked-notice {
   padding: 0.85rem;
   border-radius: 8px;
