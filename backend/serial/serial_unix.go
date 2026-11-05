@@ -112,3 +112,4 @@ func openPlatformPort(_ context.Context, cfg core.SerialConfig) (Port, error) {
 		file: f,
 	}, nil
 }
+

@@ -4,7 +4,7 @@ import { App } from './App';
 
 describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, and Hosts/Groups (F-01, F-03)', () => {
   it('starts in theme-locked (Dark Crimson), switches to theme-unlocked (Teal) on unlock, and manages Groups and Hosts with inheritance (F-01)', () => {
-    render(<App />);
+    render(<App initialLocked={true} />);
     const main = screen.getByLabelText('DoubleAgent Workspace');
     expect(main).toHaveClass('theme-locked');
     expect(screen.getByText('Vault Locked')).toBeInTheDocument();
@@ -44,10 +44,6 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
   it('opens Command Palette via Ctrl+K, performs fuzzy search over Name/Address/Tags, and supports user@host:port Quick Connect (F-02)', () => {
     render(<App />);
-
-    // Unlock vault first
-    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
 
     // Add a host with tags
     fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
@@ -92,10 +88,6 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
   it('manages Keychain generation/import/copy public key (F-04), Agent auth (F-05), and imports ssh_config with unknown directive warnings (F-22)', () => {
     render(<App />);
 
-    // Unlock vault
-    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
-
     // Open Keychain (F-04) and generate Ed25519 key
     fireEvent.click(screen.getByRole('button', { name: /Keychain \(F-04\)/i }));
     fireEvent.change(screen.getByLabelText('Key Label'), { target: { value: 'Laptop Ed25519' } });
@@ -131,10 +123,6 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
   it('supports multi-session Tabs, drag-and-drop tab reordering, mixed nested Split Panes, closing panes, and preserving logs (F-08)', () => {
     render(<App />);
-
-    // Unlock vault
-    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
 
     // Create a host: Alpha
     fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
@@ -217,10 +205,6 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
   it('provides Global Settings modal (Ctrl+,), theme switcher, font/cursor customization, and pane font zoom controls (F-08)', () => {
     render(<App />);
 
-    // Unlock vault
-    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
-
     const main = screen.getByLabelText('DoubleAgent Workspace');
     expect(main).toHaveClass('theme-unlocked');
     expect(main).toHaveClass('theme-teal');
@@ -284,10 +268,6 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
   it('organizes Top Bar into Vault/Tools/View menus and supports Host Color Coding with expandable/collapsible Tab Groups (F-09)', () => {
     render(<App />);
-
-    // Unlock vault
-    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
 
     // 1. Verify Top Bar Menu System
     const vaultMenuBtn = screen.getByRole('button', { name: /Vault ▾/i });
@@ -357,10 +337,6 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
   it('supports In-Terminal Search with Regex, Match Case, Whole Word, and Navigation (F-11)', () => {
     render(<App />);
 
-    // Unlock vault
-    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
-
     // Create a host and connect
     fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
     fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'SearchHost' } });
@@ -426,16 +402,31 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.queryByRole('search', { name: 'Search Bar SearchHost' })).not.toBeInTheDocument();
   });
 
-  it('supports Local PTY Terminals (PowerShell, CMD, WSL) and Hardware Serial / UART Console (F-23)', () => {
+  it('supports Local PTY Terminals, Serial UART Console with Auto-Detect, Saleae Logic Analyzer, and Collapsible Sidebar (F-23)', () => {
     render(<App />);
 
-    // Unlock vault
-    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+    // 0. Test Collapsible Sidebar (◀ and ▶ and Ctrl+B)
+    const sidebar = screen.getByLabelText('Hosts and Groups Sidebar');
+    expect(sidebar).not.toHaveClass('collapsed');
 
-    // 1. Open Local PowerShell terminal via Tools Menu
+    const collapseBtn = screen.getByRole('button', { name: 'Collapse Sidebar' });
+    fireEvent.click(collapseBtn);
+    expect(sidebar).toHaveClass('collapsed');
+
+    const expandBtn = screen.getByRole('button', { name: 'Expand Sidebar' });
+    fireEvent.click(expandBtn);
+    expect(sidebar).not.toHaveClass('collapsed');
+
+    // Toggle via Ctrl+B shortcut
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(sidebar).toHaveClass('collapsed');
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+    expect(sidebar).not.toHaveClass('collapsed');
+
+    // 1. Open Local PowerShell terminal via Hoverable Tools Menu
     const toolsBtn = screen.getByRole('button', { name: /Tools ▾/i });
-    fireEvent.click(toolsBtn);
+    fireEvent.mouseEnter(toolsBtn);
+    expect(screen.getByRole('menu', { name: 'Tools Menu' })).toBeInTheDocument();
 
     const pwshItem = screen.getByRole('menuitem', { name: /Local Shell \(PowerShell\)/i });
     fireEvent.click(pwshItem);
@@ -453,7 +444,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByLabelText('Pane Local (PowerShell) (V-Split #3)')).toBeInTheDocument();
 
     // 3. Open Local Command Prompt (CMD) via Tools Menu
-    fireEvent.click(toolsBtn);
+    fireEvent.mouseEnter(toolsBtn);
     const cmdItem = screen.getByRole('menuitem', { name: /Local Shell \(Command Prompt\)/i });
     fireEvent.click(cmdItem);
 
@@ -461,12 +452,18 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByLabelText('Pane Local (CMD)')).toBeInTheDocument();
 
     // 4. Open Serial / UART Console Connection Modal (F-23)
-    fireEvent.click(toolsBtn);
+    fireEvent.mouseEnter(toolsBtn);
     const serialItem = screen.getByRole('menuitem', { name: /Serial \/ UART Console \(COM\)/i });
     fireEvent.click(serialItem);
 
     expect(screen.getByRole('dialog', { name: 'Serial Connection' })).toBeInTheDocument();
     expect(screen.getByText('Serial / UART Console Connection (F-23)')).toBeInTheDocument();
+
+    // Auto-Detect port & baud button exists and operates
+    const autoDetectBtn = screen.getByRole('button', { name: /Auto Detect Port & Baud/i });
+    expect(autoDetectBtn).toBeInTheDocument();
+    fireEvent.click(autoDetectBtn);
+    expect(screen.getByText(/Auto-detected/i)).toBeInTheDocument();
 
     // Refresh detected ports button exists
     const refreshBtn = screen.getByRole('button', { name: /Refresh/i });
@@ -509,10 +506,14 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     const dtrBtn = screen.getByRole('button', { name: 'Toggle DTR for Serial (COM4 @ 115200)' });
     const rtsBtn = screen.getByRole('button', { name: 'Toggle RTS for Serial (COM4 @ 115200)' });
     const breakBtn = screen.getByRole('button', { name: 'Send Break for Serial (COM4 @ 115200)' });
+    const logicAnalyzerBtn = screen.getByRole('button', {
+      name: 'Toggle Signal Analyzer for Serial (COM4 @ 115200)',
+    });
 
     expect(dtrBtn).toBeInTheDocument();
     expect(rtsBtn).toBeInTheDocument();
     expect(breakBtn).toBeInTheDocument();
+    expect(logicAnalyzerBtn).toBeInTheDocument();
 
     // Toggle DTR and RTS
     expect(dtrBtn).toHaveClass('active');
@@ -526,5 +527,22 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     // Click Break
     fireEvent.click(breakBtn);
     expect(screen.getByText(/Sent break signal/i)).toBeInTheDocument();
+
+    // 5. Open Saleae-style Signal & Logic Analyzer
+    fireEvent.click(logicAnalyzerBtn);
+    expect(screen.getByRole('region', { name: 'Signal Analyzer' })).toBeInTheDocument();
+    expect(screen.getByText('📈 LOGIC ANALYZER')).toBeInTheDocument();
+    expect(screen.getByText(/COM4 @ 115200 baud/i)).toBeInTheDocument();
+
+    // Toggle Live / Pause button
+    const pauseBtn = screen.getByRole('button', { name: /Pause/i });
+    expect(pauseBtn).toBeInTheDocument();
+    fireEvent.click(pauseBtn);
+    expect(screen.getByRole('button', { name: /Live/i })).toBeInTheDocument();
+
+    // Close Logic Analyzer via its close button
+    const closeAnalyzerBtn = screen.getByRole('button', { name: 'Close Signal Analyzer' });
+    fireEvent.click(closeAnalyzerBtn);
+    expect(screen.queryByRole('region', { name: 'Signal Analyzer' })).not.toBeInTheDocument();
   });
 });

@@ -110,3 +110,4 @@ func startPlatformShell(ctx context.Context, shellType string, _ core.TerminalSi
 		stdout:    stdout,
 	}, nil
 }
+

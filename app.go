@@ -109,6 +109,12 @@ func NewAppWithDependencies(
 // startup is called when the Wails application starts.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// Start the app unlocked for now (auto-initialize or auto-unlock in passwordless mode)
+	if !a.vaultStore.IsInitialized() {
+		_ = a.vaultStore.Initialize(ctx, "")
+	} else if a.vaultStore.IsLocked() && a.vaultStore.IsPasswordless() {
+		_ = a.vaultStore.Unlock(ctx, "")
+	}
 }
 
 // HealthCheck returns the current status of DoubleAgent, including Vault initialization and Quick Unlock state.
@@ -671,6 +677,15 @@ func (a *App) OpenLocalTerminal(shellType string, size core.TerminalSize) (strin
 // ListSerialPorts returns detected hardware and virtual serial/COM ports.
 func (a *App) ListSerialPorts() ([]core.SerialPortInfo, error) {
 	return serial.ListPorts()
+}
+
+// AutoDetectSerial probes candidate baud rates and detected ports to automatically determine connection settings.
+func (a *App) AutoDetectSerial(port string) (core.SerialAutoDetectResult, error) {
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return serial.AutoDetect(ctx, port)
 }
 
 // ConnectSerial opens an interactive serial/UART/RS-232/USB-CDC port console.

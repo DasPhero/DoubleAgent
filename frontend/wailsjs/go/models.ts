@@ -389,6 +389,26 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class SerialAutoDetectResult {
+	    port: string;
+	    baudRate: number;
+	    confidence: string;
+	    detected: boolean;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SerialAutoDetectResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.baudRate = source["baudRate"];
+	        this.confidence = source["confidence"];
+	        this.detected = source["detected"];
+	        this.message = source["message"];
+	    }
+	}
 	export class SerialConfig {
 	    port: string;
 	    baudRate: number;

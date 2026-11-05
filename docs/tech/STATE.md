@@ -18,7 +18,11 @@
   - Local shell execution engine in `backend/pty` with full interactive streaming for PowerShell (`powershell.exe`), Command Prompt (`cmd.exe`), and WSL (`wsl.exe`).
   - Pure Go Windows COM port enumeration (`HARDWARE\DEVICEMAP\SERIALCOMM`) and hardware driver in `backend/serial` using Windows DCB, `COMMTIMEOUTS`, `EscapeCommFunction`, and `SetCommBreak`.
   - Configurable Baud rates (9,600 to 2,000,000), Data Bits (5-8), Parity, Stop Bits, Flow Control, Line Endings, and Local Echo.
-  - Hardware pin status toggles (DTR, RTS) and hardware Break signal trigger in pane header.
+  - **Serial Auto-Detect**: Added `AutoDetectSerial` probing port accessibility and analyzing ASCII response / framing stability to auto-configure optimal baud rates.
+  - **Saleae-style Signal & Logic Analyzer**: Real-time digital waveform visualizer with UART 8N1 bit synthesis, decoded character bubbles (`'A' 0x41`), timing grid, pause/live, zoom, and channel toggles (RX, TX, DTR, RTS).
+  - **Collapsible Sidebar**: Collapsible via header button `◀` / `▶` and shortcut `Ctrl+B`.
+  - **Top Bar Hoverable Dropdowns**: Layered comfortably in front of the sidebar with high z-index and smooth hover transitions.
+  - **Immediate Startup Unlocked**: Starts unlocked out of the box in Teal theme with auto-initialized/unlocked passwordless vault.
   - Unit & integration tests in `backend/pty`, `backend/serial`, and `frontend/src/App.test.tsx`.
   - Standalone binary verified with `wails build`.
 

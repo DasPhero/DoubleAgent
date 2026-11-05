@@ -27,3 +27,4 @@ type Engine struct {
 func StartShell(ctx context.Context, shellType string, size core.TerminalSize) (Session, error) {
 	return startPlatformShell(ctx, shellType, size)
 }
+

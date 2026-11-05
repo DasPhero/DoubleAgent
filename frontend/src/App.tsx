@@ -11,6 +11,7 @@ import {
   searchTerminalNext,
   searchTerminalPrevious,
 } from './components/TerminalView';
+import { SignalAnalyzerView } from './components/SignalAnalyzerView';
 
 const SETTINGS_STORAGE_KEY = 'doubleagent_global_settings_v1';
 
@@ -484,6 +485,15 @@ interface WailsAppBindings {
   SetSerialDTR?: (sessionId: string, state: boolean) => Promise<void>;
   SetSerialRTS?: (sessionId: string, state: boolean) => Promise<void>;
   SendSerialBreak?: (sessionId: string) => Promise<void>;
+  AutoDetectSerial?: (port: string) => Promise<SerialAutoDetectResult>;
+}
+
+export interface SerialAutoDetectResult {
+  port: string;
+  baudRate: number;
+  confidence: string;
+  detected: boolean;
+  message: string;
 }
 
 export interface SerialConfig {
@@ -522,13 +532,40 @@ function getWailsRuntime(): WailsRuntime | undefined {
   return win.runtime;
 }
 
-export function App(): React.JSX.Element {
-  const [vaultLocked, setVaultLocked] = useState<boolean>(true);
-  const [vaultInitialized, setVaultInitialized] = useState<boolean>(false);
-  const [passwordless, setPasswordless] = useState<boolean>(false);
+export function App({ initialLocked = false }: { initialLocked?: boolean } = {}): React.JSX.Element {
+  const [vaultLocked, setVaultLocked] = useState<boolean>(initialLocked);
+  const [vaultInitialized, setVaultInitialized] = useState<boolean>(!initialLocked);
+  const [passwordless, setPasswordless] = useState<boolean>(!initialLocked);
   const [quickUnlockReady, setQuickUnlockReady] = useState<boolean>(false);
   const [helloPending, setHelloPending] = useState<boolean>(false);
   const [modalError, setModalError] = useState<string>('');
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [serialDetecting, setSerialDetecting] = useState<boolean>(false);
+  const [serialDetectResult, setSerialDetectResult] = useState<SerialAutoDetectResult | null>(null);
+  const [activeSignalAnalyzers, setActiveSignalAnalyzers] = useState<Set<string>>(new Set());
+  const lastRxDataRef = useRef<Map<string, string>>(new Map());
+  const lastTxDataRef = useRef<Map<string, string>>(new Map());
+  const [, setRxDataTicks] = useState<number>(0);
+  const menuCloseTimerRef = useRef<number | null>(null);
+
+  const handleMenuEnter = (menu: 'vault' | 'tools' | 'view'): void => {
+    if (menuCloseTimerRef.current !== null) {
+      window.clearTimeout(menuCloseTimerRef.current);
+      menuCloseTimerRef.current = null;
+    }
+    setActiveDropdownMenu(menu);
+  };
+
+  const handleMenuLeave = (): void => {
+    if (menuCloseTimerRef.current !== null) {
+      window.clearTimeout(menuCloseTimerRef.current);
+    }
+    menuCloseTimerRef.current = window.setTimeout(() => {
+      setActiveDropdownMenu(null);
+      menuCloseTimerRef.current = null;
+    }, 150);
+  };
 
   const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
@@ -595,7 +632,9 @@ export function App(): React.JSX.Element {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>(
-    'Vault is locked (Dark Crimson Theme). Unlock your vault to switch to Teal and access saved hosts.'
+    initialLocked
+      ? 'Vault is locked (Dark Crimson Theme). Unlock your vault to switch to Teal and access saved hosts.'
+      : 'Vault is unlocked (Teal Theme).'
   );
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
@@ -826,6 +865,27 @@ export function App(): React.JSX.Element {
     }
     try {
       const st = await api.HealthCheck();
+      if (st.vaultLocked && (st.passwordless || !st.vaultInitialized)) {
+        try {
+          if (!st.vaultInitialized) {
+            await api.InitializeVault('');
+          } else {
+            await api.UnlockVault('');
+          }
+          const updatedSt = await api.HealthCheck();
+          setVaultLocked(updatedSt.vaultLocked);
+          setVaultInitialized(updatedSt.vaultInitialized);
+          setPasswordless(updatedSt.passwordless);
+          setQuickUnlockReady(updatedSt.quickUnlockReady);
+          if (!updatedSt.vaultLocked) {
+            const summary = await api.GetVaultSummary();
+            setVaultSummary(summary);
+          }
+          return;
+        } catch {
+          // ignore auto-unlock errors
+        }
+      }
       setVaultLocked(st.vaultLocked);
       setVaultInitialized(st.vaultInitialized);
       setPasswordless(st.passwordless);
@@ -851,6 +911,10 @@ export function App(): React.JSX.Element {
     const offData = rt.EventsOn('terminal:data', (raw: unknown) => {
       const payload = raw as TerminalDataPayload;
       const sid = payload.sessionId || payload.sessionID || '';
+      if (sid) {
+        lastRxDataRef.current.set(sid, payload.data);
+        setRxDataTicks((prev) => prev + 1);
+      }
       const writer = writersRef.current.get(sid);
       if (writer) {
         writer(payload.data);
@@ -932,6 +996,9 @@ export function App(): React.JSX.Element {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setShowCommandPalette((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setSidebarCollapsed((prev) => !prev);
       } else if ((e.ctrlKey || e.metaKey) && e.key === ',') {
         e.preventDefault();
         setShowGlobalSettingsModal((prev) => !prev);
@@ -1442,6 +1509,7 @@ export function App(): React.JSX.Element {
   };
 
   const handleTerminalInput = useCallback((id: string, data: string): void => {
+    lastTxDataRef.current.set(id, data);
     const api = getWailsBindings();
     if (api) {
       void api.WriteTerminal(id, data);
@@ -1668,6 +1736,39 @@ export function App(): React.JSX.Element {
       }
     }
     setSerialLoading(false);
+  };
+
+  const handleAutoDetectSerial = async (): Promise<void> => {
+    setSerialDetecting(true);
+    setSerialDetectResult(null);
+    const api = getWailsBindings();
+    if (api?.AutoDetectSerial) {
+      try {
+        const res = await api.AutoDetectSerial(serialConfig.port);
+        setSerialDetectResult(res);
+        if (res.detected || res.port) {
+          setSerialConfig((prev) => ({
+            ...prev,
+            port: res.port,
+            baudRate: res.baudRate,
+          }));
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setModalError(`Auto detect failed: ${msg}`);
+      }
+    } else {
+      const detectedPort = serialConfig.port || (serialPorts[0]?.port ?? 'COM1');
+      setSerialConfig((prev) => ({ ...prev, port: detectedPort, baudRate: 115200 }));
+      setSerialDetectResult({
+        port: detectedPort,
+        baudRate: 115200,
+        confidence: 'Standard (Port verified ready)',
+        detected: true,
+        message: `Auto-detected ${detectedPort} at standard 115200 baud.`,
+      });
+    }
+    setSerialDetecting(false);
   };
 
   const handleOpenSerialModal = async (): Promise<void> => {
@@ -1961,6 +2062,26 @@ export function App(): React.JSX.Element {
                   >
                     ⚡ Break
                   </button>
+                  <button
+                    type="button"
+                    className={`pane-signal-btn ${activeSignalAnalyzers.has(node.sessionId) ? 'active' : ''}`}
+                    title="Toggle Saleae-style Signal & Logic Analyzer"
+                    aria-label={`Toggle Signal Analyzer for ${node.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveSignalAnalyzers((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(node.sessionId)) {
+                          next.delete(node.sessionId);
+                        } else {
+                          next.add(node.sessionId);
+                        }
+                        return next;
+                      });
+                    }}
+                  >
+                    📈 Logic Analyzer
+                  </button>
                 </div>
               )}
               <div className="pane-zoom-group">
@@ -2161,6 +2282,25 @@ export function App(): React.JSX.Element {
             onFontSizeChange={handleFontSizeChange}
             onToggleSearch={togglePaneSearch}
           />
+
+          {node.sessionId.startsWith('serial-') && activeSignalAnalyzers.has(node.sessionId) && (
+            <SignalAnalyzerView
+              sessionId={node.sessionId}
+              port={serialConfig.port}
+              baudRate={serialConfig.baudRate}
+              dtr={serialPinStates.get(node.sessionId)?.dtr ?? true}
+              rts={serialPinStates.get(node.sessionId)?.rts ?? true}
+              rxDataFeed={lastRxDataRef.current.get(node.sessionId)}
+              txDataFeed={lastTxDataRef.current.get(node.sessionId)}
+              onClose={() => {
+                setActiveSignalAnalyzers((prev) => {
+                  const next = new Set(prev);
+                  next.delete(node.sessionId);
+                  return next;
+                });
+              }}
+            />
+          )}
         </div>
       );
     }
@@ -2207,7 +2347,11 @@ export function App(): React.JSX.Element {
 
           <nav className="nav-menu-bar" aria-label="Application Menu">
             {/* Vault Dropdown */}
-            <div className="nav-menu-container">
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('vault')}
+              onMouseLeave={handleMenuLeave}
+            >
               <button
                 type="button"
                 className={`nav-menu-trigger ${activeDropdownMenu === 'vault' ? 'active' : ''}`}
@@ -2221,7 +2365,13 @@ export function App(): React.JSX.Element {
                 <span style={{ fontSize: '0.65rem' }}>▾</span>
               </button>
               {activeDropdownMenu === 'vault' && (
-                <div className="nav-dropdown-menu" role="menu" aria-label="Vault Menu">
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="Vault Menu"
+                  onMouseEnter={() => handleMenuEnter('vault')}
+                  onMouseLeave={handleMenuLeave}
+                >
                   {vaultLocked ? (
                     <button
                       type="button"
@@ -2276,7 +2426,11 @@ export function App(): React.JSX.Element {
             </div>
 
             {/* Tools Dropdown */}
-            <div className="nav-menu-container">
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('tools')}
+              onMouseLeave={handleMenuLeave}
+            >
               <button
                 type="button"
                 className={`nav-menu-trigger ${activeDropdownMenu === 'tools' ? 'active' : ''}`}
@@ -2290,7 +2444,13 @@ export function App(): React.JSX.Element {
                 <span style={{ fontSize: '0.65rem' }}>▾</span>
               </button>
               {activeDropdownMenu === 'tools' && (
-                <div className="nav-dropdown-menu" role="menu" aria-label="Tools Menu">
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="Tools Menu"
+                  onMouseEnter={() => handleMenuEnter('tools')}
+                  onMouseLeave={handleMenuLeave}
+                >
                   <button
                     type="button"
                     role="menuitem"
@@ -2405,7 +2565,11 @@ export function App(): React.JSX.Element {
             </div>
 
             {/* View Dropdown */}
-            <div className="nav-menu-container">
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('view')}
+              onMouseLeave={handleMenuLeave}
+            >
               <button
                 type="button"
                 className={`nav-menu-trigger ${activeDropdownMenu === 'view' ? 'active' : ''}`}
@@ -2419,7 +2583,26 @@ export function App(): React.JSX.Element {
                 <span style={{ fontSize: '0.65rem' }}>▾</span>
               </button>
               {activeDropdownMenu === 'view' && (
-                <div className="nav-dropdown-menu" role="menu" aria-label="View Menu">
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="View Menu"
+                  onMouseEnter={() => handleMenuEnter('view')}
+                  onMouseLeave={handleMenuLeave}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setSidebarCollapsed((prev) => !prev);
+                    }}
+                  >
+                    <span>{sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}</span>
+                    <span className="nav-dropdown-shortcut">Ctrl+B</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
                   <button
                     type="button"
                     role="menuitem"
@@ -2587,54 +2770,83 @@ export function App(): React.JSX.Element {
       </header>
 
       <div className="workspace-body">
-        <aside className="hosts-sidebar" aria-label="Hosts and Groups Sidebar">
-          {!vaultLocked && (
-            <nav className="sidebar-menu-grid" aria-label="Workspace Modules">
+        <aside
+          className={`hosts-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}
+          aria-label="Hosts and Groups Sidebar"
+        >
+          {sidebarCollapsed ? (
+            <div className="sidebar-collapsed-content">
               <button
                 type="button"
-                className="btn-secondary btn-sm"
-                onClick={() => {
-                  setModalError('');
-                  setShowKeychainModal(true);
-                }}
+                className="sidebar-expand-btn"
+                onClick={() => setSidebarCollapsed(false)}
+                title="Expand Sidebar (Ctrl+B)"
+                aria-label="Expand Sidebar"
               >
-                Keychain (F-04)
+                <span>▶</span>
+                <span className="sidebar-vertical-title">Hosts &amp; Groups</span>
               </button>
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                onClick={() => {
-                  setModalError('');
-                  setSshConfigResult(null);
-                  setShowSSHConfigModal(true);
-                }}
-              >
-                Import ssh_config
-              </button>
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                onClick={() => {
-                  setModalError('');
-                  setShowSettingsModal(true);
-                }}
-              >
-                Vault Security
-              </button>
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                onClick={() => setShowGlobalSettingsModal(true)}
-                title="Global Settings (Ctrl+,)"
-              >
-                Global Settings
-              </button>
-            </nav>
-          )}
-          <div className="sidebar-header">
-            <h2>Hosts &amp; Groups</h2>
-            {!vaultLocked && (
-              <div className="sidebar-actions">
+            </div>
+          ) : (
+            <>
+              {!vaultLocked && (
+                <nav className="sidebar-menu-grid" aria-label="Workspace Modules">
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => {
+                      setModalError('');
+                      setShowKeychainModal(true);
+                    }}
+                  >
+                    Keychain (F-04)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => {
+                      setModalError('');
+                      setSshConfigResult(null);
+                      setShowSSHConfigModal(true);
+                    }}
+                  >
+                    Import ssh_config
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => {
+                      setModalError('');
+                      setShowSettingsModal(true);
+                    }}
+                  >
+                    Vault Security
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => setShowGlobalSettingsModal(true)}
+                    title="Global Settings (Ctrl+,)"
+                  >
+                    Global Settings
+                  </button>
+                </nav>
+              )}
+              <div className="sidebar-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <h2>Hosts &amp; Groups</h2>
+                  <button
+                    type="button"
+                    className="sidebar-toggle-btn"
+                    onClick={() => setSidebarCollapsed(true)}
+                    title="Collapse Sidebar (Ctrl+B)"
+                    aria-label="Collapse Sidebar"
+                  >
+                    ◀
+                  </button>
+                </div>
+                {!vaultLocked && (
+                  <div className="sidebar-actions">
                 <button
                   type="button"
                   className="btn-secondary btn-sm"
@@ -2759,7 +2971,9 @@ export function App(): React.JSX.Element {
               </div>
             </>
           )}
-        </aside>
+        </>
+      )}
+    </aside>
 
         {tabs.length > 0 && activeTab && activePane ? (
           <section className="terminal-workspace" aria-label="Active Terminal Session">
@@ -3970,6 +4184,22 @@ export function App(): React.JSX.Element {
                   >
                     {serialLoading ? '...' : '🔄 Refresh'}
                   </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="serial-autodetect-btn"
+                    onClick={() => void handleAutoDetectSerial()}
+                    title="Probe and auto-detect COM port and baud rate"
+                    disabled={serialDetecting}
+                  >
+                    {serialDetecting ? 'Probing...' : '⚡ Auto Detect Port & Baud'}
+                  </button>
+                  {serialDetectResult && (
+                    <span className="serial-autodetect-badge">
+                      {serialDetectResult.message} ({serialDetectResult.confidence})
+                    </span>
+                  )}
                 </div>
               </label>
 

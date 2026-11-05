@@ -55,6 +55,15 @@ type SerialPortInfo struct {
 	Description string `json:"description"` // e.g. "USB Serial Device" or "Silicon Labs CP210x"
 }
 
+// SerialAutoDetectResult represents the result of automatic serial port & baud rate probing.
+type SerialAutoDetectResult struct {
+	Port       string `json:"port"`
+	BaudRate   uint32 `json:"baudRate"`
+	Confidence string `json:"confidence"`
+	Detected   bool   `json:"detected"`
+	Message    string `json:"message"`
+}
+
 // DefaultSerialConfig returns standard 115200 8N1 serial configuration defaults.
 func DefaultSerialConfig() SerialConfig {
 	return SerialConfig{
@@ -99,3 +108,4 @@ func ValidateSerialConfig(cfg SerialConfig) error {
 	}
 	return nil
 }
+

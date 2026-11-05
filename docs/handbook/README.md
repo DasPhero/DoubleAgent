@@ -18,24 +18,32 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
     - Local sessions integrate seamlessly with the Tab manager, Split Panes, per-pane font zoom, and in-terminal search (`Ctrl+F`).
   - **Hardware Serial / UART / RS-232 / USB Console (`F-23`)**:
     - Connect to microcontrollers, embedded boards, network switches, routers, and serial devices via COM ports on Windows (`COM1`–`COM256`) and `/dev/ttyUSB*` / `/dev/ttyS*` on Linux.
+    - **One-Click Auto-Detect (`⚡ Auto Detect Port & Baud`)**:
+      - Click **`⚡ Auto Detect Port & Baud`** in the connection dialog to probe active hardware ports, identify the target device, and auto-configure optimal baud rates (e.g. 115200, 9600, etc.) with real-time confidence feedback.
     - **Port Detection**: Automatic hardware port enumeration with a one-click **`🔄 Refresh`** button.
     - **Baud Rates**: Select standard rates (`9600`, `19200`, `38400`, `57600`, `115200`, `230400`, `460800`, `921600`, up to `2000000` baud).
-    - **Configurable Parameters**:
-      - **Data Bits**: 5, 6, 7, or 8 bits.
-      - **Parity**: None (N), Odd (O), Even (E), Mark (M), Space (S).
-      - **Stop Bits**: 1, 1.5, or 2 stop bits.
-      - **Flow Control**: None, Hardware (RTS/CTS), or Software (XON/XOFF).
-      - **Line Endings**: CRLF (`\r\n`), LF (`\n`), or CR (`\r`).
-      - **Local Echo**: Configurable client-side echo for devices that do not echo typed characters.
+    - **Configurable Parameters**: Data Bits (5-8), Parity (None/Odd/Even/Mark/Space), Stop Bits (1/1.5/2), Flow Control (None/Hardware/Software), Line Endings (CRLF/LF/CR), and Local Echo.
     - **Hardware Pin Controls & Break Signal**:
-      - Toggle **DTR** (Data Terminal Ready) and **RTS** (Request to Send) pin states directly from the pane header in real-time.
+      - Toggle **DTR** and **RTS** pin states directly from the pane header in real-time.
       - Send a hardware **`⚡ Break`** condition signal for microcontroller reset or ROM monitor entry.
+  - **Saleae-style Digital Signal & Logic Analyzer**:
+    - Click **`📈 Logic Analyzer`** in any serial pane header to open an interactive digital oscilloscope & logic analyzer view.
+    - **Multi-channel Digital Waveforms**: Live digital square waves for **RX (CH 0)**, **TX (CH 1)**, **DTR (CH 2)**, and **RTS (CH 3)**.
+    - **UART 8N1 Protocol Decoder**: Synthesizes and plots Idle HIGH, Start bit LOW, 8 Data bits (LSB-first), and Stop bit HIGH.
+    - **Saleae-Style Decoded Packet Bubbles**: Displays decoded ASCII characters and hex bytes (e.g. `'A' 0x41`, `'\n' 0x0A`) positioned directly above the waveform pulses.
+    - **Interactive Controls**: Play/Pause live capture, horizontal drag-and-scrub pan, Zoom In (`+`), Zoom Out (`-`), Reset Zoom, Clear buffer, and channel toggles.
 - **Top Bar Menu Navigation & Workspace Organization**:
-  - The top bar is organized into a clean application menu bar:
+  - The top bar is organized into a clean application menu bar rendered in front of all panels:
+    - **Hoverable Menus**: Dropdowns open smoothly on mouse hover and allow seamless mouse movement across menus.
     - **Vault ▾**: Quick access to lock/unlock, Vault Security & Windows Hello (`F-03`), and emergency Vault Reset.
-    - **Tools ▾**: Direct triggers for Command Palette (`Ctrl+K`), Keychain (`F-04`), Import `ssh_config` (`F-22`), and one-click session password injection.
-    - **View ▾**: Split pane horizontal/vertical triggers, toggle host-grouped tabs (`F-09`), and pane font zooming (`Ctrl +` / `Ctrl -` / `Ctrl 0`).
+    - **Tools ▾**: Direct triggers for Command Palette (`Ctrl+K`), Keychain (`F-04`), Import `ssh_config` (`F-22`), Local Shells, Serial Console, and one-click session password injection.
+    - **View ▾**: Toggle sidebar, split pane horizontal/vertical triggers, toggle host-grouped tabs (`F-09`), toggle signal analyzer, and pane font zooming (`Ctrl +` / `Ctrl -` / `Ctrl 0`).
     - **Settings ⚙**: Instant access to Global Settings (`Ctrl+,`).
+- **Collapsible Sidebar (`Ctrl+B`)**:
+  - Click **`◀`** in the sidebar header (or select **Toggle Sidebar** in the View menu / press **`Ctrl+B`**) to collapse the Hosts & Groups sidebar into a slim 40px vertical strip, giving 100% of the display width to your active terminal panes.
+  - Click **`▶`** or press **`Ctrl+B`** to expand it back instantly.
+- **Immediate Startup Unlocked State**:
+  - DoubleAgent starts directly in the unlocked state with the active color theme (Teal default), allowing immediate connection and terminal usage without requiring setup hurdles. Vault password security can still be configured at any time via Vault Security.
 - **Host Color Coding & Tab Groups (`F-09`)**:
   - **Host Color Tags**: Pick from 9 curated palette colors (Emerald, Sky, Amber, Rose, Violet, Cyan, Indigo, Pink, Slate) or use automatic deterministic colors in the Add Host dialog.
   - Colors are clearly displayed as color indicator dots in the sidebar host list and as accent top-borders on open tabs.

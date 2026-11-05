@@ -85,3 +85,28 @@ func TestSerial_OpenInvalidPort_F23(t *testing.T) {
 		t.Errorf("expected error when opening non-existent port COM999, got nil")
 	}
 }
+
+func TestSerial_AutoDetect_F23(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Probing non-existent port should return gracefully without crashing
+	res, err := AutoDetect(ctx, "COM999")
+	if err != nil {
+		t.Fatalf("AutoDetect COM999 returned unexpected error: %v", err)
+	}
+	if res.Port != "COM999" {
+		t.Errorf("expected port COM999, got %s", res.Port)
+	}
+	if res.BaudRate != 115200 {
+		t.Errorf("expected default baud 115200, got %d", res.BaudRate)
+	}
+
+	// Probing empty port (auto-detects from detected ports or defaults)
+	resEmpty, err := AutoDetect(ctx, "")
+	if err != nil {
+		t.Fatalf("AutoDetect empty returned error: %v", err)
+	}
+	t.Logf("AutoDetect result: %+v", resEmpty)
+}
+
