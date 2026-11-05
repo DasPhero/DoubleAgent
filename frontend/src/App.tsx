@@ -1,5 +1,36 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { TerminalView } from './components/TerminalView';
+import {
+  AppGlobalSettings,
+  DEFAULT_SETTINGS,
+  TerminalView,
+  applySettingsToAllTerminals,
+  changeTerminalFontSize,
+  disposeTerminal,
+  resetTerminalFontSize,
+} from './components/TerminalView';
+
+const SETTINGS_STORAGE_KEY = 'doubleagent_global_settings_v1';
+
+function loadSettingsFromStorage(): AppGlobalSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    }
+  } catch {
+    // ignore local storage errors
+  }
+  return DEFAULT_SETTINGS;
+}
+
+function saveSettingsToStorage(settings: AppGlobalSettings): void {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // ignore
+  }
+}
 
 export interface HostKeyPromptInfo {
   hostPattern: string;
@@ -504,6 +535,28 @@ export function App(): React.JSX.Element {
   );
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
+  // Global Settings state
+  const [globalSettings, setGlobalSettings] = useState<AppGlobalSettings>(() =>
+    loadSettingsFromStorage()
+  );
+  const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
+  const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
+
+  const handleUpdateSettings = (partial: Partial<AppGlobalSettings>): void => {
+    setGlobalSettings((prev) => {
+      const next = { ...prev, ...partial };
+      saveSettingsToStorage(next);
+      applySettingsToAllTerminals(next);
+      return next;
+    });
+  };
+
+  const handleResetSettings = (): void => {
+    setGlobalSettings(DEFAULT_SETTINGS);
+    saveSettingsToStorage(DEFAULT_SETTINGS);
+    applySettingsToAllTerminals(DEFAULT_SETTINGS);
+  };
+
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0] || null;
   const activeTabPanes = activeTab ? collectPanes(activeTab.rootNode) : [];
   const activePane =
@@ -597,6 +650,12 @@ export function App(): React.JSX.Element {
       }
       writersRef.current.delete(exitedId);
       focusersRef.current.delete(exitedId);
+      disposeTerminal(exitedId);
+      setPaneFontSizes((prev) => {
+        const next = new Map(prev);
+        next.delete(exitedId);
+        return next;
+      });
       setTabs((prev) => {
         const nextTabs: TabItem[] = [];
         for (const t of prev) {
@@ -642,8 +701,31 @@ export function App(): React.JSX.Element {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setShowCommandPalette((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+        e.preventDefault();
+        setShowGlobalSettingsModal((prev) => !prev);
       } else if (e.key === 'Escape') {
         setShowCommandPalette(false);
+        setShowGlobalSettingsModal(false);
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '_' || e.key === '0')
+      ) {
+        if (activePane) {
+          e.preventDefault();
+          if (e.key === '=' || e.key === '+') {
+            const next = changeTerminalFontSize(activePane.sessionId, +1);
+            setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+          } else if (e.key === '-' || e.key === '_') {
+            const next = changeTerminalFontSize(activePane.sessionId, -1);
+            setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+          } else if (e.key === '0') {
+            resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
+            setPaneFontSizes((prev) =>
+              new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
+            );
+          }
+        }
       } else if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
         const delta = e.key === 'ArrowRight' ? 1 : -1;
@@ -690,7 +772,7 @@ export function App(): React.JSX.Element {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeTabId]);
+  }, [activeTabId, activePane, globalSettings.fontSize]);
 
   useEffect(() => {
     if (!showCommandPalette) {
@@ -1335,6 +1417,12 @@ export function App(): React.JSX.Element {
     if (targetPane) {
       writersRef.current.delete(targetPane.sessionId);
       focusersRef.current.delete(targetPane.sessionId);
+      disposeTerminal(targetPane.sessionId);
+      setPaneFontSizes((prev) => {
+        const next = new Map(prev);
+        next.delete(targetPane.sessionId);
+        return next;
+      });
       const api = getWailsBindings();
       if (api) {
         void api.DisconnectSession(targetPane.sessionId);
@@ -1398,6 +1486,12 @@ export function App(): React.JSX.Element {
     for (const p of targetPanes) {
       writersRef.current.delete(p.sessionId);
       focusersRef.current.delete(p.sessionId);
+      disposeTerminal(p.sessionId);
+      setPaneFontSizes((prev) => {
+        const next = new Map(prev);
+        next.delete(p.sessionId);
+        return next;
+      });
       if (api) {
         void api.DisconnectSession(p.sessionId);
       }
@@ -1424,6 +1518,7 @@ export function App(): React.JSX.Element {
   ): React.JSX.Element => {
     if (node.type === 'pane') {
       const isPaneActive = node.id === tab.activePaneId;
+      const currentSize = paneFontSizes.get(node.sessionId) || globalSettings.fontSize;
       return (
         <div
           key={node.id}
@@ -1439,6 +1534,37 @@ export function App(): React.JSX.Element {
           <div className="split-pane-header">
             <span>{node.title}</span>
             <div className="pane-header-actions">
+              <div className="pane-zoom-group">
+                <button
+                  type="button"
+                  className="pane-zoom-btn"
+                  aria-label={`Zoom out ${node.title}`}
+                  title="Zoom out (Ctrl -)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next = changeTerminalFontSize(node.sessionId, -1);
+                    setPaneFontSizes((prev) => new Map(prev.set(node.sessionId, next)));
+                  }}
+                >
+                  -
+                </button>
+                <span className="pane-font-badge" title="Font size (Ctrl + / -)">
+                  {currentSize}px
+                </span>
+                <button
+                  type="button"
+                  className="pane-zoom-btn"
+                  aria-label={`Zoom in ${node.title}`}
+                  title="Zoom in (Ctrl +)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next = changeTerminalFontSize(node.sessionId, +1);
+                    setPaneFontSizes((prev) => new Map(prev.set(node.sessionId, next)));
+                  }}
+                >
+                  +
+                </button>
+              </div>
               {isPaneActive ? (
                 <span className="pane-active-indicator">● Active</span>
               ) : (
@@ -1466,6 +1592,10 @@ export function App(): React.JSX.Element {
             onResize={handleTerminalResize}
             registerWriter={registerWriter}
             registerFocuser={registerFocuser}
+            settings={globalSettings}
+            onFontSizeChange={(szId, sz) =>
+              setPaneFontSizes((prev) => new Map(prev.set(szId, sz)))
+            }
           />
         </div>
       );
@@ -1496,7 +1626,7 @@ export function App(): React.JSX.Element {
 
   return (
     <main
-      className={`app-shell ${vaultLocked ? 'theme-locked' : 'theme-unlocked'}`}
+      className={`app-shell ${vaultLocked ? 'theme-locked' : `theme-unlocked theme-${globalSettings.colorTheme}`}`}
       aria-label="DoubleAgent Workspace"
     >
       <header className="app-header">
@@ -1527,6 +1657,14 @@ export function App(): React.JSX.Element {
             }}
           >
             Command Palette (Ctrl+K)
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setShowGlobalSettingsModal(true)}
+            title="Global Settings (Ctrl+,)"
+          >
+            Settings ⚙
           </button>
         </div>
 
@@ -1606,6 +1744,14 @@ export function App(): React.JSX.Element {
                 }}
               >
                 Vault Security
+              </button>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => setShowGlobalSettingsModal(true)}
+                title="Global Settings (Ctrl+,)"
+              >
+                Global Settings
               </button>
             </nav>
           )}
@@ -2482,6 +2628,221 @@ export function App(): React.JSX.Element {
                 onClick={() => void handleHostKeyDecision(true)}
               >
                 Trust Host Key
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGlobalSettingsModal && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Global Settings"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowGlobalSettingsModal(false);
+            }
+          }}
+        >
+          <div className="modal-card settings-card">
+            <h2>Global Settings (F-08)</h2>
+            <p>Customize terminal appearance, default font parameters, and color themes.</p>
+
+            <div className="settings-grid">
+              <section className="settings-section">
+                <h3>Color Theme</h3>
+                <div className="theme-options-grid">
+                  {(
+                    [
+                      { id: 'teal', label: 'Teal (Cyber)', swatch: '#2dd4bf' },
+                      { id: 'dracula', label: 'Dracula', swatch: '#bd93f9' },
+                      { id: 'one-dark', label: 'One Dark', swatch: '#61afef' },
+                      { id: 'nord', label: 'Nord', swatch: '#88c0d0' },
+                      { id: 'monokai', label: 'Monokai Pro', swatch: '#ffd866' },
+                      { id: 'crimson', label: 'Crimson', swatch: '#f43f5e' },
+                    ] as const
+                  ).map((th) => (
+                    <button
+                      key={th.id}
+                      type="button"
+                      className={`theme-card-btn ${globalSettings.colorTheme === th.id ? 'active' : ''}`}
+                      onClick={() => handleUpdateSettings({ colorTheme: th.id })}
+                    >
+                      <span className="theme-swatch" style={{ backgroundColor: th.swatch }} />
+                      <span>{th.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="settings-section">
+                <h3>Terminal Font &amp; Layout</h3>
+                <div className="settings-field-row">
+                  <label htmlFor="setting-font-family">Font Family</label>
+                  <select
+                    id="setting-font-family"
+                    aria-label="Font Family"
+                    value={globalSettings.fontFamily}
+                    onChange={(e) => handleUpdateSettings({ fontFamily: e.target.value })}
+                  >
+                    <option value="'Cascadia Code', 'JetBrains Mono', Consolas, monospace">
+                      Cascadia Code (Recommended)
+                    </option>
+                    <option value="'JetBrains Mono', Consolas, monospace">JetBrains Mono</option>
+                    <option value="'Fira Code', Consolas, monospace">Fira Code</option>
+                    <option value="Consolas, 'Courier New', monospace">Consolas</option>
+                    <option value="'Source Code Pro', Consolas, monospace">Source Code Pro</option>
+                    <option value="monospace">System Monospace</option>
+                  </select>
+                </div>
+
+                <div className="settings-field-row">
+                  <label htmlFor="setting-font-size">Default Font Size</label>
+                  <input
+                    id="setting-font-size"
+                    aria-label="Default Font Size"
+                    type="number"
+                    min={9}
+                    max={32}
+                    value={globalSettings.fontSize}
+                    onChange={(e) =>
+                      handleUpdateSettings({ fontSize: Number(e.target.value) || 14 })
+                    }
+                  />
+                </div>
+
+                <div className="settings-field-row">
+                  <label htmlFor="setting-line-height">Line Height</label>
+                  <select
+                    id="setting-line-height"
+                    aria-label="Line Height"
+                    value={globalSettings.lineHeight}
+                    onChange={(e) =>
+                      handleUpdateSettings({ lineHeight: Number(e.target.value) || 1.2 })
+                    }
+                  >
+                    <option value="1.0">1.0 (Compact)</option>
+                    <option value="1.1">1.1 (Standard)</option>
+                    <option value="1.2">1.2 (Comfortable - Default)</option>
+                    <option value="1.3">1.3 (Spacious)</option>
+                    <option value="1.4">1.4 (Loose)</option>
+                  </select>
+                </div>
+
+                <div className="settings-field-row">
+                  <label htmlFor="setting-cursor-style">Cursor Style</label>
+                  <select
+                    id="setting-cursor-style"
+                    aria-label="Cursor Style"
+                    value={globalSettings.cursorStyle}
+                    onChange={(e) =>
+                      handleUpdateSettings({
+                        cursorStyle: e.target.value as 'block' | 'underline' | 'bar',
+                      })
+                    }
+                  >
+                    <option value="block">Block</option>
+                    <option value="underline">Underline</option>
+                    <option value="bar">Bar</option>
+                  </select>
+                </div>
+
+                <div className="settings-field-row">
+                  <label htmlFor="setting-cursor-blink">Cursor Blink</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      id="setting-cursor-blink"
+                      aria-label="Cursor Blink"
+                      type="checkbox"
+                      style={{ width: 'auto' }}
+                      checked={globalSettings.cursorBlink}
+                      onChange={(e) => handleUpdateSettings({ cursorBlink: e.target.checked })}
+                    />
+                    <span>Blink cursor when active</span>
+                  </label>
+                </div>
+
+                <div className="settings-field-row">
+                  <label htmlFor="setting-scrollback">Scrollback Lines</label>
+                  <select
+                    id="setting-scrollback"
+                    aria-label="Scrollback Lines"
+                    value={globalSettings.scrollback}
+                    onChange={(e) =>
+                      handleUpdateSettings({ scrollback: Number(e.target.value) || 10000 })
+                    }
+                  >
+                    <option value="5000">5,000 lines</option>
+                    <option value="10000">10,000 lines (Default)</option>
+                    <option value="20000">20,000 lines</option>
+                    <option value="50000">50,000 lines</option>
+                  </select>
+                </div>
+              </section>
+
+              <section className="settings-section">
+                <h3>Keyboard Shortcuts</h3>
+                <table className="shortcuts-table">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Shortcut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Global Settings</td>
+                      <td><code>Ctrl + ,</code></td>
+                    </tr>
+                    <tr>
+                      <td>Command Palette</td>
+                      <td><code>Ctrl + K</code></td>
+                    </tr>
+                    <tr>
+                      <td>Zoom In / Out Pane Font</td>
+                      <td><code>Ctrl + +</code> / <code>Ctrl + -</code> or <code>Ctrl + Wheel</code></td>
+                    </tr>
+                    <tr>
+                      <td>Reset Pane Font Size</td>
+                      <td><code>Ctrl + 0</code></td>
+                    </tr>
+                    <tr>
+                      <td>Cycle Active Tabs</td>
+                      <td><code>Alt + ←</code> / <code>Alt + →</code></td>
+                    </tr>
+                    <tr>
+                      <td>Cycle Active Panes</td>
+                      <td><code>Alt + ↑</code> / <code>Alt + ↓</code></td>
+                    </tr>
+                    <tr>
+                      <td>New Session Tab</td>
+                      <td><code>Alt + N</code></td>
+                    </tr>
+                    <tr>
+                      <td>Close Active Pane / Tab</td>
+                      <td><code>Alt + W</code></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleResetSettings}
+                title="Restore default settings"
+              >
+                Reset to Defaults
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => setShowGlobalSettingsModal(false)}
+              >
+                Close
               </button>
             </div>
           </div>

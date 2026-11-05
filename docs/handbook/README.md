@@ -9,12 +9,21 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
 ## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, & `F-08`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
-- **Visual Security State (Dark Crimson Locked ↔ Dark Teal Unlocked)**:
+- **Global Settings & Theme Customization (`F-08`)**:
+  - Open the **Global Settings** modal anytime by pressing **`Ctrl+,`** or clicking **Settings ⚙** in the top navigation bar or sidebar.
+  - **Color Themes**: Choose between **Teal (Cyber Teal Default)**, **Dracula**, **One Dark**, **Nord**, **Monokai Pro**, and **Crimson**. The entire app window, borders, active focus indicators, and terminal color palette instantly switch in real-time.
+  - **Terminal Font & Cursor Configuration**: Configure default font family (Cascadia Code, JetBrains Mono, Fira Code, Consolas, Source Code Pro), default font size (9–32px), line height (1.0–1.4), cursor style (Block, Underline, Bar), cursor blinking, and scrollback depth (up to 50,000 lines). All settings persist across sessions in local storage.
+  - **Keyboard Shortcuts Reference**: View all active workspace shortcuts in one clear table.
+- **Visual Security State (Dark Crimson Locked ↔ Theme Unlocked)**:
   - When the **Vault is Locked**, the entire application displays a **Dark Crimson / Red** theme so you can see at a glance that secrets are locked.
-  - As soon as you unlock the Vault, the UI transitions to the **Dark Slate + Teal** glass theme.
+  - As soon as you unlock the Vault, the UI transitions to your selected theme (Teal by default).
 - **Multi-Session Tabs & Arbitrary Mixed Split Panes (`F-08`)**:
   - Connecting to multiple hosts (or multiple times to the same host) opens each session in its own **Tab** in the top tab bar.
-  - **Preserved Terminal Logs**: When switching between tabs, all background sessions remain mounted and active in the system WebView. Running logs, command outputs, and the 10,000-line scrollback buffer are completely preserved without ever clearing.
+  - **Preserved Terminal Logs Across Splits & Tab Switches**: Utilizing a persistent `TerminalPool`, all running session logs, command outputs, active screen buffers, and scrollback are 100% preserved when splitting panes horizontally/vertically or switching tabs.
+  - **Isolated Terminal Scrolling**: Scrolling inside a terminal pane never bubbles up or causes the DoubleAgent window/workspace to scroll (`overscroll-behavior: contain` + overflow locking).
+  - **Per-Pane Font Zoom Controls**:
+    - Zoom terminal text in any pane via the **`+`** and **`-`** buttons in the pane header, or press **`Ctrl +`** / **`Ctrl -`** (or **`Ctrl + MouseWheel`**).
+    - Press **`Ctrl + 0`** to quickly reset the pane's font size to the global default. Current font size is displayed dynamically in each pane header (e.g. `14px`).
   - **Drag-and-Drop Reordering**: Drag any tab pill left or right to reorder your open sessions.
   - **Mixed Nested Splitting**:
     - Click **Split ⬌** (`Split Horizontal`) or **Split ⬍** (`Split Vertical`) to divide any active pane.

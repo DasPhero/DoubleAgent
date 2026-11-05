@@ -213,4 +213,72 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByLabelText('Pane Alpha')).toBeInTheDocument();
     expect(screen.getByLabelText('Pane Alpha (H-Split #2)')).toBeInTheDocument();
   });
+
+  it('provides Global Settings modal (Ctrl+,), theme switcher, font/cursor customization, and pane font zoom controls (F-08)', () => {
+    render(<App />);
+
+    // Unlock vault
+    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+
+    const main = screen.getByLabelText('DoubleAgent Workspace');
+    expect(main).toHaveClass('theme-unlocked');
+    expect(main).toHaveClass('theme-teal');
+
+    // Open Global Settings via keyboard shortcut Ctrl+,
+    fireEvent.keyDown(window, { key: ',', ctrlKey: true });
+    expect(screen.getByRole('dialog', { name: 'Global Settings' })).toBeInTheDocument();
+
+    // Switch theme to Dracula
+    fireEvent.click(screen.getByRole('button', { name: /Dracula/i }));
+    expect(main).toHaveClass('theme-dracula');
+
+    // Switch theme to Nord
+    fireEvent.click(screen.getByRole('button', { name: /Nord/i }));
+    expect(main).toHaveClass('theme-nord');
+
+    // Change font family, font size, and cursor style
+    fireEvent.change(screen.getByLabelText('Font Family'), {
+      target: { value: "'JetBrains Mono', Consolas, monospace" },
+    });
+    fireEvent.change(screen.getByLabelText('Default Font Size'), {
+      target: { value: '16' },
+    });
+    fireEvent.change(screen.getByLabelText('Cursor Style'), {
+      target: { value: 'bar' },
+    });
+
+    // Close Settings
+    fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
+    expect(screen.queryByRole('dialog', { name: 'Global Settings' })).not.toBeInTheDocument();
+
+    // Create a host and connect
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Server-1' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), {
+      target: { value: '192.168.1.100' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
+
+    const connectBtn = screen.getByRole('button', { name: /^Connect$/i });
+    fireEvent.click(connectBtn);
+
+    // Verify pane has font badge showing 16px (from default setting)
+    expect(screen.getByText('16px')).toBeInTheDocument();
+
+    // Zoom in via pane zoom button (+)
+    const zoomInBtn = screen.getByRole('button', { name: /Zoom in Server-1/i });
+    fireEvent.click(zoomInBtn);
+    expect(screen.getByText('17px')).toBeInTheDocument();
+
+    // Zoom out via Ctrl -
+    fireEvent.keyDown(window, { key: '-', ctrlKey: true });
+    expect(screen.getByText('16px')).toBeInTheDocument();
+
+    // Reopen settings and reset to defaults
+    fireEvent.click(screen.getByRole('button', { name: /Settings ⚙/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Reset to Defaults/i }));
+    expect(main).toHaveClass('theme-teal');
+    fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
+  });
 });
