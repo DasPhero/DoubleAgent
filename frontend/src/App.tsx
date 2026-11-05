@@ -102,6 +102,44 @@ interface CommandPaletteResponse {
   quickConnect?: QuickConnectTarget;
 }
 
+export type SplitDirection = 'none' | 'horizontal' | 'vertical';
+
+export interface PaneItem {
+  id: string;
+  sessionId: string;
+  title: string;
+}
+
+export interface TabItem {
+  id: string;
+  title: string;
+  splitDir: SplitDirection;
+  panes: PaneItem[];
+  activePaneId: string;
+}
+
+function reorderTabsLocal(tabs: TabItem[], fromId: string, toId: string): TabItem[] {
+  if (fromId === toId) {
+    return tabs;
+  }
+  const fromIdx = tabs.findIndex((t) => t.id === fromId);
+  const toIdx = tabs.findIndex((t) => t.id === toId);
+  if (fromIdx === -1 || toIdx === -1) {
+    return tabs;
+  }
+  const next = [...tabs];
+  const [moved] = next.splice(fromIdx, 1);
+  next.splice(toIdx, 0, moved);
+  return next;
+}
+
+function cycleIndexLocal(current: number, length: number, delta: number): number {
+  if (length <= 0) {
+    return 0;
+  }
+  return (((current + delta) % length) + length) % length;
+}
+
 function parseQuickConnectLocal(raw: string): QuickConnectTarget | undefined {
   const trimmed = raw.trim();
   if (!trimmed) {
@@ -254,6 +292,7 @@ interface WailsAppBindings {
   DeleteSSHKey?: (keyId: string) => Promise<void>;
   ImportSSHConfig?: (configContent: string) => Promise<SSHConfigParseResult>;
   InjectSessionPassword?: (sessionId: string) => Promise<void>;
+  DuplicateSession?: (sessionId: string, size: { cols: number; rows: number }) => Promise<string>;
   ConnectSavedHost: (hostId: string, size: { cols: number; rows: number }) => Promise<string>;
   ConnectSSH: (req: {
     address: string;
@@ -357,14 +396,38 @@ export function App(): React.JSX.Element {
   const [port, setPort] = useState<string>('22');
   const [username, setUsername] = useState<string>('root');
   const [password, setPassword] = useState<string>('');
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<TabItem[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>(
     'Vault is locked (Dark Crimson Theme). Unlock your vault to switch to Teal and access saved hosts.'
   );
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
+  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0] || null;
+  const activePane =
+    activeTab?.panes.find((p) => p.id === activeTab.activePaneId) || activeTab?.panes[0] || null;
+  const sessionId = activePane?.sessionId || null;
+
   const writersRef = useRef<Map<string, (chunk: string) => void>>(new Map());
   const focusersRef = useRef<Map<string, () => void>>(new Map());
+  const tabCounterRef = useRef<number>(0);
+
+  const openSessionTab = useCallback((newSessionId: string, title: string): void => {
+    tabCounterRef.current += 1;
+    const seq = tabCounterRef.current;
+    const tabId = `tab-${seq}`;
+    const paneId = `pane-${seq}-1`;
+    const newTab: TabItem = {
+      id: tabId,
+      title,
+      splitDir: 'none',
+      panes: [{ id: paneId, sessionId: newSessionId, title }],
+      activePaneId: paneId,
+    };
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(tabId);
+  }, []);
 
   const registerWriter = useCallback((id: string, writeFn: (chunk: string) => void) => {
     writersRef.current.set(id, writeFn);
@@ -416,8 +479,29 @@ export function App(): React.JSX.Element {
       setHostKeyPrompt(info);
     });
 
-    const offExit = rt.EventsOn('terminal:exit', () => {
-      setSessionId(null);
+    const offExit = rt.EventsOn('terminal:exit', (raw: unknown) => {
+      const exitedId = typeof raw === 'string' ? raw : '';
+      setTabs((prev) => {
+        if (!exitedId) {
+          return [];
+        }
+        return prev
+          .map((t) => {
+            const remaining = t.panes.filter((p) => p.sessionId !== exitedId);
+            if (remaining.length === 0) {
+              return null;
+            }
+            return {
+              ...t,
+              splitDir: remaining.length === 1 ? ('none' as SplitDirection) : t.splitDir,
+              panes: remaining,
+              activePaneId: remaining.some((p) => p.id === t.activePaneId)
+                ? t.activePaneId
+                : remaining[0].id,
+            };
+          })
+          .filter((t): t is TabItem => t !== null);
+      });
       setStatusMessage('SSH session disconnected.');
     });
 
@@ -441,11 +525,48 @@ export function App(): React.JSX.Element {
         setShowCommandPalette((prev) => !prev);
       } else if (e.key === 'Escape') {
         setShowCommandPalette(false);
+      } else if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        const delta = e.key === 'ArrowRight' ? 1 : -1;
+        setTabs((currentTabs) => {
+          if (currentTabs.length === 0) {
+            return currentTabs;
+          }
+          setActiveTabId((currId) => {
+            const idx = currentTabs.findIndex((t) => t.id === currId);
+            const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, currentTabs.length, delta);
+            const nextTab = currentTabs[nextIdx];
+            const pane =
+              nextTab.panes.find((p) => p.id === nextTab.activePaneId) || nextTab.panes[0];
+            if (pane) {
+              setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 0);
+            }
+            return nextTab.id;
+          });
+          return currentTabs;
+        });
+      } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        const delta = e.key === 'ArrowDown' ? 1 : -1;
+        setTabs((currentTabs) =>
+          currentTabs.map((t) => {
+            if (t.id !== activeTabId || t.panes.length <= 1) {
+              return t;
+            }
+            const idx = t.panes.findIndex((p) => p.id === t.activePaneId);
+            const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, t.panes.length, delta);
+            const nextPane = t.panes[nextIdx];
+            if (nextPane) {
+              setTimeout(() => focusersRef.current.get(nextPane.sessionId)?.(), 0);
+            }
+            return { ...t, activePaneId: nextPane.id };
+          })
+        );
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [activeTabId]);
 
   useEffect(() => {
     if (!showCommandPalette) {
@@ -494,7 +615,7 @@ export function App(): React.JSX.Element {
         passphrase: '',
         size: { cols: 120, rows: 34 },
       });
-      setSessionId(id);
+      openSessionTab(id, qc.display);
       setPalettePassword('');
       setStatusMessage(`Connected (${qc.display})`);
     } catch (err: unknown) {
@@ -784,13 +905,15 @@ export function App(): React.JSX.Element {
   const handleConnectSavedHost = async (host: HostSummary): Promise<void> => {
     const api = getWailsBindings();
     if (!api) {
-      setStatusMessage(`Connecting to ${host.effectiveUser}@${host.address}:${host.effectivePort}...`);
+      const previewId = `sess-preview-${host.id}-${Date.now()}`;
+      openSessionTab(previewId, host.label);
+      setStatusMessage(`Connected to ${host.label}`);
       return;
     }
     setStatusMessage(`Connecting to ${host.label} (${host.effectiveUser}@${host.address}:${host.effectivePort})...`);
     try {
       const id = await api.ConnectSavedHost(host.id, { cols: 120, rows: 34 });
-      setSessionId(id);
+      openSessionTab(id, host.label);
       setStatusMessage(`Connected to ${host.label}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -829,7 +952,7 @@ export function App(): React.JSX.Element {
         passphrase: '',
         size: { cols: 120, rows: 34 },
       });
-      setSessionId(id);
+      openSessionTab(id, `${username}@${address}:${port}`);
       setPassword('');
       setStatusMessage(`Connected (${username}@${address}:${port})`);
     } catch (err: unknown) {
@@ -1036,15 +1159,104 @@ export function App(): React.JSX.Element {
     }
   };
 
-  const handleDisconnect = async (): Promise<void> => {
-    if (!sessionId) {
+  const handleSplitPane = async (direction: 'horizontal' | 'vertical'): Promise<void> => {
+    if (!activeTab || !activePane) {
+      return;
+    }
+    const api = getWailsBindings();
+    let newSessionId = `sess-split-${Date.now()}-${activeTab.panes.length + 1}`;
+    if (api?.DuplicateSession) {
+      try {
+        newSessionId = await api.DuplicateSession(activePane.sessionId, { cols: 120, rows: 34 });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Split pane connection failed: ${msg}`);
+        return;
+      }
+    }
+    tabCounterRef.current += 1;
+    const newPaneId = `pane-${tabCounterRef.current}`;
+    const newPane: PaneItem = {
+      id: newPaneId,
+      sessionId: newSessionId,
+      title: `${activePane.title} (${direction === 'horizontal' ? 'H' : 'V'}-Split #${activeTab.panes.length + 1})`,
+    };
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTab.id
+          ? {
+              ...t,
+              splitDir: direction,
+              panes: [...t.panes, newPane],
+              activePaneId: newPaneId,
+            }
+          : t
+      )
+    );
+    setStatusMessage(
+      `Split ${direction} created (${activeTab.panes.length + 1} panes in ${activeTab.title}).`
+    );
+    setTimeout(() => focusersRef.current.get(newSessionId)?.(), 0);
+  };
+
+  const handleCyclePaneFocus = (): void => {
+    if (!activeTab || activeTab.panes.length <= 1) {
+      return;
+    }
+    const idx = activeTab.panes.findIndex((p) => p.id === activeTab.activePaneId);
+    const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, activeTab.panes.length, 1);
+    const nextPane = activeTab.panes[nextIdx];
+    setTabs((prev) =>
+      prev.map((t) => (t.id === activeTab.id ? { ...t, activePaneId: nextPane.id } : t))
+    );
+    focusersRef.current.get(nextPane.sessionId)?.();
+  };
+
+  const handleCloseTab = async (tabId: string): Promise<void> => {
+    const target = tabs.find((t) => t.id === tabId);
+    if (!target) {
       return;
     }
     const api = getWailsBindings();
     if (api) {
-      await api.DisconnectSession(sessionId);
+      for (const p of target.panes) {
+        await api.DisconnectSession(p.sessionId);
+      }
     }
-    setSessionId(null);
+    const remaining = tabs.filter((t) => t.id !== tabId);
+    setTabs(remaining);
+    if (activeTabId === tabId) {
+      setActiveTabId(remaining[0]?.id || null);
+    }
+  };
+
+  const handleDisconnect = async (): Promise<void> => {
+    if (!activeTab || !activePane) {
+      return;
+    }
+    const api = getWailsBindings();
+    if (api) {
+      await api.DisconnectSession(activePane.sessionId);
+    }
+    setTabs((prev) =>
+      prev
+        .map((t) => {
+          if (t.id !== activeTab.id) {
+            return t;
+          }
+          const remainingPanes = t.panes.filter((p) => p.id !== activePane.id);
+          if (remainingPanes.length === 0) {
+            return null;
+          }
+          return {
+            ...t,
+            splitDir: remainingPanes.length === 1 ? ('none' as SplitDirection) : t.splitDir,
+            panes: remainingPanes,
+            activePaneId: remainingPanes[0].id,
+          };
+        })
+        .filter((t): t is TabItem => t !== null)
+    );
     setStatusMessage('Disconnected.');
   };
 
@@ -1287,13 +1499,92 @@ export function App(): React.JSX.Element {
           )}
         </aside>
 
-        {sessionId ? (
+        {activeTab && activePane ? (
           <section className="terminal-workspace" aria-label="Active Terminal Session">
+            <div className="tabs-bar" role="tablist" aria-label="Session Tabs">
+              {tabs.map((tab) => {
+                const isActive = tab.id === activeTab.id;
+                return (
+                  <div
+                    key={tab.id}
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-label={`Tab ${tab.title}`}
+                    draggable
+                    className={`tab-pill ${isActive ? 'active' : ''}`}
+                    onDragStart={() => setDraggedTabId(tab.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (draggedTabId && draggedTabId !== tab.id) {
+                        setTabs((prev) => reorderTabsLocal(prev, draggedTabId, tab.id));
+                      }
+                      setDraggedTabId(null);
+                    }}
+                    onClick={() => {
+                      setActiveTabId(tab.id);
+                      const pane =
+                        tab.panes.find((p) => p.id === tab.activePaneId) || tab.panes[0];
+                      if (pane) {
+                        setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 0);
+                      }
+                    }}
+                  >
+                    <span className="tab-dot" />
+                    <span>{tab.title}</span>
+                    {tab.panes.length > 1 && <small>({tab.panes.length})</small>}
+                    <button
+                      type="button"
+                      className="tab-close-btn"
+                      aria-label={`Close Tab ${tab.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleCloseTab(tab.id);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
             <div className="terminal-toolbar">
               <span>
                 Active Session: <strong>{statusMessage}</strong>
               </span>
               <div className="terminal-toolbar-actions">
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  aria-label="Split Horizontal"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleSplitPane('horizontal')}
+                  title="Split active tab horizontally (side-by-side)"
+                >
+                  Split ⬌
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  aria-label="Split Vertical"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleSplitPane('vertical')}
+                  title="Split active tab vertically (stacked)"
+                >
+                  Split ⬍
+                </button>
+                {activeTab.panes.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    aria-label="Next Pane"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={handleCyclePaneFocus}
+                    title="Cycle keyboard focus to the next split pane (Alt+ArrowDown)"
+                  >
+                    Next Pane ⇥
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn-secondary btn-sm"
@@ -1312,13 +1603,50 @@ export function App(): React.JSX.Element {
                 </button>
               </div>
             </div>
-            <TerminalView
-              sessionId={sessionId}
-              onInput={handleTerminalInput}
-              onResize={handleTerminalResize}
-              registerWriter={registerWriter}
-              registerFocuser={registerFocuser}
-            />
+
+            <div
+              className={`split-grid ${
+                activeTab.splitDir === 'horizontal'
+                  ? 'split-horizontal'
+                  : activeTab.splitDir === 'vertical'
+                    ? 'split-vertical'
+                    : ''
+              }`}
+              aria-label="Terminal Split Grid"
+            >
+              {activeTab.panes.map((pane) => {
+                const isPaneActive = pane.id === activePane.id;
+                return (
+                  <div
+                    key={pane.id}
+                    className={`split-pane ${isPaneActive ? 'active' : ''}`}
+                    aria-label={`Pane ${pane.title}`}
+                    onClick={() => {
+                      setTabs((prev) =>
+                        prev.map((t) =>
+                          t.id === activeTab.id ? { ...t, activePaneId: pane.id } : t
+                        )
+                      );
+                      focusersRef.current.get(pane.sessionId)?.();
+                    }}
+                  >
+                    {activeTab.panes.length > 1 && (
+                      <div className="split-pane-header">
+                        <span>{pane.title}</span>
+                        <span>{isPaneActive ? '● Focused (Alt+↑/↓)' : 'Click to focus'}</span>
+                      </div>
+                    )}
+                    <TerminalView
+                      sessionId={pane.sessionId}
+                      onInput={handleTerminalInput}
+                      onResize={handleTerminalResize}
+                      registerWriter={registerWriter}
+                      registerFocuser={registerFocuser}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </section>
         ) : (
           <section className="empty-state">

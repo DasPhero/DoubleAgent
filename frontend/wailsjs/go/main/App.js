@@ -22,12 +22,24 @@ export function DeleteHost(arg1) {
   return window['go']['main']['App']['DeleteHost'](arg1);
 }
 
+export function DeleteSSHKey(arg1) {
+  return window['go']['main']['App']['DeleteSSHKey'](arg1);
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['main']['App']['DisconnectSession'](arg1);
 }
 
+export function DuplicateSession(arg1, arg2) {
+  return window['go']['main']['App']['DuplicateSession'](arg1, arg2);
+}
+
 export function EnableQuickUnlock() {
   return window['go']['main']['App']['EnableQuickUnlock']();
+}
+
+export function GenerateSSHKey(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GenerateSSHKey'](arg1, arg2, arg3);
 }
 
 export function GetVaultSummary() {
@@ -38,12 +50,24 @@ export function HealthCheck() {
   return window['go']['main']['App']['HealthCheck']();
 }
 
+export function ImportSSHConfig(arg1) {
+  return window['go']['main']['App']['ImportSSHConfig'](arg1);
+}
+
+export function ImportSSHKey(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ImportSSHKey'](arg1, arg2, arg3);
+}
+
 export function InitializeVault(arg1) {
   return window['go']['main']['App']['InitializeVault'](arg1);
 }
 
 export function InitializeVaultWithHello() {
   return window['go']['main']['App']['InitializeVaultWithHello']();
+}
+
+export function InjectSessionPassword(arg1) {
+  return window['go']['main']['App']['InjectSessionPassword'](arg1);
 }
 
 export function LockVault() {
@@ -72,6 +96,10 @@ export function SaveHost(arg1) {
 
 export function SaveIdentity(arg1) {
   return window['go']['main']['App']['SaveIdentity'](arg1);
+}
+
+export function SearchCommandPalette(arg1) {
+  return window['go']['main']['App']['SearchCommandPalette'](arg1);
 }
 
 export function UnlockVault(arg1) {

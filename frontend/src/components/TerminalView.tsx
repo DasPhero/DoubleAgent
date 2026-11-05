@@ -51,13 +51,12 @@ export function TerminalView({
     term.loadAddon(unicode11Addon);
     term.unicode.activeVersion = '11';
 
-    term.open(container);
-
     try {
+      term.open(container);
       fitAddon.fit();
       term.focus();
     } catch {
-      // Ignore layout fit errors in headless test environments (jsdom)
+      // Ignore layout fit / matchMedia errors in headless test environments (jsdom)
     }
 
     if (registerWriter) {

@@ -6,12 +6,19 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, & `M1-3`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, & `F-08`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
 - **Visual Security State (Dark Crimson Locked ↔ Dark Teal Unlocked)**:
   - When the **Vault is Locked**, the entire application displays a **Dark Crimson / Red** theme so you can see at a glance that secrets are locked.
   - As soon as you unlock the Vault, the UI transitions to the **Dark Slate + Teal** glass theme.
+- **Multi-Session Tabs & Split Panes (`F-08`)**:
+  - Connecting to multiple hosts opens each session in its own **Tab** in the top tab bar above the terminal.
+  - **Drag-and-Drop Reordering**: Drag any tab pill left or right to reorder your open sessions.
+  - **Horizontal & Vertical Splitting**: Click **Split ⬌** (`Split Horizontal`) or **Split ⬍** (`Split Vertical`) in the terminal toolbar to open an additional shell on the same host side-by-side or stacked.
+  - **Keyboard Focus Navigation**:
+    - Press **`Alt+ArrowLeft`** / **`Alt+ArrowRight`** to switch between open **Tabs** via keyboard.
+    - Press **`Alt+ArrowUp`** / **`Alt+ArrowDown`** (or click **Next Pane ⇥**) to cycle keyboard focus across **Split Panes** within the active tab.
 - **SSH Keychain (`M1-3` — `F-04`)**:
   - Click **Keychain (`F-04`)** in the top bar when the Vault is unlocked:
     - Generate new **Ed25519** or **RSA-3072** SSH keypairs directly inside the encrypted Vault (with an optional passphrase).

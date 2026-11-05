@@ -128,4 +128,61 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByText('jump-eu')).toBeInTheDocument();
     expect(screen.getByText('secops@198.51.100.7:2202')).toBeInTheDocument();
   });
+
+  it('supports multi-session Tabs, drag-and-drop tab reordering, horizontal/vertical Split Panes, and keyboard focus navigation (F-08)', () => {
+    render(<App />);
+
+    // Unlock vault
+    fireEvent.click(screen.getByRole('button', { name: /Set Up Vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Skip Password for Now/i }));
+
+    // Create two hosts: Alpha and Beta
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Alpha' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.0.0.1' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Beta' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.0.0.2' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
+
+    // Connect both hosts to open two Tabs
+    const connectButtons = screen.getAllByRole('button', { name: /^Connect$/i });
+    fireEvent.click(connectButtons[0]);
+    fireEvent.click(connectButtons[1]);
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveAttribute('aria-label', 'Tab Alpha');
+    expect(tabs[1]).toHaveAttribute('aria-label', 'Tab Beta');
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+
+    // Reorder tabs via Drag-and-Drop: drag Alpha onto Beta (F-08)
+    fireEvent.dragStart(tabs[0]);
+    fireEvent.dragOver(tabs[1]);
+    fireEvent.drop(tabs[1]);
+
+    const reorderedTabs = screen.getAllByRole('tab');
+    expect(reorderedTabs[0]).toHaveAttribute('aria-label', 'Tab Beta');
+    expect(reorderedTabs[1]).toHaveAttribute('aria-label', 'Tab Alpha');
+
+    // Keyboard navigation between Tabs via Alt+ArrowRight (F-08)
+    fireEvent.keyDown(window, { key: 'ArrowRight', altKey: true });
+    expect(screen.getByRole('tab', { name: 'Tab Alpha' })).toHaveAttribute('aria-selected', 'true');
+
+    // Split active tab horizontally (F-08)
+    fireEvent.click(screen.getByRole('button', { name: 'Split Horizontal' }));
+    const splitGrid = screen.getByLabelText('Terminal Split Grid');
+    expect(splitGrid).toHaveClass('split-horizontal');
+    expect(screen.getByLabelText('Pane Alpha (H-Split #2)')).toHaveClass('active');
+
+    // Cycle focus between split panes via Alt+ArrowDown (F-08)
+    fireEvent.keyDown(window, { key: 'ArrowDown', altKey: true });
+    expect(screen.getByLabelText('Pane Alpha')).toHaveClass('active');
+
+    // Switch to vertical split (F-08)
+    fireEvent.click(screen.getByRole('button', { name: 'Split Vertical' }));
+    expect(splitGrid).toHaveClass('split-vertical');
+  });
 });

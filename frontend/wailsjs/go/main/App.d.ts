@@ -12,17 +12,29 @@ export function DeleteGroup(arg1:string):Promise<void>;
 
 export function DeleteHost(arg1:string):Promise<void>;
 
+export function DeleteSSHKey(arg1:string):Promise<void>;
+
 export function DisconnectSession(arg1:string):Promise<void>;
 
+export function DuplicateSession(arg1:string,arg2:core.TerminalSize):Promise<string>;
+
 export function EnableQuickUnlock():Promise<void>;
+
+export function GenerateSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
 
 export function GetVaultSummary():Promise<core.VaultSummary>;
 
 export function HealthCheck():Promise<core.AppStatus>;
 
+export function ImportSSHConfig(arg1:string):Promise<core.SSHConfigParseResult>;
+
+export function ImportSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
+
 export function InitializeVault(arg1:string):Promise<void>;
 
 export function InitializeVaultWithHello():Promise<void>;
+
+export function InjectSessionPassword(arg1:string):Promise<void>;
 
 export function LockVault():Promise<void>;
 
@@ -37,6 +49,8 @@ export function SaveGroup(arg1:core.GroupRecord):Promise<void>;
 export function SaveHost(arg1:core.HostRecord):Promise<void>;
 
 export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
+
+export function SearchCommandPalette(arg1:string):Promise<core.CommandPaletteResponse>;
 
 export function UnlockVault(arg1:string):Promise<void>;
 

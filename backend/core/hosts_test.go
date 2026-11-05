@@ -97,3 +97,4 @@ func TestM1_1_HostGroupInheritanceAndOverride_F01(t *testing.T) {
 		t.Fatalf("unexpected summary counts: %+v", summary)
 	}
 }
+

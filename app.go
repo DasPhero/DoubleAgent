@@ -34,6 +34,7 @@ type App struct {
 	activeStreams    map[string]*core.SshShellStreams
 	sessionHostID    map[string]string
 	sessionPasswords map[string]string
+	sessionRequests  map[string]core.ConnectRequest
 	pendingKeys      map[string]chan bool
 }
 
@@ -81,6 +82,7 @@ func NewAppWithDependencies(
 		activeStreams:    make(map[string]*core.SshShellStreams),
 		sessionHostID:    make(map[string]string),
 		sessionPasswords: make(map[string]string),
+		sessionRequests:  make(map[string]core.ConnectRequest),
 		pendingKeys:      make(map[string]chan bool),
 	}
 
@@ -565,6 +567,7 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 
 	a.mu.Lock()
 	a.activeStreams[sessionID] = streams
+	a.sessionRequests[sessionID] = req
 	if req.Password != "" {
 		a.sessionPasswords[sessionID] = req.Password
 	}
@@ -574,6 +577,24 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 	go a.streamReaderLoop(sessionID, streams.Stderr, false)
 
 	return sessionID, nil
+}
+
+// DuplicateSession opens a parallel SSH PTY session to the same host as an existing session
+// (used when splitting a pane horizontally or vertically per F-08).
+func (a *App) DuplicateSession(sessionID string, size core.TerminalSize) (string, error) {
+	a.mu.Lock()
+	hostID := a.sessionHostID[sessionID]
+	req, hasReq := a.sessionRequests[sessionID]
+	a.mu.Unlock()
+
+	if hostID != "" {
+		return a.ConnectSavedHost(hostID, size)
+	}
+	if hasReq {
+		req.Size = size
+		return a.ConnectSSH(req)
+	}
+	return "", core.ErrSessionNotFound
 }
 
 func (a *App) promptHostKeyTOFU(info core.HostKeyInfo) (bool, error) {
@@ -677,6 +698,7 @@ func (a *App) DisconnectSession(sessionID string) error {
 	delete(a.activeStreams, sessionID)
 	delete(a.sessionHostID, sessionID)
 	delete(a.sessionPasswords, sessionID)
+	delete(a.sessionRequests, sessionID)
 	a.mu.Unlock()
 	return a.transport.Disconnect(a.ctx, sessionID)
 }
@@ -703,6 +725,7 @@ func (a *App) streamReaderLoop(sessionID string, r io.Reader, emitExitOnEOF bool
 				delete(a.activeStreams, sessionID)
 				delete(a.sessionHostID, sessionID)
 				delete(a.sessionPasswords, sessionID)
+				delete(a.sessionRequests, sessionID)
 				a.mu.Unlock()
 				a.emit(a.ctx, "terminal:exit", core.TerminalExitEvent{
 					SessionID: sessionID,
