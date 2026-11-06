@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppGlobalSettings } from './TerminalView';
 import brandLogoText from '../assets/DoubleAgent_Logo_complete_with_text.png';
+import {
+  SYSTEM_SHORTCUTS,
+  ShortcutCategory,
+  CustomShortcutItem,
+  normalizeKeyboardShortcut,
+  findShortcutConflict,
+} from '../types/shortcuts';
 
 export interface SettingsViewProps {
   activeTab: 'appearance' | 'security' | 'shortcuts' | 'about';
@@ -16,16 +23,13 @@ export interface SettingsViewProps {
   onEnableQuickUnlock: () => Promise<void>;
   onChangePassword: (currentPw: string, newPw: string) => Promise<void>;
   onResetVault: () => Promise<void>;
+  availableSnippets?: Array<{ id: string; name: string }>;
   onClose?: () => void;
   onOpenAsTab?: () => void;
   isModal?: boolean;
 }
 
-export interface CustomShortcut {
-  id: string;
-  action: string;
-  keyCombo: string;
-}
+export type CustomShortcut = CustomShortcutItem;
 
 export function SettingsView({
   activeTab,
@@ -41,6 +45,7 @@ export function SettingsView({
   onEnableQuickUnlock,
   onChangePassword,
   onResetVault,
+  availableSnippets = [],
   onClose,
   onOpenAsTab,
   isModal = false,
@@ -51,14 +56,30 @@ export function SettingsView({
   const [pwError, setPwError] = useState<string>('');
   const [pwSuccess, setPwSuccess] = useState<string>('');
 
-  // Custom shortcuts state (F-24 TODO / Preview)
-  const [customShortcuts, setCustomShortcuts] = useState<CustomShortcut[]>([
-    { id: 'sc-1', action: 'Toggle Sidebar', keyCombo: 'Ctrl + B' },
-    { id: 'sc-2', action: 'Port Forwarding Dialog', keyCombo: 'Ctrl + Shift + P' },
-  ]);
+  // Shortcuts & Leader Key State
+  const currentKeybindings = useMemo(() => globalSettings.keybindings || {}, [globalSettings.keybindings]);
+  const currentCustomShortcuts = useMemo(
+    () => globalSettings.customShortcuts || [],
+    [globalSettings.customShortcuts]
+  );
+  const leaderEnabled = globalSettings.leaderKeyEnabled ?? false;
+  const leaderKey = globalSettings.leaderKey || 'Ctrl+B';
+  const leaderTimeout = globalSettings.leaderTimeoutMs || 2000;
+
+  const [shortcutCategory, setShortcutCategory] = useState<ShortcutCategory | 'all'>('all');
+  const [shortcutSearch, setShortcutSearch] = useState<string>('');
+  const [recordingActionId, setRecordingActionId] = useState<string | null>(null);
+  const [recordedCombo, setRecordedCombo] = useState<string>('');
+  const [conflictWarning, setConflictWarning] = useState<string>('');
+
+  // Add Custom Shortcut Modal / Form State
   const [showAddShortcut, setShowAddShortcut] = useState<boolean>(false);
+  const [customType, setCustomType] = useState<'action' | 'snippet'>('action');
   const [newShortcutAction, setNewShortcutAction] = useState<string>('Quick Connect');
+  const [selectedSnippetId, setSelectedSnippetId] = useState<string>('');
   const [newShortcutKey, setNewShortcutKey] = useState<string>('');
+  const [isRecordingCustom, setIsRecordingCustom] = useState<boolean>(false);
+  const [customConflictWarning, setCustomConflictWarning] = useState<string>('');
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,23 +103,82 @@ export function SettingsView({
     }
   };
 
-  const handleAddShortcut = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newShortcutKey.trim()) return;
-    setCustomShortcuts((prev) => [
-      ...prev,
-      {
-        id: `sc-${Date.now()}`,
-        action: newShortcutAction,
-        keyCombo: newShortcutKey.trim(),
-      },
-    ]);
-    setNewShortcutKey('');
-    setShowAddShortcut(false);
+  const handleSaveRecordedKey = (actionId: string) => {
+    if (!recordedCombo) return;
+    const updated = { ...currentKeybindings, [actionId]: recordedCombo };
+    onUpdateSettings({ keybindings: updated });
+    setRecordingActionId(null);
+    setRecordedCombo('');
+    setConflictWarning('');
   };
 
-  const handleRemoveShortcut = (id: string) => {
-    setCustomShortcuts((prev) => prev.filter((s) => s.id !== id));
+  const handleResetSingleBinding = (actionId: string) => {
+    const updated: Record<string, string> = {};
+    for (const [k, v] of Object.entries(currentKeybindings)) {
+      if (k !== actionId) {
+        updated[k] = v;
+      }
+    }
+    onUpdateSettings({ keybindings: updated });
+    if (recordingActionId === actionId) {
+      setRecordingActionId(null);
+      setRecordedCombo('');
+      setConflictWarning('');
+    }
+  };
+
+  const handleResetAllBindings = () => {
+    if (confirm('Reset all keyboard shortcuts and leader keys to factory defaults?')) {
+      onUpdateSettings({
+        keybindings: {},
+        customShortcuts: [],
+        leaderKeyEnabled: false,
+        leaderKey: 'Ctrl+B',
+        leaderTimeoutMs: 2000,
+      });
+      setRecordingActionId(null);
+      setRecordedCombo('');
+      setConflictWarning('');
+    }
+  };
+
+  const handleAddCustomShortcut = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newShortcutKey.trim()) return;
+
+    let actionLabel = newShortcutAction;
+    let snippetName: string | undefined;
+
+    if (customType === 'snippet') {
+      const snip = availableSnippets.find((s) => s.id === selectedSnippetId);
+      if (snip) {
+        actionLabel = `Run: ${snip.name}`;
+        snippetName = snip.name;
+      }
+    }
+
+    const newItem: CustomShortcutItem = {
+      id: `custom-sc-${Date.now()}`,
+      action: actionLabel,
+      keyCombo: newShortcutKey.trim(),
+      snippetId: customType === 'snippet' ? selectedSnippetId : undefined,
+      snippetName,
+    };
+
+    onUpdateSettings({
+      customShortcuts: [...currentCustomShortcuts, newItem],
+    });
+
+    setNewShortcutKey('');
+    setShowAddShortcut(false);
+    setIsRecordingCustom(false);
+    setCustomConflictWarning('');
+  };
+
+  const handleRemoveCustomShortcut = (id: string) => {
+    onUpdateSettings({
+      customShortcuts: currentCustomShortcuts.filter((s) => s.id !== id),
+    });
   };
 
   return (
@@ -439,77 +519,299 @@ export function SettingsView({
         </div>
       )}
 
-      {/* Tab 3: Keyboard Shortcuts */}
+      {/* Tab 3: Keyboard Shortcuts & Leader Key (F-18) */}
       {activeTab === 'shortcuts' && (
         <div className="settings-grid" role="tabpanel" aria-label="Keyboard Shortcuts Settings">
+          {/* Section A: Leader / Prefix Key Mode (Tmux style) */}
           <section className="settings-section">
-            <h3>Default System Shortcuts</h3>
+            <div className="leader-config-box">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>⌨️ Leader Key / Prefix Mode</span>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        padding: '0.1rem 0.45rem',
+                        borderRadius: '9999px',
+                        background: leaderEnabled ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                        color: leaderEnabled ? '#2dd4bf' : 'var(--text-muted)',
+                      }}
+                    >
+                      {leaderEnabled ? 'Active' : 'Disabled'}
+                    </span>
+                  </h3>
+                  <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Eliminate keystroke collisions with terminal programs (<code>vim</code>, <code>tmux</code>, <code>nano</code>). When enabled, DoubleAgent only listens for shortcut commands after pressing the prefix key.
+                  </p>
+                </div>
+                <label className="toggle-switch-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    aria-label="Enable Leader Key Mode"
+                    checked={leaderEnabled}
+                    onChange={(e) => onUpdateSettings({ leaderKeyEnabled: e.target.checked })}
+                  />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Enable Leader Mode</span>
+                </label>
+              </div>
+
+              {leaderEnabled && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                      Leader Key Combo
+                    </label>
+                    <select
+                      aria-label="Leader Key Combination"
+                      value={leaderKey}
+                      onChange={(e) => onUpdateSettings({ leaderKey: e.target.value })}
+                      style={{ width: '100%' }}
+                    >
+                      <option value="Ctrl+B">Ctrl + B (Tmux Default)</option>
+                      <option value="Ctrl+A">Ctrl + A (Screen Default)</option>
+                      <option value="Ctrl+Space">Ctrl + Space</option>
+                      <option value="Alt+Space">Alt + Space</option>
+                      <option value="Ctrl+Q">Ctrl + Q</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                      Leader Timeout (Auto-disarm)
+                    </label>
+                    <select
+                      aria-label="Leader Timeout"
+                      value={leaderTimeout}
+                      onChange={(e) => onUpdateSettings({ leaderTimeoutMs: Number(e.target.value) })}
+                      style={{ width: '100%' }}
+                    >
+                      <option value={1000}>1.0 second</option>
+                      <option value={1500}>1.5 seconds</option>
+                      <option value={2000}>2.0 seconds (Recommended)</option>
+                      <option value={3000}>3.0 seconds</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Section B: System Keybindings with Interactive Rebinding & Conflict Detection */}
+          <section className="settings-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0 }}>System Keybindings &amp; Actions</h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Click Rebind on any action to capture a new key combination. DoubleAgent automatically checks for key conflicts.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={handleResetAllBindings}
+                title="Restore all keyboard shortcuts to factory defaults"
+              >
+                ↺ Reset All to Defaults
+              </button>
+            </div>
+
+            {/* Filter Chips & Search Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div className="shortcuts-filter-bar" style={{ margin: 0 }}>
+                {(
+                  [
+                    { id: 'all', label: 'All Actions' },
+                    { id: 'navigation', label: 'Navigation & Tabs' },
+                    { id: 'terminal', label: 'Terminal & Font' },
+                    { id: 'sessions', label: 'Sessions & CWD' },
+                    { id: 'tools', label: 'Tools & Modals' },
+                  ] as const
+                ).map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={`shortcuts-filter-btn ${shortcutCategory === cat.id ? 'active' : ''}`}
+                    onClick={() => setShortcutCategory(cat.id)}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Search shortcuts..."
+                value={shortcutSearch}
+                onChange={(e) => setShortcutSearch(e.target.value)}
+                style={{ width: '180px', padding: '0.25rem 0.5rem', fontSize: '0.78rem' }}
+              />
+            </div>
+
+            {/* Keybindings Table */}
             <table className="shortcuts-table">
               <thead>
                 <tr>
-                  <th>Action</th>
-                  <th>Shortcut</th>
+                  <th style={{ width: '38%' }}>Action</th>
+                  <th style={{ width: '22%' }}>Active Shortcut</th>
+                  {leaderEnabled && <th style={{ width: '18%' }}>Leader Chord</th>}
+                  <th style={{ width: '22%', textAlign: 'right' }}>Customization</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>Global Settings</td>
-                  <td><code>Ctrl + ,</code></td>
-                </tr>
-                <tr>
-                  <td>Command Palette &amp; Quick Connect</td>
-                  <td><code>Ctrl + K</code></td>
-                </tr>
-                <tr>
-                  <td>Zoom In / Out Pane Font</td>
-                  <td><code>Ctrl + +</code> / <code>Ctrl + -</code> or <code>Ctrl + Wheel</code></td>
-                </tr>
-                <tr>
-                  <td>Reset Pane Font Size</td>
-                  <td><code>Ctrl + 0</code></td>
-                </tr>
-                <tr>
-                  <td>Cycle Active Tabs</td>
-                  <td><code>Alt + ←</code> / <code>Alt + →</code></td>
-                </tr>
-                <tr>
-                  <td>Cycle Active Split Panes</td>
-                  <td><code>Alt + ↑</code> / <code>Alt + ↓</code></td>
-                </tr>
-                <tr>
-                  <td>New Session Tab</td>
-                  <td><code>Alt + N</code></td>
-                </tr>
-                <tr>
-                  <td>Close Active Pane / Tab</td>
-                  <td><code>Alt + W</code></td>
-                </tr>
-                <tr>
-                  <td>Toggle Sidebar</td>
-                  <td><code>Ctrl + B</code></td>
-                </tr>
-                <tr>
-                  <td>Find in Terminal</td>
-                  <td><code>Ctrl + F</code></td>
-                </tr>
+                {SYSTEM_SHORTCUTS.filter((def) => {
+                  if (shortcutCategory !== 'all' && def.category !== shortcutCategory) return false;
+                  if (shortcutSearch.trim()) {
+                    const q = shortcutSearch.toLowerCase();
+                    return (
+                      def.label.toLowerCase().includes(q) ||
+                      def.description.toLowerCase().includes(q) ||
+                      def.defaultKey.toLowerCase().includes(q) ||
+                      (currentKeybindings[def.actionId] || '').toLowerCase().includes(q)
+                    );
+                  }
+                  return true;
+                }).map((def) => {
+                  const isRecording = recordingActionId === def.actionId;
+                  const customKey = currentKeybindings[def.actionId];
+                  const activeKey = customKey || def.defaultKey;
+                  const isOverridden = Boolean(customKey && customKey !== def.defaultKey);
+
+                  return (
+                    <tr key={def.actionId}>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{def.label}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{def.description}</div>
+                      </td>
+                      <td>
+                        {isRecording ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div
+                              tabIndex={0}
+                              className="key-record-box"
+                              onKeyDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.key === 'Escape') {
+                                  setRecordingActionId(null);
+                                  setRecordedCombo('');
+                                  setConflictWarning('');
+                                  return;
+                                }
+                                const combo = normalizeKeyboardShortcut(e.nativeEvent);
+                                if (combo) {
+                                  setRecordedCombo(combo);
+                                  const conflict = findShortcutConflict(currentKeybindings, def.actionId, combo);
+                                  setConflictWarning(conflict ? conflict.label : '');
+                                }
+                              }}
+                            >
+                              <span>🔴</span>
+                              <span>{recordedCombo || 'Press key combo...'}</span>
+                            </div>
+                            {conflictWarning && (
+                              <div className="shortcut-conflict-warning">
+                                ⚠️ Conflicts with: <strong>{conflictWarning}</strong>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={`key-badge ${isOverridden ? 'key-badge-custom' : ''}`}>
+                            {activeKey}
+                          </span>
+                        )}
+                      </td>
+                      {leaderEnabled && (
+                        <td>
+                          {def.leaderKey ? (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                              Leader + <strong>{def.leaderKey}</strong>
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      )}
+                      <td style={{ textAlign: 'right' }}>
+                        {isRecording ? (
+                          <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                            <button
+                              type="button"
+                              className="btn-primary btn-sm"
+                              disabled={!recordedCombo}
+                              onClick={() => handleSaveRecordedKey(def.actionId)}
+                              style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
+                            >
+                              ✓ Save
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-sm"
+                              onClick={() => {
+                                setRecordingActionId(null);
+                                setRecordedCombo('');
+                                setConflictWarning('');
+                              }}
+                              style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-sm"
+                              onClick={() => {
+                                setRecordingActionId(def.actionId);
+                                setRecordedCombo('');
+                                setConflictWarning('');
+                              }}
+                              style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
+                            >
+                              ⌨️ Rebind
+                            </button>
+                            {isOverridden && (
+                              <button
+                                type="button"
+                                className="btn-secondary btn-sm"
+                                onClick={() => handleResetSingleBinding(def.actionId)}
+                                title="Reset to default key"
+                                style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
+                              >
+                                ↺ Reset
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </section>
 
-          {/* Custom Shortcuts Section */}
+          {/* Section C: Custom Shortcuts & Snippet Launchers */}
           <section className="settings-section">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: 0 }}>Custom Shortcuts (Roadmap Feature)</h3>
+                <h3 style={{ margin: 0 }}>Custom Hotkeys &amp; Snippet Launchers</h3>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  Bind custom hotkeys to DoubleAgent operations. Prefix leader keys supported to avoid shell collisions.
+                  Bind custom hotkeys to trigger actions or run command snippets directly into active terminals.
                 </span>
               </div>
               {!showAddShortcut && (
                 <button
                   type="button"
                   className="btn-secondary btn-sm"
-                  onClick={() => setShowAddShortcut(true)}
+                  onClick={() => {
+                    setShowAddShortcut(true);
+                    setNewShortcutKey('');
+                    setIsRecordingCustom(false);
+                    setCustomConflictWarning('');
+                    if (availableSnippets.length > 0 && !selectedSnippetId) {
+                      setSelectedSnippetId(availableSnippets[0].id);
+                    }
+                  }}
                 >
                   + Add Custom Shortcut
                 </button>
@@ -518,7 +820,7 @@ export function SettingsView({
 
             {showAddShortcut && (
               <form
-                onSubmit={handleAddShortcut}
+                onSubmit={handleAddCustomShortcut}
                 style={{
                   padding: '0.8rem',
                   backgroundColor: 'rgba(9, 13, 20, 0.7)',
@@ -530,88 +832,149 @@ export function SettingsView({
                   gap: '0.6rem',
                 }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-                      Action
+                      Shortcut Target Type
                     </label>
                     <select
-                      value={newShortcutAction}
-                      onChange={(e) => setNewShortcutAction(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.35rem 0.5rem',
-                        backgroundColor: 'var(--bg-main)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: '4px',
-                        color: 'var(--text-main)',
-                      }}
+                      value={customType}
+                      onChange={(e) => setCustomType(e.target.value as 'action' | 'snippet')}
+                      style={{ width: '100%' }}
                     >
-                      <option value="Quick Connect">Quick Connect Bar</option>
-                      <option value="Port Forwarding Dialog">Port Forwarding Dialog</option>
-                      <option value="SSH Keychain">SSH Keychain</option>
-                      <option value="Open Default Dir Terminal">Open Default Dir Terminal</option>
-                      <option value="Open Current Dir Terminal">Open Current Dir Terminal</option>
-                      <option value="Open Root Shell Terminal">Open Root Shell Terminal</option>
-                      <option value="Disconnect Active Session">Disconnect Active Session</option>
-                      <option value="Lock Vault">Lock Vault</option>
+                      <option value="action">System Action</option>
+                      <option value="snippet">Run Command Snippet</option>
                     </select>
                   </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                      {customType === 'snippet' ? 'Target Snippet' : 'Target Action'}
+                    </label>
+                    {customType === 'snippet' ? (
+                      availableSnippets.length > 0 ? (
+                        <select
+                          value={selectedSnippetId}
+                          onChange={(e) => setSelectedSnippetId(e.target.value)}
+                          style={{ width: '100%' }}
+                        >
+                          {availableSnippets.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              ⚡ {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingTop: '0.4rem' }}>
+                          No snippets in vault yet. Create one under Tools ▾ &rarr; Snippets.
+                        </div>
+                      )
+                    ) : (
+                      <select
+                        value={newShortcutAction}
+                        onChange={(e) => setNewShortcutAction(e.target.value)}
+                        style={{ width: '100%' }}
+                      >
+                        <option value="Quick Connect">Quick Connect Bar</option>
+                        <option value="Port Forwarding Dialog">Port Forwarding Dialog</option>
+                        <option value="SSH Keychain">SSH Keychain</option>
+                        <option value="Open Default Dir Terminal">Open Default Dir Terminal</option>
+                        <option value="Open Current Dir Terminal">Open Current Dir Terminal</option>
+                        <option value="Open Root Shell Terminal">Open Root Shell Terminal</option>
+                        <option value="Disconnect Active Session">Disconnect Active Session</option>
+                        <option value="Lock Vault">Lock Vault</option>
+                      </select>
+                    )}
+                  </div>
+
                   <div>
                     <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
                       Key Combination
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Ctrl + Shift + P"
-                      value={newShortcutKey}
-                      onChange={(e) => setNewShortcutKey(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.35rem 0.5rem',
-                        backgroundColor: 'var(--bg-main)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: '4px',
-                        color: 'var(--text-main)',
-                        boxSizing: 'border-box',
+                    <div
+                      tabIndex={0}
+                      className="key-record-box"
+                      style={{ width: '100%', boxSizing: 'border-box', cursor: 'pointer' }}
+                      onFocus={() => setIsRecordingCustom(true)}
+                      onBlur={() => setIsRecordingCustom(false)}
+                      onKeyDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.key === 'Escape') {
+                          setIsRecordingCustom(false);
+                          return;
+                        }
+                        const combo = normalizeKeyboardShortcut(e.nativeEvent);
+                        if (combo) {
+                          setNewShortcutKey(combo);
+                          const conflict = findShortcutConflict(currentKeybindings, '', combo);
+                          setCustomConflictWarning(conflict ? conflict.label : '');
+                        }
                       }}
-                    />
+                    >
+                      <span>{isRecordingCustom ? '🔴' : '⌨️'}</span>
+                      <span>{newShortcutKey || (isRecordingCustom ? 'Press desired keys...' : 'Click to record keys...')}</span>
+                    </div>
+                    {customConflictWarning && (
+                      <div className="shortcut-conflict-warning">
+                        ⚠️ Conflicts with: <strong>{customConflictWarning}</strong>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.3rem' }}>
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
-                    onClick={() => setShowAddShortcut(false)}
+                    onClick={() => {
+                      setShowAddShortcut(false);
+                      setNewShortcutKey('');
+                      setIsRecordingCustom(false);
+                      setCustomConflictWarning('');
+                    }}
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn-primary btn-sm">
-                    Save Shortcut
+                  <button
+                    type="submit"
+                    className="btn-primary btn-sm"
+                    disabled={!newShortcutKey.trim() || (customType === 'snippet' && !selectedSnippetId)}
+                  >
+                    Save Custom Shortcut
                   </button>
                 </div>
               </form>
             )}
 
-            {customShortcuts.length > 0 && (
+            {currentCustomShortcuts.length > 0 ? (
               <table className="shortcuts-table" style={{ marginTop: '0.6rem' }}>
                 <thead>
                   <tr>
-                    <th>Custom Action</th>
-                    <th>Binding</th>
-                    <th style={{ width: '40px' }}></th>
+                    <th style={{ width: '60%' }}>Custom Action / Target</th>
+                    <th style={{ width: '25%' }}>Key Combination</th>
+                    <th style={{ width: '15%', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {customShortcuts.map((sc) => (
+                  {currentCustomShortcuts.map((sc) => (
                     <tr key={sc.id}>
-                      <td>{sc.action}</td>
-                      <td><code>{sc.keyCombo}</code></td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{sc.action}</div>
+                        {sc.snippetName && (
+                          <span style={{ fontSize: '0.72rem', color: '#2dd4bf' }}>
+                            ⚡ Bound to snippet: {sc.snippetName}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <span className="key-badge key-badge-custom">{sc.keyCombo}</span>
+                      </td>
                       <td style={{ textAlign: 'right' }}>
                         <button
                           type="button"
                           className="tab-close-btn"
-                          onClick={() => handleRemoveShortcut(sc.id)}
+                          onClick={() => handleRemoveCustomShortcut(sc.id)}
                           title="Remove custom shortcut"
                         >
                           ×
@@ -621,6 +984,10 @@ export function SettingsView({
                   ))}
                 </tbody>
               </table>
+            ) : (
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.75rem 0' }}>
+                No custom shortcuts configured yet. Click &quot;+ Add Custom Shortcut&quot; above to bind custom key combinations.
+              </div>
             )}
           </section>
         </div>

@@ -944,15 +944,15 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       const shortcutsTab = screen.getByRole('tab', { name: /Keyboard Shortcuts/i });
       fireEvent.click(shortcutsTab);
       expect(screen.getByRole('tabpanel', { name: /Keyboard Shortcuts Settings/i })).toBeInTheDocument();
-      expect(screen.getByText(/Custom Shortcuts/i)).toBeInTheDocument();
+      expect(screen.getByText(/Custom Hotkeys & Snippet Launchers/i)).toBeInTheDocument();
 
       // Add a custom shortcut
       const addShortcutBtn = screen.getByRole('button', { name: /\+ Add Custom Shortcut/i });
       fireEvent.click(addShortcutBtn);
-      const keyInput = screen.getByPlaceholderText(/Ctrl \+ Shift \+ P/i);
-      fireEvent.change(keyInput, { target: { value: 'Ctrl + Alt + T' } });
-      fireEvent.click(screen.getByRole('button', { name: /Save Shortcut/i }));
-      expect(screen.getByText('Ctrl + Alt + T')).toBeInTheDocument();
+      const recordBox = screen.getByText(/Click to record keys\.\.\./i);
+      fireEvent.keyDown(recordBox, { key: 't', ctrlKey: true, altKey: true });
+      fireEvent.click(screen.getByRole('button', { name: /Save Custom Shortcut/i }));
+      expect(screen.getByText('Ctrl+Alt+T')).toBeInTheDocument();
 
       // Click on backdrop outer element to close Settings
       fireEvent.click(settingsModal);
@@ -1282,6 +1282,140 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(executedSnippetId).toBe('snip-tail-logs');
       expect(executedSessionId).toBe('session-db-1');
       expect(executedUserVals['LINES']).toBe('100');
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
+
+  it('supports Custom Shortcuts Manager, interactive key rebinding, conflict detection, and Tmux-style Leader Key prefix mode (F-18)', async () => {
+    (window as unknown as { go: unknown }).go = {
+      main: {
+        App: {
+          HealthCheck: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: false,
+            quickUnlockReady: false,
+          }),
+          GetAppStatus: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: false,
+            quickUnlockReady: false,
+          }),
+          GetVaultSummary: async () => ({
+            groups: [],
+            hosts: [
+              {
+                id: 'host-sc-1',
+                label: 'Bastion Alpha',
+                address: '192.168.1.1',
+                effectivePort: 22,
+                effectiveUser: 'admin',
+                tags: ['bastion'],
+              },
+            ],
+            identities: [],
+            keys: [],
+            proxyProfiles: [],
+            snippets: [
+              {
+                id: 'snip-status',
+                name: 'Server Status',
+                body: 'uptime && free -m',
+                confirmBeforeRun: false,
+              },
+            ],
+          }),
+          ConnectSSH: async () => 'session-sc-1',
+          ConnectSavedHost: async () => 'session-sc-1',
+          WriteTerminal: async () => {},
+          ResizeTerminal: async () => {},
+          DisconnectSession: async () => {},
+        },
+      },
+    };
+
+    try {
+      render(<App initialLocked={false} />);
+      expect(await screen.findByText('Bastion Alpha')).toBeInTheDocument();
+
+      // 1. Open Settings modal via shortcut (Ctrl+,)
+      fireEvent.keyDown(window, { key: ',', ctrlKey: true });
+      const settingsModal = screen.getByRole('dialog', { name: 'Global Settings' });
+      expect(settingsModal).toBeInTheDocument();
+
+      // Switch to Keyboard Shortcuts tab
+      const shortcutsTab = screen.getByRole('tab', { name: /Keyboard Shortcuts/i });
+      fireEvent.click(shortcutsTab);
+      expect(screen.getByRole('tabpanel', { name: /Keyboard Shortcuts Settings/i })).toBeInTheDocument();
+
+      // 2. Test Leader Key / Prefix Mode Toggle
+      const leaderToggle = screen.getByLabelText(/Enable Leader Key Mode/i);
+      expect(leaderToggle).not.toBeChecked();
+      fireEvent.click(leaderToggle);
+      expect(leaderToggle).toBeChecked();
+      expect(screen.getByLabelText(/Leader Key Combination/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Leader Timeout/i)).toBeInTheDocument();
+
+      // 3. Test Interactive Key Rebinding with Conflict Detection
+      // Click Rebind on "Command Palette & Quick Connect"
+      const rebindButtons = screen.getAllByRole('button', { name: /⌨️ Rebind/i });
+      fireEvent.click(rebindButtons[0]);
+
+      // Press a conflicting key combo (e.g. Ctrl+B which belongs to Toggle Sidebar)
+      const recordBox = screen.getByText(/Press key combo\.\.\./i);
+      fireEvent.keyDown(recordBox, { key: 'b', ctrlKey: true });
+      expect(await screen.findByText(/Conflicts with:/i)).toBeInTheDocument();
+
+      // Now press a non-conflicting combo: Ctrl+Shift+K
+      fireEvent.keyDown(recordBox, { key: 'k', ctrlKey: true, shiftKey: true });
+      expect(screen.getByText('Ctrl+Shift+K')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /✓ Save/i }));
+      expect(screen.getByText('Ctrl+Shift+K')).toBeInTheDocument();
+
+      // Reset that binding back to default
+      const resetBtn = screen.getByRole('button', { name: /^↺ Reset$/i });
+      fireEvent.click(resetBtn);
+      expect(screen.getByText('Ctrl+K')).toBeInTheDocument();
+
+      // 4. Test Adding a Custom Shortcut bound to a Command Snippet
+      const addCustomBtn = screen.getByRole('button', { name: /\+ Add Custom Shortcut/i });
+      fireEvent.click(addCustomBtn);
+
+      // Select target type: snippet
+      const targetTypeSelect = screen.getByDisplayValue('System Action');
+      fireEvent.change(targetTypeSelect, { target: { value: 'snippet' } });
+
+      // Verify snippet dropdown appears with "⚡ Server Status"
+      expect(screen.getByText(/⚡ Server Status/i)).toBeInTheDocument();
+
+      // Record key for custom shortcut: Ctrl+Alt+S
+      const customRecordBox = screen.getByText(/Click to record keys\.\.\./i);
+      fireEvent.keyDown(customRecordBox, { key: 's', ctrlKey: true, altKey: true });
+      fireEvent.click(screen.getByRole('button', { name: /Save Custom Shortcut/i }));
+
+      // Verify custom shortcut was saved and is listed
+      expect(screen.getByText('Run: Server Status')).toBeInTheDocument();
+      expect(screen.getByText('Ctrl+Alt+S')).toBeInTheDocument();
+
+      // Close settings modal
+      fireEvent.click(screen.getByRole('button', { name: 'Close Settings' }));
+      expect(screen.queryByRole('dialog', { name: 'Global Settings' })).not.toBeInTheDocument();
+
+      // 5. Test Leader Key in action:
+      // Press Ctrl+B to arm leader mode
+      fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+      // Verify visual leader status pill appears in header
+      expect(screen.getByText(/⌨️ LEADER \(Ctrl\+B\)/i)).toBeInTheDocument();
+
+      // Press Escape to cancel leader mode
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByText(/⌨️ LEADER \(Ctrl\+B\)/i)).not.toBeInTheDocument();
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }

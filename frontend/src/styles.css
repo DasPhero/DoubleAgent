@@ -2143,4 +2143,114 @@ body,
   box-shadow: 0 0 8px rgba(31, 111, 235, 0.5);
 }
 
+/* Custom Shortcuts & Leader Key (F-18) */
+.leader-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 9999px;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
+  animation: pulseLeader 1.2s infinite ease-in-out;
+  cursor: default;
+}
+
+@keyframes pulseLeader {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.6);
+    border-color: rgba(245, 158, 11, 0.8);
+  }
+}
+
+.leader-config-box {
+  background: rgba(9, 13, 20, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.shortcuts-filter-bar {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  align-items: center;
+}
+
+.shortcuts-filter-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.shortcuts-filter-btn:hover {
+  color: var(--text-main);
+  border-color: var(--border-accent);
+}
+
+.shortcuts-filter-btn.active {
+  background: rgba(45, 212, 191, 0.15);
+  color: var(--accent-bright);
+  border-color: var(--accent-bright);
+  font-weight: 600;
+}
+
+.key-badge {
+  display: inline-block;
+  background: #090d14;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 0.12rem 0.45rem;
+  font-family: Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--text-main);
+}
+
+.key-badge-custom {
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(45, 212, 191, 0.4);
+  color: #2dd4bf;
+  font-weight: 600;
+}
+
+.key-record-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px dashed #f59e0b;
+  border-radius: 4px;
+  color: #fbbf24;
+  font-family: Consolas, monospace;
+  font-size: 0.75rem;
+  outline: none;
+}
+
+.shortcut-conflict-warning {
+  margin-top: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 4px;
+  color: #f87171;
+  font-size: 0.72rem;
+}
+
+
 

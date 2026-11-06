@@ -5,6 +5,8 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import '@xterm/xterm/css/xterm.css';
 
+import { CustomShortcutItem } from '../types/shortcuts';
+
 export interface AppGlobalSettings {
   fontFamily: string;
   fontSize: number;
@@ -13,6 +15,12 @@ export interface AppGlobalSettings {
   cursorBlink: boolean;
   scrollback: number;
   colorTheme: 'teal' | 'dracula' | 'one-dark' | 'nord' | 'monokai' | 'crimson';
+  // Keyboard Shortcuts & Leader Key (F-18 / Roadmap)
+  keybindings?: Record<string, string>;
+  leaderKeyEnabled?: boolean;
+  leaderKey?: string;
+  leaderTimeoutMs?: number;
+  customShortcuts?: CustomShortcutItem[];
 }
 
 export const DEFAULT_SETTINGS: AppGlobalSettings = {
@@ -23,6 +31,11 @@ export const DEFAULT_SETTINGS: AppGlobalSettings = {
   cursorBlink: true,
   scrollback: 10000,
   colorTheme: 'teal',
+  keybindings: {},
+  leaderKeyEnabled: false,
+  leaderKey: 'Ctrl+B',
+  leaderTimeoutMs: 2000,
+  customShortcuts: [],
 };
 
 export function getThemeColors(theme: string) {

@@ -6,9 +6,39 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, & `F-23`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-18`, & `F-23`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Custom Shortcuts & Leader Key Prefix Mode (`F-18` / Spec Line 190)**:
+  - **Leader Key / Prefix Mode (Tmux & Screen Style)**:
+    - Eliminate keyboard shortcut collisions with terminal programs (`nano`, `vim`, `htop`, `tmux`) by enabling Leader Key Mode in Settings.
+    - Configurable leader key: `Ctrl+B`, `Ctrl+A`, `Ctrl+Space`, or `Alt+Space`.
+    - Configurable auto-disarm timeout (1.0s to 3.0s).
+    - Header displays a real-time status indicator (`⌨️ LEADER (Ctrl+B)`) whenever the prefix key is armed.
+    - **Single-Key Actions when Armed**:
+      - `c` &rarr; New Session Tab
+      - `"` &rarr; Split Active Pane Horizontally
+      - `%` &rarr; Split Active Pane Vertically
+      - `x` &rarr; Close Active Pane or Tab
+      - `k` &rarr; Open Command Palette & Quick Connect
+      - `s` &rarr; Open Command Snippets Manager
+      - `t` &rarr; Open Port Forwarding & Tunnels
+      - `j` &rarr; Open Proxy Profiles
+      - `e` &rarr; Open SFTP File Browser
+      - `a` &rarr; Open SSH Keychain
+      - `l` &rarr; Immediately Lock Vault
+      - `d` / `w` / `r` &rarr; Open Terminal in Default Dir / Current CWD / Elevated Root
+      - `f` &rarr; Find in Terminal
+      - `+` / `-` / `0` &rarr; Zoom in / out / reset terminal font
+    - **Double-Tap Passthrough**: Pressing the leader key twice sends the raw control character (`\x02`, `\x01`, `\x00`) through to the remote shell so you can still use nested terminal applications without hindrance.
+  - **Interactive Keybinding Rebinding & Conflict Detection**:
+    - Manage and customize system keybindings organized into Navigation & Tabs, Terminal & Font, Sessions & CWD, and Tools & Modals.
+    - One-click `⌨️ Rebind` button captures keyboard combinations with modifier detection.
+    - Automatic conflict warning prevents accidentally double-binding identical hotkeys.
+    - Individual reset buttons and a global "Reset All to Defaults" button.
+  - **Custom Hotkeys & Snippet Launchers**:
+    - Bind arbitrary hotkeys to system actions or directly to saved Command Snippets.
+    - Pressing a snippet hotkey directly interpolates target session context and executes the command into the active terminal session.
 - **Command Snippets with Dynamic Variables (`F-15`)**:
   - **Encrypted Vault Storage**:
     - Store frequently used commands, scripts, diagnostics, and deployment snippets inside your encrypted vault.

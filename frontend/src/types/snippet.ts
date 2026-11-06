@@ -29,3 +29,4 @@ export interface SnippetContext {
   time?: string;
   customVars?: Record<string, string>;
 }
+

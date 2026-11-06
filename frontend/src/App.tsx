@@ -25,6 +25,12 @@ import { ProxyProfile, ProxyProfileSummary, ProxychainsExportOptions } from './t
 import { Snippet, SnippetContext } from './types/snippet';
 import { SnippetsManagerModal } from './components/SnippetsManagerModal';
 import { SnippetRunModal } from './components/SnippetRunModal';
+import {
+  CustomShortcutItem,
+  SYSTEM_SHORTCUTS,
+  ShortcutActionId,
+  matchesShortcut,
+} from './types/shortcuts';
 import appLogo from './assets/DoubleAgent_App_Logo.png';
 import brandLogoText from './assets/DoubleAgent_Logo_complete_with_text.png';
 
@@ -780,6 +786,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
   const [settingsActiveTab, setSettingsActiveTab] = useState<'appearance' | 'security' | 'shortcuts' | 'about'>('appearance');
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
+  const [leaderArmed, setLeaderArmed] = useState<boolean>(false);
+  const leaderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quickConnectInputRef = useRef<HTMLInputElement>(null);
 
   // Port Forwarding & Tunnels State (F-13)
   const [showPortForwardingModal, setShowPortForwardingModal] = useState<boolean>(false);
@@ -1201,99 +1210,6 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       offForward();
     };
   }, [refreshVaultState, refreshForwardState]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setShowCommandPalette((prev) => !prev);
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
-        e.preventDefault();
-        setSidebarCollapsed((prev) => !prev);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === ',') {
-        e.preventDefault();
-        setShowGlobalSettingsModal((prev) => !prev);
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-        if (activePane) {
-          e.preventDefault();
-          togglePaneSearch(activePane.sessionId);
-        }
-      } else if (e.key === 'Escape') {
-        setShowCommandPalette(false);
-        setShowGlobalSettingsModal(false);
-        setActiveDropdownMenu(null);
-        if (searchOpenPanes.size > 0) {
-          for (const sid of searchOpenPanes) {
-            clearTerminalSearch(sid);
-          }
-          setSearchOpenPanes(new Set());
-        }
-      } else if (
-        (e.ctrlKey || e.metaKey) &&
-        (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '_' || e.key === '0')
-      ) {
-        if (activePane) {
-          e.preventDefault();
-          if (e.key === '=' || e.key === '+') {
-            const next = changeTerminalFontSize(activePane.sessionId, +1);
-            setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
-          } else if (e.key === '-' || e.key === '_') {
-            const next = changeTerminalFontSize(activePane.sessionId, -1);
-            setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
-          } else if (e.key === '0') {
-            resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
-            setPaneFontSizes((prev) =>
-              new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
-            );
-          }
-        }
-      } else if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-        e.preventDefault();
-        const delta = e.key === 'ArrowRight' ? 1 : -1;
-        setTabs((currentTabs) => {
-          if (currentTabs.length === 0) {
-            return currentTabs;
-          }
-          setActiveTabId((currId) => {
-            const idx = currentTabs.findIndex((t) => t.id === currId);
-            const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, currentTabs.length, delta);
-            const nextTab = currentTabs[nextIdx];
-            const panes = collectPanes(nextTab.rootNode);
-            const pane =
-              panes.find((p) => p.id === nextTab.activePaneId) || panes[0];
-            if (pane) {
-              setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 50);
-            }
-            return nextTab.id;
-          });
-          return currentTabs;
-        });
-      } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        e.preventDefault();
-        const delta = e.key === 'ArrowDown' ? 1 : -1;
-        setTabs((currentTabs) =>
-          currentTabs.map((t) => {
-            if (t.id !== activeTabId) {
-              return t;
-            }
-            const panes = collectPanes(t.rootNode);
-            if (panes.length <= 1) {
-              return t;
-            }
-            const idx = panes.findIndex((p) => p.id === t.activePaneId);
-            const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, panes.length, delta);
-            const nextPane = panes[nextIdx];
-            if (nextPane) {
-              setTimeout(() => focusersRef.current.get(nextPane.sessionId)?.(), 50);
-            }
-            return { ...t, activePaneId: nextPane.id };
-          })
-        );
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeTabId, activePane, globalSettings.fontSize, togglePaneSearch, searchOpenPanes]);
 
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent): void => {
@@ -1984,55 +1900,58 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
   };
 
-  const handleTriggerSnippet = async (snippet: Snippet, targetSessionId?: string): Promise<void> => {
-    const sessId = targetSessionId || sessionId;
+  const handleTriggerSnippet = useCallback(
+    async (snippet: Snippet, targetSessionId?: string): Promise<void> => {
+      const sessId = targetSessionId || sessionId;
 
-    if (!sessId) {
-      setStatusMessage('No active terminal session to run snippet in.');
-      return;
-    }
-
-    setSnippetActiveSessionId(sessId);
-
-    let ctx: SnippetContext = {
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      date: new Date().toISOString().slice(0, 10),
-      time: new Date().toTimeString().slice(0, 8),
-      workingDir: getSessionCwd(sessId) || '~',
-    };
-
-    const api = getWailsBindings();
-    if (api?.GetSnippetContext) {
-      try {
-        const backendCtx = await api.GetSnippetContext(sessId);
-        ctx = { ...ctx, ...backendCtx };
-        if (!ctx.workingDir) {
-          ctx.workingDir = getSessionCwd(sessId) || '~';
-        }
-      } catch {
-        // fallback
+      if (!sessId) {
+        setStatusMessage('No active terminal session to run snippet in.');
+        return;
       }
-    }
 
-    const hasVars = (snippet.variables && snippet.variables.length > 0) || /\{\{([^{}]+)\}\}/.test(snippet.body);
+      setSnippetActiveSessionId(sessId);
 
-    if (snippet.confirmBeforeRun || hasVars) {
-      setRunModalSnippet(snippet);
-      setRunModalContext(ctx);
-    } else {
-      try {
-        if (api?.ExecuteSnippet) {
-          await api.ExecuteSnippet(sessId, snippet.id, {});
-        } else {
-          await api?.WriteTerminal?.(sessId, snippet.body + '\n');
+      let ctx: SnippetContext = {
+        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        date: new Date().toISOString().slice(0, 10),
+        time: new Date().toTimeString().slice(0, 8),
+        workingDir: getSessionCwd(sessId) || '~',
+      };
+
+      const api = getWailsBindings();
+      if (api?.GetSnippetContext) {
+        try {
+          const backendCtx = await api.GetSnippetContext(sessId);
+          ctx = { ...ctx, ...backendCtx };
+          if (!ctx.workingDir) {
+            ctx.workingDir = getSessionCwd(sessId) || '~';
+          }
+        } catch {
+          // fallback
         }
-        setStatusMessage(`⚡ Sent snippet "${snippet.name}" to terminal.`);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setStatusMessage(`Execute snippet failed: ${msg}`);
       }
-    }
-  };
+
+      const hasVars = (snippet.variables && snippet.variables.length > 0) || /\{\{([^{}]+)\}\}/.test(snippet.body);
+
+      if (snippet.confirmBeforeRun || hasVars) {
+        setRunModalSnippet(snippet);
+        setRunModalContext(ctx);
+      } else {
+        try {
+          if (api?.ExecuteSnippet) {
+            await api.ExecuteSnippet(sessId, snippet.id, {});
+          } else {
+            await api?.WriteTerminal?.(sessId, snippet.body + '\n');
+          }
+          setStatusMessage(`⚡ Sent snippet "${snippet.name}" to terminal.`);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStatusMessage(`Execute snippet failed: ${msg}`);
+        }
+      }
+    },
+    [sessionId]
+  );
 
   const handleExecuteSnippetFromModal = async (userValues: Record<string, string>): Promise<void> => {
     if (!runModalSnippet || !snippetActiveSessionId) return;
@@ -3094,6 +3013,280 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     );
   };
 
+  const executeShortcutAction = (actionId: ShortcutActionId): void => {
+    switch (actionId) {
+      case 'command_palette':
+        setShowCommandPalette((prev) => !prev);
+        break;
+      case 'global_settings':
+        setShowGlobalSettingsModal((prev) => !prev);
+        break;
+      case 'toggle_sidebar':
+        setSidebarCollapsed((prev) => !prev);
+        break;
+      case 'new_tab':
+        quickConnectInputRef.current?.focus();
+        break;
+      case 'close_pane':
+        if (activeTab && activePane) {
+          void handleClosePane(activeTab.id, activePane.id);
+        }
+        break;
+      case 'split_horizontal':
+        if (activeTab && activePane) {
+          void handleSplitPane('horizontal');
+        }
+        break;
+      case 'split_vertical':
+        if (activeTab && activePane) {
+          void handleSplitPane('vertical');
+        }
+        break;
+      case 'cycle_tabs_prev':
+      case 'cycle_tabs_next': {
+        const delta = actionId === 'cycle_tabs_next' ? 1 : -1;
+        setTabs((currentTabs) => {
+          if (currentTabs.length === 0) return currentTabs;
+          setActiveTabId((currId) => {
+            const idx = currentTabs.findIndex((t) => t.id === currId);
+            const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, currentTabs.length, delta);
+            const nextTab = currentTabs[nextIdx];
+            const panes = collectPanes(nextTab.rootNode);
+            const pane = panes.find((p) => p.id === nextTab.activePaneId) || panes[0];
+            if (pane) {
+              setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 50);
+            }
+            return nextTab.id;
+          });
+          return currentTabs;
+        });
+        break;
+      }
+      case 'cycle_panes_prev':
+      case 'cycle_panes_next': {
+        const delta = actionId === 'cycle_panes_next' ? 1 : -1;
+        setTabs((currentTabs) =>
+          currentTabs.map((t) => {
+            if (t.id !== activeTabId) return t;
+            const panes = collectPanes(t.rootNode);
+            if (panes.length <= 1) return t;
+            const idx = panes.findIndex((p) => p.id === t.activePaneId);
+            const nextIdx = cycleIndexLocal(idx === -1 ? 0 : idx, panes.length, delta);
+            const nextPane = panes[nextIdx];
+            if (nextPane) {
+              setTimeout(() => focusersRef.current.get(nextPane.sessionId)?.(), 50);
+            }
+            return { ...t, activePaneId: nextPane.id };
+          })
+        );
+        break;
+      }
+      case 'find_in_terminal':
+        if (activePane) {
+          togglePaneSearch(activePane.sessionId);
+        }
+        break;
+      case 'font_zoom_in':
+        if (activePane) {
+          const next = changeTerminalFontSize(activePane.sessionId, +1);
+          setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+        }
+        break;
+      case 'font_zoom_out':
+        if (activePane) {
+          const next = changeTerminalFontSize(activePane.sessionId, -1);
+          setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+        }
+        break;
+      case 'font_zoom_reset':
+        if (activePane) {
+          resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
+          setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, globalSettings.fontSize)));
+        }
+        break;
+      case 'quick_connect':
+        quickConnectInputRef.current?.focus();
+        break;
+      case 'open_default_dir':
+        void handleOpenTerminalDirectory('default');
+        break;
+      case 'open_current_dir':
+        void handleOpenTerminalDirectory('current');
+        break;
+      case 'open_root_shell':
+        void handleOpenTerminalDirectory('root');
+        break;
+      case 'disconnect_active':
+        void handleDisconnect();
+        break;
+      case 'inject_password':
+        void handleInjectPassword();
+        break;
+      case 'open_snippets':
+        setShowSnippetsModal(true);
+        break;
+      case 'open_tunnels':
+        setShowPortForwardingModal(true);
+        break;
+      case 'open_proxy_profiles':
+        setShowProxyProfilesModal(true);
+        break;
+      case 'open_sftp':
+        if (activePane) {
+          openSftpTab(activePane.sessionId, activePane.title, activeTab?.hostId);
+        }
+        break;
+      case 'open_keychain':
+        setShowKeychainModal(true);
+        break;
+      case 'lock_vault':
+        void handleVaultLock();
+        break;
+    }
+  };
+
+  const executeShortcutActionRef = useRef<(actionId: ShortcutActionId) => void>(() => {});
+  executeShortcutActionRef.current = executeShortcutAction;
+
+  const executeCustomShortcut = (sc: CustomShortcutItem): void => {
+    if (sc.snippetId && activePane) {
+      const snip = (vaultSummary.snippets || []).find((s) => s.id === sc.snippetId);
+      if (snip) {
+        void handleTriggerSnippet(snip, activePane.sessionId);
+        return;
+      }
+    }
+    const match = SYSTEM_SHORTCUTS.find((d) => d.label === sc.action);
+    if (match) {
+      executeShortcutAction(match.actionId);
+    }
+  };
+
+  const executeCustomShortcutRef = useRef<(sc: CustomShortcutItem) => void>(() => {});
+  executeCustomShortcutRef.current = executeCustomShortcut;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      // 1. Escape key cancels overlays and disarms leader mode
+      if (e.key === 'Escape') {
+        setLeaderArmed(false);
+        if (leaderTimerRef.current) {
+          clearTimeout(leaderTimerRef.current);
+          leaderTimerRef.current = null;
+        }
+        setShowCommandPalette(false);
+        setShowGlobalSettingsModal(false);
+        setActiveDropdownMenu(null);
+        if (searchOpenPanes.size > 0) {
+          for (const sid of searchOpenPanes) {
+            clearTerminalSearch(sid);
+          }
+          setSearchOpenPanes(new Set());
+        }
+        return;
+      }
+
+      const isInput =
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement;
+
+      // 2. Leader Key Mode (if enabled)
+      if (globalSettings.leaderKeyEnabled) {
+        const leaderKey = globalSettings.leaderKey || 'Ctrl+B';
+        const isLeaderPressed = matchesShortcut(e, leaderKey);
+
+        if (isLeaderPressed) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (leaderArmed) {
+            // Second press of leader key: disarm and write raw leader key character to terminal session
+            setLeaderArmed(false);
+            if (leaderTimerRef.current) {
+              clearTimeout(leaderTimerRef.current);
+              leaderTimerRef.current = null;
+            }
+            if (activePane) {
+              const rawChar = leaderKey.includes('A') ? '\x01' : leaderKey.includes('Space') ? '\x00' : '\x02';
+              const api = getWailsBindings();
+              void api?.WriteTerminal?.(activePane.sessionId, rawChar);
+            }
+          } else {
+            // First press: arm leader key mode!
+            setLeaderArmed(true);
+            if (leaderTimerRef.current) {
+              clearTimeout(leaderTimerRef.current);
+            }
+            leaderTimerRef.current = setTimeout(() => {
+              setLeaderArmed(false);
+              leaderTimerRef.current = null;
+            }, globalSettings.leaderTimeoutMs || 2000);
+          }
+          return;
+        }
+
+        if (leaderArmed) {
+          e.preventDefault();
+          e.stopPropagation();
+          setLeaderArmed(false);
+          if (leaderTimerRef.current) {
+            clearTimeout(leaderTimerRef.current);
+            leaderTimerRef.current = null;
+          }
+
+          const keyLower = e.key.toLowerCase();
+          const matchedDef = SYSTEM_SHORTCUTS.find(
+            (d) => d.leaderKey && (d.leaderKey.toLowerCase() === keyLower || d.leaderKey === e.key)
+          );
+          if (matchedDef) {
+            executeShortcutActionRef.current(matchedDef.actionId);
+          }
+          return;
+        }
+      }
+
+      // 3. Normal / Direct Shortcut Matching
+      // When inside an input element, only trigger combinations with Ctrl / Alt / Meta
+      if (isInput && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        return;
+      }
+
+      const bindings = globalSettings.keybindings || {};
+      for (const def of SYSTEM_SHORTCUTS) {
+        const configuredKey = bindings[def.actionId] || def.defaultKey;
+        if (matchesShortcut(e, configuredKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          executeShortcutActionRef.current(def.actionId);
+          return;
+        }
+      }
+
+      // 4. Custom Shortcuts Matching
+      const customList = globalSettings.customShortcuts || [];
+      for (const sc of customList) {
+        if (matchesShortcut(e, sc.keyCombo)) {
+          e.preventDefault();
+          e.stopPropagation();
+          executeCustomShortcutRef.current(sc);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    globalSettings.leaderKeyEnabled,
+    globalSettings.leaderKey,
+    globalSettings.leaderTimeoutMs,
+    globalSettings.keybindings,
+    globalSettings.customShortcuts,
+    leaderArmed,
+    activePane,
+    searchOpenPanes,
+  ]);
+
   const filteredHosts = vaultSummary.hosts.filter((h) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) {
@@ -3128,6 +3321,14 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           <span className={`status-badge ${vaultLocked ? 'locked' : 'unlocked'}`}>
             {vaultLocked ? 'Vault Locked' : passwordless ? 'Vault Unlocked (No PW)' : 'Vault Unlocked'}
           </span>
+          {leaderArmed && (
+            <span
+              className="leader-status-pill"
+              title="Leader Key Mode armed. Next keystroke will trigger command or press leader key again to send raw key to terminal."
+            >
+              ⌨️ LEADER ({globalSettings.leaderKey || 'Ctrl+B'})
+            </span>
+          )}
           {vaultLocked && (
             <button type="button" className="btn-primary" onClick={handleOpenVaultButton}>
               {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
@@ -3667,6 +3868,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
         <form className="quick-connect-bar" onSubmit={(e) => void handleConnect(e)}>
           <input
+            ref={quickConnectInputRef}
             aria-label="Host Address"
             placeholder="Host / IP (e.g. 192.168.1.10)"
             value={address}
@@ -4273,6 +4475,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         onEnableQuickUnlock={handleEnableQuickUnlock}
                         onChangePassword={handleChangePasswordDirect}
                         onResetVault={handleResetVault}
+                        availableSnippets={vaultSummary.snippets || []}
                         isModal={false}
                       />
                     ) : (
@@ -5180,6 +5383,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             onEnableQuickUnlock={handleEnableQuickUnlock}
             onChangePassword={handleChangePasswordDirect}
             onResetVault={handleResetVault}
+            availableSnippets={vaultSummary.snippets || []}
             onOpenAsTab={() => {
               setShowGlobalSettingsModal(false);
               openSettingsTab(settingsActiveTab);

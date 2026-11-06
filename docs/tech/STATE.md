@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `M1-4` Part 9 (`F-15` — Command Snippets with Variables & Dynamic Injection) — COMPLETED
-- **Next Milestone:** Creating Custom Shortcuts (Custom Keybindings & Action Shortcuts Manager)
+- **Current Milestone:** Custom Shortcuts & Leader Key Prefix Mode (`F-18` / Spec Line 190) — COMPLETED
+- **Next Milestone:** `F-17` — Host Notes & Markdown Documentation (per-host notes, folders, subpages, markdown preview, searchable)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -84,12 +84,31 @@
     - End-to-end frontend tests in `frontend/src/App.test.tsx` (`manages Command Snippets with auto-injected context variables and variable query prompt before send (F-15)`).
 - **Brand Assets Integration**:
     - Integrated user-provided logo and icon assets (`DoubleAgent.ico`, `DoubleAgent_App_Logo.png`, `DoubleAgent_Wordmark.png`, `DoubleAgent_Logo_complete_with_text.png`) across application window, favicon, header, about modal, and empty state hero.
+- **Custom Shortcuts & Leader Key Prefix Mode (`F-18` / Spec Line 190)**:
+  - **Tmux / Screen Style Leader Key Mode**:
+    - Configurable prefix key (`Ctrl+B`, `Ctrl+A`, `Ctrl+Space`, `Alt+Space`) with configurable auto-disarm timeout (1.0s – 3.0s).
+    - Visual glowing status indicator in application header (`⌨️ LEADER (Ctrl+B)`) when armed.
+    - Double-tap leader key passes the literal control character (`\x02`, `\x01`, `\x00`) to the active terminal shell.
+    - Single key chords when armed trigger system actions (`c` new tab, `"` split horizontal, `%` split vertical, `x` close pane, `k` command palette, `s` snippets, `t` tunnels, `e` sftp, `a` keychain, `l` lock vault, `q` quick connect, `d`/`w`/`r` directory terminals).
+    - Guarantees zero keystroke collision with CLI applications like `vim`, `nano`, `htop`, and `tmux`.
+  - **Interactive Key Rebinding & Conflict Detection**:
+    - Complete library of system actions categorized into Navigation & Tabs, Terminal & Font, Sessions & CWD, and Tools & Modals.
+    - Interactive recording box listening to keyboard input with key normalization.
+    - Real-time conflict detector warning when a candidate key is already bound to another action.
+    - Individual action reset to factory default, and one-click "Reset All to Defaults".
+  - **Custom Hotkeys & Snippet Launchers**:
+    - Create arbitrary hotkey combinations bound to system actions or directly to saved command snippets (`snip-*`).
+    - One-click trigger from terminal immediately interpolates and sends snippet to active session.
+  - Comprehensive unit test in `frontend/src/App.test.tsx` (`supports Custom Shortcuts Manager, interactive key rebinding, conflict detection, and Tmux-style Leader Key prefix mode (F-18)`).
 
 ## In Progress
 - None.
 
 ## Next (TODO List)
-- **Creating Custom Shortcuts (Custom Keybindings & Action Shortcuts Manager)**:
-  - Allow users to create, customize, and persist keybindings for any DoubleAgent action (e.g. Quick Connect, Open Terminal in Directory, Split Panes, Port Forwarding, Snippet Execution).
-  - Configurable prefix/leader key (e.g. `Ctrl+B` or `Ctrl+A`) to eliminate shortcut collisions with terminal CLI applications (e.g. `nano`, `vim`, `htop`).
-  - Shortcut conflict detector and one-click reset to factory defaults.
+- **`F-17`: Host Notes & Markdown Documentation**:
+  - Store per-host notes in encrypted vault with folders, subpages, and hierarchical organization.
+  - Live Markdown renderer and editor (code blocks, checkboxes, tables, links).
+  - Searchable across all hosts via Command Palette (`Ctrl+K`) and dedicated notes pane.
+- **`F-20`: TOTP Generator**:
+  - Store TOTP seeds securely in vault linked to hosts or standalone services.
+  - 30-second countdown wheel and one-click copy / auto-injection at 2FA prompt.
