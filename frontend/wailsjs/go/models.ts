@@ -204,6 +204,28 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class FileItem {
+	    name: string;
+	    path: string;
+	    size: number;
+	    isDir: boolean;
+	    modTime: number;
+	    permissions: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.size = source["size"];
+	        this.isDir = source["isDir"];
+	        this.modTime = source["modTime"];
+	        this.permissions = source["permissions"];
+	    }
+	}
 	export class GroupDefaults {
 	    port?: number;
 	    username?: string;
@@ -525,6 +547,36 @@ export namespace core {
 		    }
 		    return a;
 		}
+	}
+	export class TransferTask {
+	    id: string;
+	    sessionId: string;
+	    direction: string;
+	    localPath: string;
+	    remotePath: string;
+	    totalBytes: number;
+	    transferredBytes: number;
+	    speedBytesPerSec: number;
+	    status: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TransferTask(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sessionId = source["sessionId"];
+	        this.direction = source["direction"];
+	        this.localPath = source["localPath"];
+	        this.remotePath = source["remotePath"];
+	        this.totalBytes = source["totalBytes"];
+	        this.transferredBytes = source["transferredBytes"];
+	        this.speedBytesPerSec = source["speedBytesPerSec"];
+	        this.status = source["status"];
+	        this.error = source["error"];
+	    }
 	}
 	export class VaultSummary {
 	    groups: GroupRecord[];

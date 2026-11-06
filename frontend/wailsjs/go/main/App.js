@@ -6,6 +6,10 @@ export function AutoDetectSerial(arg1) {
   return window['go']['main']['App']['AutoDetectSerial'](arg1);
 }
 
+export function CancelTransfer(arg1) {
+  return window['go']['main']['App']['CancelTransfer'](arg1);
+}
+
 export function ChangeVaultPassword(arg1, arg2) {
   return window['go']['main']['App']['ChangeVaultPassword'](arg1, arg2);
 }
@@ -22,12 +26,20 @@ export function ConnectSerial(arg1) {
   return window['go']['main']['App']['ConnectSerial'](arg1);
 }
 
+export function CreateRemoteDir(arg1, arg2) {
+  return window['go']['main']['App']['CreateRemoteDir'](arg1, arg2);
+}
+
 export function DeleteGroup(arg1) {
   return window['go']['main']['App']['DeleteGroup'](arg1);
 }
 
 export function DeleteHost(arg1) {
   return window['go']['main']['App']['DeleteHost'](arg1);
+}
+
+export function DeleteRemoteItem(arg1, arg2) {
+  return window['go']['main']['App']['DeleteRemoteItem'](arg1, arg2);
 }
 
 export function DeleteSSHKey(arg1) {
@@ -48,6 +60,10 @@ export function EnableQuickUnlock() {
 
 export function GenerateSSHKey(arg1, arg2, arg3) {
   return window['go']['main']['App']['GenerateSSHKey'](arg1, arg2, arg3);
+}
+
+export function GetActiveTransfers() {
+  return window['go']['main']['App']['GetActiveTransfers']();
 }
 
 export function GetVaultSummary() {
@@ -76,6 +92,14 @@ export function InitializeVaultWithHello() {
 
 export function InjectSessionPassword(arg1) {
   return window['go']['main']['App']['InjectSessionPassword'](arg1);
+}
+
+export function ListLocalDir(arg1) {
+  return window['go']['main']['App']['ListLocalDir'](arg1);
+}
+
+export function ListRemoteDir(arg1, arg2) {
+  return window['go']['main']['App']['ListRemoteDir'](arg1, arg2);
 }
 
 export function ListSerialPorts() {
@@ -132,6 +156,14 @@ export function SetSerialDTR(arg1, arg2) {
 
 export function SetSerialRTS(arg1, arg2) {
   return window['go']['main']['App']['SetSerialRTS'](arg1, arg2);
+}
+
+export function StartSftpDownload(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartSftpDownload'](arg1, arg2, arg3);
+}
+
+export function StartSftpUpload(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartSftpUpload'](arg1, arg2, arg3);
 }
 
 export function UnlockVault(arg1) {

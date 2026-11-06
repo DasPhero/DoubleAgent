@@ -14,6 +14,8 @@ import {
   setSessionCwd,
 } from './components/TerminalView';
 import { SignalAnalyzerView } from './components/SignalAnalyzerView';
+import { SftpBrowserView } from './components/SftpBrowserView';
+import { FileItem, TransferTask } from './types/sftp';
 
 const SETTINGS_STORAGE_KEY = 'doubleagent_global_settings_v1';
 
@@ -174,6 +176,8 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
+  tabType?: 'terminal' | 'sftp';
+  sftpSessionId?: string;
 }
 
 export const HOST_PALETTE = [
@@ -510,6 +514,14 @@ interface WailsAppBindings {
   SetSerialRTS?: (sessionId: string, state: boolean) => Promise<void>;
   SendSerialBreak?: (sessionId: string) => Promise<void>;
   AutoDetectSerial?: (port: string) => Promise<SerialAutoDetectResult>;
+  ListLocalDir?: (path: string) => Promise<FileItem[]>;
+  ListRemoteDir?: (sessionId: string, path: string) => Promise<FileItem[]>;
+  StartSftpUpload?: (sessionId: string, localPath: string, remotePath: string) => Promise<string>;
+  StartSftpDownload?: (sessionId: string, remotePath: string, localPath: string) => Promise<string>;
+  CancelTransfer?: (taskId: string) => Promise<void>;
+  CreateRemoteDir?: (sessionId: string, path: string) => Promise<void>;
+  DeleteRemoteItem?: (sessionId: string, path: string) => Promise<void>;
+  GetActiveTransfers?: () => Promise<TransferTask[]>;
 }
 
 export interface SerialAutoDetectResult {
@@ -872,6 +884,35 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           sessionId: newSessionId,
           hostId,
           title,
+        },
+        activePaneId: paneId,
+      };
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(tabId);
+    },
+    []
+  );
+
+  const openSftpTab = useCallback(
+    (sshSessionId: string, title: string, hostId?: string): void => {
+      tabCounterRef.current += 1;
+      const seq = tabCounterRef.current;
+      const tabId = `sftp-tab-${seq}`;
+      const paneId = `sftp-pane-${seq}-1`;
+      const color = getEffectiveHostColor(hostId, undefined, title);
+      const newTab: TabItem = {
+        id: tabId,
+        title: `SFTP: ${title}`,
+        hostId,
+        color,
+        tabType: 'sftp',
+        sftpSessionId: sshSessionId,
+        rootNode: {
+          type: 'pane',
+          id: paneId,
+          sessionId: `sftp-${sshSessionId}`,
+          hostId,
+          title: `SFTP: ${title}`,
         },
         activePaneId: paneId,
       };
@@ -1495,6 +1536,37 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setStatusMessage(`Connection failed: ${msg}`);
+    }
+  };
+
+  const handleOpenHostSftp = async (host: HostSummary): Promise<void> => {
+    const existingTab = tabs.find((t) => t.hostId === host.id);
+    const existingSessionId = existingTab
+      ? collectPanes(existingTab.rootNode).find(
+          (p) => !p.sessionId.startsWith('serial-') && !p.sessionId.startsWith('local-')
+        )?.sessionId
+      : undefined;
+
+    if (existingSessionId) {
+      openSftpTab(existingSessionId, host.label, host.id);
+      return;
+    }
+
+    const api = getWailsBindings();
+    if (!api) {
+      const previewId = `sess-preview-${host.id}-${Date.now()}`;
+      openSftpTab(previewId, host.label, host.id);
+      return;
+    }
+
+    setStatusMessage(`Connecting to ${host.label} for SFTP...`);
+    try {
+      const id = await api.ConnectSavedHost(host.id, { cols: 80, rows: 24 });
+      openSftpTab(id, host.label, host.id);
+      setStatusMessage(`SFTP opened for ${host.label}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`SFTP connection failed: ${msg}`);
     }
   };
 
@@ -2320,6 +2392,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               >
                 🔍 Find
               </button>
+              {!node.sessionId.startsWith('local-') && !node.sessionId.startsWith('serial-') && (
+                <button
+                  type="button"
+                  className="pane-sftp-btn"
+                  aria-label={`Open SFTP for ${node.title}`}
+                  title="Open SFTP File Browser (F-12)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openSftpTab(node.sessionId, node.title, node.hostId);
+                  }}
+                >
+                  📁 SFTP
+                </button>
+              )}
               {isPaneActive ? (
                 <span className="pane-active-indicator">● Active</span>
               ) : (
@@ -2743,6 +2829,23 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   >
                     <span>Local Shell (WSL Linux)</span>
                     <span className="nav-dropdown-shortcut">🐧 wsl</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
+                  <div className="nav-dropdown-header">File Transfer (F-12)</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    disabled={!sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')}
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
+                        openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
+                      }
+                    }}
+                  >
+                    <span>SFTP File Browser</span>
+                    <span className="nav-dropdown-shortcut">📁 SFTP</span>
                   </button>
                   <div className="nav-dropdown-divider" />
                   <div className="nav-dropdown-header">Hardware Serial (F-23)</div>
@@ -3184,6 +3287,14 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                             </button>
                             <button
                               type="button"
+                              className="btn-secondary btn-sm"
+                              title={`Open SFTP file browser for ${h.label}`}
+                              onClick={() => void handleOpenHostSftp(h)}
+                            >
+                              SFTP
+                            </button>
+                            <button
+                              type="button"
                               className="btn-danger btn-sm"
                               onClick={() => void handleDeleteHost(h.id)}
                               aria-label={`Delete ${h.label}`}
@@ -3236,6 +3347,14 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                           onClick={() => void handleConnectSavedHost(h)}
                         >
                           Connect
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          title={`Open SFTP file browser for ${h.label}`}
+                          onClick={() => void handleOpenHostSftp(h)}
+                        >
+                          SFTP
                         </button>
                         <button
                           type="button"
@@ -3539,10 +3658,29 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   <div
                     key={tab.id}
                     className="tab-content-panel"
-                    style={{ display: isCurrentTab ? 'flex' : 'none' }}
+                    style={{ display: isCurrentTab ? 'flex' : 'none', height: '100%', flexDirection: 'column' }}
                     aria-hidden={!isCurrentTab}
                   >
-                    {renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)}
+                    {tab.tabType === 'sftp' ? (
+                      <SftpBrowserView
+                        sessionId={tab.sftpSessionId || (tab.rootNode.type === 'pane' ? tab.rootNode.sessionId.replace('sftp-', '') : '')}
+                        hostLabel={tab.title.replace('SFTP: ', '')}
+                        api={{
+                          listLocalDir: (p) => getWailsBindings()?.ListLocalDir?.(p) ?? Promise.resolve([]),
+                          listRemoteDir: (sid, p) => getWailsBindings()?.ListRemoteDir?.(sid, p) ?? Promise.resolve([]),
+                          startSftpUpload: (sid, l, r) => getWailsBindings()?.StartSftpUpload?.(sid, l, r) ?? Promise.resolve(''),
+                          startSftpDownload: (sid, r, l) => getWailsBindings()?.StartSftpDownload?.(sid, r, l) ?? Promise.resolve(''),
+                          createRemoteDir: (sid, p) => getWailsBindings()?.CreateRemoteDir?.(sid, p) ?? Promise.resolve(),
+                          deleteRemoteItem: (sid, p) => getWailsBindings()?.DeleteRemoteItem?.(sid, p) ?? Promise.resolve(),
+                          cancelTransfer: (tid) => getWailsBindings()?.CancelTransfer?.(tid) ?? Promise.resolve(),
+                          getActiveTransfers: () => getWailsBindings()?.GetActiveTransfers?.() ?? Promise.resolve([]),
+                        }}
+                        eventsOn={getWailsRuntime()?.EventsOn}
+                        onClose={() => void handleCloseTab(tab.id)}
+                      />
+                    ) : (
+                      renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)
+                    )}
                   </div>
                 );
               })}

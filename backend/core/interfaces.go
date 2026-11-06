@@ -124,8 +124,67 @@ type SshTransport interface {
 	Connect(ctx context.Context, cfg SshSessionConfig) (sessionID string, err error)
 	OpenShell(ctx context.Context, sessionID string, size TerminalSize) (*SshShellStreams, error)
 	OpenShellWithOptions(ctx context.Context, sessionID string, size TerminalSize, initialDir string, asRoot bool) (*SshShellStreams, error)
+	OpenSftp(ctx context.Context, sessionID string) (SftpClient, error)
 	ResizeShell(ctx context.Context, sessionID string, size TerminalSize) error
 	Disconnect(ctx context.Context, sessionID string) error
+}
+
+// FileItem represents a local or remote file/directory entry for the SFTP two-column browser (F-12).
+type FileItem struct {
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	Size        int64  `json:"size"`
+	IsDir       bool   `json:"isDir"`
+	ModTime     int64  `json:"modTime"`
+	Permissions string `json:"permissions"`
+}
+
+// TransferStatus indicates the current lifecycle state of an SFTP file transfer (F-12).
+type TransferStatus string
+
+const (
+	TransferQueued    TransferStatus = "queued"
+	TransferRunning   TransferStatus = "running"
+	TransferCompleted TransferStatus = "completed"
+	TransferFailed    TransferStatus = "failed"
+	TransferCancelled TransferStatus = "cancelled"
+)
+
+// TransferTask represents an entry in the SFTP transfer queue (F-12).
+type TransferTask struct {
+	ID               string         `json:"id"`
+	SessionID        string         `json:"sessionId"`
+	Direction        string         `json:"direction"` // "upload" or "download"
+	LocalPath        string         `json:"localPath"`
+	RemotePath       string         `json:"remotePath"`
+	TotalBytes       int64          `json:"totalBytes"`
+	TransferredBytes int64          `json:"transferredBytes"`
+	SpeedBytesPerSec int64          `json:"speedBytesPerSec"`
+	Status           TransferStatus `json:"status"`
+	Error            string         `json:"error,omitempty"`
+}
+
+// TransferProgressEvent is emitted to the frontend during an active file transfer (F-12).
+type TransferProgressEvent struct {
+	TaskID           string         `json:"taskId"`
+	TransferredBytes int64          `json:"transferredBytes"`
+	TotalBytes       int64          `json:"totalBytes"`
+	SpeedBytesPerSec int64          `json:"speedBytesPerSec"`
+	Percent          float64        `json:"percent"`
+	Status           TransferStatus `json:"status"`
+	Error            string         `json:"error,omitempty"`
+}
+
+// SftpClient defines the strict boundary interface for remote SFTP file operations (F-12).
+type SftpClient interface {
+	List(ctx context.Context, path string) ([]FileItem, error)
+	Stat(ctx context.Context, path string) (FileItem, error)
+	Mkdir(ctx context.Context, path string) error
+	Remove(ctx context.Context, path string) error
+	Rename(ctx context.Context, oldPath, newPath string) error
+	Upload(ctx context.Context, localPath, remotePath string, onProgress func(transferred, total int64)) error
+	Download(ctx context.Context, remotePath, localPath string, onProgress func(transferred, total int64)) error
+	Close() error
 }
 
 // TerminalSize represents terminal dimensions in columns and rows.

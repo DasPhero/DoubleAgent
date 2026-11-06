@@ -41,6 +41,13 @@ type App struct {
 	sessionPasswords map[string]string
 	sessionRequests  map[string]core.ConnectRequest
 	pendingKeys      map[string]chan bool
+	sftpClients      map[string]core.SftpClient
+	transferTasks    map[string]*activeTransferTask
+}
+
+type activeTransferTask struct {
+	task   core.TransferTask
+	cancel context.CancelFunc
 }
 
 func defaultVaultPath() string {
@@ -91,6 +98,8 @@ func NewAppWithDependencies(
 		sessionPasswords: make(map[string]string),
 		sessionRequests:  make(map[string]core.ConnectRequest),
 		pendingKeys:      make(map[string]chan bool),
+		sftpClients:      make(map[string]core.SftpClient),
+		transferTasks:    make(map[string]*activeTransferTask),
 	}
 
 	if vaultStore == nil {
@@ -1057,4 +1066,319 @@ func StripOSC52Sequences(input []byte) []byte {
 	}
 
 	return out.Bytes()
+}
+
+func (a *App) getOrOpenSftp(sessionID string) (core.SftpClient, error) {
+	a.mu.Lock()
+	client, exists := a.sftpClients[sessionID]
+	a.mu.Unlock()
+
+	if exists && client != nil {
+		return client, nil
+	}
+
+	newClient, err := a.transport.OpenSftp(a.ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("open sftp for session %q: %w", sessionID, err)
+	}
+
+	a.mu.Lock()
+	a.sftpClients[sessionID] = newClient
+	a.mu.Unlock()
+	return newClient, nil
+}
+
+// ListLocalDir lists files and folders in a local directory (F-12).
+func (a *App) ListLocalDir(path string) ([]core.FileItem, error) {
+	if path == "" {
+		home, err := os.UserHomeDir()
+		if err == nil && home != "" {
+			path = home
+		} else {
+			path = "."
+		}
+	}
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("read local dir %q: %w", path, err)
+	}
+
+	result := make([]core.FileItem, 0, len(entries))
+	for _, entry := range entries {
+		itemPath := filepath.ToSlash(filepath.Join(path, entry.Name()))
+		info, err := entry.Info()
+		size := int64(0)
+		modTime := int64(0)
+		perms := "-rw-r--r--"
+		if err == nil && info != nil {
+			size = info.Size()
+			modTime = info.ModTime().Unix()
+			perms = info.Mode().String()
+		}
+
+		result = append(result, core.FileItem{
+			Name:        entry.Name(),
+			Path:        itemPath,
+			Size:        size,
+			IsDir:       entry.IsDir(),
+			ModTime:     modTime,
+			Permissions: perms,
+		})
+	}
+	return result, nil
+}
+
+// ListRemoteDir lists files and folders on the remote SFTP server (F-12).
+func (a *App) ListRemoteDir(sessionID string, path string) ([]core.FileItem, error) {
+	client, err := a.getOrOpenSftp(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return client.List(a.ctx, path)
+}
+
+// StartSftpUpload queues and begins a background file upload from local to remote (F-12).
+func (a *App) StartSftpUpload(sessionID string, localPath string, remotePath string) (string, error) {
+	client, err := a.getOrOpenSftp(sessionID)
+	if err != nil {
+		return "", err
+	}
+
+	stat, err := os.Stat(localPath)
+	if err != nil {
+		return "", fmt.Errorf("stat local file: %w", err)
+	}
+
+	taskID := fmt.Sprintf("upload-%d-%s", time.Now().UnixNano(), filepath.Base(localPath))
+	taskCtx, cancel := context.WithCancel(a.ctx)
+
+	task := core.TransferTask{
+		ID:               taskID,
+		SessionID:        sessionID,
+		Direction:        "upload",
+		LocalPath:        localPath,
+		RemotePath:       remotePath,
+		TotalBytes:       stat.Size(),
+		TransferredBytes: 0,
+		Status:           core.TransferRunning,
+	}
+
+	a.mu.Lock()
+	a.transferTasks[taskID] = &activeTransferTask{
+		task:   task,
+		cancel: cancel,
+	}
+	a.mu.Unlock()
+
+	go func() {
+		defer cancel()
+		startTime := time.Now()
+
+		err := client.Upload(taskCtx, localPath, remotePath, func(transferred, total int64) {
+			elapsed := time.Since(startTime).Seconds()
+			speed := int64(0)
+			if elapsed > 0 {
+				speed = int64(float64(transferred) / elapsed)
+			}
+			percent := float64(0)
+			if total > 0 {
+				percent = float64(transferred) / float64(total) * 100.0
+			}
+
+			a.mu.Lock()
+			if t, ok := a.transferTasks[taskID]; ok {
+				t.task.TransferredBytes = transferred
+				t.task.SpeedBytesPerSec = speed
+			}
+			a.mu.Unlock()
+
+			a.emit(a.ctx, "sftp:progress", core.TransferProgressEvent{
+				TaskID:           taskID,
+				TransferredBytes: transferred,
+				TotalBytes:       total,
+				SpeedBytesPerSec: speed,
+				Percent:          percent,
+				Status:           core.TransferRunning,
+			})
+		})
+
+		a.mu.Lock()
+		defer a.mu.Unlock()
+
+		finalStatus := core.TransferCompleted
+		errMsg := ""
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				finalStatus = core.TransferCancelled
+			} else {
+				finalStatus = core.TransferFailed
+				errMsg = err.Error()
+			}
+		}
+
+		if t, ok := a.transferTasks[taskID]; ok {
+			t.task.Status = finalStatus
+			t.task.Error = errMsg
+			if finalStatus == core.TransferCompleted {
+				t.task.TransferredBytes = t.task.TotalBytes
+			}
+		}
+
+		a.emit(a.ctx, "sftp:progress", core.TransferProgressEvent{
+			TaskID:           taskID,
+			TransferredBytes: task.TotalBytes,
+			TotalBytes:       task.TotalBytes,
+			Percent:          100.0,
+			Status:           finalStatus,
+			Error:            errMsg,
+		})
+	}()
+
+	return taskID, nil
+}
+
+// StartSftpDownload queues and begins a background file download from remote to local (F-12).
+func (a *App) StartSftpDownload(sessionID string, remotePath string, localPath string) (string, error) {
+	client, err := a.getOrOpenSftp(sessionID)
+	if err != nil {
+		return "", err
+	}
+
+	stat, err := client.Stat(a.ctx, remotePath)
+	if err != nil {
+		return "", fmt.Errorf("stat remote file: %w", err)
+	}
+
+	taskID := fmt.Sprintf("download-%d-%s", time.Now().UnixNano(), filepath.Base(remotePath))
+	taskCtx, cancel := context.WithCancel(a.ctx)
+
+	task := core.TransferTask{
+		ID:               taskID,
+		SessionID:        sessionID,
+		Direction:        "download",
+		LocalPath:        localPath,
+		RemotePath:       remotePath,
+		TotalBytes:       stat.Size,
+		TransferredBytes: 0,
+		Status:           core.TransferRunning,
+	}
+
+	a.mu.Lock()
+	a.transferTasks[taskID] = &activeTransferTask{
+		task:   task,
+		cancel: cancel,
+	}
+	a.mu.Unlock()
+
+	go func() {
+		defer cancel()
+		startTime := time.Now()
+
+		err := client.Download(taskCtx, remotePath, localPath, func(transferred, total int64) {
+			elapsed := time.Since(startTime).Seconds()
+			speed := int64(0)
+			if elapsed > 0 {
+				speed = int64(float64(transferred) / elapsed)
+			}
+			percent := float64(0)
+			if total > 0 {
+				percent = float64(transferred) / float64(total) * 100.0
+			}
+
+			a.mu.Lock()
+			if t, ok := a.transferTasks[taskID]; ok {
+				t.task.TransferredBytes = transferred
+				t.task.SpeedBytesPerSec = speed
+			}
+			a.mu.Unlock()
+
+			a.emit(a.ctx, "sftp:progress", core.TransferProgressEvent{
+				TaskID:           taskID,
+				TransferredBytes: transferred,
+				TotalBytes:       total,
+				SpeedBytesPerSec: speed,
+				Percent:          percent,
+				Status:           core.TransferRunning,
+			})
+		})
+
+		a.mu.Lock()
+		defer a.mu.Unlock()
+
+		finalStatus := core.TransferCompleted
+		errMsg := ""
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				finalStatus = core.TransferCancelled
+			} else {
+				finalStatus = core.TransferFailed
+				errMsg = err.Error()
+			}
+		}
+
+		if t, ok := a.transferTasks[taskID]; ok {
+			t.task.Status = finalStatus
+			t.task.Error = errMsg
+			if finalStatus == core.TransferCompleted {
+				t.task.TransferredBytes = t.task.TotalBytes
+			}
+		}
+
+		a.emit(a.ctx, "sftp:progress", core.TransferProgressEvent{
+			TaskID:           taskID,
+			TransferredBytes: task.TotalBytes,
+			TotalBytes:       task.TotalBytes,
+			Percent:          100.0,
+			Status:           finalStatus,
+			Error:            errMsg,
+		})
+	}()
+
+	return taskID, nil
+}
+
+// CancelTransfer cancels an active SFTP upload or download (F-12).
+func (a *App) CancelTransfer(taskID string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	task, exists := a.transferTasks[taskID]
+	if !exists || task == nil {
+		return errors.New("transfer task not found")
+	}
+
+	task.cancel()
+	task.task.Status = core.TransferCancelled
+	return nil
+}
+
+// CreateRemoteDir creates a new directory on the remote SFTP server (F-12).
+func (a *App) CreateRemoteDir(sessionID string, path string) error {
+	client, err := a.getOrOpenSftp(sessionID)
+	if err != nil {
+		return err
+	}
+	return client.Mkdir(a.ctx, path)
+}
+
+// DeleteRemoteItem removes a file or directory on the remote SFTP server (F-12).
+func (a *App) DeleteRemoteItem(sessionID string, path string) error {
+	client, err := a.getOrOpenSftp(sessionID)
+	if err != nil {
+		return err
+	}
+	return client.Remove(a.ctx, path)
+}
+
+// GetActiveTransfers returns a snapshot of all active and recent SFTP transfers (F-12).
+func (a *App) GetActiveTransfers() []core.TransferTask {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	result := make([]core.TransferTask, 0, len(a.transferTasks))
+	for _, t := range a.transferTasks {
+		result = append(result, t.task)
+	}
+	return result
 }

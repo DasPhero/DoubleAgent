@@ -6,9 +6,32 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, & `F-23`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, & `F-23`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Two-Column SFTP File Browser & Transfer Queue (`F-12`)**:
+  - **Two-Column Layout (Local ↔ Remote)**:
+    - Side-by-side view with your local filesystem on the left and the remote host's filesystem on the right.
+    - Responsive table showing entry name, formatted size, last modified timestamp, and UNIX file permissions.
+    - Folders clearly distinguished by folder icons (📁) and sorted to the top; double-click any directory to enter.
+  - **HTML5 Drag-and-Drop File Transfers**:
+    - Drag files from the Local panel and drop them directly onto the Remote panel to trigger an immediate background upload.
+    - Drag files from the Remote panel and drop them onto the Local panel to trigger an immediate background download.
+    - Visual blue drop target highlights when dragging over target panes.
+  - **Transfer Queue with Live Progress & Cancellation**:
+    - Collapsible bottom drawer displaying all active, queued, completed, failed, and cancelled transfers.
+    - Real-time progress bar (0–100%), transferred bytes vs. total size, and dynamic transfer speed (e.g. `1.2 MB/s`).
+    - **One-Click Cancellation**: Click the **`✕`** button on any running transfer to abort it immediately.
+    - **Clear Finished**: One-click cleanup button to clear completed or failed items from the queue.
+  - **Remote File & Folder Management**:
+    - **New Remote Folder (`📁+`)**: Create new remote directories directly from the toolbar dialog.
+    - **Delete Remote Item (`🗑`)**: Remove remote files or directories with a safety confirmation prompt.
+    - **Upload (`Upload ➔`) & Download (`⬅ Download`)**: Dedicated action buttons for quick one-click transfers.
+    - **Directory Navigation**: Breadcrumb path input bar, Go Up (`⬆ Up`) to parent directory, and Refresh (`↻`).
+  - **Seamless Launching**:
+    - Click **`SFTP`** on any saved host in the sidebar to connect and open its file browser.
+    - Click **`📁 SFTP`** in the header of any active SSH terminal pane.
+    - Select **SFTP File Browser (F-12)** from the top **Tools ▾** menu.
 - **New Terminal by Working Directory & Elevated Root Shell (`F-10`)**:
   - Open new tabs or split panes directly positioned in specific directories without having to manually `cd`:
     - **Default Directory (`🏠 Default Dir`)**:

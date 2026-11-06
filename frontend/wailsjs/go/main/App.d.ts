@@ -4,6 +4,8 @@ import {core} from '../models';
 
 export function AutoDetectSerial(arg1:string):Promise<core.SerialAutoDetectResult>;
 
+export function CancelTransfer(arg1:string):Promise<void>;
+
 export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;
 
 export function ConnectSSH(arg1:core.ConnectRequest):Promise<string>;
@@ -12,9 +14,13 @@ export function ConnectSavedHost(arg1:string,arg2:core.TerminalSize):Promise<str
 
 export function ConnectSerial(arg1:core.SerialConfig):Promise<string>;
 
+export function CreateRemoteDir(arg1:string,arg2:string):Promise<void>;
+
 export function DeleteGroup(arg1:string):Promise<void>;
 
 export function DeleteHost(arg1:string):Promise<void>;
+
+export function DeleteRemoteItem(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteSSHKey(arg1:string):Promise<void>;
 
@@ -25,6 +31,8 @@ export function DuplicateSession(arg1:string,arg2:core.TerminalSize):Promise<str
 export function EnableQuickUnlock():Promise<void>;
 
 export function GenerateSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
+
+export function GetActiveTransfers():Promise<Array<core.TransferTask>>;
 
 export function GetVaultSummary():Promise<core.VaultSummary>;
 
@@ -39,6 +47,10 @@ export function InitializeVault(arg1:string):Promise<void>;
 export function InitializeVaultWithHello():Promise<void>;
 
 export function InjectSessionPassword(arg1:string):Promise<void>;
+
+export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
+
+export function ListRemoteDir(arg1:string,arg2:string):Promise<Array<core.FileItem>>;
 
 export function ListSerialPorts():Promise<Array<core.SerialPortInfo>>;
 
@@ -67,6 +79,10 @@ export function SendSerialBreak(arg1:string):Promise<void>;
 export function SetSerialDTR(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
+
+export function StartSftpDownload(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function StartSftpUpload(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function UnlockVault(arg1:string):Promise<void>;
 

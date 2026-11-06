@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -70,6 +72,37 @@ func (f *fakeSshTransport) OpenShell(_ context.Context, _ string, size core.Term
 func (f *fakeSshTransport) OpenShellWithOptions(ctx context.Context, sessionID string, size core.TerminalSize, _ string, _ bool) (*core.SshShellStreams, error) {
 	return f.OpenShell(ctx, sessionID, size)
 }
+
+func (f *fakeSshTransport) OpenSftp(_ context.Context, _ string) (core.SftpClient, error) {
+	return &fakeSftpClient{}, nil
+}
+
+type fakeSftpClient struct{}
+
+func (f *fakeSftpClient) List(_ context.Context, path string) ([]core.FileItem, error) {
+	return []core.FileItem{
+		{Name: "remote_file.txt", Path: path + "/remote_file.txt", Size: 42, IsDir: false, ModTime: time.Now().Unix(), Permissions: "-rw-r--r--"},
+	}, nil
+}
+func (f *fakeSftpClient) Stat(_ context.Context, path string) (core.FileItem, error) {
+	return core.FileItem{Name: "remote_file.txt", Path: path, Size: 42, IsDir: false, ModTime: time.Now().Unix(), Permissions: "-rw-r--r--"}, nil
+}
+func (f *fakeSftpClient) Mkdir(_ context.Context, _ string) error { return nil }
+func (f *fakeSftpClient) Remove(_ context.Context, _ string) error { return nil }
+func (f *fakeSftpClient) Rename(_ context.Context, _, _ string) error { return nil }
+func (f *fakeSftpClient) Upload(_ context.Context, _, _ string, onProgress func(int64, int64)) error {
+	if onProgress != nil {
+		onProgress(42, 42)
+	}
+	return nil
+}
+func (f *fakeSftpClient) Download(_ context.Context, _, _ string, onProgress func(int64, int64)) error {
+	if onProgress != nil {
+		onProgress(42, 42)
+	}
+	return nil
+}
+func (f *fakeSftpClient) Close() error { return nil }
 
 func (f *fakeSshTransport) ResizeShell(_ context.Context, _ string, size core.TerminalSize) error {
 	f.mu.Lock()
@@ -231,4 +264,96 @@ func TestApp_OpenTerminalWithOptions_F10(t *testing.T) {
 	_ = app.DisconnectSession(sessID)
 	_ = app.DisconnectSession(dupID)
 	_ = app.DisconnectSession(rootID)
+}
+
+func TestApp_SftpOperations_F12(t *testing.T) {
+	fake := newFakeSshTransport()
+	var app *App
+	app = NewAppWithTransport(fake, nil, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	// Test ListLocalDir with temp dir
+	tmpDir, err := os.MkdirTemp("", "sftp_local_test_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp failed: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	testFilePath := filepath.Join(tmpDir, "hello.txt")
+	if err := os.WriteFile(testFilePath, []byte("sftp test data"), 0644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	localItems, err := app.ListLocalDir(tmpDir)
+	if err != nil {
+		t.Fatalf("ListLocalDir failed: %v", err)
+	}
+	if len(localItems) != 1 || localItems[0].Name != "hello.txt" {
+		t.Fatalf("unexpected local items: %+v", localItems)
+	}
+
+	// Connect SSH to test remote operations
+	sessID, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "127.0.0.1",
+		Port:     22,
+		Username: "user",
+		Password: "password",
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH failed: %v", err)
+	}
+	defer app.DisconnectSession(sessID)
+
+	remoteItems, err := app.ListRemoteDir(sessID, "/remote/path")
+	if err != nil {
+		t.Fatalf("ListRemoteDir failed: %v", err)
+	}
+	if len(remoteItems) != 1 || remoteItems[0].Name != "remote_file.txt" {
+		t.Fatalf("unexpected remote items: %+v", remoteItems)
+	}
+
+	if err := app.CreateRemoteDir(sessID, "/remote/path/newdir"); err != nil {
+		t.Fatalf("CreateRemoteDir failed: %v", err)
+	}
+
+	if err := app.DeleteRemoteItem(sessID, "/remote/path/remote_file.txt"); err != nil {
+		t.Fatalf("DeleteRemoteItem failed: %v", err)
+	}
+
+	// Test upload
+	upTaskID, err := app.StartSftpUpload(sessID, testFilePath, "/remote/hello.txt")
+	if err != nil {
+		t.Fatalf("StartSftpUpload failed: %v", err)
+	}
+	if upTaskID == "" {
+		t.Fatalf("expected non-empty upTaskID")
+	}
+
+	// Test download
+	downDest := filepath.Join(tmpDir, "downloaded.txt")
+	downTaskID, err := app.StartSftpDownload(sessID, "/remote/remote_file.txt", downDest)
+	if err != nil {
+		t.Fatalf("StartSftpDownload failed: %v", err)
+	}
+	if downTaskID == "" {
+		t.Fatalf("expected non-empty downTaskID")
+	}
+
+	// Give goroutines a moment to register/run
+	time.Sleep(50 * time.Millisecond)
+
+	active := app.GetActiveTransfers()
+	if len(active) < 2 {
+		t.Fatalf("expected at least 2 active transfers, got %d", len(active))
+	}
+
+	// Cancel transfer test
+	_ = app.CancelTransfer(upTaskID)
 }

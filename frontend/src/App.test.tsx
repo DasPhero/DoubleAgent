@@ -593,4 +593,74 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('menuitem', { name: /New Root Shell in Current Directory/i }));
     expect(screen.getAllByRole('tab', { name: /Root/i }).length).toBeGreaterThanOrEqual(2);
   });
+
+  it('supports SFTP Two-Column File Browser, drag-drop transfers, and Transfer Queue (F-12)', async () => {
+    try {
+      render(<App />);
+
+      // 1. Add a Saved Host (using in-memory fallback state)
+      fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+      fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'SFTP-Server' } });
+      fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '192.168.1.100' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
+
+      expect(screen.getByText('SFTP-Server')).toBeInTheDocument();
+
+      // 2. Saved Host has SFTP button in sidebar actions
+      const sftpBtn = screen.getByTitle('Open SFTP file browser for SFTP-Server');
+      expect(sftpBtn).toBeInTheDocument();
+
+      // 3. Attach mocked Wails SFTP bindings now
+      const win = window as unknown as {
+        go?: {
+          main?: {
+            App?: {
+              ListLocalDir?: () => Promise<unknown[]>;
+              ListRemoteDir?: () => Promise<unknown[]>;
+              StartSftpUpload?: () => Promise<string>;
+              StartSftpDownload?: () => Promise<string>;
+              CancelTransfer?: () => Promise<void>;
+              CreateRemoteDir?: () => Promise<void>;
+              DeleteRemoteItem?: () => Promise<void>;
+              GetActiveTransfers?: () => Promise<unknown[]>;
+              ConnectSavedHost?: () => Promise<string>;
+            };
+          };
+        };
+      };
+
+      win.go = win.go || {};
+      win.go.main = win.go.main || {};
+      win.go.main.App = {
+        ListLocalDir: async () => [
+          { name: 'local_file.txt', path: '/local/local_file.txt', size: 1024, isDir: false, modTime: 1700000000, permissions: '-rw-r--r--' },
+          { name: 'local_folder', path: '/local/local_folder', size: 0, isDir: true, modTime: 1700000000, permissions: 'drwxr-xr-x' },
+        ],
+        ListRemoteDir: async () => [
+          { name: 'remote_file.txt', path: '/remote/remote_file.txt', size: 2048, isDir: false, modTime: 1700000000, permissions: '-rw-r--r--' },
+          { name: 'remote_folder', path: '/remote/remote_folder', size: 0, isDir: true, modTime: 1700000000, permissions: 'drwxr-xr-x' },
+        ],
+        GetActiveTransfers: async () => [],
+        ConnectSavedHost: async () => 'sess-test-ssh-123',
+      };
+
+      // 4. Click SFTP button -> opens SFTP Tab
+      fireEvent.click(sftpBtn);
+
+      // Verify SFTP Tab was opened
+      expect(await screen.findByRole('tab', { name: /Tab SFTP: SFTP-Server/i })).toBeInTheDocument();
+
+      // Verify SFTP Browser View elements are rendered
+      expect(screen.getByText('SFTP Browser (F-12)')).toBeInTheDocument();
+      expect(screen.getByText('LOCAL')).toBeInTheDocument();
+      expect(screen.getByText('REMOTE')).toBeInTheDocument();
+      expect(screen.getByText('TRANSFER QUEUE (0)')).toBeInTheDocument();
+
+      // Verify mocked files appear
+      expect(await screen.findByText('local_file.txt')).toBeInTheDocument();
+      expect(await screen.findByText('remote_file.txt')).toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
 });
