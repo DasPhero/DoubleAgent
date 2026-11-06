@@ -59,6 +59,7 @@
     - Unit tests in `frontend/src/App.test.tsx` (`manages Proxy Profiles (ProxyJump, ProxyCommand, SOCKS5) and exports proxychains.conf (F-14)`).
   - Standalone binary verified with `wails build`.
 - **UX Polish & Settings Unification**:
+  - **Tools Menu Streamlining**: Redesigned the top navigation `Tools ▾` dropdown into a clean, balanced 2-column dashboard layout ("Terminals & Consoles" vs "Tools & Utilities") with responsive 1-column fallback on narrow screens, reducing vertical height from ~750px to ~320px while preserving all actions and shortcuts.
   - **Background Host Connection for Forward Tunnels**: When starting a forward tunnel without an active SSH session, DoubleAgent automatically connects to the rule's associated host in the background via `ConnectSavedHost` and initializes the tunnel.
   - **Modal Backdrop Click-to-Close**: Clicking the dark background overlay (`e.target === e.currentTarget`) dismisses all modals and dialogs.
   - **Unified Settings Tab System (`SettingsView`)**: Consolidated Global Settings into a tabbed interface (Appearance & Terminal, Vault & Security, Keyboard Shortcuts) accessible both as a modal and as a dedicated persistent workspace tab.

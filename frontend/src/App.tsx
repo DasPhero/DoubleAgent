@@ -3494,258 +3494,265 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               </button>
               {activeDropdownMenu === 'tools' && (
                 <div
-                  className="nav-dropdown-menu"
+                  className="nav-dropdown-menu tools-dropdown-menu"
                   role="menu"
                   aria-label="Tools Menu"
                   onMouseEnter={() => handleMenuEnter('tools')}
                   onMouseMove={handleMenuMove}
                 >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setPaletteQuery('');
-                      setShowCommandPalette(true);
-                    }}
-                  >
-                    <span>Command Palette</span>
-                    <span className="nav-dropdown-shortcut">Ctrl+K</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setModalError('');
-                      setShowKeychainModal(true);
-                    }}
-                  >
-                    <span>Keychain</span>
-                    <span className="nav-dropdown-shortcut">F-04</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setModalError('');
-                      setSshConfigResult(null);
-                      setShowSSHConfigModal(true);
-                    }}
-                  >
-                    <span>Import ssh_config</span>
-                    <span className="nav-dropdown-shortcut">F-22</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <div className="nav-dropdown-header">Local Terminals (F-23)</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleOpenLocalTerminal('powershell');
-                    }}
-                  >
-                    <span>Local Shell (PowerShell)</span>
-                    <span className="nav-dropdown-shortcut">⚡ pwsh</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleOpenLocalTerminal('cmd');
-                    }}
-                  >
-                    <span>Local Shell (Command Prompt)</span>
-                    <span className="nav-dropdown-shortcut">cmd</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleOpenLocalTerminal('wsl');
-                    }}
-                  >
-                    <span>Local Shell (WSL Linux)</span>
-                    <span className="nav-dropdown-shortcut">🐧 wsl</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <div className="nav-dropdown-header">File Transfer (F-12)</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    disabled={!sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')}
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
-                        openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
-                      }
-                    }}
-                  >
-                    <span>SFTP File Browser</span>
-                    <span className="nav-dropdown-shortcut">📁 SFTP</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <div className="nav-dropdown-header">Port Forwarding &amp; Tunnels (F-13)</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setShowPortForwardingModal(true);
-                    }}
-                  >
-                    <span>Port Forwarding (-L, -R, -D)</span>
-                    <span className="nav-dropdown-shortcut">
-                      {activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} active` : '⇄ Tunnels'}
-                    </span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <div className="nav-dropdown-header">Proxying &amp; Bastions (F-14)</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setShowProxyProfilesModal(true);
-                    }}
-                  >
-                    <span>Proxy Profiles (Jump, SOCKS5, Command)</span>
-                    <span className="nav-dropdown-shortcut">🛡️ Profiles</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleOpenProxychainsExport();
-                    }}
-                  >
-                    <span>Export proxychains.conf</span>
-                    <span className="nav-dropdown-shortcut">⛓️ Export</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <div className="nav-dropdown-header">Automation &amp; Snippets (F-15)</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setShowSnippetsModal(true);
-                    }}
-                  >
-                    <span>Command Snippets &amp; Variables</span>
-                    <span className="nav-dropdown-shortcut">⚡ Snippets</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <div className="nav-dropdown-header">Two-Factor Authentication (F-20)</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setShowTotpModal(true);
-                    }}
-                  >
-                    <span>TOTP Authenticator Generator</span>
-                    <span className="nav-dropdown-shortcut">🔐 2FA</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <div className="nav-dropdown-header">Hardware Serial (F-23)</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleOpenSerialModal();
-                    }}
-                  >
-                    <span>Serial / UART Console (COM)</span>
-                    <span className="nav-dropdown-shortcut">🔌 COM</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <div className="nav-dropdown-header">New Terminal by Directory (F-10)</div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleOpenTerminalDirectory('default');
-                    }}
-                  >
-                    <span>New in Default Directory</span>
-                    <span className="nav-dropdown-shortcut">🏠</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleOpenTerminalDirectory('current');
-                    }}
-                  >
-                    <span>New in Current Directory (CWD)</span>
-                    <span className="nav-dropdown-shortcut">📂</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleOpenTerminalDirectory('root');
-                    }}
-                  >
-                    <span>New Root Shell in Current Directory</span>
-                    <span className="nav-dropdown-shortcut">⚡ root</span>
-                  </button>
-                  {activePane && (
-                    <>
-                      <div className="nav-dropdown-divider" />
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="nav-dropdown-item"
-                        onClick={() => {
-                          setActiveDropdownMenu(null);
-                          void handleInjectPassword();
-                        }}
-                      >
-                        <span>Inject Password</span>
-                        <span className="nav-dropdown-shortcut">🔑</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="nav-dropdown-item"
-                        onClick={() => {
-                          setActiveDropdownMenu(null);
-                          void handleInjectTotp();
-                        }}
-                      >
-                        <span>Inject 2FA Code</span>
-                        <span className="nav-dropdown-shortcut">🔐 2FA</span>
-                      </button>
-                    </>
-                  )}
+                  {/* Column 1: Terminals & Consoles */}
+                  <div className="tools-dropdown-col">
+                    <div className="tools-col-title">
+                      <span>⚡ Terminals &amp; Consoles</span>
+                    </div>
+
+                    <div className="tools-sub-header">Local &amp; Directory Shells</div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleOpenLocalTerminal('powershell');
+                      }}
+                    >
+                      <span>Local Shell (PowerShell)</span>
+                      <span className="nav-dropdown-shortcut">⚡ pwsh</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleOpenLocalTerminal('cmd');
+                      }}
+                    >
+                      <span>Local Shell (Command Prompt)</span>
+                      <span className="nav-dropdown-shortcut">cmd</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleOpenLocalTerminal('wsl');
+                      }}
+                    >
+                      <span>Local Shell (WSL Linux)</span>
+                      <span className="nav-dropdown-shortcut">🐧 wsl</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleOpenTerminalDirectory('default');
+                      }}
+                    >
+                      <span>New in Default Directory</span>
+                      <span className="nav-dropdown-shortcut">🏠</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleOpenTerminalDirectory('current');
+                      }}
+                    >
+                      <span>New in Current Directory (CWD)</span>
+                      <span className="nav-dropdown-shortcut">📂</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleOpenTerminalDirectory('root');
+                      }}
+                    >
+                      <span>New Root Shell in Current Directory</span>
+                      <span className="nav-dropdown-shortcut">⚡ root</span>
+                    </button>
+
+                    <div className="tools-sub-header">Hardware &amp; Session Actions</div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleOpenSerialModal();
+                      }}
+                    >
+                      <span>Serial / UART Console (COM)</span>
+                      <span className="nav-dropdown-shortcut">🔌 COM</span>
+                    </button>
+
+                    {activePane && (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="nav-dropdown-item"
+                          onClick={() => {
+                            setActiveDropdownMenu(null);
+                            void handleInjectPassword();
+                          }}
+                        >
+                          <span>Inject Password</span>
+                          <span className="nav-dropdown-shortcut">🔑</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="nav-dropdown-item"
+                          onClick={() => {
+                            setActiveDropdownMenu(null);
+                            void handleInjectTotp();
+                          }}
+                        >
+                          <span>Inject 2FA Code</span>
+                          <span className="nav-dropdown-shortcut">🔐 2FA</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Column 2: Tools & Utilities */}
+                  <div className="tools-dropdown-col">
+                    <div className="tools-col-title">
+                      <span>🛠️ Tools &amp; Utilities</span>
+                    </div>
+
+                    <div className="tools-sub-header">Security &amp; Credentials</div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        setPaletteQuery('');
+                        setShowCommandPalette(true);
+                      }}
+                    >
+                      <span>Command Palette</span>
+                      <span className="nav-dropdown-shortcut">Ctrl+K</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        setShowTotpModal(true);
+                      }}
+                    >
+                      <span>TOTP Authenticator Generator</span>
+                      <span className="nav-dropdown-shortcut">🔐 2FA</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        setModalError('');
+                        setShowKeychainModal(true);
+                      }}
+                    >
+                      <span>Keychain</span>
+                      <span className="nav-dropdown-shortcut">F-04</span>
+                    </button>
+
+                    <div className="tools-sub-header">Automation &amp; Networking</div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        setShowSnippetsModal(true);
+                      }}
+                    >
+                      <span>Command Snippets &amp; Variables</span>
+                      <span className="nav-dropdown-shortcut">⚡ Snippets</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        setShowPortForwardingModal(true);
+                      }}
+                    >
+                      <span>Port Forwarding (-L, -R, -D)</span>
+                      <span className="nav-dropdown-shortcut">
+                        {activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} active` : '⇄ Tunnels'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        setShowProxyProfilesModal(true);
+                      }}
+                    >
+                      <span>Proxy Profiles (Jump, SOCKS5, Command)</span>
+                      <span className="nav-dropdown-shortcut">🛡️ Profiles</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      disabled={!sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')}
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
+                          openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
+                        }
+                      }}
+                    >
+                      <span>SFTP File Browser</span>
+                      <span className="nav-dropdown-shortcut">📁 SFTP</span>
+                    </button>
+
+                    <div className="tools-sub-header">Config Import &amp; Export</div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        setModalError('');
+                        setSshConfigResult(null);
+                        setShowSSHConfigModal(true);
+                      }}
+                    >
+                      <span>Import ssh_config</span>
+                      <span className="nav-dropdown-shortcut">F-22</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleOpenProxychainsExport();
+                      }}
+                    >
+                      <span>Export proxychains.conf</span>
+                      <span className="nav-dropdown-shortcut">⛓️ Export</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
