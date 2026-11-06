@@ -93,10 +93,11 @@ func (f *fakeForwardTunnel) GetStatus() core.ForwardTunnelStatus {
 	return f.status
 }
 
-func (f *fakeSshTransport) StartForwardLocal(_ context.Context, sessionID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (core.ForwardTunnel, error) {
+func (f *fakeSshTransport) StartForwardLocal(_ context.Context, sessionID string, ruleID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (core.ForwardTunnel, error) {
 	return &fakeForwardTunnel{
 		status: core.ForwardTunnelStatus{
 			ID:          "tun-mock-local",
+			RuleID:      ruleID,
 			SessionID:   sessionID,
 			Type:        core.ForwardLocal,
 			BindAddress: bindAddr,
@@ -108,10 +109,11 @@ func (f *fakeSshTransport) StartForwardLocal(_ context.Context, sessionID string
 	}, nil
 }
 
-func (f *fakeSshTransport) StartForwardRemote(_ context.Context, sessionID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (core.ForwardTunnel, error) {
+func (f *fakeSshTransport) StartForwardRemote(_ context.Context, sessionID string, ruleID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (core.ForwardTunnel, error) {
 	return &fakeForwardTunnel{
 		status: core.ForwardTunnelStatus{
 			ID:          "tun-mock-remote",
+			RuleID:      ruleID,
 			SessionID:   sessionID,
 			Type:        core.ForwardRemote,
 			BindAddress: bindAddr,
@@ -123,10 +125,11 @@ func (f *fakeSshTransport) StartForwardRemote(_ context.Context, sessionID strin
 	}, nil
 }
 
-func (f *fakeSshTransport) StartForwardDynamic(_ context.Context, sessionID string, bindAddr string, bindPort uint16) (core.ForwardTunnel, error) {
+func (f *fakeSshTransport) StartForwardDynamic(_ context.Context, sessionID string, ruleID string, bindAddr string, bindPort uint16) (core.ForwardTunnel, error) {
 	return &fakeForwardTunnel{
 		status: core.ForwardTunnelStatus{
 			ID:          "tun-mock-dynamic",
+			RuleID:      ruleID,
 			SessionID:   sessionID,
 			Type:        core.ForwardDynamic,
 			BindAddress: bindAddr,

@@ -176,3 +176,69 @@ func TestForward_Socks5DomainParsing_F13(t *testing.T) {
 		t.Fatalf("expected port %d, got %d", port, parsedPort)
 	}
 }
+
+func TestForward_RealDataTunneling_F13(t *testing.T) {
+	cClient, cProxy := net.Pipe()
+	sProxy, sTarget := net.Pipe()
+
+	tun := &tunnelWrapper{
+		id:         "tun-real-data-test",
+		ruleID:     "rule-real-data",
+		sessionID:  "sess-real-data",
+		tunnelType: core.ForwardLocal,
+		bindAddr:   "127.0.0.1",
+		bindPort:   9090,
+		targetHost: "127.0.0.1",
+		targetPort: 80,
+		conns:      make(map[io.Closer]struct{}),
+	}
+
+	done := make(chan struct{})
+	go func() {
+		tun.pipeWithMetrics(cProxy, sProxy)
+		close(done)
+	}()
+
+	// Target server reads request, verifies it, and writes back response
+	serverReceived := make(chan []byte, 1)
+	go func() {
+		buf := make([]byte, 18)
+		_, _ = io.ReadFull(sTarget, buf)
+		serverReceived <- buf
+		_, _ = sTarget.Write([]byte("HTTP/1.1 200 OK\r\n\r\nHello"))
+		_ = sTarget.Close()
+	}()
+
+	// Client writes HTTP request to tunnel
+	go func() {
+		_, _ = cClient.Write([]byte("GET / HTTP/1.1\r\n\r\n"))
+	}()
+
+	// Client reads response from tunnel
+	respBuf := make([]byte, 24)
+	if _, err := io.ReadFull(cClient, respBuf); err != nil {
+		t.Fatalf("client failed to read response: %v", err)
+	}
+	if string(respBuf) != "HTTP/1.1 200 OK\r\n\r\nHello" {
+		t.Fatalf("unexpected response from tunnel: %q", string(respBuf))
+	}
+	_ = cClient.Close()
+
+	rec := <-serverReceived
+	if string(rec) != "GET / HTTP/1.1\r\n\r\n" {
+		t.Fatalf("server received unexpected payload: %q", string(rec))
+	}
+
+	<-done
+
+	st := tun.GetStatus()
+	if st.BytesIn < 18 {
+		t.Fatalf("expected at least 18 bytes in, got %d", st.BytesIn)
+	}
+	if st.BytesOut < 24 {
+		t.Fatalf("expected at least 24 bytes out, got %d", st.BytesOut)
+	}
+	if st.RuleID != "rule-real-data" {
+		t.Fatalf("expected ruleId 'rule-real-data', got %q", st.RuleID)
+	}
+}

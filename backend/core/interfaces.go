@@ -125,9 +125,9 @@ type SshTransport interface {
 	OpenShell(ctx context.Context, sessionID string, size TerminalSize) (*SshShellStreams, error)
 	OpenShellWithOptions(ctx context.Context, sessionID string, size TerminalSize, initialDir string, asRoot bool) (*SshShellStreams, error)
 	OpenSftp(ctx context.Context, sessionID string) (SftpClient, error)
-	StartForwardLocal(ctx context.Context, sessionID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (ForwardTunnel, error)
-	StartForwardRemote(ctx context.Context, sessionID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (ForwardTunnel, error)
-	StartForwardDynamic(ctx context.Context, sessionID string, bindAddr string, bindPort uint16) (ForwardTunnel, error)
+	StartForwardLocal(ctx context.Context, sessionID string, ruleID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (ForwardTunnel, error)
+	StartForwardRemote(ctx context.Context, sessionID string, ruleID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (ForwardTunnel, error)
+	StartForwardDynamic(ctx context.Context, sessionID string, ruleID string, bindAddr string, bindPort uint16) (ForwardTunnel, error)
 	ResizeShell(ctx context.Context, sessionID string, size TerminalSize) error
 	Disconnect(ctx context.Context, sessionID string) error
 }

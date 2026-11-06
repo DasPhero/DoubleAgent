@@ -1572,6 +1572,7 @@ func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error
 		tunnel, err = a.transport.StartForwardLocal(
 			a.ctx,
 			sessionID,
+			ruleID,
 			targetRule.BindAddress,
 			targetRule.BindPort,
 			targetRule.TargetHost,
@@ -1581,6 +1582,7 @@ func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error
 		tunnel, err = a.transport.StartForwardRemote(
 			a.ctx,
 			sessionID,
+			ruleID,
 			targetRule.BindAddress,
 			targetRule.BindPort,
 			targetRule.TargetHost,
@@ -1590,6 +1592,7 @@ func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error
 		tunnel, err = a.transport.StartForwardDynamic(
 			a.ctx,
 			sessionID,
+			ruleID,
 			targetRule.BindAddress,
 			targetRule.BindPort,
 		)
@@ -1611,19 +1614,28 @@ func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error
 }
 
 // StopForwardTunnel shuts down an active port forwarding tunnel (F-13).
-func (a *App) StopForwardTunnel(tunnelID string) error {
+// Accepts either tunnelID or ruleID.
+func (a *App) StopForwardTunnel(idOrRuleID string) error {
 	a.mu.Lock()
-	tunnel, ok := a.activeTunnels[tunnelID]
-	if ok && tunnel != nil {
-		delete(a.activeTunnels, tunnelID)
+	var targetTunnel core.ForwardTunnel
+	var targetID string
+	for id, tun := range a.activeTunnels {
+		if id == idOrRuleID || (tun != nil && tun.GetStatus().RuleID == idOrRuleID) {
+			targetTunnel = tun
+			targetID = id
+			break
+		}
+	}
+	if targetID != "" {
+		delete(a.activeTunnels, targetID)
 	}
 	a.mu.Unlock()
 
-	if !ok || tunnel == nil {
+	if targetTunnel == nil {
 		return errors.New("tunnel not found or already closed")
 	}
 
-	err := tunnel.Close()
+	err := targetTunnel.Close()
 	a.emit(a.ctx, "forward:tunnels-updated", a.GetActiveTunnels())
 	return err
 }

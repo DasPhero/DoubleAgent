@@ -115,21 +115,12 @@ func (t *tunnelWrapper) pipeWithMetrics(c1, c2 io.ReadWriteCloser) {
 		_ = c2.Close()
 	}()
 
-	var once sync.Once
-	closeBoth := func() {
-		once.Do(func() {
-			_ = c1.Close()
-			_ = c2.Close()
-		})
-	}
-
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	// c1 -> c2 (bytes in / uploaded)
 	go func() {
 		defer wg.Done()
-		defer closeBoth()
 		buf := make([]byte, 32*1024)
 		for {
 			nr, er := c1.Read(buf)
@@ -139,19 +130,24 @@ func (t *tunnelWrapper) pipeWithMetrics(c1, c2 io.ReadWriteCloser) {
 					atomic.AddInt64(&t.bytesIn, int64(nw))
 				}
 				if ew != nil {
-					break
+					_ = c1.Close()
+					return
 				}
 			}
 			if er != nil {
 				break
 			}
 		}
+		if cw, ok := c2.(interface{ CloseWrite() error }); ok {
+			_ = cw.CloseWrite()
+		} else {
+			_ = c2.Close()
+		}
 	}()
 
 	// c2 -> c1 (bytes out / downloaded)
 	go func() {
 		defer wg.Done()
-		defer closeBoth()
 		buf := make([]byte, 32*1024)
 		for {
 			nr, er := c2.Read(buf)
@@ -161,12 +157,18 @@ func (t *tunnelWrapper) pipeWithMetrics(c1, c2 io.ReadWriteCloser) {
 					atomic.AddInt64(&t.bytesOut, int64(nw))
 				}
 				if ew != nil {
-					break
+					_ = c2.Close()
+					return
 				}
 			}
 			if er != nil {
 				break
 			}
+		}
+		if cw, ok := c1.(interface{ CloseWrite() error }); ok {
+			_ = cw.CloseWrite()
+		} else {
+			_ = c1.Close()
 		}
 	}()
 
@@ -178,6 +180,7 @@ func (t *tunnelWrapper) pipeWithMetrics(c1, c2 io.ReadWriteCloser) {
 func (t *Transport) StartForwardLocal(
 	ctx context.Context,
 	sessionID string,
+	ruleID string,
 	bindAddr string,
 	bindPort uint16,
 	targetHost string,
@@ -204,6 +207,7 @@ func (t *Transport) StartForwardLocal(
 
 	tun := &tunnelWrapper{
 		id:         fmt.Sprintf("tun-L-%d", time.Now().UnixNano()),
+		ruleID:     ruleID,
 		sessionID:  sessionID,
 		tunnelType: core.ForwardLocal,
 		bindAddr:   bindAddr,
@@ -230,6 +234,9 @@ func (t *Transport) StartForwardLocal(
 			go func(lConn net.Conn) {
 				remoteConn, dialErr := sess.client.Dial("tcp", targetAddr)
 				if dialErr != nil {
+					tun.mu.Lock()
+					tun.errMsg = fmt.Sprintf("dial %s failed: %v", targetAddr, dialErr)
+					tun.mu.Unlock()
 					_ = lConn.Close()
 					return
 				}
@@ -246,6 +253,7 @@ func (t *Transport) StartForwardLocal(
 func (t *Transport) StartForwardRemote(
 	ctx context.Context,
 	sessionID string,
+	ruleID string,
 	bindAddr string,
 	bindPort uint16,
 	targetHost string,
@@ -272,6 +280,7 @@ func (t *Transport) StartForwardRemote(
 
 	tun := &tunnelWrapper{
 		id:         fmt.Sprintf("tun-R-%d", time.Now().UnixNano()),
+		ruleID:     ruleID,
 		sessionID:  sessionID,
 		tunnelType: core.ForwardRemote,
 		bindAddr:   bindAddr,
@@ -298,6 +307,9 @@ func (t *Transport) StartForwardRemote(
 			go func(rConn net.Conn) {
 				localConn, dialErr := net.Dial("tcp", targetAddr)
 				if dialErr != nil {
+					tun.mu.Lock()
+					tun.errMsg = fmt.Sprintf("dial local %s failed: %v", targetAddr, dialErr)
+					tun.mu.Unlock()
 					_ = rConn.Close()
 					return
 				}
@@ -314,6 +326,7 @@ func (t *Transport) StartForwardRemote(
 func (t *Transport) StartForwardDynamic(
 	ctx context.Context,
 	sessionID string,
+	ruleID string,
 	bindAddr string,
 	bindPort uint16,
 ) (core.ForwardTunnel, error) {
@@ -338,6 +351,7 @@ func (t *Transport) StartForwardDynamic(
 
 	tun := &tunnelWrapper{
 		id:         fmt.Sprintf("tun-D-%d", time.Now().UnixNano()),
+		ruleID:     ruleID,
 		sessionID:  sessionID,
 		tunnelType: core.ForwardDynamic,
 		bindAddr:   bindAddr,

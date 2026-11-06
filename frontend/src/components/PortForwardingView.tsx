@@ -117,8 +117,20 @@ export function PortForwardingView({
     }
   };
 
-  const getTunnelForRule = (ruleId: string): ForwardTunnelStatus | undefined => {
-    return activeTunnels.find((t) => t.ruleId === ruleId && t.status === 'active');
+  const getTunnelForRule = (rule: ForwardRule): ForwardTunnelStatus | undefined => {
+    return activeTunnels.find((t) => {
+      if (t.status !== 'active') return false;
+      if (t.ruleId && t.ruleId === rule.id) return true;
+      if (t.id === rule.id) return true;
+      if (
+        t.type === rule.type &&
+        t.bindPort === rule.bindPort &&
+        (t.bindAddress === rule.bindAddress || (!t.bindAddress && rule.bindAddress === '127.0.0.1'))
+      ) {
+        return true;
+      }
+      return false;
+    });
   };
 
   return (
@@ -463,6 +475,80 @@ export function PortForwardingView({
             </form>
           )}
 
+          {/* Active Running Tunnels Section */}
+          {activeTunnels.length > 0 && (
+            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#0d1117', border: '1px solid #238636', borderRadius: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#3fb950', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3fb950', boxShadow: '0 0 6px #3fb950' }} />
+                  Running Tunnels ({activeTunnels.length})
+                </span>
+                <span style={{ fontSize: '11px', color: '#8b949e' }}>
+                  Active background port forwarders
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {activeTunnels.map((tun) => (
+                  <div
+                    key={tun.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '6px 10px',
+                      backgroundColor: '#161b22',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          padding: '1px 6px',
+                          borderRadius: '3px',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          backgroundColor: tun.type === 'L' ? '#3fb95022' : tun.type === 'R' ? '#a371f722' : '#d2992222',
+                          color: tun.type === 'L' ? '#3fb950' : tun.type === 'R' ? '#a371f7' : '#d29922',
+                        }}
+                      >
+                        -{tun.type}
+                      </span>
+                      <span style={{ fontFamily: 'monospace' }}>
+                        {tun.bindAddress}:{tun.bindPort} ➔ {tun.type === 'D' ? 'SOCKS5 Proxy' : `${tun.targetHost}:${tun.targetPort}`}
+                      </span>
+                      <span style={{ fontSize: '10px', color: '#8b949e' }}>
+                        In: {formatBytes(tun.bytesIn)} | Out: {formatBytes(tun.bytesOut)} | {tun.activeConns} conns
+                      </span>
+                      {tun.errorMessage && (
+                        <span style={{ fontSize: '10px', color: '#ff7b72' }}>
+                          ⚠️ {tun.errorMessage}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void onStopTunnel(tun.id)}
+                      style={{
+                        padding: '2px 8px',
+                        backgroundColor: '#da3633',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                      }}
+                      title="Stop this running tunnel"
+                    >
+                      ⏹ Stop
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Rules List */}
           {rules.length === 0 ? (
             <div style={{ padding: '36px', textAlign: 'center', color: '#8b949e', backgroundColor: '#0d1117', borderRadius: '6px', border: '1px dashed #30363d' }}>
@@ -475,7 +561,7 @@ export function PortForwardingView({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {rules.map((rule) => {
-                const activeTun = getTunnelForRule(rule.id);
+                const activeTun = getTunnelForRule(rule);
                 const isActive = !!activeTun;
                 const typeColor =
                   rule.type === 'L' ? '#3fb950' : rule.type === 'R' ? '#a371f7' : '#d29922';
