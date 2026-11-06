@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
+import { TotpRecord } from './types/totp';
 
 describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, and Hosts/Groups (F-01, F-03)', () => {
   it('starts in theme-locked (Dark Crimson), switches to theme-unlocked (Teal) on unlock, and manages Groups and Hosts with inheritance (F-01)', () => {
@@ -1416,6 +1417,179 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Press Escape to cancel leader mode
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.queryByText(/⌨️ LEADER \(Ctrl\+B\)/i)).not.toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
+
+  it('supports TOTP authenticator generator, live countdown, and terminal 2FA prompt injection (F-20)', async () => {
+    let totpRecords = [
+      {
+        id: 'totp-1',
+        label: 'secops@corp.internal',
+        issuer: 'CorpBastion',
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        hostId: 'host-bastion-1',
+      },
+    ];
+    let injectedSession: string | null = null;
+    let injectedTotpId: string | null = null;
+
+    (window as unknown as { go: unknown }).go = {
+      main: {
+        App: {
+          HealthCheck: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: false,
+            quickUnlockReady: false,
+          }),
+          GetAppStatus: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: false,
+            quickUnlockReady: false,
+          }),
+          GetVaultSummary: async () => ({
+            groups: [],
+            hosts: [
+              {
+                id: 'host-bastion-1',
+                label: 'Production Bastion',
+                address: '10.0.0.1',
+                effectivePort: 22,
+                effectiveUser: 'admin',
+                tags: ['bastion', 'prod'],
+              },
+            ],
+            identities: [],
+            keys: [],
+            proxyProfiles: [],
+            snippets: [],
+            totpRecords,
+          }),
+          ListTotpRecords: async () => totpRecords,
+          GetAllTotpCodes: async () => [
+            { id: 'totp-1', code: '123456', remainingSeconds: 27, period: 30 },
+          ],
+          GetTotpCode: async (id: string) => ({
+            id,
+            code: '123456',
+            remainingSeconds: 27,
+            period: 30,
+          }),
+          ParseOTPAuthURI: async () => ({
+            label: 'alice@cloud',
+            issuer: 'CloudOps',
+            secret: 'JBSWY3DPEHPK3PXP',
+            algorithm: 'SHA1',
+            digits: 6,
+            period: 30,
+          }),
+          SaveTotpRecord: async (rec: TotpRecord) => {
+            totpRecords.push({
+              id: rec.id || 'totp-2',
+              label: rec.label,
+              issuer: rec.issuer || '',
+              algorithm: rec.algorithm || 'SHA1',
+              digits: rec.digits || 6,
+              period: rec.period || 30,
+              hostId: rec.hostId || '',
+            });
+          },
+          DeleteTotpRecord: async (id: string) => {
+            totpRecords = totpRecords.filter((t) => t.id !== id);
+          },
+          InjectTotpCode: async (sessId: string, tId: string) => {
+            injectedSession = sessId;
+            injectedTotpId = tId;
+          },
+          ConnectSSH: async () => 'session-bastion-2fa',
+          ConnectSavedHost: async () => 'session-bastion-2fa',
+          WriteTerminal: async () => {},
+          ResizeTerminal: async () => {},
+          DisconnectSession: async () => {},
+        },
+      },
+    };
+
+    // Mock clipboard
+    let clipboardText = '';
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async (text: string) => {
+          clipboardText = text;
+        },
+      },
+    });
+
+    try {
+      render(<App initialLocked={false} />);
+      expect(await screen.findByText('Production Bastion')).toBeInTheDocument();
+
+      // 1. Open Tools menu and click "TOTP Authenticator Generator"
+      const toolsBtn = screen.getByRole('button', { name: /Tools/i });
+      fireEvent.click(toolsBtn);
+
+      const totpMenuItem = screen.getByRole('menuitem', { name: /TOTP Authenticator Generator/i });
+      fireEvent.click(totpMenuItem);
+
+      // 2. Verify modal opened with initial TOTP entry and 6-digit code format
+      const modal = screen.getByRole('dialog', { name: 'TOTP Authenticator Generator' });
+      expect(modal).toBeInTheDocument();
+      expect(await screen.findByText('CorpBastion')).toBeInTheDocument();
+      expect(screen.getByText('secops@corp.internal')).toBeInTheDocument();
+      expect(screen.getByText('123 456')).toBeInTheDocument();
+      expect(screen.getByText('27')).toBeInTheDocument(); // countdown seconds
+
+      // 3. Test copy code to clipboard
+      const copyBtn = screen.getByRole('button', { name: /Copy/i });
+      fireEvent.click(copyBtn);
+      expect(clipboardText).toBe('123456');
+
+      // 4. Test adding new TOTP via URI parse
+      const addBtn = screen.getByRole('button', { name: /➕ Add Authenticator/i });
+      fireEvent.click(addBtn);
+
+      const uriInput = screen.getByPlaceholderText(/otpauth:\/\/totp\//i);
+      fireEvent.change(uriInput, {
+        target: { value: 'otpauth://totp/CloudOps:alice@cloud?secret=JBSWY3DPEHPK3PXP' },
+      });
+
+      const parseBtn = screen.getByRole('button', { name: 'Parse URI' });
+      fireEvent.click(parseBtn);
+
+      // Now manual form is visible with parsed fields
+      expect(await screen.findByDisplayValue('CloudOps')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('alice@cloud')).toBeInTheDocument();
+
+      const saveBtn = screen.getByRole('button', { name: 'Save to Encrypted Vault' });
+      fireEvent.click(saveBtn);
+
+      expect(totpRecords.length).toBe(2);
+
+      // Close modal
+      const closeBtn = screen.getByRole('button', { name: 'Close TOTP Authenticator' });
+      fireEvent.click(closeBtn);
+
+      // 5. Connect to host and test terminal 2FA injection button
+      const connectBtn = screen.getByRole('button', { name: /^Connect$/i });
+      fireEvent.click(connectBtn);
+
+      // Wait for terminal session header to show 2FA button
+      const inject2faBtn = await screen.findByRole('button', { name: /🔐 2FA \/ TOTP/i });
+      expect(inject2faBtn).toBeInTheDocument();
+
+      fireEvent.click(inject2faBtn);
+      expect(injectedSession).toBe('session-bastion-2fa');
+      expect(injectedTotpId).toBe('');
+      expect(await screen.findByText(/TOTP 2FA code injected into active terminal prompt/i)).toBeInTheDocument();
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }

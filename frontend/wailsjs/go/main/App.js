@@ -58,6 +58,10 @@ export function DeleteSnippet(arg1) {
   return window['go']['main']['App']['DeleteSnippet'](arg1);
 }
 
+export function DeleteTotpRecord(arg1) {
+  return window['go']['main']['App']['DeleteTotpRecord'](arg1);
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['main']['App']['DisconnectSession'](arg1);
 }
@@ -94,12 +98,20 @@ export function GetActiveTunnels() {
   return window['go']['main']['App']['GetActiveTunnels']();
 }
 
+export function GetAllTotpCodes() {
+  return window['go']['main']['App']['GetAllTotpCodes']();
+}
+
 export function GetDefaultProxychainsOptions() {
   return window['go']['main']['App']['GetDefaultProxychainsOptions']();
 }
 
 export function GetSnippetContext(arg1) {
   return window['go']['main']['App']['GetSnippetContext'](arg1);
+}
+
+export function GetTotpCode(arg1) {
+  return window['go']['main']['App']['GetTotpCode'](arg1);
 }
 
 export function GetVaultSummary() {
@@ -130,6 +142,10 @@ export function InjectSessionPassword(arg1) {
   return window['go']['main']['App']['InjectSessionPassword'](arg1);
 }
 
+export function InjectTotpCode(arg1, arg2) {
+  return window['go']['main']['App']['InjectTotpCode'](arg1, arg2);
+}
+
 export function ListForwardRules() {
   return window['go']['main']['App']['ListForwardRules']();
 }
@@ -154,6 +170,10 @@ export function ListSnippets() {
   return window['go']['main']['App']['ListSnippets']();
 }
 
+export function ListTotpRecords() {
+  return window['go']['main']['App']['ListTotpRecords']();
+}
+
 export function LockVault() {
   return window['go']['main']['App']['LockVault']();
 }
@@ -164,6 +184,10 @@ export function OpenLocalTerminal(arg1, arg2) {
 
 export function OpenTerminalWithOptions(arg1, arg2) {
   return window['go']['main']['App']['OpenTerminalWithOptions'](arg1, arg2);
+}
+
+export function ParseOTPAuthURI(arg1) {
+  return window['go']['main']['App']['ParseOTPAuthURI'](arg1);
 }
 
 export function ResetVault() {
@@ -208,6 +232,10 @@ export function SaveProxychainsFile(arg1, arg2) {
 
 export function SaveSnippet(arg1) {
   return window['go']['main']['App']['SaveSnippet'](arg1);
+}
+
+export function SaveTotpRecord(arg1) {
+  return window['go']['main']['App']['SaveTotpRecord'](arg1);
 }
 
 export function SearchCommandPalette(arg1) {

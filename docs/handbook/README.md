@@ -65,6 +65,23 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
     - Options to **Copy to Clipboard** or **⚡ Run in Terminal** directly piping to SSH, local PTYs, or serial consoles.
   - **Command Palette & Search Integration**:
     - Search and run snippets directly from `Ctrl+K` Command Palette.
+- **TOTP Authenticator Generator & Terminal 2FA Prompt Injection (`F-20`)**:
+  - **Encrypted Vault Storage & Security Boundary (Threat Model Line 155)**:
+    - Two-factor authentication (TOTP) secret seeds live strictly inside the encrypted Go vault and are never exported in cleartext to frontend summaries or browser memory.
+    - Only ephemeral calculated codes with remaining countdown seconds leave the Go process.
+  - **Live Codes & Circular 30-Second Countdown Wheel**:
+    - Real-time circular countdown wheel with second counter and dynamic urgent warning color (< 5 seconds) before token rollover.
+    - Clean formatting with digit separation for effortless reading (e.g. `123 456` or `1234 5678`).
+    - One-click **`📋 Copy`** button with instant "Copied!" checkmark feedback.
+  - **One-Click Terminal 2FA Prompt Auto-Injection**:
+    - When an SSH host or interactive shell prompts for 2FA / verification code, click **`🔐 2FA / TOTP`** in the terminal header (or press **`Ctrl+Shift+O`** / Leader **`o`**).
+    - The Go backend automatically resolves the TOTP authenticator linked to the active session's host or identity, calculates the current valid token, and writes it directly into the remote PTY `stdin`.
+  - **Quick Import via `otpauth://totp/...` URI**:
+    - Paste standard authenticator URLs (`otpauth://totp/Issuer:account?secret=...`) or QR code text directly into the modal.
+    - Automatically parses and populates Issuer, Account Label, Base32 Secret, Hash Algorithm (SHA1, SHA256, SHA512), Digits (6 or 8), and Period (default 30s).
+  - **Manual Entry & Host Association**:
+    - Manage standalone authenticators or link authenticators to specific hosts for automatic context-aware injection.
+    - Accessible via **Tools ▾ -> TOTP Authenticator Generator (F-20)**, **`Alt+O`**, and the terminal toolbar at all times.
 - **Proxy Profiles: ProxyJump, ProxyCommand, & proxychains Export (`F-14`)**:
   - **Proxy Profiles in Encrypted Vault**:
     - Configure reusable proxy profiles under **Tools ▾ -> Proxy Profiles (F-14)**:

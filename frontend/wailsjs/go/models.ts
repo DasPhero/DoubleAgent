@@ -430,6 +430,7 @@ export namespace core {
 	    username: string;
 	    authMethod: string;
 	    keyId?: string;
+	    totpId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new IdentitySummary(source);
@@ -442,6 +443,7 @@ export namespace core {
 	        this.username = source["username"];
 	        this.authMethod = source["authMethod"];
 	        this.keyId = source["keyId"];
+	        this.totpId = source["totpId"];
 	    }
 	}
 	export class ProxyProfile {
@@ -842,6 +844,78 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class TotpCodeResponse {
+	    id: string;
+	    code: string;
+	    remainingSeconds: number;
+	    period: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TotpCodeResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.code = source["code"];
+	        this.remainingSeconds = source["remainingSeconds"];
+	        this.period = source["period"];
+	    }
+	}
+	export class TotpRecord {
+	    id: string;
+	    label: string;
+	    issuer?: string;
+	    secret: string;
+	    algorithm?: string;
+	    digits?: number;
+	    period?: number;
+	    hostId?: string;
+	    createdAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TotpRecord(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.issuer = source["issuer"];
+	        this.secret = source["secret"];
+	        this.algorithm = source["algorithm"];
+	        this.digits = source["digits"];
+	        this.period = source["period"];
+	        this.hostId = source["hostId"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
+	export class TotpSummary {
+	    id: string;
+	    label: string;
+	    issuer?: string;
+	    algorithm: string;
+	    digits: number;
+	    period: number;
+	    hostId?: string;
+	    createdAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TotpSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.issuer = source["issuer"];
+	        this.algorithm = source["algorithm"];
+	        this.digits = source["digits"];
+	        this.period = source["period"];
+	        this.hostId = source["hostId"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class TransferTask {
 	    id: string;
 	    sessionId: string;
@@ -879,6 +953,7 @@ export namespace core {
 	    keys: SshKeySummary[];
 	    proxyProfiles: ProxyProfileSummary[];
 	    snippets: Snippet[];
+	    totpRecords: TotpSummary[];
 	
 	    static createFrom(source: any = {}) {
 	        return new VaultSummary(source);
@@ -892,6 +967,7 @@ export namespace core {
 	        this.keys = this.convertValues(source["keys"], SshKeySummary);
 	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfileSummary);
 	        this.snippets = this.convertValues(source["snippets"], Snippet);
+	        this.totpRecords = this.convertValues(source["totpRecords"], TotpSummary);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

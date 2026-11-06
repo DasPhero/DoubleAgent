@@ -25,6 +25,8 @@ import { ProxyProfile, ProxyProfileSummary, ProxychainsExportOptions } from './t
 import { Snippet, SnippetContext } from './types/snippet';
 import { SnippetsManagerModal } from './components/SnippetsManagerModal';
 import { SnippetRunModal } from './components/SnippetRunModal';
+import { TotpSummary, TotpRecord, TotpCodeResponse } from './types/totp';
+import { TotpManagerModal } from './components/TotpManagerModal';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -114,6 +116,7 @@ interface IdentitySummary {
   username: string;
   authMethod: string;
   keyId?: string;
+  totpId?: string;
 }
 
 interface SshKeySummary {
@@ -145,6 +148,7 @@ interface VaultSummary {
   keys?: SshKeySummary[];
   proxyProfiles?: ProxyProfileSummary[];
   snippets?: Snippet[];
+  totpRecords?: TotpSummary[];
 }
 
 interface QuickConnectTarget {
@@ -567,6 +571,13 @@ interface WailsAppBindings {
   GetSnippetContext?: (sessionId: string) => Promise<SnippetContext>;
   ResolveSnippetTemplate?: (snippetId: string, sessionId: string, userValues: Record<string, string>) => Promise<string>;
   ExecuteSnippet?: (sessionId: string, snippetId: string, userValues: Record<string, string>) => Promise<void>;
+  SaveTotpRecord?: (record: TotpRecord) => Promise<void>;
+  DeleteTotpRecord?: (totpId: string) => Promise<void>;
+  ListTotpRecords?: () => Promise<TotpSummary[]>;
+  GetTotpCode?: (totpId: string) => Promise<TotpCodeResponse>;
+  GetAllTotpCodes?: () => Promise<TotpCodeResponse[]>;
+  ParseOTPAuthURI?: (uri: string) => Promise<TotpRecord>;
+  InjectTotpCode?: (sessionId: string, totpId: string) => Promise<void>;
 }
 
 export interface SerialAutoDetectResult {
@@ -806,6 +817,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [runModalContext, setRunModalContext] = useState<SnippetContext | null>(null);
   const [snippetActiveSessionId, setSnippetActiveSessionId] = useState<string>('');
   const [snippetPrefillBody, setSnippetPrefillBody] = useState<string>('');
+
+  // TOTP Authenticator Generator State (F-20)
+  const [showTotpModal, setShowTotpModal] = useState<boolean>(false);
 
   // Terminal Search state (F-11)
   const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
@@ -2201,6 +2215,30 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
   };
 
+  const handleInjectTotp = async (totpId = ''): Promise<void> => {
+    if (!sessionId) {
+      setStatusMessage('No active terminal session to inject 2FA code into.');
+      return;
+    }
+    const api = getWailsBindings();
+    if (!api?.InjectTotpCode) {
+      setStatusMessage('TOTP 2FA code injected into active terminal session (mock mode).');
+      focusersRef.current.get(sessionId)?.();
+      return;
+    }
+    try {
+      await api.InjectTotpCode(sessionId, totpId);
+      setStatusMessage('TOTP 2FA code injected into active terminal prompt (F-20).');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`2FA injection: ${msg}`);
+      // Open TOTP manager modal so user can choose or configure an authenticator
+      setShowTotpModal(true);
+    } finally {
+      focusersRef.current.get(sessionId)?.();
+    }
+  };
+
   const handleOpenLocalTerminal = async (shellType: string): Promise<void> => {
     const api = getWailsBindings();
     let sid = `local-${shellType}-${Date.now()}`;
@@ -3122,8 +3160,14 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       case 'inject_password':
         void handleInjectPassword();
         break;
+      case 'inject_totp':
+        void handleInjectTotp();
+        break;
       case 'open_snippets':
         setShowSnippetsModal(true);
+        break;
+      case 'open_totp':
+        setShowTotpModal(true);
         break;
       case 'open_tunnels':
         setShowPortForwardingModal(true);
@@ -3608,6 +3652,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     <span className="nav-dropdown-shortcut">⚡ Snippets</span>
                   </button>
                   <div className="nav-dropdown-divider" />
+                  <div className="nav-dropdown-header">Two-Factor Authentication (F-20)</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setShowTotpModal(true);
+                    }}
+                  >
+                    <span>TOTP Authenticator Generator</span>
+                    <span className="nav-dropdown-shortcut">🔐 2FA</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
                   <div className="nav-dropdown-header">Hardware Serial (F-23)</div>
                   <button
                     type="button"
@@ -3673,6 +3731,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       >
                         <span>Inject Password</span>
                         <span className="nav-dropdown-shortcut">🔑</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="nav-dropdown-item"
+                        onClick={() => {
+                          setActiveDropdownMenu(null);
+                          void handleInjectTotp();
+                        }}
+                      >
+                        <span>Inject 2FA Code</span>
+                        <span className="nav-dropdown-shortcut">🔐 2FA</span>
                       </button>
                     </>
                   )}
@@ -4421,6 +4491,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   title="Injects the stored password directly from the Go Vault into the terminal without pressing Enter"
                 >
                   Inject Password
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleInjectTotp()}
+                  title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt (F-20)"
+                >
+                  🔐 2FA / TOTP
                 </button>
                 <button
                   type="button"
@@ -5816,6 +5895,21 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             setRunModalSnippet(null);
             setRunModalContext(null);
           }}
+        />
+      )}
+
+      {showTotpModal && (
+        <TotpManagerModal
+          isOpen={showTotpModal}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: `${h.effectiveUser}@${h.address}:${h.effectivePort}`,
+          }))}
+          activeSessionId={sessionId}
+          onInjectCode={handleInjectTotp}
+          onRefreshVault={refreshVaultState}
+          onClose={() => setShowTotpModal(false)}
         />
       )}
 

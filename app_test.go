@@ -792,3 +792,119 @@ func TestApp_Snippets_F15(t *testing.T) {
 		t.Errorf("expected 0 snippets after delete, got %d", len(snippetsAfter))
 	}
 }
+
+func TestApp_Totp_F20(t *testing.T) {
+	fake := newFakeSshTransport()
+	tmpVault := filepath.Join(t.TempDir(), "test_totp.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	var app *App
+	app = NewAppWithDependencies(fake, nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	// 1. Create a host
+	host := core.HostRecord{
+		ID:      "host-bastion",
+		Label:   "Corporate Bastion",
+		Address: "10.0.0.1",
+		Port:    22,
+	}
+	if err := app.SaveHost(host); err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+
+	// 2. Save TOTP record linked to host (F-20)
+	totp1 := core.TotpRecord{
+		ID:        "totp-bastion",
+		Label:     "secops@corp.internal",
+		Issuer:    "CorpBastion",
+		Secret:    "JBSWY3DPEHPK3PXP", // base32
+		Algorithm: "SHA1",
+		Digits:    6,
+		Period:    30,
+		HostID:    "host-bastion",
+	}
+	if err := app.SaveTotpRecord(totp1); err != nil {
+		t.Fatalf("SaveTotpRecord failed: %v", err)
+	}
+
+	// 3. Parse and save another TOTP via otpauth:// URI
+	parsed, err := app.ParseOTPAuthURI("otpauth://totp/GitHub:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=GitHub")
+	if err != nil {
+		t.Fatalf("ParseOTPAuthURI failed: %v", err)
+	}
+	if err := app.SaveTotpRecord(*parsed); err != nil {
+		t.Fatalf("SaveTotpRecord from URI failed: %v", err)
+	}
+
+	// 4. List TOTP summaries (Golden Rule 2: secret is masked/not exposed)
+	list, err := app.ListTotpRecords()
+	if err != nil {
+		t.Fatalf("ListTotpRecords failed: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 totp records, got %d", len(list))
+	}
+	for _, item := range list {
+		if item.Label == "" {
+			t.Errorf("empty label in totp summary: %+v", item)
+		}
+	}
+
+	// 5. GetTotpCode
+	resp, err := app.GetTotpCode("totp-bastion")
+	if err != nil {
+		t.Fatalf("GetTotpCode failed: %v", err)
+	}
+	if len(resp.Code) != 6 {
+		t.Errorf("expected 6-digit code, got %q", resp.Code)
+	}
+	if resp.RemainingSeconds <= 0 || resp.RemainingSeconds > 30 {
+		t.Errorf("invalid remaining seconds: %d", resp.RemainingSeconds)
+	}
+
+	// 6. GetAllTotpCodes
+	allCodes, err := app.GetAllTotpCodes()
+	if err != nil {
+		t.Fatalf("GetAllTotpCodes failed: %v", err)
+	}
+	if len(allCodes) != 2 {
+		t.Fatalf("expected 2 codes, got %d", len(allCodes))
+	}
+
+	// 7. Test terminal 2FA prompt auto-injection (F-20)
+	sessID, err := app.ConnectSavedHost("host-bastion", core.TerminalSize{Cols: 80, Rows: 24})
+	if err != nil {
+		t.Fatalf("ConnectSavedHost failed: %v", err)
+	}
+	defer app.DisconnectSession(sessID)
+
+	// Inject with empty totpID -> auto resolves from host-bastion
+	if err := app.InjectTotpCode(sessID, ""); err != nil {
+		t.Fatalf("InjectTotpCode auto-resolve failed: %v", err)
+	}
+
+	// Inject with explicit totpID
+	if err := app.InjectTotpCode(sessID, "totp-bastion"); err != nil {
+		t.Fatalf("InjectTotpCode explicit failed: %v", err)
+	}
+
+	// 8. Delete record
+	if err := app.DeleteTotpRecord("totp-bastion"); err != nil {
+		t.Fatalf("DeleteTotpRecord failed: %v", err)
+	}
+	listAfter, _ := app.ListTotpRecords()
+	if len(listAfter) != 1 {
+		t.Errorf("expected 1 record after delete, got %d", len(listAfter))
+	}
+}

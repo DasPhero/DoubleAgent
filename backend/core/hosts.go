@@ -51,6 +51,7 @@ type IdentitySummary struct {
 	Username   string         `json:"username"`
 	AuthMethod AuthMethodType `json:"authMethod"`
 	KeyID      string         `json:"keyId,omitempty"`
+	TotpID     string         `json:"totpId,omitempty"`
 }
 
 // SshKeySummary is a non-secret view of a saved SSH keypair exposed to the frontend UI (F-04, Golden Rule 2).
@@ -63,7 +64,7 @@ type SshKeySummary struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
-// VaultSummary aggregates non-secret groups, hosts (with inherited values resolved), identities, public keys, proxy profiles, and snippets for the UI.
+// VaultSummary aggregates non-secret groups, hosts (with inherited values resolved), identities, public keys, proxy profiles, snippets, and totp authenticators for the UI.
 type VaultSummary struct {
 	Groups        []GroupRecord         `json:"groups"`
 	Hosts         []HostSummary         `json:"hosts"`
@@ -71,6 +72,7 @@ type VaultSummary struct {
 	Keys          []SshKeySummary       `json:"keys"`
 	ProxyProfiles []ProxyProfileSummary `json:"proxyProfiles"`
 	Snippets      []Snippet             `json:"snippets"`
+	TotpRecords   []TotpSummary         `json:"totpRecords"`
 }
 
 // ResolveEffectiveHost computes the effective Port, Username, IdentityID, KeepaliveSecs, and SshAuthConfig
@@ -206,6 +208,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			Username:   id.Username,
 			AuthMethod: id.AuthMethod,
 			KeyID:      id.KeyID,
+			TotpID:     id.TotpID,
 		})
 	}
 
@@ -289,6 +292,32 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		snippets = []Snippet{}
 	}
 
+	totpSummaries := make([]TotpSummary, 0, len(payload.TotpRecords))
+	for _, tr := range payload.TotpRecords {
+		alg := tr.Algorithm
+		if alg == "" {
+			alg = "SHA1"
+		}
+		digits := tr.Digits
+		if digits == 0 {
+			digits = 6
+		}
+		period := tr.Period
+		if period == 0 {
+			period = 30
+		}
+		totpSummaries = append(totpSummaries, TotpSummary{
+			ID:        tr.ID,
+			Label:     tr.Label,
+			Issuer:    tr.Issuer,
+			Algorithm: alg,
+			Digits:    digits,
+			Period:    period,
+			HostID:    tr.HostID,
+			CreatedAt: tr.CreatedAt,
+		})
+	}
+
 	return VaultSummary{
 		Groups:        groups,
 		Hosts:         hosts,
@@ -296,6 +325,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		Keys:          keys,
 		ProxyProfiles: proxySummaries,
 		Snippets:      snippets,
+		TotpRecords:   totpSummaries,
 	}
 }
 

@@ -397,7 +397,41 @@ type SnippetContext struct {
 	CustomVars map[string]string `json:"customVars,omitempty"`
 }
 
-// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14, F-15).
+// TotpRecord represents a time-based one-time password secret stored in the encrypted vault (Spec Section 8, F-20).
+// The Secret seed never leaves the Go process (Golden Rule 2, Threat Model Line 155).
+type TotpRecord struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	Issuer    string `json:"issuer,omitempty"`
+	Secret    string `json:"secret"`              // Encrypted in vault; never exposed in summaries
+	Algorithm string `json:"algorithm,omitempty"` // "SHA1", "SHA256", "SHA512" (default "SHA1")
+	Digits    int    `json:"digits,omitempty"`    // 6 or 8 (default 6)
+	Period    int    `json:"period,omitempty"`    // step in seconds (default 30)
+	HostID    string `json:"hostId,omitempty"`    // optional host or service association
+	CreatedAt string `json:"createdAt,omitempty"`
+}
+
+// TotpSummary provides a non-secret view of a saved TOTP authenticator entry for the frontend UI (F-20, Golden Rule 2).
+type TotpSummary struct {
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	Issuer    string `json:"issuer,omitempty"`
+	Algorithm string `json:"algorithm"`
+	Digits    int    `json:"digits"`
+	Period    int    `json:"period"`
+	HostID    string `json:"hostId,omitempty"`
+	CreatedAt string `json:"createdAt,omitempty"`
+}
+
+// TotpCodeResponse contains an ephemeral calculated TOTP code and remaining countdown seconds (F-20).
+type TotpCodeResponse struct {
+	ID               string `json:"id"`
+	Code             string `json:"code"`
+	RemainingSeconds int    `json:"remainingSeconds"`
+	Period           int    `json:"period"`
+}
+
+// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14, F-15, F-20).
 type VaultPayload struct {
 	SchemaVersion int              `json:"schemaVersion"`
 	Hosts         []HostRecord     `json:"hosts"`
@@ -407,6 +441,7 @@ type VaultPayload struct {
 	ForwardRules  []ForwardRule    `json:"forwardRules,omitempty"`
 	ProxyProfiles []ProxyProfile   `json:"proxyProfiles,omitempty"`
 	Snippets      []Snippet        `json:"snippets,omitempty"`
+	TotpRecords   []TotpRecord     `json:"totpRecords,omitempty"`
 }
 
 // SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).

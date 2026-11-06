@@ -746,6 +746,9 @@ func ensureNonNilSlices(p core.VaultPayload) core.VaultPayload {
 	if p.Snippets == nil {
 		p.Snippets = []core.Snippet{}
 	}
+	if p.TotpRecords == nil {
+		p.TotpRecords = []core.TotpRecord{}
+	}
 	return p
 }
 

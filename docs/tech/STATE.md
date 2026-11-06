@@ -1,6 +1,6 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** Custom Shortcuts & Leader Key Prefix Mode (`F-18` / Spec Line 190) — COMPLETED
+- **Current Milestone:** TOTP Authenticator Generator & 2FA Terminal Prompt Injection (`F-20` / Spec Line 130) — COMPLETED
 - **Next Milestone:** `F-17` — Host Notes & Markdown Documentation (per-host notes, folders, subpages, markdown preview, searchable)
 - **Stage:** `2-flagship`
 
@@ -100,6 +100,29 @@
     - Create arbitrary hotkey combinations bound to system actions or directly to saved command snippets (`snip-*`).
     - One-click trigger from terminal immediately interpolates and sends snippet to active session.
   - Comprehensive unit test in `frontend/src/App.test.tsx` (`supports Custom Shortcuts Manager, interactive key rebinding, conflict detection, and Tmux-style Leader Key prefix mode (F-18)`).
+- **`M1-4` Part 11 (`F-20` — TOTP Authenticator Generator & 2FA Terminal Prompt Auto-Injection)**:
+  - **Core Domain & Vault Security Boundary (`backend/core/` & `backend/vault/`, Golden Rules 2, 3, 4)**:
+    - Defined `TotpRecord`, `TotpSummary`, and `TotpCodeResponse` in `backend/core/interfaces.go`.
+    - Golden Rule 2 & Threat Model Line 155: TOTP seeds (`Secret`) live encrypted inside the vault and are never exported to frontend summaries (`BuildVaultSummary()` masks secrets into non-secret `TotpSummary`).
+    - Golden Rule 3 & RFC 6238 / RFC 4226: Implemented pure Go stdlib HMAC-SHA1/SHA256/SHA512 dynamic truncation in `backend/vault/totp.go`. Base32 normalization (handles unpadded keys, spaces, dashes, case insensitivity).
+    - Golden Rule 4: Zero crypto imports in `backend/core/`. All cryptographic operations reside in `backend/vault/`.
+    - Appendix B RFC 6238 test vectors verified in `backend/vault/totp_test.go` (`TestTOTP_RFC6238_F20`, `TestTOTP_ParseOTPAuthURI_F20`, `TestTOTP_SecretNormalization_F20`).
+  - **Application Service Bindings (`app.go` & `app_test.go`)**:
+    - Bound `SaveTotpRecord`, `DeleteTotpRecord`, `ListTotpRecords`, `GetTotpCode`, `GetAllTotpCodes`, `ParseOTPAuthURI`, `InjectTotpCode`.
+    - `InjectTotpCode(sessionID, totpID)`: auto-resolves TOTP record linked to session host or identity, calculates ephemeral OTP token inside Go process, and injects directly into terminal stdin without exposing secret to UI.
+    - Preserves existing stored secret when editing account labels or issuers.
+    - Verified in `app_test.go` (`TestApp_Totp_F20`).
+  - **Frontend UI & Interactive Modals (`frontend/src/`)**:
+    - Created `frontend/src/types/totp.ts` and `frontend/src/components/TotpManagerModal.tsx`.
+    - Live SVG circular countdown wheel with remaining seconds and danger color change (< 5s).
+    - Formatted 6/8-digit token displays (e.g. `123 456`) with 1-click clipboard copy and feedback.
+    - Paste `otpauth://totp/...` URI parser with automatic extraction of issuer, label, secret, algorithm, digits, and period.
+    - Link authenticators to saved hosts for automatic 1-click 2FA prompt injection.
+    - Terminal toolbar `🔐 2FA / TOTP` quick-action button on active session header.
+    - Top navigation `Tools ▾ -> TOTP Authenticator Generator (F-20)` and `Inject 2FA Code`.
+    - Keyboard shortcut bindings (`Alt+O`, `Ctrl+Shift+O`, and Tmux Leader `o`/`O`).
+    - Comprehensive unit test in `frontend/src/App.test.tsx` (`supports TOTP authenticator generator, live countdown, and terminal 2FA prompt injection (F-20)`).
+  - Standalone binary verified with `wails build`.
 
 ## In Progress
 - None.
@@ -109,6 +132,3 @@
   - Store per-host notes in encrypted vault with folders, subpages, and hierarchical organization.
   - Live Markdown renderer and editor (code blocks, checkboxes, tables, links).
   - Searchable across all hosts via Command Palette (`Ctrl+K`) and dedicated notes pane.
-- **`F-20`: TOTP Generator**:
-  - Store TOTP seeds securely in vault linked to hosts or standalone services.
-  - 30-second countdown wheel and one-click copy / auto-injection at 2FA prompt.

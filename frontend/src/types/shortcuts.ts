@@ -22,9 +22,11 @@ export type ShortcutActionId =
   | 'open_root_shell'
   | 'disconnect_active'
   | 'inject_password'
+  | 'inject_totp'
   | 'open_keychain'
   | 'open_tunnels'
   | 'open_snippets'
+  | 'open_totp'
   | 'open_proxy_profiles'
   | 'open_sftp'
   | 'lock_vault';
@@ -220,6 +222,14 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
     defaultKey: 'Ctrl+Shift+I',
     leaderKey: 'i',
   },
+  {
+    actionId: 'inject_totp',
+    label: 'Inject 2FA / TOTP Code',
+    description: 'Auto-fill current TOTP code into active terminal prompt (F-20)',
+    category: 'sessions',
+    defaultKey: 'Ctrl+Shift+O',
+    leaderKey: 'o',
+  },
 
   // Tools & Modals
   {
@@ -229,6 +239,14 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
     category: 'tools',
     defaultKey: 'Alt+S',
     leaderKey: 's',
+  },
+  {
+    actionId: 'open_totp',
+    label: 'TOTP Authenticator Generator',
+    description: 'Open TOTP 2FA authenticator with 30s countdown wheel (F-20)',
+    category: 'tools',
+    defaultKey: 'Alt+O',
+    leaderKey: 'O',
   },
   {
     actionId: 'open_tunnels',
@@ -381,3 +399,4 @@ export function findShortcutConflict(
   }
   return null;
 }
+

@@ -2148,3 +2148,274 @@ func (a *App) ExecuteSnippet(sessionID string, snippetID string, userValues map[
 
 	return a.WriteTerminal(sessionID, resolvedCmd+"\n")
 }
+
+// SaveTotpRecord creates or updates a TOTP secret in the encrypted vault (F-20).
+// Secret seeds remain inside the Go process (Golden Rule 2, Threat Model Line 155).
+func (a *App) SaveTotpRecord(record core.TotpRecord) error {
+	a.vaultStore.Touch()
+
+	record.Label = strings.TrimSpace(record.Label)
+	record.Issuer = strings.TrimSpace(record.Issuer)
+	record.Secret = strings.TrimSpace(record.Secret)
+
+	if record.Label == "" {
+		if record.Issuer != "" {
+			record.Label = record.Issuer
+		} else {
+			return errors.New("totp label or issuer is required")
+		}
+	}
+
+	if record.ID == "" {
+		record.ID = fmt.Sprintf("totp-%d", time.Now().UnixNano())
+	}
+	if record.Algorithm == "" {
+		record.Algorithm = "SHA1"
+	}
+	if record.Digits != 8 {
+		record.Digits = 6
+	}
+	if record.Period <= 0 {
+		record.Period = 30
+	}
+	if record.CreatedAt == "" {
+		record.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	updated := false
+	for i := range payload.TotpRecords {
+		if payload.TotpRecords[i].ID == record.ID {
+			// If editing without changing the secret, retain existing secret
+			if record.Secret == "" {
+				record.Secret = payload.TotpRecords[i].Secret
+			} else {
+				if _, err := vault.DecodeBase32Key(record.Secret); err != nil {
+					return fmt.Errorf("invalid base32 secret: %w", err)
+				}
+			}
+			payload.TotpRecords[i] = record
+			updated = true
+			break
+		}
+	}
+
+	if !updated {
+		if record.Secret == "" {
+			return errors.New("totp secret is required")
+		}
+		if _, err := vault.DecodeBase32Key(record.Secret); err != nil {
+			return fmt.Errorf("invalid base32 secret: %w", err)
+		}
+		payload.TotpRecords = append(payload.TotpRecords, record)
+	}
+
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// DeleteTotpRecord deletes a TOTP secret from the encrypted vault by its ID (F-20).
+func (a *App) DeleteTotpRecord(totpID string) error {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	filtered := make([]core.TotpRecord, 0, len(payload.TotpRecords))
+	for _, tr := range payload.TotpRecords {
+		if tr.ID != totpID {
+			filtered = append(filtered, tr)
+		}
+	}
+	payload.TotpRecords = filtered
+
+	// Disassociate from identities referencing this TotpID
+	for i := range payload.Identities {
+		if payload.Identities[i].TotpID == totpID {
+			payload.Identities[i].TotpID = ""
+		}
+	}
+
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// ListTotpRecords returns all non-secret TOTP summaries stored in the vault (F-20, Golden Rule 2).
+func (a *App) ListTotpRecords() ([]core.TotpSummary, error) {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]core.TotpSummary, 0, len(payload.TotpRecords))
+	for _, tr := range payload.TotpRecords {
+		alg := tr.Algorithm
+		if alg == "" {
+			alg = "SHA1"
+		}
+		digits := tr.Digits
+		if digits == 0 {
+			digits = 6
+		}
+		period := tr.Period
+		if period == 0 {
+			period = 30
+		}
+		summaries = append(summaries, core.TotpSummary{
+			ID:        tr.ID,
+			Label:     tr.Label,
+			Issuer:    tr.Issuer,
+			Algorithm: alg,
+			Digits:    digits,
+			Period:    period,
+			HostID:    tr.HostID,
+			CreatedAt: tr.CreatedAt,
+		})
+	}
+	return summaries, nil
+}
+
+// GetTotpCode computes an ephemeral TOTP code and countdown for a given TotpID (F-20).
+func (a *App) GetTotpCode(totpID string) (*core.TotpCodeResponse, error) {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	var target *core.TotpRecord
+	for i := range payload.TotpRecords {
+		if payload.TotpRecords[i].ID == totpID {
+			target = &payload.TotpRecords[i]
+			break
+		}
+	}
+	if target == nil {
+		return nil, errors.New("totp record not found")
+	}
+
+	code, remaining, err := vault.GenerateTOTPCode(target.Secret, time.Now().UTC(), target.Algorithm, target.Digits, target.Period)
+	if err != nil {
+		return nil, err
+	}
+
+	period := target.Period
+	if period <= 0 {
+		period = 30
+	}
+
+	return &core.TotpCodeResponse{
+		ID:               target.ID,
+		Code:             code,
+		RemainingSeconds: remaining,
+		Period:           period,
+	}, nil
+}
+
+// GetAllTotpCodes generates ephemeral codes and remaining countdowns for all saved TOTP records (F-20).
+func (a *App) GetAllTotpCodes() ([]core.TotpCodeResponse, error) {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	results := make([]core.TotpCodeResponse, 0, len(payload.TotpRecords))
+	for _, tr := range payload.TotpRecords {
+		code, remaining, err := vault.GenerateTOTPCode(tr.Secret, now, tr.Algorithm, tr.Digits, tr.Period)
+		if err != nil {
+			continue
+		}
+		period := tr.Period
+		if period <= 0 {
+			period = 30
+		}
+		results = append(results, core.TotpCodeResponse{
+			ID:               tr.ID,
+			Code:             code,
+			RemainingSeconds: remaining,
+			Period:           period,
+		})
+	}
+	return results, nil
+}
+
+// ParseOTPAuthURI parses an otpauth:// URI string into a TotpRecord candidate (F-20).
+func (a *App) ParseOTPAuthURI(uri string) (*core.TotpRecord, error) {
+	return vault.ParseOTPAuthURI(uri)
+}
+
+// InjectTotpCode generates the current TOTP code and writes it directly to the active session stdin (F-20, Golden Rule 2).
+// If totpID is empty, it attempts to resolve the TOTP record associated with the active session's host or identity.
+func (a *App) InjectTotpCode(sessionID string, totpID string) error {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	a.mu.Lock()
+	hostID := a.sessionHostID[sessionID]
+	a.mu.Unlock()
+
+	// If totpID not specified, resolve automatically from session host
+	if totpID == "" {
+		if hostID != "" {
+			// 1. Look for a TotpRecord directly linked to this HostID
+			for _, tr := range payload.TotpRecords {
+				if tr.HostID == hostID {
+					totpID = tr.ID
+					break
+				}
+			}
+			// 2. Look for host's effective identity TotpID
+			if totpID == "" {
+				if resolved, err := core.ResolveEffectiveHost(hostID, payload); err == nil && resolved.IdentityID != "" {
+					for _, id := range payload.Identities {
+						if id.ID == resolved.IdentityID && id.TotpID != "" {
+							totpID = id.TotpID
+							break
+						}
+					}
+				}
+			}
+		}
+		// 3. Fallback: if there is exactly 1 TotpRecord, auto-select it
+		if totpID == "" && len(payload.TotpRecords) == 1 {
+			totpID = payload.TotpRecords[0].ID
+		}
+	}
+
+	if totpID == "" {
+		return errors.New("no TOTP authenticator associated with this session; please select one")
+	}
+
+	var target *core.TotpRecord
+	for i := range payload.TotpRecords {
+		if payload.TotpRecords[i].ID == totpID {
+			target = &payload.TotpRecords[i]
+			break
+		}
+	}
+	if target == nil {
+		return fmt.Errorf("totp record %q not found", totpID)
+	}
+
+	code, _, err := vault.GenerateTOTPCode(target.Secret, time.Now().UTC(), target.Algorithm, target.Digits, target.Period)
+	if err != nil {
+		return fmt.Errorf("failed to generate totp code: %w", err)
+	}
+
+	// Write code + newline directly into terminal session stdin
+	return a.WriteTerminal(sessionID, code+"\n")
+}
