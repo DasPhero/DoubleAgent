@@ -6,9 +6,35 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, & `F-23`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, & `F-23`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Command Snippets with Dynamic Variables (`F-15`)**:
+  - **Encrypted Vault Storage**:
+    - Store frequently used commands, scripts, diagnostics, and deployment snippets inside your encrypted vault.
+    - Categorize snippets with searchable tags (e.g. `docker`, `k8s`, `logs`, `network`, `db`).
+    - Dedicated management modal accessible via **Tools ▾ -> Automation & Snippets (F-15)** or the `⚡ Snippets` button in any terminal header.
+  - **Auto-Injected Context Variables**:
+    - Automatic variable substitution based on the active target session:
+      - `{{HOST}}`, `{{IP}}`, `{{HOSTNAME}}`: Target host address or resolved IP.
+      - `{{USER}}`: Resolved effective username of the target session.
+      - `{{PORT}}`: Target SSH or service port.
+      - `{{CWD}}`: Current working directory of the active session (detected via OSC 7 escape sequence or default host directory).
+      - `{{TIMESTAMP}}`, `{{DATE}}`, `{{TIME}}`: Local timestamps formatted for logs and backups.
+      - `{{LOCAL_IP}}`: Local non-loopback network interface address.
+      - `{{PASSWORD}}`: Host authentication password securely resolved directly within the backend Go process (never exposed in cleartext to the frontend).
+  - **Custom User Parameters & Syntax**:
+    - Define interactive variables with optional defaults and descriptions:
+      - `{{INTERFACE=eth0}}`
+      - `{{COUNT=4:Number of pings}}` or `{{COUNT=4 | Number of pings}}`
+      - `{{IMAGE=nginx:alpine}}` (preserves colons within default values)
+  - **Interactive Parameter Query Modal (`SnippetRunModal`)**:
+    - Before execution, DoubleAgent automatically inspects the command template. If custom parameters exist or if **Always prompt before running** is enabled, an interactive modal pops up.
+    - Auto-populates detected built-in context parameters with live session details.
+    - Real-time command preview dynamically updates syntax substitutions as you type.
+    - Options to **Copy to Clipboard** or **⚡ Run in Terminal** directly piping to SSH, local PTYs, or serial consoles.
+  - **Command Palette & Search Integration**:
+    - Search and run snippets directly from `Ctrl+K` Command Palette.
 - **Proxy Profiles: ProxyJump, ProxyCommand, & proxychains Export (`F-14`)**:
   - **Proxy Profiles in Encrypted Vault**:
     - Configure reusable proxy profiles under **Tools ▾ -> Proxy Profiles (F-14)**:

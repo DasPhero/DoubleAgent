@@ -54,6 +54,10 @@ export function DeleteSSHKey(arg1) {
   return window['go']['main']['App']['DeleteSSHKey'](arg1);
 }
 
+export function DeleteSnippet(arg1) {
+  return window['go']['main']['App']['DeleteSnippet'](arg1);
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['main']['App']['DisconnectSession'](arg1);
 }
@@ -64,6 +68,10 @@ export function DuplicateSession(arg1, arg2) {
 
 export function EnableQuickUnlock() {
   return window['go']['main']['App']['EnableQuickUnlock']();
+}
+
+export function ExecuteSnippet(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExecuteSnippet'](arg1, arg2, arg3);
 }
 
 export function ExportProxychainsConfig() {
@@ -88,6 +96,10 @@ export function GetActiveTunnels() {
 
 export function GetDefaultProxychainsOptions() {
   return window['go']['main']['App']['GetDefaultProxychainsOptions']();
+}
+
+export function GetSnippetContext(arg1) {
+  return window['go']['main']['App']['GetSnippetContext'](arg1);
 }
 
 export function GetVaultSummary() {
@@ -138,6 +150,10 @@ export function ListSerialPorts() {
   return window['go']['main']['App']['ListSerialPorts']();
 }
 
+export function ListSnippets() {
+  return window['go']['main']['App']['ListSnippets']();
+}
+
 export function LockVault() {
   return window['go']['main']['App']['LockVault']();
 }
@@ -162,6 +178,10 @@ export function ResolveHostKeyPrompt(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveHostKeyPrompt'](arg1, arg2, arg3);
 }
 
+export function ResolveSnippetTemplate(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ResolveSnippetTemplate'](arg1, arg2, arg3);
+}
+
 export function SaveForwardRule(arg1) {
   return window['go']['main']['App']['SaveForwardRule'](arg1);
 }
@@ -184,6 +204,10 @@ export function SaveProxyProfile(arg1) {
 
 export function SaveProxychainsFile(arg1, arg2) {
   return window['go']['main']['App']['SaveProxychainsFile'](arg1, arg2);
+}
+
+export function SaveSnippet(arg1) {
+  return window['go']['main']['App']['SaveSnippet'](arg1);
 }
 
 export function SearchCommandPalette(arg1) {

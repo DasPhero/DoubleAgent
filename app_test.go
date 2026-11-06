@@ -684,3 +684,111 @@ func TestApp_ProxyProfiles_F14(t *testing.T) {
 		}
 	}
 }
+
+func TestApp_Snippets_F15(t *testing.T) {
+	fake := newFakeSshTransport()
+	tmpVault := filepath.Join(t.TempDir(), "test_snippets.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	var app *App
+	app = NewAppWithDependencies(fake, nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	// 1. Create identity, host, and connect
+	ident := core.IdentityRecord{
+		ID:         "ident-pg",
+		Label:      "Postgres Admin",
+		Username:   "postgres",
+		AuthMethod: core.AuthPassword,
+		Password:   "pgpass",
+	}
+	if err := app.SaveIdentity(ident); err != nil {
+		t.Fatalf("SaveIdentity failed: %v", err)
+	}
+
+	host := core.HostRecord{
+		ID:         "host-prod-db",
+		Label:      "Production Database",
+		Address:    "192.168.10.50",
+		Port:       5432,
+		IdentityID: "ident-pg",
+		InitialDir: "/var/lib/postgresql",
+	}
+	if err := app.SaveHost(host); err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+
+	sessID, err := app.ConnectSavedHost("host-prod-db", core.TerminalSize{Cols: 80, Rows: 24})
+	if err != nil {
+		t.Fatalf("ConnectSavedHost failed: %v", err)
+	}
+	defer app.DisconnectSession(sessID)
+
+	// 2. Save a snippet with builtins and user variables
+	snip := core.Snippet{
+		ID:               "snip-pg-backup",
+		Name:             "PostgreSQL Dump",
+		Description:      "Dumps database to designated file with timestamps",
+		Body:             "pg_dump -h {{HOST}} -p {{PORT}} -U {{USER=postgres}} -f {{DEST_FILE=/backups/db.sql}} {{DB_NAME}}",
+		Tags:             []string{"database", "backup", "postgres"},
+		ConfirmBeforeRun: true,
+	}
+	if err := app.SaveSnippet(snip); err != nil {
+		t.Fatalf("SaveSnippet failed: %v", err)
+	}
+
+	// 3. List snippets and verify variables were auto-extracted
+	snippets, err := app.ListSnippets()
+	if err != nil {
+		t.Fatalf("ListSnippets failed: %v", err)
+	}
+	if len(snippets) != 1 {
+		t.Fatalf("expected 1 snippet, got %d", len(snippets))
+	}
+	if len(snippets[0].Variables) < 4 {
+		t.Fatalf("expected at least 4 auto-extracted variables, got %d", len(snippets[0].Variables))
+	}
+
+	// 4. Test GetSnippetContext for active session
+	ctx := app.GetSnippetContext(sessID)
+	if ctx.IP != "192.168.10.50" || ctx.Port != 5432 || ctx.WorkingDir != "/var/lib/postgresql" {
+		t.Errorf("unexpected snippet context: %+v", ctx)
+	}
+
+	// 5. Test ResolveSnippetTemplate
+	userVals := map[string]string{
+		"DB_NAME": "analytics_prod",
+	}
+	resolved, err := app.ResolveSnippetTemplate("snip-pg-backup", sessID, userVals)
+	if err != nil {
+		t.Fatalf("ResolveSnippetTemplate failed: %v", err)
+	}
+	expected := "pg_dump -h 192.168.10.50 -p 5432 -U postgres -f /backups/db.sql analytics_prod"
+	if resolved != expected {
+		t.Errorf("got resolved %q, want %q", resolved, expected)
+	}
+
+	// 6. Test ExecuteSnippet writes into session PTY
+	if err := app.ExecuteSnippet(sessID, "snip-pg-backup", userVals); err != nil {
+		t.Fatalf("ExecuteSnippet failed: %v", err)
+	}
+
+	// 7. Test DeleteSnippet
+	if err := app.DeleteSnippet("snip-pg-backup"); err != nil {
+		t.Fatalf("DeleteSnippet failed: %v", err)
+	}
+	snippetsAfter, _ := app.ListSnippets()
+	if len(snippetsAfter) != 0 {
+		t.Errorf("expected 0 snippets after delete, got %d", len(snippetsAfter))
+	}
+}

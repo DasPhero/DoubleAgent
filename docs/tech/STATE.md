@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `M1-4` Part 8 (`F-14` — Proxy Profiles: ProxyJump, ProxyCommand, and proxychains Export) — COMPLETED
-- **Next Milestone:** `M1-4` Part 9 (`F-15` — Snippets with variables like `{{VAR}}` and prompt before execution)
+- **Current Milestone:** `M1-4` Part 9 (`F-15` — Command Snippets with Variables & Dynamic Injection) — COMPLETED
+- **Next Milestone:** Creating Custom Shortcuts (Custom Keybindings & Action Shortcuts Manager)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -62,16 +62,33 @@
   - **Background Host Connection for Forward Tunnels**: When starting a forward tunnel without an active SSH session, DoubleAgent automatically connects to the rule's associated host in the background via `ConnectSavedHost` and initializes the tunnel.
   - **Modal Backdrop Click-to-Close**: Clicking the dark background overlay (`e.target === e.currentTarget`) dismisses all modals and dialogs.
   - **Unified Settings Tab System (`SettingsView`)**: Consolidated Global Settings into a tabbed interface (Appearance & Terminal, Vault & Security, Keyboard Shortcuts) accessible both as a modal and as a dedicated persistent workspace tab.
+- **`M1-4` Part 9 (`F-15` — Command Snippets with Variables & Dynamic Injection)**:
+  - **Core Domain & Encrypted Vault Storage (`backend/core/interfaces.go` & `backend/vault/store.go`)**:
+    - Defined `SnippetVariable`, `Snippet`, `SnippetContext` structs.
+    - Extended `VaultPayload` and `VaultSummary` with `Snippets []Snippet`.
+    - Initialized slices in `vault.NewStore` / `ensureNonNilSlices()`.
+  - **Template Parser & Resolver Engine (`backend/core/snippets.go`)**:
+    - `ExtractSnippetVariables`: parses `{{VAR}}`, `{{VAR=default}}`, `{{VAR:hint}}`, `{{VAR=default:hint}}`, and `{{VAR | hint}}`. Preserves colons in defaults (e.g. `{{IMG=nginx:alpine}}`).
+    - `IsBuiltinSnippetVariable`: identifies auto-injected built-in variables (`HOST`, `IP`, `HOSTNAME`, `USER`, `PORT`, `CWD`, `TIMESTAMP`, `DATE`, `TIME`, `LOCAL_IP`, `PASSWORD`).
+    - `ResolveSnippet`: substitutes session context, user parameters, and securely resolves vault credentials (`{{PASSWORD}}`) inside Go process without exposing secrets to frontend.
+    - Comprehensive unit tests in `backend/core/snippets_test.go` (`TestSnippet_ExtractVariables_F15`, `TestSnippet_ResolveSnippet_F15`).
+  - **Application Service Bindings (`app.go` & `app_test.go`)**:
+    - Bound methods: `SaveSnippet`, `DeleteSnippet`, `ListSnippets`, `GetSnippetContext`, `ResolveSnippetTemplate`, `ExecuteSnippet`.
+    - `ExecuteSnippet` pipes resolved commands directly to `WriteTerminal(sessionID, cmd + "\n")` across SSH, local PTY (ConPTY), and serial UART sessions.
+    - Comprehensive unit tests in `app_test.go` (`TestApp_Snippets_F15`).
+  - **Frontend UI & Diagnostics (`frontend/src/`)**:
+    - Created `frontend/src/types/snippet.ts`.
+    - Created `frontend/src/components/SnippetRunModal.tsx`: interactive parameter query modal before execution with pre-filled context, real-time command syntax preview, copy to clipboard, and run button.
+    - Created `frontend/src/components/SnippetsManagerModal.tsx`: full CRUD manager with search, tag filters, live variable detection, and 1-click variable insert toolbar.
+    - Added `⚡ Snippets` action button in terminal split pane headers, `Tools ▾ -> Automation & Snippets (F-15)`, and integrated into `Ctrl+K` Command Palette.
+    - End-to-end frontend tests in `frontend/src/App.test.tsx` (`manages Command Snippets with auto-injected context variables and variable query prompt before send (F-15)`).
+- **Brand Assets Integration**:
+    - Integrated user-provided logo and icon assets (`DoubleAgent.ico`, `DoubleAgent_App_Logo.png`, `DoubleAgent_Wordmark.png`, `DoubleAgent_Logo_complete_with_text.png`) across application window, favicon, header, about modal, and empty state hero.
 
 ## In Progress
 - None.
 
 ## Next (TODO List)
-- **`F-15`: Snippets with Variables**:
-  - Store reusable command snippets in the encrypted vault with categorization and tags.
-  - Support template variables like `{{HOST}}`, `{{PORT}}`, `{{INTERFACE}}`, `{{CUSTOM}}`.
-  - Interactive parameter query modal/popup before sending the command to active terminal sessions.
-  - Quick-execute snippets from terminal toolbar and Command Palette (`Ctrl+K`).
 - **Creating Custom Shortcuts (Custom Keybindings & Action Shortcuts Manager)**:
   - Allow users to create, customize, and persist keybindings for any DoubleAgent action (e.g. Quick Connect, Open Terminal in Directory, Split Panes, Port Forwarding, Snippet Execution).
   - Configurable prefix/leader key (e.g. `Ctrl+B` or `Ctrl+A`) to eliminate shortcut collisions with terminal CLI applications (e.g. `nano`, `vim`, `htop`).

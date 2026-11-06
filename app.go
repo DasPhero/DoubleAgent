@@ -1938,3 +1938,213 @@ func (a *App) SaveProxychainsFile(content string, targetPath string) error {
 	}
 	return os.WriteFile(targetPath, []byte(content), 0644)
 }
+
+// SaveSnippet saves or updates a command snippet in the vault, auto-extracting variable placeholders (F-15).
+func (a *App) SaveSnippet(snippet core.Snippet) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	if snippet.ID == "" {
+		snippet.ID = fmt.Sprintf("snippet-%d", time.Now().UnixNano())
+	}
+	if snippet.Name == "" {
+		snippet.Name = "Untitled Snippet"
+	}
+	if snippet.Tags == nil {
+		snippet.Tags = []string{}
+	}
+
+	// Auto-extract and synchronize variables from the snippet body
+	extracted := core.ExtractSnippetVariables(snippet.Body)
+	existingMap := make(map[string]core.SnippetVariable)
+	for _, v := range snippet.Variables {
+		existingMap[strings.ToUpper(v.Name)] = v
+	}
+	for i, v := range extracted {
+		if ex, ok := existingMap[strings.ToUpper(v.Name)]; ok {
+			if ex.Description != "" && v.Description == "" {
+				extracted[i].Description = ex.Description
+			}
+			if ex.SecretRef != "" && v.SecretRef == "" {
+				extracted[i].SecretRef = ex.SecretRef
+			}
+			if ex.DefaultValue != "" && v.DefaultValue == "" {
+				extracted[i].DefaultValue = ex.DefaultValue
+			}
+		}
+	}
+	snippet.Variables = extracted
+
+	updated := false
+	for i, s := range payload.Snippets {
+		if s.ID == snippet.ID {
+			payload.Snippets[i] = snippet
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		payload.Snippets = append(payload.Snippets, snippet)
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	return nil
+}
+
+// DeleteSnippet removes a snippet from the vault by its ID (F-15).
+func (a *App) DeleteSnippet(snippetID string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	filtered := make([]core.Snippet, 0, len(payload.Snippets))
+	for _, s := range payload.Snippets {
+		if s.ID != snippetID {
+			filtered = append(filtered, s)
+		}
+	}
+	payload.Snippets = filtered
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	return nil
+}
+
+// ListSnippets returns all snippets stored in the vault (F-15).
+func (a *App) ListSnippets() ([]core.Snippet, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	if payload.Snippets == nil {
+		return []core.Snippet{}, nil
+	}
+	return payload.Snippets, nil
+}
+
+// GetSnippetContext constructs the auto-injected context for an active terminal session (F-15).
+func (a *App) GetSnippetContext(sessionID string) core.SnippetContext {
+	ctx := core.SnippetContext{
+		Timestamp: time.Now().Format("2006-01-02 15:04:05"),
+		Date:      time.Now().Format("2006-01-02"),
+		Time:      time.Now().Format("15:04:05"),
+	}
+
+	a.mu.Lock()
+	hostID := a.sessionHostID[sessionID]
+	req, hasReq := a.sessionRequests[sessionID]
+	_, isLocal := a.localSessions[sessionID]
+	_, isSerial := a.serialSessions[sessionID]
+	a.mu.Unlock()
+
+	if hostID != "" {
+		payload, err := a.vaultStore.GetPayload()
+		if err == nil {
+			resolved, err := core.ResolveEffectiveHost(hostID, payload)
+			if err == nil {
+				ctx.HostID = hostID
+				ctx.HostLabel = resolved.Label
+				ctx.Address = resolved.Address
+				ctx.Hostname = resolved.Address
+				ctx.IP = resolved.Address
+				ctx.Port = resolved.Port
+				ctx.Username = resolved.Username
+				ctx.WorkingDir = resolved.InitialDir
+			}
+		}
+	} else if hasReq {
+		ctx.Address = req.Address
+		ctx.Hostname = req.Address
+		ctx.IP = req.Address
+		ctx.Port = req.Port
+		ctx.Username = req.Username
+	} else if isLocal {
+		hostname, _ := os.Hostname()
+		user := os.Getenv("USERNAME")
+		if user == "" {
+			user = os.Getenv("USER")
+		}
+		cwd, _ := os.Getwd()
+		ctx.Hostname = hostname
+		ctx.Address = "127.0.0.1"
+		ctx.IP = "127.0.0.1"
+		ctx.Username = user
+		ctx.WorkingDir = cwd
+	} else if isSerial {
+		ctx.HostLabel = "Serial Hardware Port"
+		ctx.Address = sessionID
+	}
+
+	return ctx
+}
+
+// ResolveSnippetTemplate resolves snippet placeholders using active session context and user values (F-15).
+func (a *App) ResolveSnippetTemplate(snippetID string, sessionID string, userValues map[string]string) (string, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return "", err
+	}
+
+	var targetSnippet *core.Snippet
+	for _, s := range payload.Snippets {
+		if s.ID == snippetID {
+			targetSnippet = &s
+			break
+		}
+	}
+	if targetSnippet == nil {
+		return "", fmt.Errorf("snippet %s not found in vault", snippetID)
+	}
+
+	snipCtx := a.GetSnippetContext(sessionID)
+
+	// Secret resolver for {{SECRET:id}} or {{PASSWORD}}
+	secretResolver := func(ref string) (string, error) {
+		a.mu.Lock()
+		cachedPW := a.sessionPasswords[sessionID]
+		a.mu.Unlock()
+
+		if ref == "session_password" {
+			if cachedPW != "" {
+				return cachedPW, nil
+			}
+			return "", errors.New("no cached session password available")
+		}
+
+		// Look up in identities
+		for _, id := range payload.Identities {
+			if id.ID == ref || strings.EqualFold(id.Label, ref) {
+				if id.Password != "" {
+					return id.Password, nil
+				}
+			}
+		}
+		return "", fmt.Errorf("secret reference %q not found in vault", ref)
+	}
+
+	return core.ResolveSnippet(targetSnippet.Body, snipCtx, userValues, secretResolver)
+}
+
+// ExecuteSnippet executes a resolved snippet by writing directly into the active session stdin/PTY (F-15).
+func (a *App) ExecuteSnippet(sessionID string, snippetID string, userValues map[string]string) error {
+	a.vaultStore.Touch()
+
+	resolvedCmd, err := a.ResolveSnippetTemplate(snippetID, sessionID, userValues)
+	if err != nil {
+		return err
+	}
+
+	return a.WriteTerminal(sessionID, resolvedCmd+"\n")
+}

@@ -22,6 +22,9 @@ import { ProxychainsExportModal } from './components/ProxychainsExportModal';
 import { FileItem, TransferTask } from './types/sftp';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 import { ProxyProfile, ProxyProfileSummary, ProxychainsExportOptions } from './types/proxy';
+import { Snippet, SnippetContext } from './types/snippet';
+import { SnippetsManagerModal } from './components/SnippetsManagerModal';
+import { SnippetRunModal } from './components/SnippetRunModal';
 import appLogo from './assets/DoubleAgent_App_Logo.png';
 import brandLogoText from './assets/DoubleAgent_Logo_complete_with_text.png';
 
@@ -135,6 +138,7 @@ interface VaultSummary {
   identities: IdentitySummary[];
   keys?: SshKeySummary[];
   proxyProfiles?: ProxyProfileSummary[];
+  snippets?: Snippet[];
 }
 
 interface QuickConnectTarget {
@@ -551,6 +555,12 @@ interface WailsAppBindings {
   GenerateProxychainsConfig?: (opts: ProxychainsExportOptions) => Promise<string>;
   ExportProxychainsConfig?: () => Promise<string>;
   SaveProxychainsFile?: (content: string, targetPath: string) => Promise<void>;
+  SaveSnippet?: (snippet: Snippet) => Promise<void>;
+  DeleteSnippet?: (snippetId: string) => Promise<void>;
+  ListSnippets?: () => Promise<Snippet[]>;
+  GetSnippetContext?: (sessionId: string) => Promise<SnippetContext>;
+  ResolveSnippetTemplate?: (snippetId: string, sessionId: string, userValues: Record<string, string>) => Promise<string>;
+  ExecuteSnippet?: (sessionId: string, snippetId: string, userValues: Record<string, string>) => Promise<void>;
 }
 
 export interface SerialAutoDetectResult {
@@ -669,6 +679,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     hosts: [],
     identities: [],
     keys: [],
+    proxyProfiles: [],
+    snippets: [],
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -778,6 +790,13 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [showProxyProfilesModal, setShowProxyProfilesModal] = useState<boolean>(false);
   const [showProxychainsExportModal, setShowProxychainsExportModal] = useState<boolean>(false);
   const [proxychainsOptions, setProxychainsOptions] = useState<ProxychainsExportOptions | undefined>(undefined);
+
+  // Snippets State (F-15)
+  const [showSnippetsModal, setShowSnippetsModal] = useState<boolean>(false);
+  const [runModalSnippet, setRunModalSnippet] = useState<Snippet | null>(null);
+  const [runModalContext, setRunModalContext] = useState<SnippetContext | null>(null);
+  const [snippetActiveSessionId, setSnippetActiveSessionId] = useState<string>('');
+  const [snippetPrefillBody, setSnippetPrefillBody] = useState<string>('');
 
   // Terminal Search state (F-11)
   const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
@@ -1920,6 +1939,116 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
   };
 
+  const handleSaveSnippet = async (snippet: Snippet): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.SaveSnippet) {
+      try {
+        await api.SaveSnippet(snippet);
+        await refreshVaultState();
+        setStatusMessage(`Saved snippet "${snippet.name}".`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Save snippet failed: ${msg}`);
+      }
+    } else {
+      setVaultSummary((prev) => {
+        const id = snippet.id || `snippet-${Date.now()}`;
+        const updated = { ...snippet, id };
+        const exists = (prev.snippets || []).some((s) => s.id === id);
+        const list = exists
+          ? (prev.snippets || []).map((s) => (s.id === id ? updated : s))
+          : [...(prev.snippets || []), updated];
+        return { ...prev, snippets: list };
+      });
+      setStatusMessage(`Saved snippet "${snippet.name}".`);
+    }
+  };
+
+  const handleDeleteSnippet = async (snippetId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.DeleteSnippet) {
+      try {
+        await api.DeleteSnippet(snippetId);
+        await refreshVaultState();
+        setStatusMessage('Snippet deleted.');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Delete snippet failed: ${msg}`);
+      }
+    } else {
+      setVaultSummary((prev) => ({
+        ...prev,
+        snippets: (prev.snippets || []).filter((s) => s.id !== snippetId),
+      }));
+      setStatusMessage('Snippet deleted.');
+    }
+  };
+
+  const handleTriggerSnippet = async (snippet: Snippet, targetSessionId?: string): Promise<void> => {
+    const sessId = targetSessionId || sessionId;
+
+    if (!sessId) {
+      setStatusMessage('No active terminal session to run snippet in.');
+      return;
+    }
+
+    setSnippetActiveSessionId(sessId);
+
+    let ctx: SnippetContext = {
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      date: new Date().toISOString().slice(0, 10),
+      time: new Date().toTimeString().slice(0, 8),
+      workingDir: getSessionCwd(sessId) || '~',
+    };
+
+    const api = getWailsBindings();
+    if (api?.GetSnippetContext) {
+      try {
+        const backendCtx = await api.GetSnippetContext(sessId);
+        ctx = { ...ctx, ...backendCtx };
+        if (!ctx.workingDir) {
+          ctx.workingDir = getSessionCwd(sessId) || '~';
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    const hasVars = (snippet.variables && snippet.variables.length > 0) || /\{\{([^{}]+)\}\}/.test(snippet.body);
+
+    if (snippet.confirmBeforeRun || hasVars) {
+      setRunModalSnippet(snippet);
+      setRunModalContext(ctx);
+    } else {
+      try {
+        if (api?.ExecuteSnippet) {
+          await api.ExecuteSnippet(sessId, snippet.id, {});
+        } else {
+          await api?.WriteTerminal?.(sessId, snippet.body + '\n');
+        }
+        setStatusMessage(`⚡ Sent snippet "${snippet.name}" to terminal.`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Execute snippet failed: ${msg}`);
+      }
+    }
+  };
+
+  const handleExecuteSnippetFromModal = async (userValues: Record<string, string>): Promise<void> => {
+    if (!runModalSnippet || !snippetActiveSessionId) return;
+    const api = getWailsBindings();
+    if (api?.ExecuteSnippet) {
+      await api.ExecuteSnippet(snippetActiveSessionId, runModalSnippet.id, userValues);
+    } else {
+      let previewCmd = runModalSnippet.body;
+      for (const [k, v] of Object.entries(userValues)) {
+        previewCmd = previewCmd.replace(new RegExp(`\\{\\{${k}[^}]*\\}\\}`, 'g'), v);
+      }
+      await api?.WriteTerminal?.(snippetActiveSessionId, previewCmd + '\n');
+    }
+    setStatusMessage(`⚡ Executed snippet "${runModalSnippet.name}".`);
+  };
+
   const handleConnect = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     const api = getWailsBindings();
@@ -2743,6 +2872,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   📁 SFTP
                 </button>
               )}
+              <button
+                type="button"
+                className="pane-snippets-btn"
+                aria-label={`Run Snippet in ${node.title}`}
+                title="Run command snippet in this terminal (F-15)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSnippetActiveSessionId(node.sessionId);
+                  setShowSnippetsModal(true);
+                }}
+              >
+                ⚡ Snippets
+              </button>
               {isPaneActive ? (
                 <span className="pane-active-indicator">● Active</span>
               ) : (
@@ -3249,6 +3391,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   >
                     <span>Export proxychains.conf</span>
                     <span className="nav-dropdown-shortcut">⛓️ Export</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
+                  <div className="nav-dropdown-header">Automation &amp; Snippets (F-15)</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setShowSnippetsModal(true);
+                    }}
+                  >
+                    <span>Command Snippets &amp; Variables</span>
+                    <span className="nav-dropdown-shortcut">⚡ Snippets</span>
                   </button>
                   <div className="nav-dropdown-divider" />
                   <div className="nav-dropdown-header">Hardware Serial (F-23)</div>
@@ -5430,6 +5586,32 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           onGenerateConfig={handleGenerateProxychainsConfig}
           onSaveToFile={handleSaveProxychainsFile}
           onClose={() => setShowProxychainsExportModal(false)}
+        />
+      )}
+
+      {showSnippetsModal && (
+        <SnippetsManagerModal
+          snippets={vaultSummary.snippets || []}
+          onSaveSnippet={handleSaveSnippet}
+          onDeleteSnippet={handleDeleteSnippet}
+          onRunSnippet={(snip) => void handleTriggerSnippet(snip, snippetActiveSessionId)}
+          initialPrefillBody={snippetPrefillBody}
+          onClose={() => {
+            setShowSnippetsModal(false);
+            setSnippetPrefillBody('');
+          }}
+        />
+      )}
+
+      {runModalSnippet && runModalContext && (
+        <SnippetRunModal
+          snippet={runModalSnippet}
+          context={runModalContext}
+          onExecute={handleExecuteSnippetFromModal}
+          onClose={() => {
+            setRunModalSnippet(null);
+            setRunModalContext(null);
+          }}
         />
       )}
 

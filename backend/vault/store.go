@@ -737,6 +737,15 @@ func ensureNonNilSlices(p core.VaultPayload) core.VaultPayload {
 	if p.Keys == nil {
 		p.Keys = []core.SshKeyRecord{}
 	}
+	if p.ForwardRules == nil {
+		p.ForwardRules = []core.ForwardRule{}
+	}
+	if p.ProxyProfiles == nil {
+		p.ProxyProfiles = []core.ProxyProfile{}
+	}
+	if p.Snippets == nil {
+		p.Snippets = []core.Snippet{}
+	}
 	return p
 }
 

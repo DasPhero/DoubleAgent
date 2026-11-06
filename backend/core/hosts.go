@@ -63,13 +63,14 @@ type SshKeySummary struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
-// VaultSummary aggregates non-secret groups, hosts (with inherited values resolved), identities, public keys, and proxy profiles for the UI.
+// VaultSummary aggregates non-secret groups, hosts (with inherited values resolved), identities, public keys, proxy profiles, and snippets for the UI.
 type VaultSummary struct {
 	Groups        []GroupRecord         `json:"groups"`
 	Hosts         []HostSummary         `json:"hosts"`
 	Identities    []IdentitySummary     `json:"identities"`
 	Keys          []SshKeySummary       `json:"keys"`
 	ProxyProfiles []ProxyProfileSummary `json:"proxyProfiles"`
+	Snippets      []Snippet             `json:"snippets"`
 }
 
 // ResolveEffectiveHost computes the effective Port, Username, IdentityID, KeepaliveSecs, and SshAuthConfig
@@ -283,12 +284,18 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		})
 	}
 
+	snippets := payload.Snippets
+	if snippets == nil {
+		snippets = []Snippet{}
+	}
+
 	return VaultSummary{
 		Groups:        groups,
 		Hosts:         hosts,
 		Identities:    identities,
 		Keys:          keys,
 		ProxyProfiles: proxySummaries,
+		Snippets:      snippets,
 	}
 }
 

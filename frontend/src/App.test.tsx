@@ -1108,4 +1108,182 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       delete (window as unknown as { go?: unknown }).go;
     }
   });
+
+  it('manages Command Snippets with auto-injected context variables and variable query prompt before send (F-15)', async () => {
+    let savedSnippet: unknown = null;
+    let executedSnippetId = '';
+    let executedSessionId = '';
+    let executedUserVals: Record<string, string> = {};
+
+    let currentSnippets: Array<{
+      id: string;
+      name: string;
+      description?: string;
+      body: string;
+      tags?: string[];
+      confirmBeforeRun?: boolean;
+      variables?: Array<{ name: string; defaultValue?: string }>;
+    }> = [
+      {
+        id: 'snip-tail-logs',
+        name: 'Tail Nginx Logs',
+        description: 'Streams recent web logs with custom count',
+        body: 'tail -n {{LINES=50}} {{FILE=/var/log/nginx/access.log}}',
+        tags: ['logs', 'nginx'],
+        confirmBeforeRun: true,
+        variables: [
+          { name: 'LINES', defaultValue: '50' },
+          { name: 'FILE', defaultValue: '/var/log/nginx/access.log' },
+        ],
+      },
+    ];
+
+    (window as unknown as { go: unknown }).go = {
+      main: {
+        App: {
+          HealthCheck: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: false,
+            quickUnlockReady: false,
+          }),
+          GetAppStatus: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: false,
+            quickUnlockReady: false,
+          }),
+          GetVaultSummary: async () => ({
+            groups: [],
+            hosts: [
+              {
+                id: 'host-db-1',
+                label: 'Production DB',
+                address: '10.0.0.99',
+                effectivePort: 5432,
+                effectiveUser: 'postgres',
+                tags: ['database'],
+              },
+            ],
+            identities: [],
+            keys: [],
+            proxyProfiles: [],
+            snippets: currentSnippets,
+          }),
+          SaveSnippet: async (s: unknown) => {
+            savedSnippet = s;
+            const snip = s as {
+              id?: string;
+              name: string;
+              body: string;
+              description?: string;
+              tags?: string[];
+              confirmBeforeRun?: boolean;
+            };
+            currentSnippets = [
+              ...currentSnippets,
+              {
+                id: snip.id || `snip-${Date.now()}`,
+                name: snip.name,
+                body: snip.body,
+                description: snip.description,
+                tags: snip.tags,
+                confirmBeforeRun: snip.confirmBeforeRun,
+              },
+            ];
+          },
+          DeleteSnippet: async () => {},
+          ListSnippets: async () => currentSnippets,
+          GetSnippetContext: async () => ({
+            hostId: 'host-db-1',
+            hostLabel: 'Production DB',
+            address: '10.0.0.99',
+            ip: '10.0.0.99',
+            port: 5432,
+            username: 'postgres',
+            workingDir: '/var/log/nginx',
+            timestamp: '2026-11-06 19:00:00',
+            date: '2026-11-06',
+            time: '19:00:00',
+          }),
+          ResolveSnippetTemplate: async () => 'tail -n 100 /var/log/nginx/access.log',
+          ExecuteSnippet: async (sid: string, snipId: string, vals: Record<string, string>) => {
+            executedSessionId = sid;
+            executedSnippetId = snipId;
+            executedUserVals = vals;
+          },
+          ConnectSSH: async () => 'session-db-1',
+          ConnectSavedHost: async () => 'session-db-1',
+          WriteTerminal: async () => {},
+          ResizeTerminal: async () => {},
+          DisconnectSession: async () => {},
+        },
+      },
+    };
+
+    try {
+      render(<App initialLocked={false} />);
+
+      // Wait for initial vault load
+      expect(await screen.findByText('Production DB')).toBeInTheDocument();
+
+      // Connect to host to have an active session
+      fireEvent.click(screen.getByRole('button', { name: /^Connect$/i }));
+      expect(await screen.findByText(/Connected to Production DB/i)).toBeInTheDocument();
+
+      // 1. Open Tools -> Command Snippets & Variables
+      const toolsBtn = screen.getByRole('button', { name: /Tools/i });
+      fireEvent.click(toolsBtn);
+      const snippetsMenuItem = screen.getByRole('menuitem', { name: /Command Snippets/i });
+      fireEvent.click(snippetsMenuItem);
+
+      // Verify Snippets Manager modal is open
+      expect(await screen.findByText('Command Snippets (F-15)')).toBeInTheDocument();
+      expect(screen.getByText('Tail Nginx Logs')).toBeInTheDocument();
+
+      // 2. Click "+ New Snippet"
+      fireEvent.click(screen.getByRole('button', { name: /\+ New Snippet/i }));
+      fireEvent.change(screen.getByPlaceholderText(/e\.g\. Inspect Nginx Logs/i), {
+        target: { value: 'Ping Target Host' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/tail -n/i), {
+        target: { value: 'ping -c {{COUNT=4}} {{HOST}}' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/e\.g\. web, logs, nginx/i), {
+        target: { value: 'network, icmp' },
+      });
+
+      // Click quick insert button for variable
+      expect(screen.getByText(/Detected Template Variables:/i)).toBeInTheDocument();
+
+      // Save snippet
+      fireEvent.click(screen.getByRole('button', { name: /Save Snippet/i }));
+      expect(savedSnippet).toBeTruthy();
+
+      // 3. Test running a snippet into active terminal session
+      const runButtons = await screen.findAllByRole('button', { name: /⚡ Run/i });
+      fireEvent.click(runButtons[0]);
+
+      // Verify SnippetRunModal opened with auto-injected context and parameter fields
+      expect(await screen.findByText(/Snippet Parameters & Injected Variables/i)).toBeInTheDocument();
+      expect(screen.getByText(/Target Session:/i)).toBeInTheDocument();
+      expect(screen.getByText(/Command Preview/i)).toBeInTheDocument();
+
+      // Fill parameter
+      const linesInput = screen.getByPlaceholderText(/Default: 50/i);
+      fireEvent.change(linesInput, { target: { value: '100' } });
+
+      // Run in terminal
+      fireEvent.click(screen.getByRole('button', { name: /⚡ Run in Terminal/i }));
+      expect(executedSnippetId).toBe('snip-tail-logs');
+      expect(executedSessionId).toBe('session-db-1');
+      expect(executedUserVals['LINES']).toBe('100');
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
 });

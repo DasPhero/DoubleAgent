@@ -690,6 +690,101 @@ export namespace core {
 	        this.isConnected = source["isConnected"];
 	    }
 	}
+	export class SnippetVariable {
+	    name: string;
+	    defaultValue?: string;
+	    description?: string;
+	    secretRef?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnippetVariable(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.defaultValue = source["defaultValue"];
+	        this.description = source["description"];
+	        this.secretRef = source["secretRef"];
+	    }
+	}
+	export class Snippet {
+	    id: string;
+	    name: string;
+	    description?: string;
+	    body: string;
+	    variables?: SnippetVariable[];
+	    tags?: string[];
+	    confirmBeforeRun: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Snippet(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.body = source["body"];
+	        this.variables = this.convertValues(source["variables"], SnippetVariable);
+	        this.tags = source["tags"];
+	        this.confirmBeforeRun = source["confirmBeforeRun"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SnippetContext {
+	    hostId?: string;
+	    hostLabel?: string;
+	    address?: string;
+	    hostname?: string;
+	    ip?: string;
+	    port?: number;
+	    username?: string;
+	    workingDir?: string;
+	    timestamp?: string;
+	    date?: string;
+	    time?: string;
+	    customVars?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnippetContext(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hostId = source["hostId"];
+	        this.hostLabel = source["hostLabel"];
+	        this.address = source["address"];
+	        this.hostname = source["hostname"];
+	        this.ip = source["ip"];
+	        this.port = source["port"];
+	        this.username = source["username"];
+	        this.workingDir = source["workingDir"];
+	        this.timestamp = source["timestamp"];
+	        this.date = source["date"];
+	        this.time = source["time"];
+	        this.customVars = source["customVars"];
+	    }
+	}
+	
 	export class SshKeySummary {
 	    id: string;
 	    label: string;
@@ -783,6 +878,7 @@ export namespace core {
 	    identities: IdentitySummary[];
 	    keys: SshKeySummary[];
 	    proxyProfiles: ProxyProfileSummary[];
+	    snippets: Snippet[];
 	
 	    static createFrom(source: any = {}) {
 	        return new VaultSummary(source);
@@ -795,6 +891,7 @@ export namespace core {
 	        this.identities = this.convertValues(source["identities"], IdentitySummary);
 	        this.keys = this.convertValues(source["keys"], SshKeySummary);
 	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfileSummary);
+	        this.snippets = this.convertValues(source["snippets"], Snippet);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

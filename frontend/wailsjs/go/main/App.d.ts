@@ -28,11 +28,15 @@ export function DeleteRemoteItem(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteSSHKey(arg1:string):Promise<void>;
 
+export function DeleteSnippet(arg1:string):Promise<void>;
+
 export function DisconnectSession(arg1:string):Promise<void>;
 
 export function DuplicateSession(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
 export function EnableQuickUnlock():Promise<void>;
+
+export function ExecuteSnippet(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
 
 export function ExportProxychainsConfig():Promise<string>;
 
@@ -45,6 +49,8 @@ export function GetActiveTransfers():Promise<Array<core.TransferTask>>;
 export function GetActiveTunnels():Promise<Array<core.ForwardTunnelStatus>>;
 
 export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOptions>;
+
+export function GetSnippetContext(arg1:string):Promise<core.SnippetContext>;
 
 export function GetVaultSummary():Promise<core.VaultSummary>;
 
@@ -70,6 +76,8 @@ export function ListRemoteDir(arg1:string,arg2:string):Promise<Array<core.FileIt
 
 export function ListSerialPorts():Promise<Array<core.SerialPortInfo>>;
 
+export function ListSnippets():Promise<Array<core.Snippet>>;
+
 export function LockVault():Promise<void>;
 
 export function OpenLocalTerminal(arg1:string,arg2:core.TerminalSize):Promise<string>;
@@ -82,6 +90,8 @@ export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void
 
 export function ResolveHostKeyPrompt(arg1:string,arg2:number,arg3:boolean):Promise<void>;
 
+export function ResolveSnippetTemplate(arg1:string,arg2:string,arg3:Record<string, string>):Promise<string>;
+
 export function SaveForwardRule(arg1:core.ForwardRule):Promise<void>;
 
 export function SaveGroup(arg1:core.GroupRecord):Promise<void>;
@@ -93,6 +103,8 @@ export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
 export function SaveProxyProfile(arg1:core.ProxyProfile):Promise<void>;
 
 export function SaveProxychainsFile(arg1:string,arg2:string):Promise<void>;
+
+export function SaveSnippet(arg1:core.Snippet):Promise<void>;
 
 export function SearchCommandPalette(arg1:string):Promise<core.CommandPaletteResponse>;
 

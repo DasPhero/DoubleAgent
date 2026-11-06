@@ -362,7 +362,42 @@ type SshKeyRecord struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
-// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14).
+// SnippetVariable represents a variable parameter defined in a command snippet (F-15).
+type SnippetVariable struct {
+	Name         string `json:"name"`                   // e.g. "TARGET_PORT", "INTERFACE"
+	DefaultValue string `json:"defaultValue,omitempty"` // default fallback value
+	Description  string `json:"description,omitempty"`  // human-readable hint in prompt modal
+	SecretRef    string `json:"secretRef,omitempty"`    // optional IdentityID / Vault secret reference
+}
+
+// Snippet represents a reusable command snippet stored in the encrypted vault (Spec Section 8, F-15).
+type Snippet struct {
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	Description      string            `json:"description,omitempty"`
+	Body             string            `json:"body"`
+	Variables        []SnippetVariable `json:"variables,omitempty"`
+	Tags             []string          `json:"tags,omitempty"`
+	ConfirmBeforeRun bool              `json:"confirmBeforeRun"`
+}
+
+// SnippetContext holds session context for automatic variable interpolation (F-15).
+type SnippetContext struct {
+	HostID     string            `json:"hostId,omitempty"`
+	HostLabel  string            `json:"hostLabel,omitempty"`
+	Address    string            `json:"address,omitempty"`
+	Hostname   string            `json:"hostname,omitempty"`
+	IP         string            `json:"ip,omitempty"`
+	Port       uint16            `json:"port,omitempty"`
+	Username   string            `json:"username,omitempty"`
+	WorkingDir string            `json:"workingDir,omitempty"`
+	Timestamp  string            `json:"timestamp,omitempty"`
+	Date       string            `json:"date,omitempty"`
+	Time       string            `json:"time,omitempty"`
+	CustomVars map[string]string `json:"customVars,omitempty"`
+}
+
+// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14, F-15).
 type VaultPayload struct {
 	SchemaVersion int              `json:"schemaVersion"`
 	Hosts         []HostRecord     `json:"hosts"`
@@ -371,6 +406,7 @@ type VaultPayload struct {
 	Keys          []SshKeyRecord   `json:"keys"`
 	ForwardRules  []ForwardRule    `json:"forwardRules,omitempty"`
 	ProxyProfiles []ProxyProfile   `json:"proxyProfiles,omitempty"`
+	Snippets      []Snippet        `json:"snippets,omitempty"`
 }
 
 // SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).
