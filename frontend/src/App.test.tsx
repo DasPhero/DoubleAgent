@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
+import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 
 describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, and Hosts/Groups (F-01, F-03)', () => {
   it('starts in theme-locked (Dark Crimson), switches to theme-unlocked (Teal) on unlock, and manages Groups and Hosts with inheritance (F-01)', () => {
@@ -840,6 +841,154 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       const closeBtn = screen.getByRole('button', { name: /Close Port Forwarding/i });
       fireEvent.click(closeBtn);
       expect(screen.queryByRole('heading', { name: /Port Forwarding & Tunnels \(F-13\)/i })).not.toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
+
+  it('supports modal backdrop click-to-close, unified Settings tabs, custom shortcuts, and starting tunnel with background host connection', async () => {
+    let forwardRules: ForwardRule[] = [];
+    let activeTunnels: ForwardTunnelStatus[] = [];
+    let connectedSavedHostId = '';
+
+    const mockApi = {
+      HealthCheck: async () => 'ok',
+      GetVaultSummary: async () => ({
+        initialized: true,
+        locked: false,
+        hosts: [
+          {
+            id: 'host-prod-1',
+            label: 'Production Web',
+            address: '10.0.0.1',
+            effectivePort: 22,
+            effectiveUser: 'admin',
+            color: '#10b981',
+            authMethod: 'password',
+            hasPassword: true,
+            hasKey: false,
+            keyId: '',
+            groupId: '',
+            tags: ['prod', 'web'],
+          },
+        ],
+        groups: [],
+        keys: [],
+        passwordless: false,
+        quickUnlockArmable: true,
+        quickUnlockArmed: false,
+      }),
+      ListForwardRules: async () => forwardRules,
+      SaveForwardRule: async (r: ForwardRule) => {
+        forwardRules = [r];
+      },
+      DeleteForwardRule: async () => {
+        forwardRules = [];
+      },
+      GetActiveTunnels: async () => activeTunnels,
+      ConnectSavedHost: async (hId: string) => {
+        connectedSavedHostId = hId;
+        return 'sess-bg-prod-1';
+      },
+      StartForwardTunnel: async (_sessId: string, ruleId: string) => {
+        activeTunnels = [
+          {
+            id: 'tun-bg-1',
+            ruleId,
+            sessionId: _sessId,
+            type: 'L',
+            bindAddress: '127.0.0.1',
+            bindPort: 8080,
+            targetHost: '127.0.0.1',
+            targetPort: 80,
+            status: 'active',
+            bytesIn: 100,
+            bytesOut: 200,
+            activeConns: 1,
+          },
+        ];
+        return 'tun-bg-1';
+      },
+      StopForwardTunnel: async () => {
+        activeTunnels = [];
+      },
+    };
+
+    (window as unknown as { go?: { main?: { App?: typeof mockApi } } }).go = {
+      main: { App: mockApi },
+    };
+
+    try {
+      render(<App />);
+
+      // 1. Verify modal backdrop click closes Command Palette
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+      const paletteBackdrop = screen.getByRole('dialog', { name: 'Command Palette' });
+      expect(paletteBackdrop).toBeInTheDocument();
+      // Click on backdrop outer element
+      fireEvent.click(paletteBackdrop);
+      expect(screen.queryByRole('dialog', { name: 'Command Palette' })).not.toBeInTheDocument();
+
+      // 2. Open Global Settings (Ctrl+,), test tabs: Appearance, Vault Security, Shortcuts
+      fireEvent.keyDown(window, { key: ',', ctrlKey: true });
+      const settingsModal = screen.getByRole('dialog', { name: 'Global Settings' });
+      expect(settingsModal).toBeInTheDocument();
+
+      // Switch to Vault & Security tab inside Settings
+      const securityTab = screen.getByRole('tab', { name: /Vault & Security/i });
+      fireEvent.click(securityTab);
+      expect(screen.getByRole('tabpanel', { name: /Vault & Security Settings/i })).toBeInTheDocument();
+      expect(screen.getByText(/Master Password & Encryption/i)).toBeInTheDocument();
+
+      // Switch to Keyboard Shortcuts tab inside Settings
+      const shortcutsTab = screen.getByRole('tab', { name: /Keyboard Shortcuts/i });
+      fireEvent.click(shortcutsTab);
+      expect(screen.getByRole('tabpanel', { name: /Keyboard Shortcuts Settings/i })).toBeInTheDocument();
+      expect(screen.getByText(/Custom Shortcuts/i)).toBeInTheDocument();
+
+      // Add a custom shortcut
+      const addShortcutBtn = screen.getByRole('button', { name: /\+ Add Custom Shortcut/i });
+      fireEvent.click(addShortcutBtn);
+      const keyInput = screen.getByPlaceholderText(/Ctrl \+ Shift \+ P/i);
+      fireEvent.change(keyInput, { target: { value: 'Ctrl + Alt + T' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Shortcut/i }));
+      expect(screen.getByText('Ctrl + Alt + T')).toBeInTheDocument();
+
+      // Click on backdrop outer element to close Settings
+      fireEvent.click(settingsModal);
+      expect(screen.queryByRole('dialog', { name: 'Global Settings' })).not.toBeInTheDocument();
+
+      // 3. Test starting tunnel when no active session exists (connects host in background)
+      // Wait for vault hosts to load
+      expect(await screen.findByText('Production Web')).toBeInTheDocument();
+
+      // Open Port Forwarding modal
+      const tunnelsBtn = screen.getByRole('button', { name: /Port Forwarding/i });
+      fireEvent.click(tunnelsBtn);
+      const forwardModal = screen.getByRole('dialog', { name: 'Port Forwarding & Tunnels' });
+      expect(forwardModal).toBeInTheDocument();
+
+      // Add a forward rule tied to host-prod-1
+      const newRuleBtn = screen.getByRole('button', { name: /\+ New Forward Rule/i });
+      fireEvent.click(newRuleBtn);
+      fireEvent.change(screen.getByLabelText(/Rule Label/i), { target: { value: 'Auto-DB' } });
+      fireEvent.change(screen.getByLabelText(/Associated Host/i), { target: { value: 'host-prod-1' } });
+      fireEvent.click(screen.getByRole('button', { name: /Save Rule/i }));
+
+      // With 0 active sessions, it should present "Connect Production Web & Start Tunnel"
+      const connectAndStartBtn = await screen.findByRole('button', { name: /Connect Production Web & Start Tunnel/i });
+      expect(connectAndStartBtn).toBeInTheDocument();
+
+      // Click Connect & Start Tunnel
+      fireEvent.click(connectAndStartBtn);
+
+      // Verify it called ConnectSavedHost in the background and started tunnel
+      expect(connectedSavedHostId).toBe('host-prod-1');
+      expect(await screen.findByText('ACTIVE')).toBeInTheDocument();
+
+      // Click backdrop of Port Forwarding modal to close it
+      fireEvent.click(forwardModal);
+      expect(screen.queryByRole('dialog', { name: 'Port Forwarding & Tunnels' })).not.toBeInTheDocument();
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }

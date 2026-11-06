@@ -22,6 +22,7 @@ export interface PortForwardingViewProps {
   onSaveRule: (rule: ForwardRule) => Promise<void>;
   onDeleteRule: (ruleId: string) => Promise<void>;
   onStartTunnel: (sessionId: string, ruleId: string) => Promise<void>;
+  onStartTunnelWithHost?: (hostId: string, ruleId: string) => Promise<void>;
   onStopTunnel: (tunnelId: string) => Promise<void>;
   onClose: () => void;
 }
@@ -34,6 +35,7 @@ export function PortForwardingView({
   onSaveRule,
   onDeleteRule,
   onStartTunnel,
+  onStartTunnelWithHost,
   onStopTunnel,
   onClose,
 }: PortForwardingViewProps): React.JSX.Element {
@@ -48,6 +50,8 @@ export function PortForwardingView({
   const [targetPort, setTargetPort] = useState<string>('80');
   const [autoStart, setAutoStart] = useState<boolean>(false);
   const [selectedSessionForStart, setSelectedSessionForStart] = useState<Map<string, string>>(new Map());
+  const [selectedHostForStart, setSelectedHostForStart] = useState<Map<string, string>>(new Map());
+  const [startingRuleId, setStartingRuleId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string>('');
 
   const resetForm = () => {
@@ -137,6 +141,11 @@ export function PortForwardingView({
     <div
       role="dialog"
       aria-label="Port Forwarding & Tunnels"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -679,7 +688,9 @@ export function PortForwardingView({
                                     selectedSessionForStart.get(rule.id) ||
                                     (rule.hostId
                                       ? activeSessions.find((s) => s.hostId === rule.hostId)?.sessionId ||
-                                        activeSessions[0]?.sessionId
+                                        (hosts.some((h) => h.id === rule.hostId)
+                                          ? `host:${rule.hostId}`
+                                          : activeSessions[0]?.sessionId)
                                       : activeSessions[0]?.sessionId) ||
                                     ''
                                   }
@@ -696,23 +707,48 @@ export function PortForwardingView({
                                     fontSize: '11px',
                                   }}
                                 >
-                                  {activeSessions.map((s) => (
-                                    <option key={s.sessionId} value={s.sessionId}>
-                                      Session: {s.title}
-                                    </option>
-                                  ))}
+                                  <optgroup label="Active SSH Sessions">
+                                    {activeSessions.map((s) => (
+                                      <option key={s.sessionId} value={s.sessionId}>
+                                        Session: {s.title}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                  {hosts.length > 0 && onStartTunnelWithHost && (
+                                    <optgroup label="Connect in background">
+                                      {hosts.map((h) => (
+                                        <option key={`host-${h.id}`} value={`host:${h.id}`}>
+                                          ⚡ Connect {h.label} ({h.address})
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  )}
                                 </select>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    const targetSessionId =
+                                  disabled={startingRuleId === rule.id}
+                                  onClick={async () => {
+                                    const targetVal =
                                       selectedSessionForStart.get(rule.id) ||
                                       (rule.hostId
                                         ? activeSessions.find((s) => s.hostId === rule.hostId)?.sessionId ||
-                                          activeSessions[0]?.sessionId
+                                          (hosts.some((h) => h.id === rule.hostId)
+                                            ? `host:${rule.hostId}`
+                                            : activeSessions[0]?.sessionId)
                                         : activeSessions[0]?.sessionId);
-                                    if (targetSessionId) {
-                                      void onStartTunnel(targetSessionId, rule.id);
+                                    if (!targetVal) return;
+                                    setStartingRuleId(rule.id);
+                                    try {
+                                      if (targetVal.startsWith('host:')) {
+                                        const hId = targetVal.slice(5);
+                                        if (onStartTunnelWithHost) {
+                                          await onStartTunnelWithHost(hId, rule.id);
+                                        }
+                                      } else {
+                                        await onStartTunnel(targetVal, rule.id);
+                                      }
+                                    } finally {
+                                      setStartingRuleId(null);
                                     }
                                   }}
                                   style={{
@@ -721,17 +757,103 @@ export function PortForwardingView({
                                     color: '#fff',
                                     border: 'none',
                                     borderRadius: '3px',
-                                    cursor: 'pointer',
+                                    cursor: startingRuleId === rule.id ? 'wait' : 'pointer',
                                     fontWeight: 600,
                                     fontSize: '11px',
                                   }}
                                 >
-                                  ▶ Start Tunnel
+                                  {startingRuleId === rule.id ? 'Starting...' : '▶ Start Tunnel'}
+                                </button>
+                              </div>
+                            ) : associatedHost && onStartTunnelWithHost ? (
+                              <button
+                                type="button"
+                                disabled={startingRuleId === rule.id}
+                                onClick={async () => {
+                                  if (!rule.hostId) return;
+                                  setStartingRuleId(rule.id);
+                                  try {
+                                    await onStartTunnelWithHost(rule.hostId, rule.id);
+                                  } finally {
+                                    setStartingRuleId(null);
+                                  }
+                                }}
+                                style={{
+                                  padding: '3px 10px',
+                                  backgroundColor: '#238636',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '3px',
+                                  cursor: startingRuleId === rule.id ? 'wait' : 'pointer',
+                                  fontWeight: 600,
+                                  fontSize: '11px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                                title={`Connects to ${associatedHost.label} in background and starts the tunnel`}
+                              >
+                                {startingRuleId === rule.id
+                                  ? '⏳ Connecting...'
+                                  : `⚡ Connect ${associatedHost.label} & Start Tunnel`}
+                              </button>
+                            ) : hosts.length > 0 && onStartTunnelWithHost ? (
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <select
+                                  value={selectedHostForStart.get(rule.id) || hosts[0]?.id || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSelectedHostForStart((prev) => new Map(prev.set(rule.id, val)));
+                                  }}
+                                  style={{
+                                    padding: '3px 6px',
+                                    backgroundColor: '#21262d',
+                                    color: '#c9d1d9',
+                                    border: '1px solid #30363d',
+                                    borderRadius: '3px',
+                                    fontSize: '11px',
+                                  }}
+                                >
+                                  {hosts.map((h) => (
+                                    <option key={h.id} value={h.id}>
+                                      {h.label} ({h.address})
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  disabled={startingRuleId === rule.id}
+                                  onClick={async () => {
+                                    const targetHostId =
+                                      selectedHostForStart.get(rule.id) || hosts[0]?.id;
+                                    if (!targetHostId) return;
+                                    setStartingRuleId(rule.id);
+                                    try {
+                                      await onStartTunnelWithHost(targetHostId, rule.id);
+                                    } finally {
+                                      setStartingRuleId(null);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '3px 10px',
+                                    backgroundColor: '#238636',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '3px',
+                                    cursor: startingRuleId === rule.id ? 'wait' : 'pointer',
+                                    fontWeight: 600,
+                                    fontSize: '11px',
+                                  }}
+                                  title="Connect to selected host in background and start tunnel"
+                                >
+                                  {startingRuleId === rule.id
+                                    ? '⏳ Connecting...'
+                                    : '⚡ Connect & Start Tunnel'}
                                 </button>
                               </div>
                             ) : (
                               <span style={{ fontSize: '11px', color: '#8b949e' }}>
-                                Connect to an SSH session to start this tunnel.
+                                Connect to an SSH session or add a host to start this tunnel.
                               </span>
                             )}
                           </>

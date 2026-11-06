@@ -1566,6 +1566,16 @@ func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error
 		return "", fmt.Errorf("forward rule %s not found in vault", ruleID)
 	}
 
+	a.mu.Lock()
+	for _, t := range a.activeTunnels {
+		st := t.GetStatus()
+		if st.Status == "active" && (st.RuleID == ruleID || st.ID == ruleID) {
+			a.mu.Unlock()
+			return st.ID, nil
+		}
+	}
+	a.mu.Unlock()
+
 	var tunnel core.ForwardTunnel
 	switch targetRule.Type {
 	case core.ForwardLocal:

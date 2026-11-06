@@ -16,6 +16,7 @@ import {
 import { SignalAnalyzerView } from './components/SignalAnalyzerView';
 import { SftpBrowserView } from './components/SftpBrowserView';
 import { PortForwardingView } from './components/PortForwardingView';
+import { SettingsView } from './components/SettingsView';
 import { FileItem, TransferTask } from './types/sftp';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 
@@ -178,7 +179,7 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp';
+  tabType?: 'terminal' | 'sftp' | 'settings';
   sftpSessionId?: string;
 }
 
@@ -741,6 +742,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     loadSettingsFromStorage()
   );
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
+  const [settingsActiveTab, setSettingsActiveTab] = useState<'appearance' | 'security' | 'shortcuts'>('appearance');
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
 
   // Port Forwarding & Tunnels State (F-13)
@@ -931,6 +933,39 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       };
       setTabs((prev) => [...prev, newTab]);
       setActiveTabId(tabId);
+    },
+    []
+  );
+
+  const openSettingsTab = useCallback(
+    (subTab: 'appearance' | 'security' | 'shortcuts' = 'appearance'): void => {
+      setSettingsActiveTab(subTab);
+      setTabs((prev) => {
+        const existingTab = prev.find((t) => t.tabType === 'settings');
+        if (existingTab) {
+          setActiveTabId(existingTab.id);
+          return prev;
+        }
+        tabCounterRef.current += 1;
+        const seq = tabCounterRef.current;
+        const tabId = `settings-tab-${seq}`;
+        const paneId = `settings-pane-${seq}-1`;
+        const newTab: TabItem = {
+          id: tabId,
+          title: 'Settings ⚙',
+          color: '#2dd4bf',
+          tabType: 'settings',
+          rootNode: {
+            type: 'pane',
+            id: paneId,
+            sessionId: `settings-${seq}`,
+            title: 'Settings ⚙',
+          },
+          activePaneId: paneId,
+        };
+        setActiveTabId(tabId);
+        return [...prev, newTab];
+      });
     },
     []
   );
@@ -1437,6 +1472,29 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
   };
 
+  const handleChangePasswordDirect = async (currPw: string, nextPw: string): Promise<void> => {
+    setModalError('');
+    const api = getWailsBindings();
+    if (!api) {
+      setPasswordless(nextPw === '');
+      setStatusMessage('Password updated in preview mode.');
+      return;
+    }
+    try {
+      await api.ChangeVaultPassword(passwordless ? '' : currPw, nextPw);
+      await refreshVaultState();
+      setStatusMessage(
+        nextPw === ''
+          ? 'Master password removed (vault is now in passwordless mode).'
+          : 'Master password updated and vault re-encrypted.'
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setModalError(`Password update failed: ${msg}`);
+      throw err;
+    }
+  };
+
   const handleResetVault = async (): Promise<void> => {
     setModalError('');
     const api = getWailsBindings();
@@ -1685,6 +1743,29 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setStatusMessage(`Start tunnel failed: ${msg}`);
+    }
+  };
+
+  const handleStartTunnelWithHost = async (hostId: string, ruleId: string): Promise<void> => {
+    const host = vaultSummary.hosts.find((h) => h.id === hostId);
+    const api = getWailsBindings();
+    if (!api?.ConnectSavedHost || !api?.StartForwardTunnel) {
+      setStatusMessage('Wails backend not available to connect and start tunnel.');
+      return;
+    }
+    setStatusMessage(`Connecting to ${host ? host.label : hostId} in background...`);
+    try {
+      const sessionId = await api.ConnectSavedHost(hostId, { cols: 80, rows: 24 });
+      if (host) {
+        openSessionTab(sessionId, host.label, host.id, host.color);
+      }
+      await api.StartForwardTunnel(sessionId, ruleId);
+      await refreshForwardState();
+      setStatusMessage(`Started tunnel on ${host ? host.label : hostId} (connected in background).`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`Failed to connect & start tunnel: ${msg}`);
+      throw err;
     }
   };
 
@@ -2825,7 +2906,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     onClick={() => {
                       setActiveDropdownMenu(null);
                       setModalError('');
-                      setShowSettingsModal(true);
+                      openSettingsTab('security');
                     }}
                   >
                     <span>Vault Security &amp; Hello (F-03)</span>
@@ -3231,7 +3312,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             <button
               type="button"
               className="nav-menu-trigger"
-              onClick={() => setShowGlobalSettingsModal(true)}
+              onClick={() => {
+                setSettingsActiveTab('appearance');
+                setShowGlobalSettingsModal(true);
+              }}
               title="Global Settings (Ctrl+,)"
               aria-label="Settings ⚙"
             >
@@ -3330,7 +3414,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     className="btn-secondary btn-sm"
                     onClick={() => {
                       setModalError('');
-                      setShowSettingsModal(true);
+                      openSettingsTab('security');
                     }}
                   >
                     Vault Security
@@ -3338,7 +3422,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
-                    onClick={() => setShowGlobalSettingsModal(true)}
+                    onClick={() => openSettingsTab('appearance')}
                     title="Global Settings (Ctrl+,)"
                   >
                     Global Settings
@@ -3834,6 +3918,23 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         eventsOn={getWailsRuntime()?.EventsOn}
                         onClose={() => void handleCloseTab(tab.id)}
                       />
+                    ) : tab.tabType === 'settings' ? (
+                      <SettingsView
+                        activeTab={settingsActiveTab}
+                        onTabChange={setSettingsActiveTab}
+                        globalSettings={globalSettings}
+                        onUpdateSettings={handleUpdateSettings}
+                        onResetSettings={handleResetSettings}
+                        vaultLocked={vaultLocked}
+                        passwordless={passwordless}
+                        helloPending={helloPending}
+                        quickUnlockReady={quickUnlockReady}
+                        modalError={modalError}
+                        onEnableQuickUnlock={handleEnableQuickUnlock}
+                        onChangePassword={handleChangePasswordDirect}
+                        onResetVault={handleResetVault}
+                        isModal={false}
+                      />
                     ) : (
                       renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)
                     )}
@@ -3941,7 +4042,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       </div>
 
       {showCommandPalette && (
-        <div className="modal-backdrop" role="dialog" aria-label="Command Palette">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Command Palette"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCommandPalette(false);
+            }
+          }}
+        >
           <div className="modal-card palette-card">
             <h2>Command Palette &amp; Quick Connect (F-02)</h2>
             <p>
@@ -4049,7 +4159,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       )}
 
       {showAddGroupModal && (
-        <div className="modal-backdrop" role="dialog" aria-label="New Host Group">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="New Host Group"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddGroupModal(false);
+            }
+          }}
+        >
           <form className="modal-card" onSubmit={(e) => void handleSaveGroup(e)}>
             <h2>New Host Group (F-01)</h2>
             <p>Hosts in this group inherit its default Port, Username, and Keepalive.</p>
@@ -4114,7 +4233,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       )}
 
       {showAddHostModal && (
-        <div className="modal-backdrop" role="dialog" aria-label="New Host">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="New Host"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddHostModal(false);
+            }
+          }}
+        >
           <form className="modal-card" onSubmit={(e) => void handleSaveHost(e)}>
             <h2>New SSH Host (F-01)</h2>
             <p>Leave Port at 0 or Username empty to inherit from the selected Group.</p>
@@ -4251,7 +4379,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       )}
 
       {showKeychainModal && (
-        <div className="modal-backdrop" role="dialog" aria-label="SSH Keychain">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="SSH Keychain"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowKeychainModal(false);
+            }
+          }}
+        >
           <div className="modal-card palette-card">
             <h2>SSH Keychain (F-04)</h2>
             <p>
@@ -4347,7 +4484,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       )}
 
       {showSSHConfigModal && (
-        <div className="modal-backdrop" role="dialog" aria-label="Import SSH Config">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Import SSH Config"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowSSHConfigModal(false);
+            }
+          }}
+        >
           <form className="modal-card palette-card" onSubmit={(e) => void handleImportSSHConfig(e)}>
             <h2>Import OpenSSH Config (F-22)</h2>
             <p>
@@ -4395,7 +4541,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       )}
 
       {showVaultModal && !vaultInitialized && (
-        <div className="modal-backdrop" role="dialog" aria-label="Initialize Vault">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Initialize Vault"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowVaultModal(false);
+            }
+          }}
+        >
           <div className="modal-card">
             <h2>Initialize Encrypted Vault (F-03)</h2>
             <p>
@@ -4464,7 +4619,17 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       )}
 
       {showVaultModal && vaultInitialized && (
-        <div className="modal-backdrop" role="dialog" aria-label="Unlock Vault">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Unlock Vault"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowVaultModal(false);
+              setMasterPassword('');
+            }
+          }}
+        >
           <form className="modal-card" onSubmit={(e) => void handleVaultUnlock(e)}>
             <h2>Unlock Encrypted Vault (F-03)</h2>
             <p>
@@ -4527,7 +4692,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       )}
 
       {showSettingsModal && (
-        <div className="modal-backdrop" role="dialog" aria-label="Vault Security Settings">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Vault Security Settings"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowSettingsModal(false);
+            }
+          }}
+        >
           <form className="modal-card" onSubmit={(e) => void handleChangePassword(e)}>
             <h2>Vault Security &amp; Windows Hello (F-03)</h2>
             <p>
@@ -4589,7 +4763,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       )}
 
       {hostKeyPrompt && (
-        <div className="modal-backdrop" role="dialog" aria-label="Verify SSH Host Key">
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Verify SSH Host Key"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              void handleHostKeyDecision(false);
+            }
+          }}
+        >
           <div className="modal-card">
             <h2>Verify Unknown Host Key (F-06)</h2>
             <p>
@@ -4632,207 +4815,27 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             }
           }}
         >
-          <div className="modal-card settings-card">
-            <h2>Global Settings (F-08)</h2>
-            <p>Customize terminal appearance, default font parameters, and color themes.</p>
-
-            <div className="settings-grid">
-              <section className="settings-section">
-                <h3>Color Theme</h3>
-                <div className="theme-options-grid">
-                  {(
-                    [
-                      { id: 'teal', label: 'Teal (Cyber)', swatch: '#2dd4bf' },
-                      { id: 'dracula', label: 'Dracula', swatch: '#bd93f9' },
-                      { id: 'one-dark', label: 'One Dark', swatch: '#61afef' },
-                      { id: 'nord', label: 'Nord', swatch: '#88c0d0' },
-                      { id: 'monokai', label: 'Monokai Pro', swatch: '#ffd866' },
-                      { id: 'crimson', label: 'Crimson', swatch: '#f43f5e' },
-                    ] as const
-                  ).map((th) => (
-                    <button
-                      key={th.id}
-                      type="button"
-                      className={`theme-card-btn ${globalSettings.colorTheme === th.id ? 'active' : ''}`}
-                      onClick={() => handleUpdateSettings({ colorTheme: th.id })}
-                    >
-                      <span className="theme-swatch" style={{ backgroundColor: th.swatch }} />
-                      <span>{th.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="settings-section">
-                <h3>Terminal Font &amp; Layout</h3>
-                <div className="settings-field-row">
-                  <label htmlFor="setting-font-family">Font Family</label>
-                  <select
-                    id="setting-font-family"
-                    aria-label="Font Family"
-                    value={globalSettings.fontFamily}
-                    onChange={(e) => handleUpdateSettings({ fontFamily: e.target.value })}
-                  >
-                    <option value="'Cascadia Code', 'JetBrains Mono', Consolas, monospace">
-                      Cascadia Code (Recommended)
-                    </option>
-                    <option value="'JetBrains Mono', Consolas, monospace">JetBrains Mono</option>
-                    <option value="'Fira Code', Consolas, monospace">Fira Code</option>
-                    <option value="Consolas, 'Courier New', monospace">Consolas</option>
-                    <option value="'Source Code Pro', Consolas, monospace">Source Code Pro</option>
-                    <option value="monospace">System Monospace</option>
-                  </select>
-                </div>
-
-                <div className="settings-field-row">
-                  <label htmlFor="setting-font-size">Default Font Size</label>
-                  <input
-                    id="setting-font-size"
-                    aria-label="Default Font Size"
-                    type="number"
-                    min={9}
-                    max={32}
-                    value={globalSettings.fontSize}
-                    onChange={(e) =>
-                      handleUpdateSettings({ fontSize: Number(e.target.value) || 14 })
-                    }
-                  />
-                </div>
-
-                <div className="settings-field-row">
-                  <label htmlFor="setting-line-height">Line Height</label>
-                  <select
-                    id="setting-line-height"
-                    aria-label="Line Height"
-                    value={globalSettings.lineHeight}
-                    onChange={(e) =>
-                      handleUpdateSettings({ lineHeight: Number(e.target.value) || 1.2 })
-                    }
-                  >
-                    <option value="1.0">1.0 (Compact)</option>
-                    <option value="1.1">1.1 (Standard)</option>
-                    <option value="1.2">1.2 (Comfortable - Default)</option>
-                    <option value="1.3">1.3 (Spacious)</option>
-                    <option value="1.4">1.4 (Loose)</option>
-                  </select>
-                </div>
-
-                <div className="settings-field-row">
-                  <label htmlFor="setting-cursor-style">Cursor Style</label>
-                  <select
-                    id="setting-cursor-style"
-                    aria-label="Cursor Style"
-                    value={globalSettings.cursorStyle}
-                    onChange={(e) =>
-                      handleUpdateSettings({
-                        cursorStyle: e.target.value as 'block' | 'underline' | 'bar',
-                      })
-                    }
-                  >
-                    <option value="block">Block</option>
-                    <option value="underline">Underline</option>
-                    <option value="bar">Bar</option>
-                  </select>
-                </div>
-
-                <div className="settings-field-row">
-                  <label htmlFor="setting-cursor-blink">Cursor Blink</label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                    <input
-                      id="setting-cursor-blink"
-                      aria-label="Cursor Blink"
-                      type="checkbox"
-                      style={{ width: 'auto' }}
-                      checked={globalSettings.cursorBlink}
-                      onChange={(e) => handleUpdateSettings({ cursorBlink: e.target.checked })}
-                    />
-                    <span>Blink cursor when active</span>
-                  </label>
-                </div>
-
-                <div className="settings-field-row">
-                  <label htmlFor="setting-scrollback">Scrollback Lines</label>
-                  <select
-                    id="setting-scrollback"
-                    aria-label="Scrollback Lines"
-                    value={globalSettings.scrollback}
-                    onChange={(e) =>
-                      handleUpdateSettings({ scrollback: Number(e.target.value) || 10000 })
-                    }
-                  >
-                    <option value="5000">5,000 lines</option>
-                    <option value="10000">10,000 lines (Default)</option>
-                    <option value="20000">20,000 lines</option>
-                    <option value="50000">50,000 lines</option>
-                  </select>
-                </div>
-              </section>
-
-              <section className="settings-section">
-                <h3>Keyboard Shortcuts</h3>
-                <table className="shortcuts-table">
-                  <thead>
-                    <tr>
-                      <th>Action</th>
-                      <th>Shortcut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>Global Settings</td>
-                      <td><code>Ctrl + ,</code></td>
-                    </tr>
-                    <tr>
-                      <td>Command Palette</td>
-                      <td><code>Ctrl + K</code></td>
-                    </tr>
-                    <tr>
-                      <td>Zoom In / Out Pane Font</td>
-                      <td><code>Ctrl + +</code> / <code>Ctrl + -</code> or <code>Ctrl + Wheel</code></td>
-                    </tr>
-                    <tr>
-                      <td>Reset Pane Font Size</td>
-                      <td><code>Ctrl + 0</code></td>
-                    </tr>
-                    <tr>
-                      <td>Cycle Active Tabs</td>
-                      <td><code>Alt + ←</code> / <code>Alt + →</code></td>
-                    </tr>
-                    <tr>
-                      <td>Cycle Active Panes</td>
-                      <td><code>Alt + ↑</code> / <code>Alt + ↓</code></td>
-                    </tr>
-                    <tr>
-                      <td>New Session Tab</td>
-                      <td><code>Alt + N</code></td>
-                    </tr>
-                    <tr>
-                      <td>Close Active Pane / Tab</td>
-                      <td><code>Alt + W</code></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </section>
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: '1rem' }}>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={handleResetSettings}
-                title="Restore default settings"
-              >
-                Reset to Defaults
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => setShowGlobalSettingsModal(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
+          <SettingsView
+            activeTab={settingsActiveTab}
+            onTabChange={setSettingsActiveTab}
+            globalSettings={globalSettings}
+            onUpdateSettings={handleUpdateSettings}
+            onResetSettings={handleResetSettings}
+            vaultLocked={vaultLocked}
+            passwordless={passwordless}
+            helloPending={helloPending}
+            quickUnlockReady={quickUnlockReady}
+            modalError={modalError}
+            onEnableQuickUnlock={handleEnableQuickUnlock}
+            onChangePassword={handleChangePasswordDirect}
+            onResetVault={handleResetVault}
+            onOpenAsTab={() => {
+              setShowGlobalSettingsModal(false);
+              openSettingsTab(settingsActiveTab);
+            }}
+            onClose={() => setShowGlobalSettingsModal(false)}
+            isModal={true}
+          />
         </div>
       )}
       {showSerialModal && (
@@ -5203,6 +5206,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           onSaveRule={handleSaveForwardRule}
           onDeleteRule={handleDeleteForwardRule}
           onStartTunnel={handleStartForwardTunnel}
+          onStartTunnelWithHost={handleStartTunnelWithHost}
           onStopTunnel={handleStopForwardTunnel}
           onClose={() => setShowPortForwardingModal(false)}
         />

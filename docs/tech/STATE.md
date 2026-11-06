@@ -41,9 +41,17 @@
     - Dedicated management modal triggered via top navigation bar button (`⚡ N Tunnels` / `Tunnels ⇄`) and **Tools ▾ -> Port Forwarding (-L, -R, -D)**.
     - Comprehensive unit tests in `frontend/src/App.test.tsx`.
     - Standalone binary verified with `wails build`.
+- **UX Polish & Settings Unification**:
+  - **Background Host Connection for Forward Tunnels**: When starting a forward tunnel without an active SSH session, DoubleAgent automatically connects to the rule's associated host in the background via `ConnectSavedHost` and initializes the tunnel.
+  - **Modal Backdrop Click-to-Close**: Clicking the dark background overlay (`e.target === e.currentTarget`) dismisses all modals and dialogs (Port Forwarding, Command Palette, New Host, New Group, Keychain, Import Config, Vault Setup/Unlock, Settings, Host Key Prompt, Serial).
+  - **Unified Settings Tab System (`SettingsView`)**: Consolidated Global Settings into a tabbed interface (Appearance & Terminal, Vault & Security, Keyboard Shortcuts) accessible both as a modal and as a dedicated persistent workspace tab.
 
 ## In Progress
-- None (`F-13` completed and verified).
+- None.
 
-## Next
+## Next (TODO List)
+- **Creating Custom Shortcuts (Custom Keybindings & Action Shortcuts Manager)**:
+  - Allow users to create, customize, and persist keybindings for any DoubleAgent action (e.g. Quick Connect, Open Terminal in Directory, Split Panes, Port Forwarding, Snippet Execution).
+  - Configurable prefix/leader key (e.g. `Ctrl+B` or `Ctrl+A`) to eliminate shortcut collisions with terminal CLI applications (e.g. `nano`, `vim`, `htop`).
+  - Shortcut conflict detector and one-click reset to factory defaults.
 - **`F-14` (Proxy Profiles: ProxyJump, ProxyCommand, and proxychains Export)**.
