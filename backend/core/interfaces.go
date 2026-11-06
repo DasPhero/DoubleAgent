@@ -123,6 +123,7 @@ type SshShellStreams struct {
 type SshTransport interface {
 	Connect(ctx context.Context, cfg SshSessionConfig) (sessionID string, err error)
 	OpenShell(ctx context.Context, sessionID string, size TerminalSize) (*SshShellStreams, error)
+	OpenShellWithOptions(ctx context.Context, sessionID string, size TerminalSize, initialDir string, asRoot bool) (*SshShellStreams, error)
 	ResizeShell(ctx context.Context, sessionID string, size TerminalSize) error
 	Disconnect(ctx context.Context, sessionID string) error
 }
@@ -133,6 +134,14 @@ type TerminalSize struct {
 	Rows uint16 `json:"rows"`
 }
 
+// TerminalSpawnOptions configures how a new terminal is opened in relation to working directory and privileges (F-10).
+type TerminalSpawnOptions struct {
+	Mode       string       `json:"mode"`       // "default", "current", "root"
+	WorkingDir string       `json:"workingDir"` // CWD path
+	SplitDir   string       `json:"splitDir"`   // "none", "horizontal", "vertical"
+	Size       TerminalSize `json:"size"`
+}
+
 // TerminalEngine defines the strict boundary interface for local PTY or remote shell I/O.
 // Implementations live in backend/pty or backend/ssh; backend/core never imports PTY packages.
 type TerminalEngine interface {
@@ -141,7 +150,7 @@ type TerminalEngine interface {
 	Close(ctx context.Context, sessionID string) error
 }
 
-// HostRecord represents a configured SSH target stored inside the encrypted vault (Spec Section 8, F-01).
+// HostRecord represents a configured SSH target stored inside the encrypted vault (Spec Section 8, F-01, F-10).
 type HostRecord struct {
 	ID             string   `json:"id"`
 	Label          string   `json:"label"`
@@ -149,6 +158,7 @@ type HostRecord struct {
 	Port           uint16   `json:"port"`
 	GroupID        string   `json:"groupId,omitempty"`
 	IdentityID     string   `json:"identityId,omitempty"`
+	InitialDir     string   `json:"initialDir,omitempty"`
 	Tags           []string `json:"tags,omitempty"`
 	Color          string   `json:"color,omitempty"`
 	Favorite       bool     `json:"favorite,omitempty"`
@@ -156,11 +166,12 @@ type HostRecord struct {
 	ForwardRuleIDs []string `json:"forwardRuleIds,omitempty"`
 }
 
-// GroupDefaults holds inheritable connection settings for a host group (F-01).
+// GroupDefaults holds inheritable connection settings for a host group (F-01, F-10).
 type GroupDefaults struct {
 	Port          uint16 `json:"port,omitempty"`
 	Username      string `json:"username,omitempty"`
 	IdentityID    string `json:"identityId,omitempty"`
+	InitialDir    string `json:"initialDir,omitempty"`
 	KeepaliveSecs uint16 `json:"keepaliveSecs,omitempty"`
 }
 

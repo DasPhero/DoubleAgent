@@ -46,6 +46,8 @@ export function LockVault():Promise<void>;
 
 export function OpenLocalTerminal(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
+export function OpenTerminalWithOptions(arg1:string,arg2:core.TerminalSpawnOptions):Promise<string>;
+
 export function ResetVault():Promise<void>;
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;

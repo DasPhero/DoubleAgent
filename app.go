@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -593,26 +594,144 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 
 // DuplicateSession opens a parallel SSH, local shell, or fails for serial (used when splitting a pane horizontally or vertically per F-08).
 func (a *App) DuplicateSession(sessionID string, size core.TerminalSize) (string, error) {
+	return a.OpenTerminalWithOptions(sessionID, core.TerminalSpawnOptions{
+		Mode: "current",
+		Size: size,
+	})
+}
+
+// OpenTerminalWithOptions opens a new terminal session (as a new tab or split pane) with custom directory and root options (F-10).
+// Mode can be "default", "current", or "root".
+func (a *App) OpenTerminalWithOptions(targetSessionID string, opts core.TerminalSpawnOptions) (string, error) {
 	a.mu.Lock()
-	locSess, isLocal := a.localSessions[sessionID]
-	_, isSerial := a.serialSessions[sessionID]
-	hostID := a.sessionHostID[sessionID]
-	req, hasReq := a.sessionRequests[sessionID]
+	locSess, isLocal := a.localSessions[targetSessionID]
+	_, isSerial := a.serialSessions[targetSessionID]
+	hostID := a.sessionHostID[targetSessionID]
+	req, hasReq := a.sessionRequests[targetSessionID]
 	a.mu.Unlock()
 
-	if isLocal && locSess != nil {
-		return a.OpenLocalTerminal(locSess.ShellType(), size)
+	size := opts.Size
+	if size.Cols == 0 {
+		size.Cols = 80
 	}
+	if size.Rows == 0 {
+		size.Rows = 24
+	}
+
+	asRoot := opts.Mode == "root"
+	workingDir := ""
+	if opts.Mode == "current" || opts.Mode == "root" {
+		workingDir = strings.TrimSpace(opts.WorkingDir)
+	}
+
 	if isSerial {
 		return "", errors.New("cannot duplicate serial connection; port is already open")
 	}
-	if hostID != "" {
-		return a.ConnectSavedHost(hostID, size)
+
+	if isLocal && locSess != nil {
+		ptyOpts := pty.ShellOptions{
+			ShellType:  locSess.ShellType(),
+			WorkingDir: workingDir,
+			AsRoot:     asRoot,
+			Size:       size,
+		}
+		sess, err := pty.StartShellWithOptions(a.ctx, ptyOpts)
+		if err != nil {
+			return "", err
+		}
+		newID := sess.ID()
+		a.mu.Lock()
+		a.localSessions[newID] = sess
+		a.mu.Unlock()
+		go a.streamReaderLoop(newID, sess.Stdout(), true)
+		return newID, nil
 	}
+
+	if hostID != "" {
+		payload, err := a.vaultStore.GetPayload()
+		if err != nil {
+			return "", err
+		}
+		resolved, err := core.ResolveEffectiveHost(hostID, payload)
+		if err != nil {
+			return "", err
+		}
+
+		if opts.Mode == "default" && resolved.InitialDir != "" {
+			workingDir = resolved.InitialDir
+		}
+
+		sessionID, err := a.transport.Connect(a.ctx, core.SshSessionConfig{
+			HostID:   resolved.HostID,
+			Address:  resolved.Address,
+			Port:     resolved.Port,
+			Username: resolved.Username,
+			Auth:     resolved.Auth,
+			OnFirstSeenKey: func(info core.HostKeyInfo) (bool, error) {
+				return a.promptHostKeyTOFU(info)
+			},
+		})
+		if err != nil {
+			return "", err
+		}
+
+		streams, err := a.transport.OpenShellWithOptions(a.ctx, sessionID, size, workingDir, asRoot)
+		if err != nil {
+			_ = a.transport.Disconnect(a.ctx, sessionID)
+			return "", err
+		}
+
+		a.mu.Lock()
+		a.activeStreams[sessionID] = streams
+		a.sessionHostID[sessionID] = hostID
+		if resolved.Auth.Password != "" {
+			a.sessionPasswords[sessionID] = resolved.Auth.Password
+		}
+		a.mu.Unlock()
+
+		go a.streamReaderLoop(sessionID, streams.Stdout, true)
+		go a.streamReaderLoop(sessionID, streams.Stderr, false)
+		return sessionID, nil
+	}
+
 	if hasReq {
 		req.Size = size
-		return a.ConnectSSH(req)
+		sessionID, err := a.transport.Connect(a.ctx, core.SshSessionConfig{
+			HostID:   req.Address,
+			Address:  req.Address,
+			Port:     req.Port,
+			Username: req.Username,
+			Auth: core.SshAuthConfig{
+				Method:   core.AuthPassword,
+				Password: req.Password,
+			},
+			OnFirstSeenKey: func(info core.HostKeyInfo) (bool, error) {
+				return a.promptHostKeyTOFU(info)
+			},
+		})
+		if err != nil {
+			return "", err
+		}
+
+		streams, err := a.transport.OpenShellWithOptions(a.ctx, sessionID, size, workingDir, asRoot)
+		if err != nil {
+			_ = a.transport.Disconnect(a.ctx, sessionID)
+			return "", err
+		}
+
+		a.mu.Lock()
+		a.activeStreams[sessionID] = streams
+		a.sessionRequests[sessionID] = req
+		if req.Password != "" {
+			a.sessionPasswords[sessionID] = req.Password
+		}
+		a.mu.Unlock()
+
+		go a.streamReaderLoop(sessionID, streams.Stdout, true)
+		go a.streamReaderLoop(sessionID, streams.Stderr, false)
+		return sessionID, nil
 	}
+
 	return "", core.ErrSessionNotFound
 }
 

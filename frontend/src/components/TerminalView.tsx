@@ -135,6 +135,38 @@ interface PoolEntry {
 const terminalPool = new Map<string, PoolEntry>();
 const inputCallbacks = new Map<string, (data: string) => void>();
 const resizeCallbacks = new Map<string, (cols: number, rows: number) => void>();
+const sessionCwdMap = new Map<string, string>();
+
+export function getSessionCwd(sessionId: string): string | undefined {
+  return sessionCwdMap.get(sessionId);
+}
+
+export function setSessionCwd(sessionId: string, cwd: string): void {
+  if (cwd) {
+    sessionCwdMap.set(sessionId, cwd);
+  }
+}
+
+export function parseOsc7Url(url: string): string | null {
+  try {
+    let clean = url.trim();
+    if (!clean.startsWith('file://')) {
+      return null;
+    }
+    clean = clean.slice(7);
+    const slashIdx = clean.indexOf('/');
+    if (slashIdx !== -1) {
+      clean = clean.slice(slashIdx);
+    }
+    let decoded = decodeURIComponent(clean);
+    if (/^\/[a-zA-Z]:/.test(decoded)) {
+      decoded = decoded.slice(1);
+    }
+    return decoded;
+  } catch {
+    return null;
+  }
+}
 
 export function getTerminalFontSize(sessionId: string): number {
   return terminalPool.get(sessionId)?.currentFontSize || 14;
@@ -200,6 +232,7 @@ export function disposeTerminal(sessionId: string): void {
     terminalPool.delete(sessionId);
     inputCallbacks.delete(sessionId);
     resizeCallbacks.delete(sessionId);
+    sessionCwdMap.delete(sessionId);
   }
 }
 
@@ -279,6 +312,7 @@ export interface TerminalViewProps {
   settings?: AppGlobalSettings;
   onFontSizeChange?: (sessionId: string, newSize: number) => void;
   onToggleSearch?: (sessionId: string) => void;
+  onCwdChange?: (sessionId: string, cwd: string) => void;
 }
 
 export function TerminalView({
@@ -290,6 +324,7 @@ export function TerminalView({
   settings,
   onFontSizeChange,
   onToggleSearch,
+  onCwdChange,
 }: TerminalViewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -301,6 +336,8 @@ export function TerminalView({
   onFontSizeChangeRef.current = onFontSizeChange;
   const onToggleSearchRef = useRef(onToggleSearch);
   onToggleSearchRef.current = onToggleSearch;
+  const onCwdChangeRef = useRef(onCwdChange);
+  onCwdChangeRef.current = onCwdChange;
   const registerWriterRef = useRef(registerWriter);
   registerWriterRef.current = registerWriter;
   const registerFocuserRef = useRef(registerFocuser);
@@ -402,6 +439,20 @@ export function TerminalView({
       const resizeDisposable = term.onResize(({ cols, rows }) => {
         resizeCallbacks.get(sessionId)?.(cols, rows);
       });
+
+      // OSC 7 Working Directory reporting (F-10)
+      try {
+        term.parser.registerOscHandler(7, (data: string) => {
+          const parsed = parseOsc7Url(data);
+          if (parsed) {
+            sessionCwdMap.set(sessionId, parsed);
+            onCwdChangeRef.current?.(sessionId, parsed);
+          }
+          return true;
+        });
+      } catch {
+        // Ignore parser registration errors in mock environments
+      }
 
       entry = {
         term,

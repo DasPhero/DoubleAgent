@@ -58,9 +58,14 @@ func (s *unixPtySession) Close() error {
 	return nil
 }
 
-func startPlatformShell(ctx context.Context, shellType string, _ core.TerminalSize) (Session, error) {
-	normType := strings.ToLower(strings.TrimSpace(shellType))
+func startPlatformShell(ctx context.Context, shellType string, size core.TerminalSize) (Session, error) {
+	return startPlatformShellWithOptions(ctx, ShellOptions{ShellType: shellType, Size: size})
+}
+
+func startPlatformShellWithOptions(ctx context.Context, opts ShellOptions) (Session, error) {
+	normType := strings.ToLower(strings.TrimSpace(opts.ShellType))
 	var binary string
+	var args []string
 	var title string
 	switch normType {
 	case "bash", "bash.exe":
@@ -79,7 +84,16 @@ func startPlatformShell(ctx context.Context, shellType string, _ core.TerminalSi
 		}
 	}
 
-	cmd := exec.CommandContext(ctx, binary)
+	if opts.AsRoot {
+		title += " (Root)"
+		args = []string{"-i"}
+		binary = "sudo"
+	}
+
+	cmd := exec.CommandContext(ctx, binary, args...)
+	if opts.WorkingDir != "" {
+		cmd.Dir = opts.WorkingDir
+	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("stdin pipe: %w", err)

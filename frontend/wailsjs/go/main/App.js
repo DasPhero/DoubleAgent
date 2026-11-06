@@ -90,6 +90,10 @@ export function OpenLocalTerminal(arg1, arg2) {
   return window['go']['main']['App']['OpenLocalTerminal'](arg1, arg2);
 }
 
+export function OpenTerminalWithOptions(arg1, arg2) {
+  return window['go']['main']['App']['OpenTerminalWithOptions'](arg1, arg2);
+}
+
 export function ResetVault() {
   return window['go']['main']['App']['ResetVault']();
 }

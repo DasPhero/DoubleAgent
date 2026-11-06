@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -13,11 +14,12 @@ import (
 )
 
 type fakeSshTransport struct {
-	mu          sync.Mutex
-	stdinBuf    bytes.Buffer
-	stdoutR     *io.PipeReader
-	stdoutW     *io.PipeWriter
-	lastResize  core.TerminalSize
+	mu           sync.Mutex
+	connCount    int
+	stdinBuf     bytes.Buffer
+	stdoutR      *io.PipeReader
+	stdoutW      *io.PipeWriter
+	lastResize   core.TerminalSize
 	disconnected bool
 }
 
@@ -41,7 +43,11 @@ func (f *fakeSshTransport) Connect(_ context.Context, cfg core.SshSessionConfig)
 			return "", core.ErrHostKeyUntrusted
 		}
 	}
-	return "sess-1", nil
+	f.mu.Lock()
+	f.connCount++
+	id := fmt.Sprintf("sess-%d", f.connCount)
+	f.mu.Unlock()
+	return id, nil
 }
 
 type nopCloserWriter struct {
@@ -59,6 +65,10 @@ func (f *fakeSshTransport) OpenShell(_ context.Context, _ string, size core.Term
 		Stdout: f.stdoutR,
 		Stderr: nil,
 	}, nil
+}
+
+func (f *fakeSshTransport) OpenShellWithOptions(ctx context.Context, sessionID string, size core.TerminalSize, _ string, _ bool) (*core.SshShellStreams, error) {
+	return f.OpenShell(ctx, sessionID, size)
 }
 
 func (f *fakeSshTransport) ResizeShell(_ context.Context, _ string, size core.TerminalSize) error {
@@ -167,4 +177,58 @@ func TestS1_AppTerminalFlowAndHostKeyTOFU_F06_F07(t *testing.T) {
 	if err := app.DisconnectSession(sessID); err != nil {
 		t.Fatalf("DisconnectSession failed: %v", err)
 	}
+}
+
+func TestApp_OpenTerminalWithOptions_F10(t *testing.T) {
+	fake := newFakeSshTransport()
+	var app *App
+	app = NewAppWithTransport(fake, nil, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	sessID, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "127.0.0.1",
+		Port:     22,
+		Username: "user",
+		Password: "password",
+		Size:     core.TerminalSize{Cols: 80, Rows: 24},
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH failed: %v", err)
+	}
+
+	// Duplicate in default directory
+	dupID, err := app.OpenTerminalWithOptions(sessID, core.TerminalSpawnOptions{
+		Mode: "default",
+		Size: core.TerminalSize{Cols: 100, Rows: 30},
+	})
+	if err != nil {
+		t.Fatalf("OpenTerminalWithOptions default failed: %v", err)
+	}
+	if dupID == "" || dupID == sessID {
+		t.Fatalf("unexpected new session ID: %s", dupID)
+	}
+
+	// Duplicate in current directory as root
+	rootID, err := app.OpenTerminalWithOptions(sessID, core.TerminalSpawnOptions{
+		Mode:       "root",
+		WorkingDir: "/var/log",
+		Size:       core.TerminalSize{Cols: 120, Rows: 34},
+	})
+	if err != nil {
+		t.Fatalf("OpenTerminalWithOptions root failed: %v", err)
+	}
+	if rootID == "" || rootID == sessID || rootID == dupID {
+		t.Fatalf("unexpected root session ID: %s", rootID)
+	}
+
+	_ = app.DisconnectSession(sessID)
+	_ = app.DisconnectSession(dupID)
+	_ = app.DisconnectSession(rootID)
 }

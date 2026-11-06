@@ -6,9 +6,22 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, & `F-23`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, & `F-23`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **New Terminal by Working Directory & Elevated Root Shell (`F-10`)**:
+  - Open new tabs or split panes directly positioned in specific directories without having to manually `cd`:
+    - **Default Directory (`🏠 Default Dir`)**:
+      - Configurable per-host and inherited from group defaults (`InitialDir`).
+      - Spawns a new tab/pane positioned in the host's configured default directory or user home.
+    - **Current Directory (`📂 Current Dir`)**:
+      - Automatic real-time working directory detection via **OSC 7** shell escape sequences (`file://hostname/path`).
+      - Displays the live working directory pill (`📂 /path/to/cwd`) in the pane header.
+      - Spawns a duplicate tab or split pane positioned in the exact CWD of the active session.
+    - **Elevated Root Shell (`⚡ Root in Dir`)**:
+      - Spawns an elevated/root terminal session (`sudo -s` or WSL root) positioned in the active terminal's CWD.
+      - Visual red indicator badge (`Root`) in the tab title and accent color.
+    - Accessible via toolbar action buttons on active sessions and through the **Tools ▾** menu.
 - **Local Terminals & Hardware Serial / UART Console (`F-23`)**:
   - **Local PTY Terminals (PowerShell, Command Prompt, WSL)**:
     - Open local terminals directly inside DoubleAgent tabs from **Tools ▾**:

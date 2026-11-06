@@ -58,8 +58,12 @@ func (s *localProcessSession) Close() error {
 	return nil
 }
 
-func startPlatformShell(ctx context.Context, shellType string, _ core.TerminalSize) (Session, error) {
-	normType := strings.ToLower(strings.TrimSpace(shellType))
+func startPlatformShell(ctx context.Context, shellType string, size core.TerminalSize) (Session, error) {
+	return startPlatformShellWithOptions(ctx, ShellOptions{ShellType: shellType, Size: size})
+}
+
+func startPlatformShellWithOptions(ctx context.Context, opts ShellOptions) (Session, error) {
+	normType := strings.ToLower(strings.TrimSpace(opts.ShellType))
 	var binary string
 	var args []string
 	var title string
@@ -69,12 +73,21 @@ func startPlatformShell(ctx context.Context, shellType string, _ core.TerminalSi
 		binary = "cmd.exe"
 		args = []string{"/Q"}
 		title = "Local (CMD)"
+		if opts.AsRoot {
+			title = "Local (CMD Admin)"
+		}
 		normType = "cmd"
 	case "wsl", "wsl.exe", "linux":
 		binary = "wsl.exe"
-		args = nil
 		title = "Local (WSL)"
 		normType = "wsl"
+		if opts.AsRoot {
+			title = "Local (WSL Root)"
+			args = append(args, "-u", "root")
+		}
+		if opts.WorkingDir != "" {
+			args = append(args, "--cd", opts.WorkingDir)
+		}
 	case "powershell", "pwsh", "powershell.exe", "":
 		if p, err := exec.LookPath("pwsh.exe"); err == nil && p != "" {
 			binary = p
@@ -83,6 +96,9 @@ func startPlatformShell(ctx context.Context, shellType string, _ core.TerminalSi
 		}
 		args = []string{"-NoLogo"}
 		title = "Local (PowerShell)"
+		if opts.AsRoot {
+			title = "Local (PowerShell Admin)"
+		}
 		normType = "powershell"
 	default:
 		binary = normType
@@ -91,6 +107,9 @@ func startPlatformShell(ctx context.Context, shellType string, _ core.TerminalSi
 	}
 
 	cmd := exec.CommandContext(ctx, binary, args...)
+	if opts.WorkingDir != "" && normType != "wsl" {
+		cmd.Dir = opts.WorkingDir
+	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("stdin pipe for %s: %w", binary, err)

@@ -17,6 +17,7 @@ type ResolvedHost struct {
 	Port          uint16         `json:"port"`
 	Username      string         `json:"username"`
 	IdentityID    string         `json:"identityId"`
+	InitialDir    string         `json:"initialDir,omitempty"`
 	KeepaliveSecs uint16         `json:"keepaliveSecs"`
 	Auth          SshAuthConfig  `json:"-"`
 }
@@ -28,6 +29,7 @@ type HostSummary struct {
 	Address       string   `json:"address"`
 	EffectivePort uint16   `json:"effectivePort"`
 	EffectiveUser string   `json:"effectiveUser"`
+	InitialDir    string   `json:"initialDir,omitempty"`
 	KeepaliveSecs uint16   `json:"keepaliveSecs"`
 	GroupID       string   `json:"groupId"`
 	IdentityID    string   `json:"identityId"`
@@ -101,6 +103,7 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 	effectiveUser := "root"
 	effectiveIdentityID := ""
 	effectiveKeepalive := uint16(30)
+	effectiveInitialDir := ""
 
 	// 1. Apply inherited group settings from top-most ancestor down to immediate group
 	for _, g := range chain {
@@ -116,6 +119,9 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 		if g.DefaultSettings.KeepaliveSecs != 0 {
 			effectiveKeepalive = g.DefaultSettings.KeepaliveSecs
 		}
+		if g.DefaultSettings.InitialDir != "" {
+			effectiveInitialDir = g.DefaultSettings.InitialDir
+		}
 	}
 
 	// 2. Host value overrides group value (F-01 acceptance criterion)
@@ -124,6 +130,9 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 	}
 	if target.IdentityID != "" {
 		effectiveIdentityID = target.IdentityID
+	}
+	if target.InitialDir != "" {
+		effectiveInitialDir = target.InitialDir
 	}
 
 	var authCfg SshAuthConfig
@@ -156,6 +165,7 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 		Port:          effectivePort,
 		Username:      effectiveUser,
 		IdentityID:    effectiveIdentityID,
+		InitialDir:    effectiveInitialDir,
 		KeepaliveSecs: effectiveKeepalive,
 		Auth:          authCfg,
 	}, nil
@@ -195,11 +205,13 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		user := "root"
 		keepalive := uint16(30)
 		effIdentity := h.IdentityID
+		var initialDir string
 		if err == nil {
 			port = resolved.Port
 			user = resolved.Username
 			keepalive = resolved.KeepaliveSecs
 			effIdentity = resolved.IdentityID
+			initialDir = resolved.InitialDir
 		}
 		tags := h.Tags
 		if tags == nil {
@@ -215,6 +227,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			Address:       h.Address,
 			EffectivePort: port,
 			EffectiveUser: user,
+			InitialDir:    initialDir,
 			KeepaliveSecs: keepalive,
 			GroupID:       h.GroupID,
 			IdentityID:    effIdentity,

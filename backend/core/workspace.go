@@ -24,6 +24,7 @@ type WorkspaceNode struct {
 	SessionID string            `json:"sessionId,omitempty"`
 	HostID    string            `json:"hostId,omitempty"`
 	Title     string            `json:"title,omitempty"`
+	Cwd       string            `json:"cwd,omitempty"`
 	Direction SplitDirection    `json:"direction,omitempty"`
 	Children  []*WorkspaceNode  `json:"children,omitempty"`
 }
@@ -34,6 +35,7 @@ type PaneItem struct {
 	SessionID string `json:"sessionId"`
 	HostID    string `json:"hostId,omitempty"`
 	Title     string `json:"title"`
+	Cwd       string `json:"cwd,omitempty"`
 }
 
 // TabItem represents an open terminal tab containing an arbitrary nested split tree of panes (F-08).
@@ -132,6 +134,7 @@ func CollectPanes(root *WorkspaceNode) []PaneItem {
 			SessionID: root.SessionID,
 			HostID:    root.HostID,
 			Title:     root.Title,
+			Cwd:       root.Cwd,
 		}}
 	}
 	var out []PaneItem
@@ -152,6 +155,7 @@ func FindPane(root *WorkspaceNode, paneID string) *PaneItem {
 			SessionID: root.SessionID,
 			HostID:    root.HostID,
 			Title:     root.Title,
+			Cwd:       root.Cwd,
 		}
 	}
 	for _, child := range root.Children {

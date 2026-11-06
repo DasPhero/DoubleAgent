@@ -48,6 +48,7 @@ export namespace core {
 	    address: string;
 	    effectivePort: number;
 	    effectiveUser: string;
+	    initialDir?: string;
 	    keepaliveSecs: number;
 	    groupId: string;
 	    identityId: string;
@@ -67,6 +68,7 @@ export namespace core {
 	        this.address = source["address"];
 	        this.effectivePort = source["effectivePort"];
 	        this.effectiveUser = source["effectiveUser"];
+	        this.initialDir = source["initialDir"];
 	        this.keepaliveSecs = source["keepaliveSecs"];
 	        this.groupId = source["groupId"];
 	        this.identityId = source["identityId"];
@@ -206,6 +208,7 @@ export namespace core {
 	    port?: number;
 	    username?: string;
 	    identityId?: string;
+	    initialDir?: string;
 	    keepaliveSecs?: number;
 	
 	    static createFrom(source: any = {}) {
@@ -217,6 +220,7 @@ export namespace core {
 	        this.port = source["port"];
 	        this.username = source["username"];
 	        this.identityId = source["identityId"];
+	        this.initialDir = source["initialDir"];
 	        this.keepaliveSecs = source["keepaliveSecs"];
 	    }
 	}
@@ -263,6 +267,7 @@ export namespace core {
 	    port: number;
 	    groupId?: string;
 	    identityId?: string;
+	    initialDir?: string;
 	    tags?: string[];
 	    color?: string;
 	    favorite?: boolean;
@@ -281,6 +286,7 @@ export namespace core {
 	        this.port = source["port"];
 	        this.groupId = source["groupId"];
 	        this.identityId = source["identityId"];
+	        this.initialDir = source["initialDir"];
 	        this.tags = source["tags"];
 	        this.color = source["color"];
 	        this.favorite = source["favorite"];
@@ -484,6 +490,42 @@ export namespace core {
 	    }
 	}
 	
+	export class TerminalSpawnOptions {
+	    mode: string;
+	    workingDir: string;
+	    splitDir: string;
+	    size: TerminalSize;
+	
+	    static createFrom(source: any = {}) {
+	        return new TerminalSpawnOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.workingDir = source["workingDir"];
+	        this.splitDir = source["splitDir"];
+	        this.size = this.convertValues(source["size"], TerminalSize);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class VaultSummary {
 	    groups: GroupRecord[];
 	    hosts: HostSummary[];

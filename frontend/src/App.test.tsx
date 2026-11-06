@@ -545,4 +545,52 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(closeAnalyzerBtn);
     expect(screen.queryByRole('region', { name: 'Signal Analyzer' })).not.toBeInTheDocument();
   });
+
+  it('spawns new terminals in Default Directory, Current Directory (CWD), and Root Shell (F-10)', () => {
+    render(<App />);
+
+    // 1. Open Local Shell (PowerShell) via Tools Menu
+    const toolsBtn = screen.getByRole('button', { name: /Tools ▾/i });
+    fireEvent.mouseEnter(toolsBtn);
+    const pwshItem = screen.getByRole('menuitem', { name: /Local Shell \(PowerShell\)/i });
+    fireEvent.click(pwshItem);
+
+    expect(screen.getByRole('tab', { name: 'Tab Local (PowerShell)' })).toBeInTheDocument();
+
+    // Verify the F-10 toolbar buttons are present
+    const defaultDirBtn = screen.getByRole('button', { name: 'New Terminal Default Directory' });
+    const currentDirBtn = screen.getByRole('button', { name: 'New Terminal Current Directory' });
+    const rootDirBtn = screen.getByRole('button', { name: 'New Terminal Root in Current Directory' });
+
+    expect(defaultDirBtn).toBeInTheDocument();
+    expect(currentDirBtn).toBeInTheDocument();
+    expect(rootDirBtn).toBeInTheDocument();
+
+    // 2. Click "Default Dir" button -> opens new session tab with (Default Dir)
+    fireEvent.click(defaultDirBtn);
+    expect(screen.getByRole('tab', { name: 'Tab Local (PowerShell) (Default Dir)' })).toBeInTheDocument();
+
+    // 3. Switch back to first tab
+    const firstTab = screen.getByRole('tab', { name: 'Tab Local (PowerShell)' });
+    fireEvent.click(firstTab);
+
+    // Click "Current Dir" button -> opens new session tab with [CWD]
+    fireEvent.click(currentDirBtn);
+    expect(screen.getByRole('tab', { name: 'Tab Local (PowerShell) [CWD]' })).toBeInTheDocument();
+
+    // 4. Click "Root in Dir" button -> opens elevated root session tab with (Root)
+    fireEvent.click(firstTab);
+    fireEvent.click(rootDirBtn);
+    expect(screen.getByRole('tab', { name: /Tab Local \(PowerShell\) \(Root\)/i })).toBeInTheDocument();
+
+    // 5. Test Tools menu options for F-10
+    fireEvent.mouseEnter(toolsBtn);
+    expect(screen.getByRole('menuitem', { name: /New in Default Directory/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /New in Current Directory \(CWD\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /New Root Shell in Current Directory/i })).toBeInTheDocument();
+
+    // Trigger Root shell via Tools menu
+    fireEvent.click(screen.getByRole('menuitem', { name: /New Root Shell in Current Directory/i }));
+    expect(screen.getAllByRole('tab', { name: /Root/i }).length).toBeGreaterThanOrEqual(2);
+  });
 });

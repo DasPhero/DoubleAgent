@@ -575,6 +575,22 @@ body,
   color: var(--accent-text);
 }
 
+.pane-cwd-pill {
+  font-size: 0.68rem;
+  font-family: Consolas, monospace;
+  color: var(--accent-text);
+  background: rgba(13, 148, 136, 0.15);
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  border-radius: 4px;
+  padding: 0.08rem 0.4rem;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 .pane-header-actions {
   display: flex;
   align-items: center;

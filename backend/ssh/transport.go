@@ -265,7 +265,12 @@ func (t *Transport) Connect(ctx context.Context, cfg core.SshSessionConfig) (str
 }
 
 // OpenShell opens an interactive PTY shell on an active SSH session (F-07).
-func (t *Transport) OpenShell(_ context.Context, sessionID string, size core.TerminalSize) (*core.SshShellStreams, error) {
+func (t *Transport) OpenShell(ctx context.Context, sessionID string, size core.TerminalSize) (*core.SshShellStreams, error) {
+	return t.OpenShellWithOptions(ctx, sessionID, size, "", false)
+}
+
+// OpenShellWithOptions opens an interactive PTY shell with optional initial directory and root elevation (F-10).
+func (t *Transport) OpenShellWithOptions(_ context.Context, sessionID string, size core.TerminalSize, initialDir string, asRoot bool) (*core.SshShellStreams, error) {
 	sess, err := t.getSession(sessionID)
 	if err != nil {
 		return nil, err
@@ -322,9 +327,28 @@ func (t *Transport) OpenShell(_ context.Context, sessionID string, size core.Ter
 		return nil, fmt.Errorf("stderr pipe: %w", err)
 	}
 
-	if err := sshSess.Shell(); err != nil {
-		_ = sshSess.Close()
-		return nil, fmt.Errorf("start remote shell: %w", err)
+	if asRoot {
+		var startCmd string
+		if initialDir != "" {
+			startCmd = fmt.Sprintf("sudo -s -H sh -c 'cd %q && exec \"${SHELL:-/bin/bash}\"'", initialDir)
+		} else {
+			startCmd = "sudo -s"
+		}
+		if err := sshSess.Start(startCmd); err != nil {
+			_ = sshSess.Close()
+			return nil, fmt.Errorf("start remote root shell: %w", err)
+		}
+	} else if initialDir != "" {
+		startCmd := fmt.Sprintf("sh -c 'cd %q && exec \"${SHELL:-/bin/bash}\" -l'", initialDir)
+		if err := sshSess.Start(startCmd); err != nil {
+			_ = sshSess.Close()
+			return nil, fmt.Errorf("start remote shell in dir: %w", err)
+		}
+	} else {
+		if err := sshSess.Shell(); err != nil {
+			_ = sshSess.Close()
+			return nil, fmt.Errorf("start remote shell: %w", err)
+		}
 	}
 
 	sess.shell = sshSess

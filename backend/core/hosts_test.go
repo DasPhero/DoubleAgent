@@ -18,6 +18,7 @@ func TestM1_1_HostGroupInheritanceAndOverride_F01(t *testing.T) {
 					Username:      "deploy",
 					IdentityID:    "id-prod",
 					KeepaliveSecs: 60,
+					InitialDir:    "/var/www",
 				},
 			},
 			{
@@ -59,6 +60,7 @@ func TestM1_1_HostGroupInheritanceAndOverride_F01(t *testing.T) {
 				Address:    "10.10.1.20",
 				Port:       2299,        // Overrides group port 2200 -> 2299
 				IdentityID: "id-custom", // Overrides group identity id-prod -> id-custom
+				InitialDir: "/opt/db",   // Overrides group default /var/www -> /opt/db (F-10)
 				GroupID:    "grp-eu",
 			},
 		},
@@ -78,6 +80,9 @@ func TestM1_1_HostGroupInheritanceAndOverride_F01(t *testing.T) {
 	if resInherited.IdentityID != "id-prod" || resInherited.Username != "deploy-id" {
 		t.Fatalf("expected inherited Identity id-prod (user deploy-id), got id=%q user=%q", resInherited.IdentityID, resInherited.Username)
 	}
+	if resInherited.InitialDir != "/var/www" {
+		t.Fatalf("expected inherited InitialDir /var/www from root group, got %q", resInherited.InitialDir)
+	}
 
 	// 2. Verify host explicit values override group defaults (F-01 acceptance criterion)
 	resOverride, err := core.ResolveEffectiveHost("host-override", payload)
@@ -89,6 +94,9 @@ func TestM1_1_HostGroupInheritanceAndOverride_F01(t *testing.T) {
 	}
 	if resOverride.IdentityID != "id-custom" || resOverride.Username != "customroot" {
 		t.Fatalf("expected host Identity id-custom (user customroot) to override group, got id=%q user=%q", resOverride.IdentityID, resOverride.Username)
+	}
+	if resOverride.InitialDir != "/opt/db" {
+		t.Fatalf("expected host InitialDir /opt/db to override group, got %q", resOverride.InitialDir)
 	}
 
 	// 3. Verify BuildVaultSummary exposes no secrets

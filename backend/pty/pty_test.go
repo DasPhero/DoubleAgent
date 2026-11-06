@@ -133,3 +133,37 @@ loop:
 		t.Errorf("expected output to contain POWERSHELL_F23_OK")
 	}
 }
+
+func TestLocalPTY_WorkingDirAndRoot_F10(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Test launching shell with working directory set to temporary folder
+	tempDir := t.TempDir()
+	sess, err := StartShellWithOptions(ctx, ShellOptions{
+		ShellType:  "cmd",
+		WorkingDir: tempDir,
+		AsRoot:     false,
+		Size:       core.TerminalSize{Cols: 80, Rows: 24},
+	})
+	if err != nil {
+		t.Fatalf("failed to start shell with working dir: %v", err)
+	}
+
+	_ = sess.Close()
+
+	// Test AsRoot title flag
+	rootSess, err := StartShellWithOptions(ctx, ShellOptions{
+		ShellType: "cmd",
+		AsRoot:    true,
+		Size:      core.TerminalSize{Cols: 80, Rows: 24},
+	})
+	if err != nil {
+		t.Fatalf("failed to start root shell: %v", err)
+	}
+	defer func() { _ = rootSess.Close() }()
+
+	if !strings.Contains(rootSess.Title(), "Admin") && !strings.Contains(rootSess.Title(), "Root") {
+		t.Errorf("expected admin/root title, got %s", rootSess.Title())
+	}
+}

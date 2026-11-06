@@ -7,9 +7,11 @@ import {
   changeTerminalFontSize,
   clearTerminalSearch,
   disposeTerminal,
+  getSessionCwd,
   resetTerminalFontSize,
   searchTerminalNext,
   searchTerminalPrevious,
+  setSessionCwd,
 } from './components/TerminalView';
 import { SignalAnalyzerView } from './components/SignalAnalyzerView';
 
@@ -146,6 +148,7 @@ export type WorkspaceNode =
       sessionId: string;
       hostId?: string;
       title: string;
+      cwd?: string;
     }
   | {
       type: 'split';
@@ -159,6 +162,7 @@ export interface PaneItem {
   sessionId: string;
   hostId?: string;
   title: string;
+  cwd?: string;
 }
 
 export interface TabItem {
@@ -205,7 +209,15 @@ export function collectPanes(node: WorkspaceNode | null): PaneItem[] {
     return [];
   }
   if (node.type === 'pane') {
-    return [{ id: node.id, sessionId: node.sessionId, hostId: node.hostId, title: node.title }];
+    return [
+      {
+        id: node.id,
+        sessionId: node.sessionId,
+        hostId: node.hostId,
+        title: node.title,
+        cwd: node.cwd,
+      },
+    ];
   }
   return node.children.flatMap(collectPanes);
 }
@@ -464,6 +476,15 @@ interface WailsAppBindings {
   ImportSSHConfig?: (configContent: string) => Promise<SSHConfigParseResult>;
   InjectSessionPassword?: (sessionId: string) => Promise<void>;
   DuplicateSession?: (sessionId: string, size: { cols: number; rows: number }) => Promise<string>;
+  OpenTerminalWithOptions?: (
+    targetSessionId: string,
+    opts: {
+      mode: string;
+      workingDir: string;
+      splitDir: string;
+      size: { cols: number; rows: number };
+    }
+  ) => Promise<string>;
   ConnectSavedHost: (hostId: string, size: { cols: number; rows: number }) => Promise<string>;
   ConnectSSH: (req: {
     address: string;
@@ -1911,6 +1932,107 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     setTimeout(() => focusersRef.current.get(newSessionId)?.(), 50);
   };
 
+  const handleOpenTerminalDirectory = async (
+    mode: 'default' | 'current' | 'root',
+    splitDir: 'none' | 'horizontal' | 'vertical' = 'none'
+  ): Promise<void> => {
+    if (!activeTab || !activePane) {
+      return;
+    }
+    const api = getWailsBindings();
+    const currentCwd = getSessionCwd(activePane.sessionId) || activePane.cwd || '';
+    const targetDir = mode === 'default' ? '' : currentCwd;
+
+    let newSessionId = `sess-${mode}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    if (api?.OpenTerminalWithOptions) {
+      try {
+        newSessionId = await api.OpenTerminalWithOptions(activePane.sessionId, {
+          mode,
+          workingDir: targetDir,
+          splitDir,
+          size: { cols: 120, rows: 34 },
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Failed to open terminal (${mode}): ${msg}`);
+        return;
+      }
+    } else if (api?.DuplicateSession) {
+      try {
+        newSessionId = await api.DuplicateSession(activePane.sessionId, { cols: 120, rows: 34 });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Duplicate session failed: ${msg}`);
+        return;
+      }
+    }
+
+    const baseTitle =
+      activeTab.title
+        .replace(/\s*\([^)]*Split[^)]*\)/gi, '')
+        .replace(/\s*\([^)]*Dir[^)]*\)/gi, '')
+        .replace(/\s*\([^)]*Root[^)]*\)/gi, '')
+        .replace(/\s*\[[^\]]*\]/gi, '')
+        .trim() || activeTab.title;
+
+    let dirLabel = '';
+    if (targetDir) {
+      const parts = targetDir.split(/[/\\]/).filter(Boolean);
+      dirLabel = parts.length > 0 ? parts[parts.length - 1] : targetDir;
+    }
+
+    const titleSuffix =
+      mode === 'root'
+        ? ` (Root${dirLabel ? `: ${dirLabel}` : ''})`
+        : mode === 'current'
+          ? ` [${dirLabel || 'CWD'}]`
+          : ' (Default Dir)';
+
+    if (splitDir === 'horizontal' || splitDir === 'vertical') {
+      tabCounterRef.current += 1;
+      const newPaneId = `pane-${tabCounterRef.current}`;
+      const currentPanes = collectPanes(activeTab.rootNode);
+      const splitLabel = splitDir === 'horizontal' ? 'H' : 'V';
+      const newPane: WorkspaceNode = {
+        type: 'pane',
+        id: newPaneId,
+        sessionId: newSessionId,
+        hostId: activeTab.hostId,
+        title: `${baseTitle} (${splitLabel}-Split #${currentPanes.length + 1})${titleSuffix}`,
+        cwd: targetDir,
+      };
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== activeTab.id) {
+            return t;
+          }
+          const updatedRoot = splitPaneInTree(t.rootNode, activePane.id, newPane, splitDir);
+          return {
+            ...t,
+            rootNode: updatedRoot,
+            activePaneId: newPaneId,
+          };
+        })
+      );
+      setStatusMessage(`Opened ${mode} terminal in split pane.`);
+      setTimeout(() => focusersRef.current.get(newSessionId)?.(), 50);
+    } else {
+      openSessionTab(
+        newSessionId,
+        `${baseTitle}${titleSuffix}`,
+        activeTab.hostId,
+        mode === 'root' ? '#ef4444' : activeTab.color
+      );
+      setStatusMessage(
+        mode === 'root'
+          ? `Opened root terminal in current directory (${targetDir || '/'}).`
+          : mode === 'current'
+            ? `Opened terminal in current directory (${targetDir || '~'}).`
+            : 'Opened terminal in default directory.'
+      );
+    }
+  };
+
   const handleClosePane = async (tabId: string, paneId: string): Promise<void> => {
     const targetTab = tabs.find((t) => t.id === tabId);
     if (!targetTab) {
@@ -2037,7 +2159,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <div className="split-pane-header">
-            <span>{node.title}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
+              <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                {node.title}
+              </span>
+              {(node.cwd || getSessionCwd(node.sessionId)) && (
+                <span
+                  className="pane-cwd-pill"
+                  title={`Current working directory: ${node.cwd || getSessionCwd(node.sessionId)}`}
+                >
+                  📂 {node.cwd || getSessionCwd(node.sessionId)}
+                </span>
+              )}
+            </div>
             <div className="pane-header-actions">
               {node.sessionId.startsWith('serial-') && (
                 <div className="serial-pin-controls">
@@ -2296,6 +2430,26 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             settings={globalSettings}
             onFontSizeChange={handleFontSizeChange}
             onToggleSearch={togglePaneSearch}
+            onCwdChange={(sid, cwd) => {
+              setSessionCwd(sid, cwd);
+              setTabs((prev) =>
+                prev.map((t) => {
+                  if (t.id !== tab.id) {
+                    return t;
+                  }
+                  const updateNodeCwd = (n: WorkspaceNode): WorkspaceNode => {
+                    if (n.type === 'pane') {
+                      if (n.sessionId === sid) {
+                        return { ...n, cwd };
+                      }
+                      return n;
+                    }
+                    return { ...n, children: n.children.map(updateNodeCwd) };
+                  };
+                  return { ...t, rootNode: updateNodeCwd(t.rootNode) };
+                })
+              );
+            }}
           />
 
           {node.sessionId.startsWith('serial-') && activeSignalAnalyzers.has(node.sessionId) && (
@@ -2558,6 +2712,44 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   </button>
                   {activePane && (
                     <>
+                      <div className="nav-dropdown-divider" />
+                      <div className="nav-dropdown-header">New Terminal by Directory (F-10)</div>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="nav-dropdown-item"
+                        onClick={() => {
+                          setActiveDropdownMenu(null);
+                          void handleOpenTerminalDirectory('default');
+                        }}
+                      >
+                        <span>New in Default Directory</span>
+                        <span className="nav-dropdown-shortcut">🏠</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="nav-dropdown-item"
+                        onClick={() => {
+                          setActiveDropdownMenu(null);
+                          void handleOpenTerminalDirectory('current');
+                        }}
+                      >
+                        <span>New in Current Directory (CWD)</span>
+                        <span className="nav-dropdown-shortcut">📂</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="nav-dropdown-item"
+                        onClick={() => {
+                          setActiveDropdownMenu(null);
+                          void handleOpenTerminalDirectory('root');
+                        }}
+                      >
+                        <span>New Root Shell in Current Directory</span>
+                        <span className="nav-dropdown-shortcut">⚡ root</span>
+                      </button>
                       <div className="nav-dropdown-divider" />
                       <button
                         type="button"
@@ -3201,6 +3393,36 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   title="Split active pane vertically (stacked)"
                 >
                   Split ⬍
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  aria-label="New Terminal Default Directory"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleOpenTerminalDirectory('default')}
+                  title="Open new terminal in default working directory (F-10)"
+                >
+                  🏠 Default Dir
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  aria-label="New Terminal Current Directory"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleOpenTerminalDirectory('current')}
+                  title="Open new terminal in current working directory (F-10)"
+                >
+                  📂 Current Dir
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  aria-label="New Terminal Root in Current Directory"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleOpenTerminalDirectory('root')}
+                  title="Open new root / elevated terminal in current working directory (F-10)"
+                >
+                  ⚡ Root in Dir
                 </button>
                 {activeTabPanes.length > 1 && (
                   <button

@@ -18,6 +18,14 @@ type Session interface {
 	Close() error
 }
 
+// ShellOptions configures launch parameters for a local PTY shell (F-10, F-23).
+type ShellOptions struct {
+	ShellType  string
+	WorkingDir string
+	AsRoot     bool
+	Size       core.TerminalSize
+}
+
 // Engine manages local interactive PTY sessions.
 type Engine struct {
 	// platform specific fields
@@ -25,6 +33,11 @@ type Engine struct {
 
 // StartShell launches a local pseudo-terminal shell based on shellType ("powershell", "cmd", "wsl", "default").
 func StartShell(ctx context.Context, shellType string, size core.TerminalSize) (Session, error) {
-	return startPlatformShell(ctx, shellType, size)
+	return StartShellWithOptions(ctx, ShellOptions{ShellType: shellType, Size: size})
+}
+
+// StartShellWithOptions launches a local pseudo-terminal shell with specific working directory and root elevation (F-10).
+func StartShellWithOptions(ctx context.Context, opts ShellOptions) (Session, error) {
+	return startPlatformShellWithOptions(ctx, opts)
 }
 
