@@ -226,6 +226,72 @@ export namespace core {
 	        this.permissions = source["permissions"];
 	    }
 	}
+	export class ForwardRule {
+	    id: string;
+	    hostId?: string;
+	    type: string;
+	    bindAddress: string;
+	    bindPort: number;
+	    targetHost?: string;
+	    targetPort?: number;
+	    autoStart: boolean;
+	    label?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForwardRule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.hostId = source["hostId"];
+	        this.type = source["type"];
+	        this.bindAddress = source["bindAddress"];
+	        this.bindPort = source["bindPort"];
+	        this.targetHost = source["targetHost"];
+	        this.targetPort = source["targetPort"];
+	        this.autoStart = source["autoStart"];
+	        this.label = source["label"];
+	    }
+	}
+	export class ForwardTunnelStatus {
+	    id: string;
+	    ruleId: string;
+	    sessionId: string;
+	    hostId?: string;
+	    type: string;
+	    bindAddress: string;
+	    bindPort: number;
+	    targetHost?: string;
+	    targetPort?: number;
+	    status: string;
+	    bytesIn: number;
+	    bytesOut: number;
+	    activeConns: number;
+	    errorMessage?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForwardTunnelStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.ruleId = source["ruleId"];
+	        this.sessionId = source["sessionId"];
+	        this.hostId = source["hostId"];
+	        this.type = source["type"];
+	        this.bindAddress = source["bindAddress"];
+	        this.bindPort = source["bindPort"];
+	        this.targetHost = source["targetHost"];
+	        this.targetPort = source["targetPort"];
+	        this.status = source["status"];
+	        this.bytesIn = source["bytesIn"];
+	        this.bytesOut = source["bytesOut"];
+	        this.activeConns = source["activeConns"];
+	        this.errorMessage = source["errorMessage"];
+	    }
+	}
 	export class GroupDefaults {
 	    port?: number;
 	    username?: string;

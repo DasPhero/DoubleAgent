@@ -663,4 +663,185 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       delete (window as unknown as { go?: unknown }).go;
     }
   });
+
+  it('manages Port Forwarding rules (-L, -R, -D) and active tunnels with status indicators (F-13)', async () => {
+    const rulesList: Array<{
+      id: string;
+      type: 'L' | 'R' | 'D';
+      label?: string;
+      bindAddress: string;
+      bindPort: number;
+      targetHost?: string;
+      targetPort?: number;
+      autoStart: boolean;
+    }> = [];
+    const activeTunnelsList: Array<{
+      id: string;
+      ruleId: string;
+      sessionId: string;
+      type: 'L' | 'R' | 'D';
+      bindAddress: string;
+      bindPort: number;
+      targetHost: string;
+      targetPort: number;
+      status: string;
+      bytesIn: number;
+      bytesOut: number;
+      activeConns: number;
+      error?: string;
+    }> = [];
+
+    const win = window as unknown as {
+      go?: {
+        main?: {
+          App?: {
+            HealthCheck?: () => Promise<{
+              vaultInitialized: boolean;
+              vaultLocked: boolean;
+              passwordless: boolean;
+              quickUnlockReady: boolean;
+            }>;
+            GetVaultSummary?: () => Promise<{ groups: unknown[]; hosts: unknown[]; identities: unknown[] }>;
+            ConnectSSH?: () => Promise<string>;
+            ListForwardRules?: () => Promise<typeof rulesList>;
+            SaveForwardRule?: (rule: (typeof rulesList)[0]) => Promise<void>;
+            DeleteForwardRule?: (ruleId: string) => Promise<void>;
+            StartForwardTunnel?: (sessionId: string, ruleId: string) => Promise<string>;
+            StopForwardTunnel?: (tunnelId: string) => Promise<void>;
+            GetActiveTunnels?: () => Promise<typeof activeTunnelsList>;
+          };
+        };
+      };
+    };
+
+    win.go = win.go || {};
+    win.go.main = win.go.main || {};
+    win.go.main.App = {
+      HealthCheck: async () => ({
+        vaultInitialized: true,
+        vaultLocked: false,
+        passwordless: true,
+        quickUnlockReady: false,
+      }),
+      GetVaultSummary: async () => ({ groups: [], hosts: [], identities: [] }),
+      ConnectSSH: async () => 'sess-test-ssh-123',
+      ListForwardRules: async () => rulesList,
+      SaveForwardRule: async (r) => {
+        const existingIdx = rulesList.findIndex((item) => item.id === r.id);
+        if (existingIdx >= 0) {
+          rulesList[existingIdx] = r;
+        } else {
+          rulesList.push(r);
+        }
+      },
+      DeleteForwardRule: async (ruleId) => {
+        const idx = rulesList.findIndex((r) => r.id === ruleId);
+        if (idx >= 0) rulesList.splice(idx, 1);
+      },
+      StartForwardTunnel: async (sessionId, ruleId) => {
+        const rule = rulesList.find((r) => r.id === ruleId);
+        const tunnelId = `tun-${Date.now()}`;
+        activeTunnelsList.push({
+          id: tunnelId,
+          ruleId,
+          sessionId,
+          type: rule?.type || 'L',
+          bindAddress: rule?.bindAddress || '127.0.0.1',
+          bindPort: rule?.bindPort || 8080,
+          targetHost: rule?.targetHost || '127.0.0.1',
+          targetPort: rule?.targetPort || 80,
+          status: 'active',
+          bytesIn: 1024,
+          bytesOut: 2048,
+          activeConns: 1,
+        });
+        return tunnelId;
+      },
+      StopForwardTunnel: async (tunnelId) => {
+        const idx = activeTunnelsList.findIndex((t) => t.id === tunnelId);
+        if (idx >= 0) activeTunnelsList.splice(idx, 1);
+      },
+      GetActiveTunnels: async () => activeTunnelsList,
+    };
+
+    try {
+      render(<App />);
+
+      // 1. Connect via quick connect to have an active SSH session
+      const hostInput = screen.getByLabelText('Host Address');
+      fireEvent.change(hostInput, { target: { value: '192.168.1.50' } });
+      const connectBtn = screen.getByRole('button', { name: /Connect SSH/i });
+      fireEvent.click(connectBtn);
+
+      // Verify session tab opened
+      expect(await screen.findByRole('tab', { name: /Tab root@192.168.1.50:22/i })).toBeInTheDocument();
+
+      // 2. Open Port Forwarding modal via Tunnels button in nav
+      const tunnelsNavBtn = screen.getByRole('button', { name: /Port Forwarding/i });
+      expect(tunnelsNavBtn).toBeInTheDocument();
+      fireEvent.click(tunnelsNavBtn);
+
+      // Verify Port Forwarding modal opens
+      expect(screen.getByRole('heading', { name: /Port Forwarding & Tunnels \(F-13\)/i })).toBeInTheDocument();
+      expect(screen.getByText(/No Port Forwarding Rules configured/i)).toBeInTheDocument();
+
+      // 3. Click "+ New Forward Rule"
+      const addRuleBtn = screen.getByRole('button', { name: /\+ New Forward Rule/i });
+      fireEvent.click(addRuleBtn);
+
+      // Verify form appears
+      expect(screen.getByLabelText(/Rule Type/i)).toBeInTheDocument();
+
+      // Configure a Local forward rule (-L 8080:localhost:80)
+      const labelInput = screen.getByLabelText(/Rule Label/i);
+      fireEvent.change(labelInput, { target: { value: 'Web Dashboard' } });
+
+      const bindPortInput = screen.getByLabelText(/Bind Port/i);
+      fireEvent.change(bindPortInput, { target: { value: '8080' } });
+
+      const targetHostInput = screen.getByLabelText(/Target Host/i);
+      fireEvent.change(targetHostInput, { target: { value: '127.0.0.1' } });
+
+      const targetPortInput = screen.getByLabelText(/Target Port/i);
+      fireEvent.change(targetPortInput, { target: { value: '80' } });
+
+      // Save rule
+      const saveBtn = screen.getByRole('button', { name: /Save Rule/i });
+      fireEvent.click(saveBtn);
+
+      // Rule should now be in the list
+      expect(await screen.findByText('Web Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('Local -L')).toBeInTheDocument();
+      expect(screen.getByText('INACTIVE')).toBeInTheDocument();
+
+      // 4. Start tunnel on the active SSH session
+      const startBtn = screen.getByRole('button', { name: /▶ Start Tunnel/i });
+      fireEvent.click(startBtn);
+
+      // Tunnel should become active
+      expect(await screen.findByText('ACTIVE')).toBeInTheDocument();
+      expect(screen.getByText(/1 active connection/i)).toBeInTheDocument();
+
+      // 5. Stop tunnel
+      const stopBtn = screen.getByRole('button', { name: /Stop Tunnel/i });
+      fireEvent.click(stopBtn);
+
+      // Tunnel should return to inactive
+      expect(await screen.findByText('INACTIVE')).toBeInTheDocument();
+
+      // 6. Delete rule
+      const deleteBtn = screen.getByRole('button', { name: /Delete/i });
+      fireEvent.click(deleteBtn);
+
+      // Empty state returns
+      expect(await screen.findByText(/No Port Forwarding Rules configured/i)).toBeInTheDocument();
+
+      // Close modal
+      const closeBtn = screen.getByRole('button', { name: /Close Port Forwarding/i });
+      fireEvent.click(closeBtn);
+      expect(screen.queryByRole('heading', { name: /Port Forwarding & Tunnels \(F-13\)/i })).not.toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
 });

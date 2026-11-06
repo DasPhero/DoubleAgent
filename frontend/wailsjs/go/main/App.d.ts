@@ -16,6 +16,8 @@ export function ConnectSerial(arg1:core.SerialConfig):Promise<string>;
 
 export function CreateRemoteDir(arg1:string,arg2:string):Promise<void>;
 
+export function DeleteForwardRule(arg1:string):Promise<void>;
+
 export function DeleteGroup(arg1:string):Promise<void>;
 
 export function DeleteHost(arg1:string):Promise<void>;
@@ -34,6 +36,8 @@ export function GenerateSSHKey(arg1:string,arg2:string,arg3:string):Promise<core
 
 export function GetActiveTransfers():Promise<Array<core.TransferTask>>;
 
+export function GetActiveTunnels():Promise<Array<core.ForwardTunnelStatus>>;
+
 export function GetVaultSummary():Promise<core.VaultSummary>;
 
 export function HealthCheck():Promise<core.AppStatus>;
@@ -47,6 +51,8 @@ export function InitializeVault(arg1:string):Promise<void>;
 export function InitializeVaultWithHello():Promise<void>;
 
 export function InjectSessionPassword(arg1:string):Promise<void>;
+
+export function ListForwardRules():Promise<Array<core.ForwardRule>>;
 
 export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
 
@@ -66,6 +72,8 @@ export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void
 
 export function ResolveHostKeyPrompt(arg1:string,arg2:number,arg3:boolean):Promise<void>;
 
+export function SaveForwardRule(arg1:core.ForwardRule):Promise<void>;
+
 export function SaveGroup(arg1:core.GroupRecord):Promise<void>;
 
 export function SaveHost(arg1:core.HostRecord):Promise<void>;
@@ -80,9 +88,13 @@ export function SetSerialDTR(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
 
+export function StartForwardTunnel(arg1:string,arg2:string):Promise<string>;
+
 export function StartSftpDownload(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function StartSftpUpload(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function StopForwardTunnel(arg1:string):Promise<void>;
 
 export function UnlockVault(arg1:string):Promise<void>;
 

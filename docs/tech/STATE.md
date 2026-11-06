@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `M1-4` Part 6 (`F-12` — SFTP File Transfer & File Tree Browser) — COMPLETED
-- **Next Milestone:** `M1-4` Part 7 (`F-13` — Port Forwarding: Local `-L`, Remote `-R`, Dynamic SOCKS5 `-D`)
+- **Current Milestone:** `M1-4` Part 7 (`F-13` — Port Forwarding: Local `-L`, Remote `-R`, Dynamic SOCKS5 `-D`) — COMPLETED
+- **Next Milestone:** `M1-4` Part 8 (`F-14` — Proxy Profiles: ProxyJump, ProxyCommand, and proxychains Export)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -14,36 +14,36 @@
 - **`M1-4` Part 3 (`F-11` — In-Terminal Search & Highlighting)**: Completed (`c0f9942`).
 - **`M1-4` Part 4 (`F-23` — Local Terminals, ConPTY & Hardware Serial / UART Console)**: Completed (`33683e2`).
 - **`M1-4` Part 5 (`F-10` — New Terminal: Working Directory & Root Shell)**: Completed.
-- **`M1-4` Part 6 (`F-12` — SFTP File Transfer & File Tree Browser)**:
-  - **Backend SFTP Engine (`backend/ssh/sftp.go`)**:
-    - Wrapped `github.com/pkg/sftp` behind strict `core.SftpClient` boundary in `backend/core/interfaces.go`.
-    - Zero leaks: `backend/core` never imports `github.com/pkg/sftp`.
-    - Implemented `List`, `Stat`, `Mkdir`, `Remove`, `Rename`, `Upload`, and `Download` with progress metering and context cancellation.
-    - Extended `SshTransport` with `OpenSftp(ctx, sessionID)`.
-    - Added in-memory SFTP server unit tests using `net.Pipe()` (`TestSFTP_ListAndStat_F12`, `TestSFTP_UploadDownloadProgress_F12`, `TestSFTP_MkdirAndRemove_F12`).
+- **`M1-4` Part 6 (`F-12` — SFTP File Transfer & File Tree Browser)**: Completed (`be3a7e6`).
+- **`M1-4` Part 7 (`F-13` — Port Forwarding: Local `-L`, Remote `-R`, Dynamic SOCKS5 `-D`)**:
+  - **Core Interfaces (`backend/core/interfaces.go`)**:
+    - Defined `ForwardRuleType` (`"L"`, `"R"`, `"D"`), `ForwardRule`, `ForwardTunnelStatus`, and `ForwardTunnel` interface.
+    - Extended `core.VaultPayload` with `ForwardRules []ForwardRule`.
+    - Extended `core.SshTransport` with `StartForwardLocal`, `StartForwardRemote`, `StartForwardDynamic`.
+    - Strict boundary: `backend/core` never imports `golang.org/x/crypto/ssh` or non-standard packages.
+  - **Backend Forwarding Engine (`backend/ssh/forward.go`)**:
+    - Local Forwarding (`-L`): `net.Listen` on local address/port and dials remote target host/port via SSH transport client.
+    - Remote Reverse Forwarding (`-R`): `sshClient.Listen` on remote address/port and dials local target host/port via `net.Dial`.
+    - Dynamic SOCKS5 Proxy (`-D`): RFC 1928 compliant SOCKS5 protocol handler supporting `NO AUTH` (0x00), `CONNECT` (0x01) command, IPv4 (0x01), Domain Name (0x03), and IPv6 (0x04) destination addresses, tunneling traffic transparently via SSH client dialer.
+    - Bidirectional connection copying with thread-safe atomic byte counters (`bytesIn`, `bytesOut`) and active connection tracking.
+    - Comprehensive unit tests with in-memory `net.Pipe()` pairs (`backend/ssh/forward_test.go`).
   - **Application Service Bindings (`app.go`)**:
-    - Bound methods: `ListLocalDir`, `ListRemoteDir`, `StartSftpUpload`, `StartSftpDownload`, `CancelTransfer`, `CreateRemoteDir`, `DeleteRemoteItem`, `GetActiveTransfers`.
-    - Background goroutine transfer queue emitting `sftp:progress` Wails events with speed calculations (bytes/sec) and completion/cancellation statuses.
-    - Added comprehensive unit tests in `app_test.go` (`TestApp_SftpOperations_F12`).
-  - **Frontend Two-Column Browser (`frontend/src/components/SftpBrowserView.tsx`)**:
-    - Side-by-side local (left) and remote (right) file listings.
-    - Path navigation bar with breadcrumbs/editable input, parent folder navigation (`⬆ Up`), and refresh (`↻`).
-    - Sortable table columns: Name (directories first), Size, Last Modified timestamp, UNIX permissions.
-    - HTML5 Drag-and-Drop:
-      - Drag from Local to Remote panel -> background upload.
-      - Drag from Remote to Local panel -> background download.
-      - Visual drop target highlights.
-    - Modal workflows for New Remote Folder (`📁+`) and Delete Remote Item (`🗑`).
-    - Bottom Transfer Queue drawer with progress bars, live transfer speed, status badges, and transfer cancellation (`✕`).
-  - **UI Integration**:
-    - One-click `SFTP` button on saved host cards in the sidebar.
-    - One-click `📁 SFTP` button on active terminal pane headers.
-    - `SFTP File Browser (F-12)` entry in top menu **Tools ▾**.
-    - Unit tests in `frontend/src/App.test.tsx`.
+    - Bound methods: `SaveForwardRule`, `DeleteForwardRule`, `ListForwardRules`, `StartForwardTunnel`, `StopForwardTunnel`, `GetActiveTunnels`.
+    - Automated lifecycle: `autoStartForwardRules` auto-initiates configured rules on `ConnectSavedHost`.
+    - Active tunnel cleanup on session disconnect and app shutdown.
+    - Backend tests: `app_test.go` (`TestApp_PortForwarding_F13`).
+  - **Frontend UI & Visual Diagnostics (`frontend/src/components/PortForwardingView.tsx`)**:
+    - Rule configuration form supporting `-L`, `-R`, and `-D` with validation for port ranges (1–65535).
+    - Color-coded badges: `-L` (Green), `-R` (Purple), `-D` (Amber).
+    - Real-time status indicators (`ACTIVE` with glowing green badge / `INACTIVE`).
+    - Bidirectional byte counters (`In`, `Out`) and active connection counters.
+    - Mapping diagram preview (`bind ➔ target`).
+    - Dedicated management modal triggered via top navigation bar button (`⚡ N Tunnels` / `Tunnels ⇄`) and **Tools ▾ -> Port Forwarding (-L, -R, -D)**.
+    - Comprehensive unit tests in `frontend/src/App.test.tsx`.
     - Standalone binary verified with `wails build`.
 
 ## In Progress
-- None (`F-12` completed and verified).
+- None (`F-13` completed and verified).
 
 ## Next
-- **`F-13` (Port Forwarding: Local `-L`, Remote `-R`, Dynamic SOCKS5 `-D`)**.
+- **`F-14` (Proxy Profiles: ProxyJump, ProxyCommand, and proxychains Export)**.

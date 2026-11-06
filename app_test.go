@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"doubleagent/backend/core"
+	"doubleagent/backend/vault"
 )
 
 type fakeSshTransport struct {
@@ -75,6 +76,64 @@ func (f *fakeSshTransport) OpenShellWithOptions(ctx context.Context, sessionID s
 
 func (f *fakeSshTransport) OpenSftp(_ context.Context, _ string) (core.SftpClient, error) {
 	return &fakeSftpClient{}, nil
+}
+
+type fakeForwardTunnel struct {
+	status core.ForwardTunnelStatus
+	closed bool
+}
+
+func (f *fakeForwardTunnel) Close() error {
+	f.closed = true
+	f.status.Status = "closed"
+	return nil
+}
+
+func (f *fakeForwardTunnel) GetStatus() core.ForwardTunnelStatus {
+	return f.status
+}
+
+func (f *fakeSshTransport) StartForwardLocal(_ context.Context, sessionID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (core.ForwardTunnel, error) {
+	return &fakeForwardTunnel{
+		status: core.ForwardTunnelStatus{
+			ID:          "tun-mock-local",
+			SessionID:   sessionID,
+			Type:        core.ForwardLocal,
+			BindAddress: bindAddr,
+			BindPort:    bindPort,
+			TargetHost:  targetHost,
+			TargetPort:  targetPort,
+			Status:      "active",
+		},
+	}, nil
+}
+
+func (f *fakeSshTransport) StartForwardRemote(_ context.Context, sessionID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (core.ForwardTunnel, error) {
+	return &fakeForwardTunnel{
+		status: core.ForwardTunnelStatus{
+			ID:          "tun-mock-remote",
+			SessionID:   sessionID,
+			Type:        core.ForwardRemote,
+			BindAddress: bindAddr,
+			BindPort:    bindPort,
+			TargetHost:  targetHost,
+			TargetPort:  targetPort,
+			Status:      "active",
+		},
+	}, nil
+}
+
+func (f *fakeSshTransport) StartForwardDynamic(_ context.Context, sessionID string, bindAddr string, bindPort uint16) (core.ForwardTunnel, error) {
+	return &fakeForwardTunnel{
+		status: core.ForwardTunnelStatus{
+			ID:          "tun-mock-dynamic",
+			SessionID:   sessionID,
+			Type:        core.ForwardDynamic,
+			BindAddress: bindAddr,
+			BindPort:    bindPort,
+			Status:      "active",
+		},
+	}, nil
 }
 
 type fakeSftpClient struct{}
@@ -356,4 +415,120 @@ func TestApp_SftpOperations_F12(t *testing.T) {
 
 	// Cancel transfer test
 	_ = app.CancelTransfer(upTaskID)
+}
+
+func TestApp_PortForwarding_F13(t *testing.T) {
+	fake := newFakeSshTransport()
+	tmpVault := filepath.Join(t.TempDir(), "test_forward.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	var app *App
+	app = NewAppWithDependencies(fake, nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	// 1. Save forward rules (-L, -R, -D)
+	localRule := core.ForwardRule{
+		ID:          "rule-loc-1",
+		Label:       "Web Forward",
+		Type:        core.ForwardLocal,
+		BindAddress: "127.0.0.1",
+		BindPort:    8080,
+		TargetHost:  "10.0.0.5",
+		TargetPort:  80,
+		AutoStart:   true,
+		HostID:      "host-test-1",
+	}
+	if err := app.SaveForwardRule(localRule); err != nil {
+		t.Fatalf("SaveForwardRule local failed: %v", err)
+	}
+
+	remoteRule := core.ForwardRule{
+		ID:          "rule-rem-1",
+		Label:       "Remote Reverse",
+		Type:        core.ForwardRemote,
+		BindAddress: "0.0.0.0",
+		BindPort:    2222,
+		TargetHost:  "127.0.0.1",
+		TargetPort:  22,
+		AutoStart:   false,
+	}
+	if err := app.SaveForwardRule(remoteRule); err != nil {
+		t.Fatalf("SaveForwardRule remote failed: %v", err)
+	}
+
+	socksRule := core.ForwardRule{
+		ID:          "rule-socks-1",
+		Label:       "SOCKS5 Proxy",
+		Type:        core.ForwardDynamic,
+		BindAddress: "127.0.0.1",
+		BindPort:    1080,
+		AutoStart:   false,
+	}
+	if err := app.SaveForwardRule(socksRule); err != nil {
+		t.Fatalf("SaveForwardRule socks failed: %v", err)
+	}
+
+	// 2. List rules
+	rules, err := app.ListForwardRules()
+	if err != nil {
+		t.Fatalf("ListForwardRules failed: %v", err)
+	}
+	if len(rules) != 3 {
+		t.Fatalf("expected 3 rules, got %d", len(rules))
+	}
+
+	// 3. Connect SSH session
+	sessID, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "127.0.0.1",
+		Port:     22,
+		Username: "user",
+		Password: "password",
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH failed: %v", err)
+	}
+	defer app.DisconnectSession(sessID)
+
+	// 4. Start tunnel for local rule
+	tunID, err := app.StartForwardTunnel(sessID, "rule-loc-1")
+	if err != nil {
+		t.Fatalf("StartForwardTunnel failed: %v", err)
+	}
+	if tunID == "" {
+		t.Fatal("expected non-empty tunnel ID")
+	}
+
+	// 5. Verify active tunnels
+	active := app.GetActiveTunnels()
+	if len(active) != 1 || active[0].Type != core.ForwardLocal || active[0].Status != "active" {
+		t.Fatalf("unexpected active tunnels: %+v", active)
+	}
+
+	// 6. Stop tunnel
+	if err := app.StopForwardTunnel(tunID); err != nil {
+		t.Fatalf("StopForwardTunnel failed: %v", err)
+	}
+	activeAfterStop := app.GetActiveTunnels()
+	if len(activeAfterStop) != 0 {
+		t.Fatalf("expected 0 active tunnels, got %d", len(activeAfterStop))
+	}
+
+	// 7. Delete rule
+	if err := app.DeleteForwardRule("rule-rem-1"); err != nil {
+		t.Fatalf("DeleteForwardRule failed: %v", err)
+	}
+	rulesAfterDel, _ := app.ListForwardRules()
+	if len(rulesAfterDel) != 2 {
+		t.Fatalf("expected 2 rules after deletion, got %d", len(rulesAfterDel))
+	}
 }

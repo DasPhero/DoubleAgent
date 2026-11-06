@@ -6,9 +6,28 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, & `F-23`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, & `F-23`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Port Forwarding: Local `-L`, Remote `-R`, & Dynamic SOCKS5 `-D` (`F-13`)**:
+  - **Rule Storage & Management in Encrypted Vault**:
+    - Configure persistent port forwarding rules stored securely in the encrypted vault (`ForwardRules`).
+    - Color-coded badges for quick identification:
+      - **Local Forwarding (`-L`)** (Green): Listen on a local port and tunnel connections to a remote target through SSH.
+      - **Remote Reverse Forwarding (`-R`)** (Purple): Listen on a remote server port and tunnel connections back to a local machine port.
+      - **Dynamic SOCKS5 Proxy (`-D`)** (Amber): Turn any SSH connection into an RFC 1928 compliant SOCKS5 proxy on a local port to route arbitrary application traffic (browsers, curl, tools).
+    - Configurable rule parameters: Label/Description, Associated Host, Auto-Start toggle, Bind Address, Bind Port, Target Host, and Target Port.
+  - **Status Indicators & Live Traffic Metrics**:
+    - Real-time status badge (`ACTIVE` with green glow / `INACTIVE`).
+    - Bidirectional live traffic counters: `In: <bytes>` and `Out: <bytes>`.
+    - Active concurrent connection counter: `<count> active connection(s)`.
+    - Mapping diagram preview: `<bindAddress>:<bindPort> ➔ <targetHost>:<targetPort>`.
+  - **Auto-Start with Host**:
+    - Rules flagged with **Auto-start** automatically spin up their background tunnels as soon as you connect to their associated host (`ConnectSavedHost`).
+  - **Multi-Tunnel Control**:
+    - Start and stop individual tunnels on demand.
+    - Top navigation bar displays a live indicator pill (`⚡ N Tunnels` / `Tunnels ⇄`) showing the number of active tunnels at a glance.
+    - Dedicated management modal accessible via the top bar button or **Tools ▾ -> Port Forwarding (-L, -R, -D)**.
 - **Two-Column SFTP File Browser & Transfer Queue (`F-12`)**:
   - **Two-Column Layout (Local ↔ Remote)**:
     - Side-by-side view with your local filesystem on the left and the remote host's filesystem on the right.

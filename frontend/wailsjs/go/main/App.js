@@ -30,6 +30,10 @@ export function CreateRemoteDir(arg1, arg2) {
   return window['go']['main']['App']['CreateRemoteDir'](arg1, arg2);
 }
 
+export function DeleteForwardRule(arg1) {
+  return window['go']['main']['App']['DeleteForwardRule'](arg1);
+}
+
 export function DeleteGroup(arg1) {
   return window['go']['main']['App']['DeleteGroup'](arg1);
 }
@@ -66,6 +70,10 @@ export function GetActiveTransfers() {
   return window['go']['main']['App']['GetActiveTransfers']();
 }
 
+export function GetActiveTunnels() {
+  return window['go']['main']['App']['GetActiveTunnels']();
+}
+
 export function GetVaultSummary() {
   return window['go']['main']['App']['GetVaultSummary']();
 }
@@ -92,6 +100,10 @@ export function InitializeVaultWithHello() {
 
 export function InjectSessionPassword(arg1) {
   return window['go']['main']['App']['InjectSessionPassword'](arg1);
+}
+
+export function ListForwardRules() {
+  return window['go']['main']['App']['ListForwardRules']();
 }
 
 export function ListLocalDir(arg1) {
@@ -130,6 +142,10 @@ export function ResolveHostKeyPrompt(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveHostKeyPrompt'](arg1, arg2, arg3);
 }
 
+export function SaveForwardRule(arg1) {
+  return window['go']['main']['App']['SaveForwardRule'](arg1);
+}
+
 export function SaveGroup(arg1) {
   return window['go']['main']['App']['SaveGroup'](arg1);
 }
@@ -158,12 +174,20 @@ export function SetSerialRTS(arg1, arg2) {
   return window['go']['main']['App']['SetSerialRTS'](arg1, arg2);
 }
 
+export function StartForwardTunnel(arg1, arg2) {
+  return window['go']['main']['App']['StartForwardTunnel'](arg1, arg2);
+}
+
 export function StartSftpDownload(arg1, arg2, arg3) {
   return window['go']['main']['App']['StartSftpDownload'](arg1, arg2, arg3);
 }
 
 export function StartSftpUpload(arg1, arg2, arg3) {
   return window['go']['main']['App']['StartSftpUpload'](arg1, arg2, arg3);
+}
+
+export function StopForwardTunnel(arg1) {
+  return window['go']['main']['App']['StopForwardTunnel'](arg1);
 }
 
 export function UnlockVault(arg1) {

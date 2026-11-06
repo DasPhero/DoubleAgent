@@ -118,15 +118,64 @@ type SshShellStreams struct {
 	Stderr io.Reader
 }
 
-// SshTransport defines the strict boundary interface for all SSH and SFTP operations (ADR-0006).
+// SshTransport defines the strict boundary interface for all SSH, SFTP, and port forwarding operations (ADR-0006, F-12, F-13).
 // Implementations live in backend/ssh; backend/core never imports golang.org/x/crypto/ssh.
 type SshTransport interface {
 	Connect(ctx context.Context, cfg SshSessionConfig) (sessionID string, err error)
 	OpenShell(ctx context.Context, sessionID string, size TerminalSize) (*SshShellStreams, error)
 	OpenShellWithOptions(ctx context.Context, sessionID string, size TerminalSize, initialDir string, asRoot bool) (*SshShellStreams, error)
 	OpenSftp(ctx context.Context, sessionID string) (SftpClient, error)
+	StartForwardLocal(ctx context.Context, sessionID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (ForwardTunnel, error)
+	StartForwardRemote(ctx context.Context, sessionID string, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (ForwardTunnel, error)
+	StartForwardDynamic(ctx context.Context, sessionID string, bindAddr string, bindPort uint16) (ForwardTunnel, error)
 	ResizeShell(ctx context.Context, sessionID string, size TerminalSize) error
 	Disconnect(ctx context.Context, sessionID string) error
+}
+
+// ForwardRuleType defines the direction of SSH port forwarding (F-13).
+type ForwardRuleType string
+
+const (
+	ForwardLocal   ForwardRuleType = "L" // Local port forwarding (-L)
+	ForwardRemote  ForwardRuleType = "R" // Remote port forwarding (-R)
+	ForwardDynamic ForwardRuleType = "D" // Dynamic SOCKS5 forwarding (-D)
+)
+
+// ForwardRule defines a saved port forwarding configuration in the vault (Spec Section 8, F-13).
+type ForwardRule struct {
+	ID          string          `json:"id"`
+	HostID      string          `json:"hostId,omitempty"`
+	Type        ForwardRuleType `json:"type"` // "L", "R", "D"
+	BindAddress string          `json:"bindAddress"`
+	BindPort    uint16          `json:"bindPort"`
+	TargetHost  string          `json:"targetHost,omitempty"`
+	TargetPort  uint16          `json:"targetPort,omitempty"`
+	AutoStart   bool            `json:"autoStart"`
+	Label       string          `json:"label,omitempty"`
+}
+
+// ForwardTunnelStatus represents the runtime status and metrics of an active port forwarding tunnel (F-13).
+type ForwardTunnelStatus struct {
+	ID           string          `json:"id"`
+	RuleID       string          `json:"ruleId"`
+	SessionID    string          `json:"sessionId"`
+	HostID       string          `json:"hostId,omitempty"`
+	Type         ForwardRuleType `json:"type"`
+	BindAddress  string          `json:"bindAddress"`
+	BindPort     uint16          `json:"bindPort"`
+	TargetHost   string          `json:"targetHost,omitempty"`
+	TargetPort   uint16          `json:"targetPort,omitempty"`
+	Status       string          `json:"status"` // "active", "error", "closed"
+	BytesIn      int64           `json:"bytesIn"`
+	BytesOut     int64           `json:"bytesOut"`
+	ActiveConns  int             `json:"activeConns"`
+	ErrorMessage string          `json:"errorMessage,omitempty"`
+}
+
+// ForwardTunnel defines an active port-forwarding tunnel listener lifecycle and metrics (F-13).
+type ForwardTunnel interface {
+	io.Closer
+	GetStatus() ForwardTunnelStatus
 }
 
 // FileItem represents a local or remote file/directory entry for the SFTP two-column browser (F-12).
@@ -271,6 +320,7 @@ type VaultPayload struct {
 	Groups        []GroupRecord    `json:"groups"`
 	Identities    []IdentityRecord `json:"identities"`
 	Keys          []SshKeyRecord   `json:"keys"`
+	ForwardRules  []ForwardRule    `json:"forwardRules,omitempty"`
 }
 
 // SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).

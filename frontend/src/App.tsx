@@ -15,7 +15,9 @@ import {
 } from './components/TerminalView';
 import { SignalAnalyzerView } from './components/SignalAnalyzerView';
 import { SftpBrowserView } from './components/SftpBrowserView';
+import { PortForwardingView } from './components/PortForwardingView';
 import { FileItem, TransferTask } from './types/sftp';
+import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 
 const SETTINGS_STORAGE_KEY = 'doubleagent_global_settings_v1';
 
@@ -522,6 +524,12 @@ interface WailsAppBindings {
   CreateRemoteDir?: (sessionId: string, path: string) => Promise<void>;
   DeleteRemoteItem?: (sessionId: string, path: string) => Promise<void>;
   GetActiveTransfers?: () => Promise<TransferTask[]>;
+  SaveForwardRule?: (rule: ForwardRule) => Promise<void>;
+  DeleteForwardRule?: (ruleId: string) => Promise<void>;
+  ListForwardRules?: () => Promise<ForwardRule[]>;
+  StartForwardTunnel?: (sessionId: string, ruleId: string) => Promise<string>;
+  StopForwardTunnel?: (tunnelId: string) => Promise<void>;
+  GetActiveTunnels?: () => Promise<ForwardTunnelStatus[]>;
 }
 
 export interface SerialAutoDetectResult {
@@ -734,6 +742,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   );
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
+
+  // Port Forwarding & Tunnels State (F-13)
+  const [showPortForwardingModal, setShowPortForwardingModal] = useState<boolean>(false);
+  const [forwardRules, setForwardRules] = useState<ForwardRule[]>([]);
+  const [activeTunnels, setActiveTunnels] = useState<ForwardTunnelStatus[]>([]);
 
   // Terminal Search state (F-11)
   const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
@@ -972,11 +985,38 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       if (!st.vaultLocked) {
         const summary = await api.GetVaultSummary();
         setVaultSummary(summary);
+        if (api.ListForwardRules) {
+          const rules = await api.ListForwardRules();
+          setForwardRules(rules || []);
+        }
+        if (api.GetActiveTunnels) {
+          const tunnels = await api.GetActiveTunnels();
+          setActiveTunnels(tunnels || []);
+        }
       } else {
         setVaultSummary({ groups: [], hosts: [], identities: [] });
+        setForwardRules([]);
+        setActiveTunnels([]);
       }
     } catch {
       // Ignore during initial mount if bindings not ready
+    }
+  }, []);
+
+  const refreshForwardState = useCallback(async (): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api) return;
+    try {
+      if (api.ListForwardRules) {
+        const rules = await api.ListForwardRules();
+        setForwardRules(rules || []);
+      }
+      if (api.GetActiveTunnels) {
+        const tunnels = await api.GetActiveTunnels();
+        setActiveTunnels(tunnels || []);
+      }
+    } catch {
+      // ignore
     }
   }, []);
 
@@ -1062,13 +1102,22 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       void refreshVaultState();
     });
 
+    const offForward = rt.EventsOn('forward:tunnels-updated', (raw: unknown) => {
+      if (Array.isArray(raw)) {
+        setActiveTunnels(raw as ForwardTunnelStatus[]);
+      } else {
+        void refreshForwardState();
+      }
+    });
+
     return () => {
       offData();
       offPrompt();
       offExit();
       offVaultLock();
+      offForward();
     };
-  }, [refreshVaultState]);
+  }, [refreshVaultState, refreshForwardState]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -1580,6 +1629,78 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         ...prev,
         hosts: prev.hosts.filter((h) => h.id !== hostId),
       }));
+    }
+  };
+
+  const handleSaveForwardRule = async (rule: ForwardRule): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.SaveForwardRule) {
+      try {
+        await api.SaveForwardRule(rule);
+        await refreshForwardState();
+        setStatusMessage(`Saved port forwarding rule "${rule.label || rule.type}".`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Save forward rule failed: ${msg}`);
+      }
+    } else {
+      setForwardRules((prev) => {
+        const idx = prev.findIndex((r) => r.id === rule.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = rule;
+          return next;
+        }
+        return [...prev, rule];
+      });
+    }
+  };
+
+  const handleDeleteForwardRule = async (ruleId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.DeleteForwardRule) {
+      try {
+        await api.DeleteForwardRule(ruleId);
+        await refreshForwardState();
+        setStatusMessage('Deleted port forwarding rule.');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Delete forward rule failed: ${msg}`);
+      }
+    } else {
+      setForwardRules((prev) => prev.filter((r) => r.id !== ruleId));
+    }
+  };
+
+  const handleStartForwardTunnel = async (sessionIdToUse: string, ruleId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.StartForwardTunnel) {
+      setStatusMessage('Wails backend not available to start tunnel.');
+      return;
+    }
+    try {
+      const tunnelId = await api.StartForwardTunnel(sessionIdToUse, ruleId);
+      await refreshForwardState();
+      setStatusMessage(`Started tunnel ${tunnelId}.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`Start tunnel failed: ${msg}`);
+    }
+  };
+
+  const handleStopForwardTunnel = async (tunnelId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.StopForwardTunnel) {
+      try {
+        await api.StopForwardTunnel(tunnelId);
+        await refreshForwardState();
+        setStatusMessage('Stopped tunnel.');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Stop tunnel failed: ${msg}`);
+      }
+    } else {
+      setActiveTunnels((prev) => prev.filter((t) => t.id !== tunnelId));
     }
   };
 
@@ -2848,6 +2969,22 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     <span className="nav-dropdown-shortcut">📁 SFTP</span>
                   </button>
                   <div className="nav-dropdown-divider" />
+                  <div className="nav-dropdown-header">Port Forwarding &amp; Tunnels (F-13)</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setShowPortForwardingModal(true);
+                    }}
+                  >
+                    <span>Port Forwarding (-L, -R, -D)</span>
+                    <span className="nav-dropdown-shortcut">
+                      {activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} active` : '⇄ Tunnels'}
+                    </span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
                   <div className="nav-dropdown-header">Hardware Serial (F-23)</div>
                   <button
                     type="button"
@@ -3070,6 +3207,25 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 </div>
               )}
             </div>
+
+            {/* Port Forwarding / Tunnels Pill Button (F-13) */}
+            <button
+              type="button"
+              className={`nav-menu-trigger ${activeTunnels.length > 0 ? 'active' : ''}`}
+              onClick={() => setShowPortForwardingModal(true)}
+              title="Port Forwarding & Tunnels (F-13)"
+              aria-label="Port Forwarding"
+              style={
+                activeTunnels.length > 0
+                  ? {
+                      color: 'var(--color-primary-green, #10b981)',
+                      borderColor: 'rgba(16, 185, 129, 0.4)',
+                    }
+                  : undefined
+              }
+            >
+              <span>{activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} Tunnels` : 'Tunnels ⇄'}</span>
+            </button>
 
             {/* Global Settings */}
             <button
@@ -5011,6 +5167,45 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             </form>
           </div>
         </div>
+      )}
+      {showPortForwardingModal && (
+        <PortForwardingView
+          rules={forwardRules}
+          activeTunnels={activeTunnels}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: `${h.effectiveUser}@${h.address}:${h.effectivePort}`,
+          }))}
+          activeSessions={(() => {
+            const sessions: { sessionId: string; hostId?: string; title: string }[] = [];
+            for (const t of tabs) {
+              const panes = collectPanes(t.rootNode);
+              for (const p of panes) {
+                if (
+                  p.sessionId &&
+                  !p.sessionId.startsWith('local-') &&
+                  !p.sessionId.startsWith('serial-') &&
+                  !p.sessionId.startsWith('sftp-')
+                ) {
+                  if (!sessions.some((s) => s.sessionId === p.sessionId)) {
+                    sessions.push({
+                      sessionId: p.sessionId,
+                      hostId: p.hostId || t.hostId,
+                      title: p.title || t.title,
+                    });
+                  }
+                }
+              }
+            }
+            return sessions;
+          })()}
+          onSaveRule={handleSaveForwardRule}
+          onDeleteRule={handleDeleteForwardRule}
+          onStartTunnel={handleStartForwardTunnel}
+          onStopTunnel={handleStopForwardTunnel}
+          onClose={() => setShowPortForwardingModal(false)}
+        />
       )}
     </main>
   );

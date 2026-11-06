@@ -43,6 +43,7 @@ type App struct {
 	pendingKeys      map[string]chan bool
 	sftpClients      map[string]core.SftpClient
 	transferTasks    map[string]*activeTransferTask
+	activeTunnels    map[string]core.ForwardTunnel
 }
 
 type activeTransferTask struct {
@@ -100,6 +101,7 @@ func NewAppWithDependencies(
 		pendingKeys:      make(map[string]chan bool),
 		sftpClients:      make(map[string]core.SftpClient),
 		transferTasks:    make(map[string]*activeTransferTask),
+		activeTunnels:    make(map[string]core.ForwardTunnel),
 	}
 
 	if vaultStore == nil {
@@ -530,6 +532,8 @@ func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, e
 	go a.streamReaderLoop(sessionID, streams.Stdout, true)
 	go a.streamReaderLoop(sessionID, streams.Stderr, false)
 
+	go a.autoStartForwardRules(sessionID, hostID)
+
 	return sessionID, nil
 }
 
@@ -602,6 +606,8 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 
 	go a.streamReaderLoop(sessionID, streams.Stdout, true)
 	go a.streamReaderLoop(sessionID, streams.Stderr, false)
+
+	go a.autoStartForwardRules(sessionID, "")
 
 	return sessionID, nil
 }
@@ -975,7 +981,22 @@ func (a *App) DisconnectSession(sessionID string) error {
 	delete(a.sessionHostID, sessionID)
 	delete(a.sessionPasswords, sessionID)
 	delete(a.sessionRequests, sessionID)
+
+	var tunnelsToClose []core.ForwardTunnel
+	for tid, tun := range a.activeTunnels {
+		if tun != nil && tun.GetStatus().SessionID == sessionID {
+			tunnelsToClose = append(tunnelsToClose, tun)
+			delete(a.activeTunnels, tid)
+		}
+	}
 	a.mu.Unlock()
+
+	for _, tun := range tunnelsToClose {
+		_ = tun.Close()
+	}
+	if len(tunnelsToClose) > 0 {
+		a.emit(a.ctx, "forward:tunnels-updated", a.GetActiveTunnels())
+	}
 
 	if isLocal && locSess != nil {
 		return locSess.Close()
@@ -1379,6 +1400,244 @@ func (a *App) GetActiveTransfers() []core.TransferTask {
 	result := make([]core.TransferTask, 0, len(a.transferTasks))
 	for _, t := range a.transferTasks {
 		result = append(result, t.task)
+	}
+	return result
+}
+
+// autoStartForwardRules starts any port forwarding rules configured for auto-start with a given host (F-13).
+func (a *App) autoStartForwardRules(sessionID, hostID string) {
+	if a.vaultStore.IsLocked() {
+		return
+	}
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return
+	}
+
+	var targetHost *core.HostRecord
+	if hostID != "" {
+		for _, h := range payload.Hosts {
+			if h.ID == hostID {
+				targetHost = &h
+				break
+			}
+		}
+	}
+
+	for _, rule := range payload.ForwardRules {
+		if !rule.AutoStart {
+			continue
+		}
+		isMatch := (hostID != "" && rule.HostID == hostID)
+		if !isMatch && targetHost != nil {
+			for _, rID := range targetHost.ForwardRuleIDs {
+				if rID == rule.ID {
+					isMatch = true
+					break
+				}
+			}
+		}
+		if isMatch {
+			_, _ = a.StartForwardTunnel(sessionID, rule.ID)
+		}
+	}
+}
+
+// SaveForwardRule creates or updates a port forwarding rule in the encrypted vault (F-13).
+func (a *App) SaveForwardRule(rule core.ForwardRule) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	if rule.ID == "" {
+		rule.ID = fmt.Sprintf("rule-%d", time.Now().UnixNano())
+	}
+	if rule.Type == "" {
+		rule.Type = core.ForwardLocal
+	}
+	if rule.BindAddress == "" {
+		rule.BindAddress = "127.0.0.1"
+	}
+
+	updated := false
+	for i, r := range payload.ForwardRules {
+		if r.ID == rule.ID {
+			payload.ForwardRules[i] = rule
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		payload.ForwardRules = append(payload.ForwardRules, rule)
+	}
+
+	// If rule is associated with a specific host, ensure the host references it
+	if rule.HostID != "" {
+		for i, h := range payload.Hosts {
+			if h.ID == rule.HostID {
+				hasID := false
+				for _, existingRuleID := range h.ForwardRuleIDs {
+					if existingRuleID == rule.ID {
+						hasID = true
+						break
+					}
+				}
+				if !hasID {
+					payload.Hosts[i].ForwardRuleIDs = append(payload.Hosts[i].ForwardRuleIDs, rule.ID)
+				}
+			}
+		}
+	}
+
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// DeleteForwardRule removes a port forwarding rule from the vault and stops any active tunnels using it (F-13).
+func (a *App) DeleteForwardRule(ruleID string) error {
+	a.vaultStore.Touch()
+
+	// Stop any active tunnels using this rule
+	a.mu.Lock()
+	var toStop []string
+	for tid, tun := range a.activeTunnels {
+		if tun != nil && tun.GetStatus().RuleID == ruleID {
+			toStop = append(toStop, tid)
+		}
+	}
+	a.mu.Unlock()
+
+	for _, tid := range toStop {
+		_ = a.StopForwardTunnel(tid)
+	}
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	filteredRules := make([]core.ForwardRule, 0, len(payload.ForwardRules))
+	for _, r := range payload.ForwardRules {
+		if r.ID != ruleID {
+			filteredRules = append(filteredRules, r)
+		}
+	}
+	payload.ForwardRules = filteredRules
+
+	for i := range payload.Hosts {
+		filteredHostRuleIDs := make([]string, 0, len(payload.Hosts[i].ForwardRuleIDs))
+		for _, rID := range payload.Hosts[i].ForwardRuleIDs {
+			if rID != ruleID {
+				filteredHostRuleIDs = append(filteredHostRuleIDs, rID)
+			}
+		}
+		payload.Hosts[i].ForwardRuleIDs = filteredHostRuleIDs
+	}
+
+	return a.vaultStore.SavePayload(a.ctx, payload)
+}
+
+// ListForwardRules returns all port forwarding rules stored in the vault (F-13).
+func (a *App) ListForwardRules() ([]core.ForwardRule, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	return payload.ForwardRules, nil
+}
+
+// StartForwardTunnel starts a port forwarding tunnel on an active SSH session for a given rule (F-13).
+func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return "", err
+	}
+
+	var targetRule *core.ForwardRule
+	for _, r := range payload.ForwardRules {
+		if r.ID == ruleID {
+			targetRule = &r
+			break
+		}
+	}
+	if targetRule == nil {
+		return "", fmt.Errorf("forward rule %s not found in vault", ruleID)
+	}
+
+	var tunnel core.ForwardTunnel
+	switch targetRule.Type {
+	case core.ForwardLocal:
+		tunnel, err = a.transport.StartForwardLocal(
+			a.ctx,
+			sessionID,
+			targetRule.BindAddress,
+			targetRule.BindPort,
+			targetRule.TargetHost,
+			targetRule.TargetPort,
+		)
+	case core.ForwardRemote:
+		tunnel, err = a.transport.StartForwardRemote(
+			a.ctx,
+			sessionID,
+			targetRule.BindAddress,
+			targetRule.BindPort,
+			targetRule.TargetHost,
+			targetRule.TargetPort,
+		)
+	case core.ForwardDynamic:
+		tunnel, err = a.transport.StartForwardDynamic(
+			a.ctx,
+			sessionID,
+			targetRule.BindAddress,
+			targetRule.BindPort,
+		)
+	default:
+		return "", fmt.Errorf("unsupported forward rule type: %s", targetRule.Type)
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	tunnelID := tunnel.GetStatus().ID
+	a.mu.Lock()
+	a.activeTunnels[tunnelID] = tunnel
+	a.mu.Unlock()
+
+	a.emit(a.ctx, "forward:tunnels-updated", a.GetActiveTunnels())
+	return tunnelID, nil
+}
+
+// StopForwardTunnel shuts down an active port forwarding tunnel (F-13).
+func (a *App) StopForwardTunnel(tunnelID string) error {
+	a.mu.Lock()
+	tunnel, ok := a.activeTunnels[tunnelID]
+	if ok && tunnel != nil {
+		delete(a.activeTunnels, tunnelID)
+	}
+	a.mu.Unlock()
+
+	if !ok || tunnel == nil {
+		return errors.New("tunnel not found or already closed")
+	}
+
+	err := tunnel.Close()
+	a.emit(a.ctx, "forward:tunnels-updated", a.GetActiveTunnels())
+	return err
+}
+
+// GetActiveTunnels returns a snapshot of all active port forwarding tunnels and their current metrics (F-13).
+func (a *App) GetActiveTunnels() []core.ForwardTunnelStatus {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	result := make([]core.ForwardTunnelStatus, 0, len(a.activeTunnels))
+	for _, tun := range a.activeTunnels {
+		if tun != nil {
+			result = append(result, tun.GetStatus())
+		}
 	}
 	return result
 }
