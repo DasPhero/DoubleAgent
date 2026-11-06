@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"sync"
@@ -132,10 +133,12 @@ func (s *KnownHostsStore) VerifyOrTrust(host string, port uint16, key ssh.Public
 }
 
 type activeSession struct {
-	mu      sync.Mutex
-	client  *ssh.Client
-	shell   *ssh.Session
-	closed  bool
+	mu          sync.Mutex
+	client      *ssh.Client
+	shell       *ssh.Session
+	closed      bool
+	jumpClients []*ssh.Client
+	closers     []io.Closer
 }
 
 // DialFunc abstracts network connection establishment (needed for ProxyJump chains F-14/F-25 and sandboxed tests).
@@ -226,9 +229,34 @@ func (t *Transport) Connect(ctx context.Context, cfg core.SshSessionConfig) (str
 	}
 
 	targetAddr := net.JoinHostPort(cfg.Address, strconv.Itoa(int(port)))
-	rawConn, err := t.dial(ctx, "tcp", targetAddr, timeout)
-	if err != nil {
-		return "", fmt.Errorf("tcp dial %s: %w", targetAddr, err)
+	var (
+		rawConn     net.Conn
+		jumpClients []*ssh.Client
+		closers     []io.Closer
+	)
+
+	if len(cfg.JumpChain) > 0 {
+		rawConn, jumpClients, closers, err = t.dialProxyJump(ctx, cfg.JumpChain, targetAddr, timeout)
+		if err != nil {
+			return "", fmt.Errorf("proxyjump: %w", err)
+		}
+	} else if cfg.ProxyCommand != "" {
+		rawConn, err = dialProxyCommand(ctx, cfg.ProxyCommand, cfg.Address, port)
+		if err != nil {
+			return "", fmt.Errorf("proxycommand: %w", err)
+		}
+		closers = append(closers, rawConn)
+	} else if cfg.SocksProxy != "" {
+		rawConn, err = dialSocks5(ctx, cfg.SocksProxy, targetAddr, cfg.SocksAuth, timeout)
+		if err != nil {
+			return "", fmt.Errorf("socks5 proxy: %w", err)
+		}
+		closers = append(closers, rawConn)
+	} else {
+		rawConn, err = t.dial(ctx, "tcp", targetAddr, timeout)
+		if err != nil {
+			return "", fmt.Errorf("tcp dial %s: %w", targetAddr, err)
+		}
 	}
 
 	// Respect context cancellation during the SSH handshake.
@@ -245,6 +273,12 @@ func (t *Transport) Connect(ctx context.Context, cfg core.SshSessionConfig) (str
 	close(handshakeDone)
 	if err != nil {
 		_ = rawConn.Close()
+		for _, jc := range jumpClients {
+			_ = jc.Close()
+		}
+		for _, c := range closers {
+			_ = c.Close()
+		}
 		return "", err
 	}
 
@@ -252,12 +286,20 @@ func (t *Transport) Connect(ctx context.Context, cfg core.SshSessionConfig) (str
 	sessionID, err := generateSessionID()
 	if err != nil {
 		_ = client.Close()
+		for _, jc := range jumpClients {
+			_ = jc.Close()
+		}
+		for _, c := range closers {
+			_ = c.Close()
+		}
 		return "", err
 	}
 
 	t.mu.Lock()
 	t.sessions[sessionID] = &activeSession{
-		client: client,
+		client:      client,
+		jumpClients: jumpClients,
+		closers:     closers,
 	}
 	t.mu.Unlock()
 
@@ -399,7 +441,16 @@ func (t *Transport) Disconnect(_ context.Context, sessionID string) error {
 		_ = sess.shell.Close()
 		sess.shell = nil
 	}
-	return sess.client.Close()
+	err := sess.client.Close()
+	for _, jc := range sess.jumpClients {
+		_ = jc.Close()
+	}
+	sess.jumpClients = nil
+	for _, c := range sess.closers {
+		_ = c.Close()
+	}
+	sess.closers = nil
+	return err
 }
 
 func (t *Transport) getSession(sessionID string) (*activeSession, error) {

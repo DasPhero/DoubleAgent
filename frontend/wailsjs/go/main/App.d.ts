@@ -22,6 +22,8 @@ export function DeleteGroup(arg1:string):Promise<void>;
 
 export function DeleteHost(arg1:string):Promise<void>;
 
+export function DeleteProxyProfile(arg1:string):Promise<void>;
+
 export function DeleteRemoteItem(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteSSHKey(arg1:string):Promise<void>;
@@ -32,11 +34,17 @@ export function DuplicateSession(arg1:string,arg2:core.TerminalSize):Promise<str
 
 export function EnableQuickUnlock():Promise<void>;
 
+export function ExportProxychainsConfig():Promise<string>;
+
+export function GenerateProxychainsConfig(arg1:core.ProxychainsExportOptions):Promise<string>;
+
 export function GenerateSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
 
 export function GetActiveTransfers():Promise<Array<core.TransferTask>>;
 
 export function GetActiveTunnels():Promise<Array<core.ForwardTunnelStatus>>;
+
+export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOptions>;
 
 export function GetVaultSummary():Promise<core.VaultSummary>;
 
@@ -55,6 +63,8 @@ export function InjectSessionPassword(arg1:string):Promise<void>;
 export function ListForwardRules():Promise<Array<core.ForwardRule>>;
 
 export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
+
+export function ListProxyProfiles():Promise<Array<core.ProxyProfileSummary>>;
 
 export function ListRemoteDir(arg1:string,arg2:string):Promise<Array<core.FileItem>>;
 
@@ -79,6 +89,10 @@ export function SaveGroup(arg1:core.GroupRecord):Promise<void>;
 export function SaveHost(arg1:core.HostRecord):Promise<void>;
 
 export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
+
+export function SaveProxyProfile(arg1:core.ProxyProfile):Promise<void>;
+
+export function SaveProxychainsFile(arg1:string,arg2:string):Promise<void>;
 
 export function SearchCommandPalette(arg1:string):Promise<core.CommandPaletteResponse>;
 

@@ -9,34 +9,39 @@ import (
 var ErrHostNotFound = errors.New("host not found in vault")
 
 // ResolvedHost contains the effective connection settings for a host after applying
-// hierarchical group inheritance (root group -> child group -> host override) per F-01.
+// hierarchical group inheritance (root group -> child group -> host override) per F-01, F-14.
 type ResolvedHost struct {
-	HostID        string         `json:"hostId"`
-	Label         string         `json:"label"`
-	Address       string         `json:"address"`
-	Port          uint16         `json:"port"`
-	Username      string         `json:"username"`
-	IdentityID    string         `json:"identityId"`
-	InitialDir    string         `json:"initialDir,omitempty"`
-	KeepaliveSecs uint16         `json:"keepaliveSecs"`
-	Auth          SshAuthConfig  `json:"-"`
+	HostID         string        `json:"hostId"`
+	Label          string        `json:"label"`
+	Address        string        `json:"address"`
+	Port           uint16        `json:"port"`
+	Username       string        `json:"username"`
+	IdentityID     string        `json:"identityId"`
+	InitialDir     string        `json:"initialDir,omitempty"`
+	KeepaliveSecs  uint16        `json:"keepaliveSecs"`
+	ProxyProfileID string        `json:"proxyProfileId,omitempty"`
+	ProxyCommand   string        `json:"proxyCommand,omitempty"`
+	JumpChain      []string      `json:"jumpChain,omitempty"`
+	Auth           SshAuthConfig `json:"-"`
 }
 
-// HostSummary is a non-secret view of a saved host exposed to the frontend UI (Golden Rule 2).
+// HostSummary is a non-secret view of a saved host exposed to the frontend UI (Golden Rule 2, F-14).
 type HostSummary struct {
-	ID            string   `json:"id"`
-	Label         string   `json:"label"`
-	Address       string   `json:"address"`
-	EffectivePort uint16   `json:"effectivePort"`
-	EffectiveUser string   `json:"effectiveUser"`
-	InitialDir    string   `json:"initialDir,omitempty"`
-	KeepaliveSecs uint16   `json:"keepaliveSecs"`
-	GroupID       string   `json:"groupId"`
-	IdentityID    string   `json:"identityId"`
-	Tags          []string `json:"tags"`
-	JumpChain     []string `json:"jumpChain"`
-	Color         string   `json:"color"`
-	Favorite      bool     `json:"favorite"`
+	ID             string   `json:"id"`
+	Label          string   `json:"label"`
+	Address        string   `json:"address"`
+	EffectivePort  uint16   `json:"effectivePort"`
+	EffectiveUser  string   `json:"effectiveUser"`
+	InitialDir     string   `json:"initialDir,omitempty"`
+	KeepaliveSecs  uint16   `json:"keepaliveSecs"`
+	GroupID        string   `json:"groupId"`
+	IdentityID     string   `json:"identityId"`
+	Tags           []string `json:"tags"`
+	JumpChain      []string `json:"jumpChain"`
+	ProxyProfileID string   `json:"proxyProfileId,omitempty"`
+	ProxyCommand   string   `json:"proxyCommand,omitempty"`
+	Color          string   `json:"color"`
+	Favorite       bool     `json:"favorite"`
 }
 
 // IdentitySummary is a non-secret view of a saved identity exposed to the frontend UI (Golden Rule 2).
@@ -58,12 +63,13 @@ type SshKeySummary struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
-// VaultSummary aggregates non-secret groups, hosts (with inherited values resolved), identities, and public keys for the UI.
+// VaultSummary aggregates non-secret groups, hosts (with inherited values resolved), identities, public keys, and proxy profiles for the UI.
 type VaultSummary struct {
-	Groups     []GroupRecord     `json:"groups"`
-	Hosts      []HostSummary     `json:"hosts"`
-	Identities []IdentitySummary `json:"identities"`
-	Keys       []SshKeySummary   `json:"keys"`
+	Groups        []GroupRecord         `json:"groups"`
+	Hosts         []HostSummary         `json:"hosts"`
+	Identities    []IdentitySummary     `json:"identities"`
+	Keys          []SshKeySummary       `json:"keys"`
+	ProxyProfiles []ProxyProfileSummary `json:"proxyProfiles"`
 }
 
 // ResolveEffectiveHost computes the effective Port, Username, IdentityID, KeepaliveSecs, and SshAuthConfig
@@ -104,6 +110,9 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 	effectiveIdentityID := ""
 	effectiveKeepalive := uint16(30)
 	effectiveInitialDir := ""
+	effectiveProxyProfileID := ""
+	effectiveProxyCommand := ""
+	jumpChain := append([]string(nil), target.JumpChain...)
 
 	// 1. Apply inherited group settings from top-most ancestor down to immediate group
 	for _, g := range chain {
@@ -122,9 +131,12 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 		if g.DefaultSettings.InitialDir != "" {
 			effectiveInitialDir = g.DefaultSettings.InitialDir
 		}
+		if g.DefaultSettings.ProxyProfileID != "" {
+			effectiveProxyProfileID = g.DefaultSettings.ProxyProfileID
+		}
 	}
 
-	// 2. Host value overrides group value (F-01 acceptance criterion)
+	// 2. Host value overrides group value (F-01, F-14 acceptance criteria)
 	if target.Port != 0 {
 		effectivePort = target.Port
 	}
@@ -133,6 +145,12 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 	}
 	if target.InitialDir != "" {
 		effectiveInitialDir = target.InitialDir
+	}
+	if target.ProxyProfileID != "" {
+		effectiveProxyProfileID = target.ProxyProfileID
+	}
+	if target.ProxyCommand != "" {
+		effectiveProxyCommand = target.ProxyCommand
 	}
 
 	var authCfg SshAuthConfig
@@ -159,19 +177,22 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 	}
 
 	return ResolvedHost{
-		HostID:        target.ID,
-		Label:         target.Label,
-		Address:       target.Address,
-		Port:          effectivePort,
-		Username:      effectiveUser,
-		IdentityID:    effectiveIdentityID,
-		InitialDir:    effectiveInitialDir,
-		KeepaliveSecs: effectiveKeepalive,
-		Auth:          authCfg,
+		HostID:         target.ID,
+		Label:          target.Label,
+		Address:        target.Address,
+		Port:           effectivePort,
+		Username:       effectiveUser,
+		IdentityID:     effectiveIdentityID,
+		InitialDir:     effectiveInitialDir,
+		KeepaliveSecs:  effectiveKeepalive,
+		ProxyProfileID: effectiveProxyProfileID,
+		ProxyCommand:   effectiveProxyCommand,
+		JumpChain:      jumpChain,
+		Auth:           authCfg,
 	}, nil
 }
 
-// BuildVaultSummary produces a non-secret VaultSummary from a decrypted VaultPayload (F-01, Golden Rule 2).
+// BuildVaultSummary produces a non-secret VaultSummary from a decrypted VaultPayload (F-01, F-14, Golden Rule 2).
 func BuildVaultSummary(payload VaultPayload) VaultSummary {
 	groups := make([]GroupRecord, len(payload.Groups))
 	copy(groups, payload.Groups)
@@ -198,6 +219,24 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		})
 	}
 
+	proxySummaries := make([]ProxyProfileSummary, 0, len(payload.ProxyProfiles))
+	for _, p := range payload.ProxyProfiles {
+		jumpIDs := p.JumpHostIDs
+		if jumpIDs == nil {
+			jumpIDs = []string{}
+		}
+		proxySummaries = append(proxySummaries, ProxyProfileSummary{
+			ID:            p.ID,
+			Name:          p.Name,
+			Type:          p.Type,
+			JumpHostIDs:   jumpIDs,
+			Command:       p.Command,
+			SocksAddress:  p.SocksAddress,
+			SocksUsername: p.SocksUsername,
+			HasPassword:   p.SocksPassword != "",
+		})
+	}
+
 	hosts := make([]HostSummary, 0, len(payload.Hosts))
 	for _, h := range payload.Hosts {
 		resolved, err := ResolveEffectiveHost(h.ID, payload)
@@ -205,6 +244,8 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		user := "root"
 		keepalive := uint16(30)
 		effIdentity := h.IdentityID
+		proxyProfileID := h.ProxyProfileID
+		proxyCommand := h.ProxyCommand
 		var initialDir string
 		if err == nil {
 			port = resolved.Port
@@ -212,6 +253,8 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			keepalive = resolved.KeepaliveSecs
 			effIdentity = resolved.IdentityID
 			initialDir = resolved.InitialDir
+			proxyProfileID = resolved.ProxyProfileID
+			proxyCommand = resolved.ProxyCommand
 		}
 		tags := h.Tags
 		if tags == nil {
@@ -222,27 +265,30 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			jumpChain = []string{}
 		}
 		hosts = append(hosts, HostSummary{
-			ID:            h.ID,
-			Label:         h.Label,
-			Address:       h.Address,
-			EffectivePort: port,
-			EffectiveUser: user,
-			InitialDir:    initialDir,
-			KeepaliveSecs: keepalive,
-			GroupID:       h.GroupID,
-			IdentityID:    effIdentity,
-			Tags:          tags,
-			JumpChain:     jumpChain,
-			Color:         h.Color,
-			Favorite:      h.Favorite,
+			ID:             h.ID,
+			Label:          h.Label,
+			Address:        h.Address,
+			EffectivePort:  port,
+			EffectiveUser:  user,
+			InitialDir:     initialDir,
+			KeepaliveSecs:  keepalive,
+			GroupID:        h.GroupID,
+			IdentityID:     effIdentity,
+			Tags:           tags,
+			JumpChain:      jumpChain,
+			ProxyProfileID: proxyProfileID,
+			ProxyCommand:   proxyCommand,
+			Color:          h.Color,
+			Favorite:       h.Favorite,
 		})
 	}
 
 	return VaultSummary{
-		Groups:     groups,
-		Hosts:      hosts,
-		Identities: identities,
-		Keys:       keys,
+		Groups:        groups,
+		Hosts:         hosts,
+		Identities:    identities,
+		Keys:          keys,
+		ProxyProfiles: proxySummaries,
 	}
 }
 

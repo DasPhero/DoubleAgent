@@ -535,3 +535,152 @@ func TestApp_PortForwarding_F13(t *testing.T) {
 		t.Fatalf("expected 2 rules after deletion, got %d", len(rulesAfterDel))
 	}
 }
+
+func TestApp_ProxyProfiles_F14(t *testing.T) {
+	fake := newFakeSshTransport()
+	tmpVault := filepath.Join(t.TempDir(), "test_proxy.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	var app *App
+	app = NewAppWithDependencies(fake, nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	// 1. Create a Bastion Host and a Target Host in the vault
+	bastionHost := core.HostRecord{
+		ID:      "host-bastion",
+		Label:   "Bastion Jumphost",
+		Address: "bastion.corp.net",
+		Port:    2222,
+	}
+	if err := app.SaveHost(bastionHost); err != nil {
+		t.Fatalf("SaveHost bastion failed: %v", err)
+	}
+
+	// 2. Create Proxy Profiles (Jump and SOCKS5)
+	jumpProf := core.ProxyProfile{
+		ID:          "prof-jump-1",
+		Name:        "Corp Bastion Jump",
+		Type:        core.ProxyTypeJump,
+		JumpHostIDs: []string{"host-bastion"},
+	}
+	if err := app.SaveProxyProfile(jumpProf); err != nil {
+		t.Fatalf("SaveProxyProfile jump failed: %v", err)
+	}
+
+	socksProf := core.ProxyProfile{
+		ID:            "prof-socks-1",
+		Name:          "Local SOCKS5 Proxy",
+		Type:          core.ProxyTypeSocks5,
+		SocksAddress:  "127.0.0.1:1080",
+		SocksUsername: "proxyuser",
+		SocksPassword: "supersecretproxypass",
+	}
+	if err := app.SaveProxyProfile(socksProf); err != nil {
+		t.Fatalf("SaveProxyProfile socks failed: %v", err)
+	}
+
+	// 3. Verify ListProxyProfiles masks secrets and reports HasPassword
+	profs, err := app.ListProxyProfiles()
+	if err != nil {
+		t.Fatalf("ListProxyProfiles failed: %v", err)
+	}
+	if len(profs) != 2 {
+		t.Fatalf("expected 2 proxy profiles, got %d", len(profs))
+	}
+
+	var foundSocks *core.ProxyProfileSummary
+	for i := range profs {
+		if profs[i].ID == "prof-socks-1" {
+			foundSocks = &profs[i]
+			break
+		}
+	}
+	if foundSocks == nil {
+		t.Fatal("prof-socks-1 not found in summary")
+	}
+	if !foundSocks.HasPassword {
+		t.Error("expected HasPassword to be true for socks profile")
+	}
+
+	// 4. Update profile without password and verify password is preserved
+	updateProf := core.ProxyProfile{
+		ID:            "prof-socks-1",
+		Name:          "Renamed SOCKS5",
+		Type:          core.ProxyTypeSocks5,
+		SocksAddress:  "127.0.0.1:1081",
+		SocksUsername: "proxyuser",
+		SocksPassword: "", // empty, should preserve existing
+	}
+	if err := app.SaveProxyProfile(updateProf); err != nil {
+		t.Fatalf("SaveProxyProfile update failed: %v", err)
+	}
+
+	rawPayload, err := app.vaultStore.GetPayload()
+	if err != nil {
+		t.Fatalf("GetPayload failed: %v", err)
+	}
+	for _, p := range rawPayload.ProxyProfiles {
+		if p.ID == "prof-socks-1" {
+			if p.SocksPassword != "supersecretproxypass" {
+				t.Fatalf("expected preserved password 'supersecretproxypass', got %q", p.SocksPassword)
+			}
+			if p.SocksAddress != "127.0.0.1:1081" {
+				t.Fatalf("expected updated address '127.0.0.1:1081', got %q", p.SocksAddress)
+			}
+		}
+	}
+
+	// 5. Test ExportProxychainsConfig
+	cfgText, err := app.ExportProxychainsConfig()
+	if err != nil {
+		t.Fatalf("ExportProxychainsConfig failed: %v", err)
+	}
+	if !strings.Contains(cfgText, "strict_chain") || !strings.Contains(cfgText, "127.0.0.1") || !strings.Contains(cfgText, "1081") || !strings.Contains(cfgText, "proxyuser") {
+		t.Errorf("unexpected proxychains config:\n%s", cfgText)
+	}
+
+	// 6. Target host associated with Jump Profile
+	targetHost := core.HostRecord{
+		ID:             "host-internal-app",
+		Label:          "Internal Application",
+		Address:        "10.0.0.50",
+		Port:           22,
+		ProxyProfileID: "prof-jump-1",
+	}
+	if err := app.SaveHost(targetHost); err != nil {
+		t.Fatalf("SaveHost target failed: %v", err)
+	}
+
+	// Verify ConnectSavedHost builds config with JumpChain
+	sessID, err := app.ConnectSavedHost("host-internal-app", core.TerminalSize{Cols: 80, Rows: 24})
+	if err != nil {
+		t.Fatalf("ConnectSavedHost with jump profile failed: %v", err)
+	}
+	if sessID == "" {
+		t.Fatal("expected non-empty session ID")
+	}
+	_ = app.DisconnectSession(sessID)
+
+	// 7. Delete proxy profile and verify host reference cleared
+	if err := app.DeleteProxyProfile("prof-jump-1"); err != nil {
+		t.Fatalf("DeleteProxyProfile failed: %v", err)
+	}
+	summary, _ := app.GetVaultSummary()
+	for _, h := range summary.Hosts {
+		if h.ID == "host-internal-app" {
+			if h.ProxyProfileID != "" {
+				t.Errorf("expected cleared ProxyProfileID on target host, got %q", h.ProxyProfileID)
+			}
+		}
+	}
+}

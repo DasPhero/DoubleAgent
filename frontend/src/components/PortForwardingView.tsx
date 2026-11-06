@@ -24,6 +24,7 @@ export interface PortForwardingViewProps {
   onStartTunnel: (sessionId: string, ruleId: string) => Promise<void>;
   onStartTunnelWithHost?: (hostId: string, ruleId: string) => Promise<void>;
   onStopTunnel: (tunnelId: string) => Promise<void>;
+  onOpenProxychainsExport?: () => void;
   onClose: () => void;
 }
 
@@ -37,6 +38,7 @@ export function PortForwardingView({
   onStartTunnel,
   onStartTunnelWithHost,
   onStopTunnel,
+  onOpenProxychainsExport,
   onClose,
 }: PortForwardingViewProps): React.JSX.Element {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -193,6 +195,28 @@ export function PortForwardingView({
             </span>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
+            {onOpenProxychainsExport && (
+              <button
+                type="button"
+                onClick={onOpenProxychainsExport}
+                style={{
+                  padding: '4px 10px',
+                  backgroundColor: '#21262d',
+                  color: '#58a6ff',
+                  border: '1px solid #30363d',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>⛓️</span>
+                <span>Export proxychains.conf</span>
+              </button>
+            )}
             {!showAddForm && (
               <button
                 type="button"

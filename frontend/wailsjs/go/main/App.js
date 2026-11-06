@@ -42,6 +42,10 @@ export function DeleteHost(arg1) {
   return window['go']['main']['App']['DeleteHost'](arg1);
 }
 
+export function DeleteProxyProfile(arg1) {
+  return window['go']['main']['App']['DeleteProxyProfile'](arg1);
+}
+
 export function DeleteRemoteItem(arg1, arg2) {
   return window['go']['main']['App']['DeleteRemoteItem'](arg1, arg2);
 }
@@ -62,6 +66,14 @@ export function EnableQuickUnlock() {
   return window['go']['main']['App']['EnableQuickUnlock']();
 }
 
+export function ExportProxychainsConfig() {
+  return window['go']['main']['App']['ExportProxychainsConfig']();
+}
+
+export function GenerateProxychainsConfig(arg1) {
+  return window['go']['main']['App']['GenerateProxychainsConfig'](arg1);
+}
+
 export function GenerateSSHKey(arg1, arg2, arg3) {
   return window['go']['main']['App']['GenerateSSHKey'](arg1, arg2, arg3);
 }
@@ -72,6 +84,10 @@ export function GetActiveTransfers() {
 
 export function GetActiveTunnels() {
   return window['go']['main']['App']['GetActiveTunnels']();
+}
+
+export function GetDefaultProxychainsOptions() {
+  return window['go']['main']['App']['GetDefaultProxychainsOptions']();
 }
 
 export function GetVaultSummary() {
@@ -108,6 +124,10 @@ export function ListForwardRules() {
 
 export function ListLocalDir(arg1) {
   return window['go']['main']['App']['ListLocalDir'](arg1);
+}
+
+export function ListProxyProfiles() {
+  return window['go']['main']['App']['ListProxyProfiles']();
 }
 
 export function ListRemoteDir(arg1, arg2) {
@@ -156,6 +176,14 @@ export function SaveHost(arg1) {
 
 export function SaveIdentity(arg1) {
   return window['go']['main']['App']['SaveIdentity'](arg1);
+}
+
+export function SaveProxyProfile(arg1) {
+  return window['go']['main']['App']['SaveProxyProfile'](arg1);
+}
+
+export function SaveProxychainsFile(arg1, arg2) {
+  return window['go']['main']['App']['SaveProxychainsFile'](arg1, arg2);
 }
 
 export function SearchCommandPalette(arg1) {

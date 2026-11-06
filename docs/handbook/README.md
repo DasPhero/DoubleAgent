@@ -6,9 +6,29 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, & `F-23`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, & `F-23`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Proxy Profiles: ProxyJump, ProxyCommand, & proxychains Export (`F-14`)**:
+  - **Proxy Profiles in Encrypted Vault**:
+    - Configure reusable proxy profiles under **Tools ▾ -> Proxy Profiles (F-14)**:
+      - **ProxyJump Chains**: Define intermediate bastion/jump hosts (`[user@]host[:port]` or select from existing saved hosts). Chain through multiple hops sequentially (e.g. `bastion-dmz ➔ internal-jump ➔ target-server`).
+      - **ProxyCommand**: Execute custom proxy helper commands locally (e.g. `connect-proxy -S proxy:1080 %h %p`, `nc -X 5 -x 127.0.0.1:1080 %h %p`, `ncat --proxy-type socks5 %h %p`). Macro expansion dynamically substitutes `%h` with the target host and `%p` with the target port. Windows commands run headlessly with `CREATE_NO_WINDOW`.
+      - **SOCKS5 Proxies**: Tunnel SSH connections directly through corporate or dynamic SOCKS5 proxies (`host:port`) with optional username and password authentication.
+    - Passwords for authenticated proxies are stored in the encrypted vault and never exposed in cleartext to the frontend.
+  - **Host & Group Proxy Assignment & Inheritance**:
+    - Assign a Proxy Profile to any SSH Host or set a default Proxy Profile on a Host Group to have all member hosts inherit the proxy settings automatically.
+    - Override jump chains or proxy commands on individual hosts when needed.
+  - **Export `proxychains.conf`**:
+    - Open **Tools ▾ -> Export proxychains.conf** or click **Export proxychains.conf** in the Port Forwarding view.
+    - Automatically collects all active and saved dynamic SOCKS5 forward rules (`-D`) and SOCKS5 proxy profiles.
+    - **Configurable Options**:
+      - Chain Modes: `strict_chain` (traverse all proxies in order), `dynamic_chain` (skip offline proxies), `random_chain`, `round_robin_chain`.
+      - DNS Leak Prevention: Toggle `proxy_dns` to route all DNS queries through the proxy chain.
+      - Quiet Mode: Suppress proxychains banner output.
+      - Timeouts: Configure connect timeout (ms) and data read timeout (ms).
+      - Proxy List Editor: Reorder hops, toggle individual proxies on/off, edit type (`socks5`, `socks4`, `http`), host, port, user, and password.
+    - **Export Options**: Real-time configuration preview, **Copy to Clipboard**, **Download .conf**, and **Save to Disk** (`proxychains.conf` or `proxychains4.conf`).
 - **Port Forwarding: Local `-L`, Remote `-R`, & Dynamic SOCKS5 `-D` (`F-13`)**:
   - **Rule Storage & Management in Encrypted Vault**:
     - Configure persistent port forwarding rules stored securely in the encrypted vault (`ForwardRules`).

@@ -14,6 +14,7 @@ type SSHConfigHostEntry struct {
 	Port         uint16   `json:"port"`
 	IdentityFile string   `json:"identityFile"`
 	ProxyJump    []string `json:"proxyJump"`
+	ProxyCommand string   `json:"proxyCommand,omitempty"`
 }
 
 // SSHConfigParseResult holds the extracted Host entries and any unknown/unsupported directive warnings (F-22).
@@ -63,6 +64,9 @@ func ParseSSHConfig(content string) SSHConfigParseResult {
 			}
 			if len(entry.ProxyJump) == 0 && len(globalDefaults.ProxyJump) > 0 {
 				entry.ProxyJump = append([]string(nil), globalDefaults.ProxyJump...)
+			}
+			if entry.ProxyCommand == "" {
+				entry.ProxyCommand = globalDefaults.ProxyCommand
 			}
 			entries = append(entries, entry)
 		}
@@ -127,6 +131,11 @@ func ParseSSHConfig(content string) SSHConfigParseResult {
 				}
 			}
 			target.ProxyJump = cleaned
+		case "proxycommand":
+			cmdVal := strings.Trim(val, "\"")
+			if !strings.EqualFold(cmdVal, "none") {
+				target.ProxyCommand = cmdVal
+			}
 		default:
 			scope := "global"
 			if inBlock && len(currentAliases) > 0 {

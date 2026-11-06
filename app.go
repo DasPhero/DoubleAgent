@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -477,8 +478,115 @@ func (a *App) ImportSSHConfig(configContent string) (core.SSHConfigParseResult, 
 	return parsed, nil
 }
 
+// buildSshConfigForHost resolves proxy settings (ProxyJump, ProxyCommand, SOCKS5) and credentials for a host (F-14).
+func (a *App) buildSshConfigForHost(resolved core.ResolvedHost, payload core.VaultPayload) (core.SshSessionConfig, error) {
+	cfg := core.SshSessionConfig{
+		HostID:   resolved.HostID,
+		Address:  resolved.Address,
+		Port:     resolved.Port,
+		Username: resolved.Username,
+		Auth:     resolved.Auth,
+		OnFirstSeenKey: func(info core.HostKeyInfo) (bool, error) {
+			return a.promptHostKeyTOFU(info)
+		},
+	}
+
+	if resolved.ProxyCommand != "" {
+		cfg.ProxyCommand = resolved.ProxyCommand
+	}
+
+	if resolved.ProxyProfileID != "" {
+		for _, prof := range payload.ProxyProfiles {
+			if prof.ID == resolved.ProxyProfileID {
+				switch prof.Type {
+				case core.ProxyTypeCommand:
+					cfg.ProxyCommand = prof.Command
+				case core.ProxyTypeSocks5:
+					cfg.SocksProxy = prof.SocksAddress
+					if prof.SocksUsername != "" {
+						cfg.SocksAuth = &core.SocksAuth{
+							Username: prof.SocksUsername,
+							Password: prof.SocksPassword,
+						}
+					}
+				case core.ProxyTypeJump:
+					for _, jumpID := range prof.JumpHostIDs {
+						jumpCfg, err := a.resolveJumpHopConfig(jumpID, payload)
+						if err != nil {
+							return cfg, fmt.Errorf("resolve jump hop %s: %w", jumpID, err)
+						}
+						cfg.JumpChain = append(cfg.JumpChain, jumpCfg)
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// Direct JumpChain on host if not set by profile
+	if len(cfg.JumpChain) == 0 && len(resolved.JumpChain) > 0 {
+		for _, jumpID := range resolved.JumpChain {
+			jumpCfg, err := a.resolveJumpHopConfig(jumpID, payload)
+			if err != nil {
+				return cfg, fmt.Errorf("resolve jump hop %s: %w", jumpID, err)
+			}
+			cfg.JumpChain = append(cfg.JumpChain, jumpCfg)
+		}
+	}
+
+	return cfg, nil
+}
+
+func (a *App) resolveJumpHopConfig(jumpSpec string, payload core.VaultPayload) (core.SshSessionConfig, error) {
+	// First check if jumpSpec is a saved HostID or Label
+	for _, h := range payload.Hosts {
+		if h.ID == jumpSpec || h.Label == jumpSpec {
+			resHop, err := core.ResolveEffectiveHost(h.ID, payload)
+			if err == nil {
+				return core.SshSessionConfig{
+					HostID:   resHop.HostID,
+					Address:  resHop.Address,
+					Port:     resHop.Port,
+					Username: resHop.Username,
+					Auth:     resHop.Auth,
+					OnFirstSeenKey: func(info core.HostKeyInfo) (bool, error) {
+						return a.promptHostKeyTOFU(info)
+					},
+				}, nil
+			}
+		}
+	}
+
+	// Ad-hoc host specification: [user@]host[:port]
+	addr := jumpSpec
+	user := "root"
+	port := uint16(22)
+	if atIdx := strings.Index(addr, "@"); atIdx != -1 {
+		user = addr[:atIdx]
+		addr = addr[atIdx+1:]
+	}
+	if colonIdx := strings.LastIndex(addr, ":"); colonIdx != -1 {
+		if p, err := strconv.Atoi(addr[colonIdx+1:]); err == nil && p > 0 && p <= 65535 {
+			port = uint16(p)
+			addr = addr[:colonIdx]
+		}
+	}
+
+	return core.SshSessionConfig{
+		Address:  addr,
+		Port:     port,
+		Username: user,
+		Auth: core.SshAuthConfig{
+			Method: core.AuthAgent,
+		},
+		OnFirstSeenKey: func(info core.HostKeyInfo) (bool, error) {
+			return a.promptHostKeyTOFU(info)
+		},
+	}, nil
+}
+
 // ConnectSavedHost resolves a saved host's effective address, port, username, and secret identity inside Go
-// (applying group inheritance per F-01) and starts an interactive SSH PTY session.
+// (applying group inheritance per F-01, and proxy settings per F-14) and starts an interactive SSH PTY session.
 func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, error) {
 	payload, err := a.vaultStore.GetPayload()
 	if err != nil {
@@ -489,16 +597,12 @@ func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, e
 		return "", err
 	}
 
-	sessionID, err := a.transport.Connect(a.ctx, core.SshSessionConfig{
-		HostID:   resolved.HostID,
-		Address:  resolved.Address,
-		Port:     resolved.Port,
-		Username: resolved.Username,
-		Auth:     resolved.Auth,
-		OnFirstSeenKey: func(info core.HostKeyInfo) (bool, error) {
-			return a.promptHostKeyTOFU(info)
-		},
-	})
+	sshCfg, err := a.buildSshConfigForHost(resolved, payload)
+	if err != nil {
+		return "", err
+	}
+
+	sessionID, err := a.transport.Connect(a.ctx, sshCfg)
 	if err != nil {
 		return "", err
 	}
@@ -569,7 +673,7 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 		}
 	}
 
-	sessionID, err := a.transport.Connect(a.ctx, core.SshSessionConfig{
+	sshCfg := core.SshSessionConfig{
 		Address:  req.Address,
 		Port:     port,
 		Username: req.Username,
@@ -577,7 +681,55 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 		OnFirstSeenKey: func(info core.HostKeyInfo) (bool, error) {
 			return a.promptHostKeyTOFU(info)
 		},
-	})
+	}
+
+	if req.ProxyCommand != "" {
+		sshCfg.ProxyCommand = req.ProxyCommand
+	}
+
+	if req.ProxyJump != "" {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			jumps := strings.Split(req.ProxyJump, ",")
+			for _, j := range jumps {
+				trimmed := strings.TrimSpace(j)
+				if trimmed != "" {
+					if hop, err := a.resolveJumpHopConfig(trimmed, payload); err == nil {
+						sshCfg.JumpChain = append(sshCfg.JumpChain, hop)
+					}
+				}
+			}
+		}
+	}
+
+	if req.ProxyProfileID != "" {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			for _, prof := range payload.ProxyProfiles {
+				if prof.ID == req.ProxyProfileID {
+					switch prof.Type {
+					case core.ProxyTypeCommand:
+						sshCfg.ProxyCommand = prof.Command
+					case core.ProxyTypeSocks5:
+						sshCfg.SocksProxy = prof.SocksAddress
+						if prof.SocksUsername != "" {
+							sshCfg.SocksAuth = &core.SocksAuth{
+								Username: prof.SocksUsername,
+								Password: prof.SocksPassword,
+							}
+						}
+					case core.ProxyTypeJump:
+						for _, jID := range prof.JumpHostIDs {
+							if hop, err := a.resolveJumpHopConfig(jID, payload); err == nil {
+								sshCfg.JumpChain = append(sshCfg.JumpChain, hop)
+							}
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	sessionID, err := a.transport.Connect(a.ctx, sshCfg)
 	if err != nil {
 		return "", err
 	}
@@ -1662,4 +1814,127 @@ func (a *App) GetActiveTunnels() []core.ForwardTunnelStatus {
 		}
 	}
 	return result
+}
+
+// SaveProxyProfile creates or updates a proxy profile in the encrypted vault (F-14).
+func (a *App) SaveProxyProfile(profile core.ProxyProfile) error {
+	a.vaultStore.Touch()
+	if profile.Name == "" {
+		return errors.New("proxy profile name is required")
+	}
+	if profile.Type == "" {
+		profile.Type = core.ProxyTypeJump
+	}
+	if profile.ID == "" {
+		profile.ID = fmt.Sprintf("prof-%d", time.Now().UnixNano())
+	}
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	updated := false
+	for i := range payload.ProxyProfiles {
+		if payload.ProxyProfiles[i].ID == profile.ID {
+			// Preserve existing password if user edited profile without re-entering password (Golden Rule 2)
+			if profile.Type == core.ProxyTypeSocks5 && profile.SocksPassword == "" {
+				profile.SocksPassword = payload.ProxyProfiles[i].SocksPassword
+			}
+			payload.ProxyProfiles[i] = profile
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		payload.ProxyProfiles = append(payload.ProxyProfiles, profile)
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	return nil
+}
+
+// DeleteProxyProfile removes a proxy profile and clears references on associated hosts and groups (F-14).
+func (a *App) DeleteProxyProfile(profileID string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	filtered := make([]core.ProxyProfile, 0, len(payload.ProxyProfiles))
+	for _, p := range payload.ProxyProfiles {
+		if p.ID != profileID {
+			filtered = append(filtered, p)
+		}
+	}
+	payload.ProxyProfiles = filtered
+
+	// Clear references from hosts
+	for i := range payload.Hosts {
+		if payload.Hosts[i].ProxyProfileID == profileID {
+			payload.Hosts[i].ProxyProfileID = ""
+		}
+	}
+	// Clear references from groups
+	for i := range payload.Groups {
+		if payload.Groups[i].DefaultSettings.ProxyProfileID == profileID {
+			payload.Groups[i].DefaultSettings.ProxyProfileID = ""
+		}
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	return nil
+}
+
+// ListProxyProfiles returns non-secret summaries of all configured proxy profiles (F-14).
+func (a *App) ListProxyProfiles() ([]core.ProxyProfileSummary, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	summary := core.BuildVaultSummary(payload)
+	return summary.ProxyProfiles, nil
+}
+
+// GetDefaultProxychainsOptions builds default export configuration from current vault tunnels and profiles (F-14).
+func (a *App) GetDefaultProxychainsOptions() (core.ProxychainsExportOptions, error) {
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.ProxychainsExportOptions{}, err
+	}
+	return core.BuildDefaultProxychainsOptions(payload), nil
+}
+
+// GenerateProxychainsConfig produces proxychains.conf text from supplied options (F-14).
+func (a *App) GenerateProxychainsConfig(opts core.ProxychainsExportOptions) (string, error) {
+	return core.GenerateProxychainsConfig(opts), nil
+}
+
+// ExportProxychainsConfig exports a standard proxychains.conf based on active/saved SOCKS proxies (F-14).
+func (a *App) ExportProxychainsConfig() (string, error) {
+	opts, err := a.GetDefaultProxychainsOptions()
+	if err != nil {
+		return "", err
+	}
+	return core.GenerateProxychainsConfig(opts), nil
+}
+
+// SaveProxychainsFile writes the generated proxychains configuration to disk (F-14).
+func (a *App) SaveProxychainsFile(content string, targetPath string) error {
+	if strings.TrimSpace(targetPath) == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			targetPath = "proxychains.conf"
+		} else {
+			targetPath = filepath.Join(home, "proxychains.conf")
+		}
+	}
+	return os.WriteFile(targetPath, []byte(content), 0644)
 }

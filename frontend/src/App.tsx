@@ -17,8 +17,11 @@ import { SignalAnalyzerView } from './components/SignalAnalyzerView';
 import { SftpBrowserView } from './components/SftpBrowserView';
 import { PortForwardingView } from './components/PortForwardingView';
 import { SettingsView } from './components/SettingsView';
+import { ProxyProfilesView } from './components/ProxyProfilesView';
+import { ProxychainsExportModal } from './components/ProxychainsExportModal';
 import { FileItem, TransferTask } from './types/sftp';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
+import { ProxyProfile, ProxyProfileSummary, ProxychainsExportOptions } from './types/proxy';
 
 const SETTINGS_STORAGE_KEY = 'doubleagent_global_settings_v1';
 
@@ -66,6 +69,7 @@ interface GroupDefaults {
   identityId?: string;
   initialDir?: string;
   keepaliveSecs?: number;
+  proxyProfileId?: string;
 }
 
 interface GroupRecord {
@@ -88,6 +92,9 @@ interface HostSummary {
   tags: string[];
   color: string;
   favorite: boolean;
+  proxyProfileId?: string;
+  proxyCommand?: string;
+  jumpChain?: string[];
 }
 
 interface IdentitySummary {
@@ -125,6 +132,7 @@ interface VaultSummary {
   hosts: HostSummary[];
   identities: IdentitySummary[];
   keys?: SshKeySummary[];
+  proxyProfiles?: ProxyProfileSummary[];
 }
 
 interface QuickConnectTarget {
@@ -478,6 +486,9 @@ interface WailsAppBindings {
     tags: string[];
     color?: string;
     favorite: boolean;
+    proxyProfileId?: string;
+    proxyCommand?: string;
+    jumpChain?: string[];
   }) => Promise<void>;
   DeleteHost: (hostId: string) => Promise<void>;
   GenerateSSHKey?: (label: string, keyType: string, passphrase: string) => Promise<SshKeySummary>;
@@ -531,6 +542,13 @@ interface WailsAppBindings {
   StartForwardTunnel?: (sessionId: string, ruleId: string) => Promise<string>;
   StopForwardTunnel?: (tunnelId: string) => Promise<void>;
   GetActiveTunnels?: () => Promise<ForwardTunnelStatus[]>;
+  SaveProxyProfile?: (profile: ProxyProfile) => Promise<void>;
+  DeleteProxyProfile?: (profileId: string) => Promise<void>;
+  ListProxyProfiles?: () => Promise<ProxyProfileSummary[]>;
+  GetDefaultProxychainsOptions?: () => Promise<ProxychainsExportOptions>;
+  GenerateProxychainsConfig?: (opts: ProxychainsExportOptions) => Promise<string>;
+  ExportProxychainsConfig?: () => Promise<string>;
+  SaveProxychainsFile?: (content: string, targetPath: string) => Promise<void>;
 }
 
 export interface SerialAutoDetectResult {
@@ -669,6 +687,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [grpUser, setGrpUser] = useState<string>('root');
   const [grpKeepalive, setGrpKeepalive] = useState<string>('30');
   const [grpInitialDir, setGrpInitialDir] = useState<string>('');
+  const [grpProxyProfileId, setGrpProxyProfileId] = useState<string>('');
 
   // Add Host form state
   const [hostLabel, setHostLabel] = useState<string>('');
@@ -682,6 +701,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [hostTags, setHostTags] = useState<string>('');
   const [hostColor, setHostColor] = useState<string>('');
   const [hostInitialDir, setHostInitialDir] = useState<string>('');
+  const [hostProxyProfileId, setHostProxyProfileId] = useState<string>('');
+  const [hostProxyCommand, setHostProxyCommand] = useState<string>('');
+  const [hostProxyJump, setHostProxyJump] = useState<string>('');
 
   const [address, setAddress] = useState<string>('');
   const [port, setPort] = useState<string>('22');
@@ -749,6 +771,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [showPortForwardingModal, setShowPortForwardingModal] = useState<boolean>(false);
   const [forwardRules, setForwardRules] = useState<ForwardRule[]>([]);
   const [activeTunnels, setActiveTunnels] = useState<ForwardTunnelStatus[]>([]);
+
+  // Proxy Profiles & Proxychains Export State (F-14)
+  const [showProxyProfilesModal, setShowProxyProfilesModal] = useState<boolean>(false);
+  const [showProxychainsExportModal, setShowProxychainsExportModal] = useState<boolean>(false);
+  const [proxychainsOptions, setProxychainsOptions] = useState<ProxychainsExportOptions | undefined>(undefined);
 
   // Terminal Search state (F-11)
   const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
@@ -1533,6 +1560,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         username: grpUser.trim() || 'root',
         initialDir: grpInitialDir.trim() || undefined,
         keepaliveSecs: Number(grpKeepalive) || 30,
+        proxyProfileId: grpProxyProfileId || undefined,
       },
     };
     const api = getWailsBindings();
@@ -1544,6 +1572,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
     setGrpName('');
     setGrpInitialDir('');
+    setGrpProxyProfileId('');
     setShowAddGroupModal(false);
   };
 
@@ -1572,6 +1601,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
+    const jumpChainList = hostProxyJump
+      ? hostProxyJump
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined;
 
     if (api) {
       await api.SaveHost({
@@ -1585,6 +1620,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         tags: tagList,
         color: hostColor,
         favorite: false,
+        proxyProfileId: hostProxyProfileId || undefined,
+        proxyCommand: hostProxyCommand.trim() || undefined,
+        jumpChain: jumpChainList,
       });
       await refreshVaultState();
     } else {
@@ -1610,6 +1648,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             tags: tagList,
             color: hostColor,
             favorite: false,
+            proxyProfileId: hostProxyProfileId || undefined,
+            proxyCommand: hostProxyCommand.trim() || undefined,
+            jumpChain: jumpChainList,
           },
         ],
       }));
@@ -1624,6 +1665,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     setHostTags('');
     setHostColor('');
     setHostInitialDir('');
+    setHostProxyProfileId('');
+    setHostProxyCommand('');
+    setHostProxyJump('');
     setShowAddHostModal(false);
   };
 
@@ -1782,6 +1826,95 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       }
     } else {
       setActiveTunnels((prev) => prev.filter((t) => t.id !== tunnelId));
+    }
+  };
+
+  const handleSaveProxyProfile = async (profile: ProxyProfile): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.SaveProxyProfile) {
+      try {
+        await api.SaveProxyProfile(profile);
+        await refreshVaultState();
+        setStatusMessage(`Saved proxy profile "${profile.name}".`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Save proxy profile failed: ${msg}`);
+      }
+    } else {
+      setVaultSummary((prev) => {
+        const existing = prev.proxyProfiles || [];
+        const idx = existing.findIndex((p) => p.id === profile.id);
+        const summary: ProxyProfileSummary = {
+          id: profile.id,
+          name: profile.name,
+          type: profile.type,
+          jumpHostIds: profile.jumpHostIds,
+          command: profile.command,
+          socksAddress: profile.socksAddress,
+          socksUsername: profile.socksUsername,
+          hasPassword: !!profile.socksPassword,
+        };
+        let next: ProxyProfileSummary[];
+        if (idx >= 0) {
+          next = [...existing];
+          next[idx] = summary;
+        } else {
+          next = [...existing, summary];
+        }
+        return { ...prev, proxyProfiles: next };
+      });
+      setStatusMessage(`Saved proxy profile "${profile.name}" (local).`);
+    }
+  };
+
+  const handleDeleteProxyProfile = async (profileId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.DeleteProxyProfile) {
+      try {
+        await api.DeleteProxyProfile(profileId);
+        await refreshVaultState();
+        setStatusMessage('Deleted proxy profile.');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Delete proxy profile failed: ${msg}`);
+      }
+    } else {
+      setVaultSummary((prev) => ({
+        ...prev,
+        proxyProfiles: (prev.proxyProfiles || []).filter((p) => p.id !== profileId),
+      }));
+      setStatusMessage('Deleted proxy profile (local).');
+    }
+  };
+
+  const handleOpenProxychainsExport = async (): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.GetDefaultProxychainsOptions) {
+      try {
+        const opts = await api.GetDefaultProxychainsOptions();
+        setProxychainsOptions(opts);
+      } catch {
+        setProxychainsOptions(undefined);
+      }
+    }
+    setShowProxychainsExportModal(true);
+  };
+
+  const handleGenerateProxychainsConfig = async (opts: ProxychainsExportOptions): Promise<string> => {
+    const api = getWailsBindings();
+    if (api?.GenerateProxychainsConfig) {
+      return await api.GenerateProxychainsConfig(opts);
+    }
+    const proto = opts.proxies[0]?.type || 'socks5';
+    const host = opts.proxies[0]?.host || '127.0.0.1';
+    const port = opts.proxies[0]?.port || 1080;
+    return `# proxychains.conf - generated by DoubleAgent SSH Client (F-14)\n${opts.chainType}\n${opts.proxyDNS ? 'proxy_dns\n' : ''}tcp_read_time_out ${opts.tcpReadTimeout}\ntcp_connect_time_out ${opts.tcpConnectTimeout}\n\n[ProxyList]\n${proto}    ${host}    ${port}\n`;
+  };
+
+  const handleSaveProxychainsFile = async (content: string, targetPath: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.SaveProxychainsFile) {
+      await api.SaveProxychainsFile(content, targetPath);
     }
   };
 
@@ -3066,6 +3199,32 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     </span>
                   </button>
                   <div className="nav-dropdown-divider" />
+                  <div className="nav-dropdown-header">Proxying &amp; Bastions (F-14)</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setShowProxyProfilesModal(true);
+                    }}
+                  >
+                    <span>Proxy Profiles (Jump, SOCKS5, Command)</span>
+                    <span className="nav-dropdown-shortcut">🛡️ Profiles</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleOpenProxychainsExport();
+                    }}
+                  >
+                    <span>Export proxychains.conf</span>
+                    <span className="nav-dropdown-shortcut">⛓️ Export</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
                   <div className="nav-dropdown-header">Hardware Serial (F-23)</div>
                   <button
                     type="button"
@@ -4208,6 +4367,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               value={grpInitialDir}
               onChange={(e) => setGrpInitialDir(e.target.value)}
             />
+            <select
+              aria-label="Default Group Proxy Profile"
+              value={grpProxyProfileId}
+              onChange={(e) => setGrpProxyProfileId(e.target.value)}
+            >
+              <option value="">No Default Proxy (Direct Connection)</option>
+              {(vaultSummary.proxyProfiles || []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  Proxy: {p.name} ({p.type})
+                </option>
+              ))}
+            </select>
             <div className="modal-actions">
               <button
                 type="button"
@@ -4322,6 +4493,40 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               value={hostInitialDir}
               onChange={(e) => setHostInitialDir(e.target.value)}
             />
+            <div style={{ margin: '8px 0', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-bright)', marginBottom: '6px', display: 'block' }}>
+                Proxy &amp; Bastion Settings (F-14)
+              </label>
+              <select
+                aria-label="Host Proxy Profile"
+                value={hostProxyProfileId}
+                onChange={(e) => setHostProxyProfileId(e.target.value)}
+                style={{ width: '100%', marginBottom: '8px' }}
+              >
+                <option value="">Direct Connection (or Inherit Group Proxy)</option>
+                {(vaultSummary.proxyProfiles || []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    Use Proxy Profile: {p.name} ({p.type})
+                  </option>
+                ))}
+              </select>
+              {!hostProxyProfileId && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input
+                    aria-label="Host Custom ProxyJump"
+                    placeholder="Custom ProxyJump (e.g. bastion.corp.net:2222)"
+                    value={hostProxyJump}
+                    onChange={(e) => setHostProxyJump(e.target.value)}
+                  />
+                  <input
+                    aria-label="Host Custom ProxyCommand"
+                    placeholder="Custom ProxyCommand (e.g. ssh -W %h:%p bastion)"
+                    value={hostProxyCommand}
+                    onChange={(e) => setHostProxyCommand(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
             <div>
               <label
                 style={{
@@ -5158,7 +5363,33 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           onStartTunnel={handleStartForwardTunnel}
           onStartTunnelWithHost={handleStartTunnelWithHost}
           onStopTunnel={handleStopForwardTunnel}
+          onOpenProxychainsExport={handleOpenProxychainsExport}
           onClose={() => setShowPortForwardingModal(false)}
+        />
+      )}
+
+      {showProxyProfilesModal && (
+        <ProxyProfilesView
+          profiles={vaultSummary.proxyProfiles || []}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+            port: h.effectivePort,
+          }))}
+          onSaveProfile={handleSaveProxyProfile}
+          onDeleteProfile={handleDeleteProxyProfile}
+          onOpenProxychainsExport={handleOpenProxychainsExport}
+          onClose={() => setShowProxyProfilesModal(false)}
+        />
+      )}
+
+      {showProxychainsExportModal && (
+        <ProxychainsExportModal
+          initialOptions={proxychainsOptions}
+          onGenerateConfig={handleGenerateProxychainsConfig}
+          onSaveToFile={handleSaveProxychainsFile}
+          onClose={() => setShowProxychainsExportModal(false)}
         />
       )}
 

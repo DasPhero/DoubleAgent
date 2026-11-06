@@ -29,16 +29,19 @@ type AppStatus struct {
 	QuickUnlockReady bool   `json:"quickUnlockReady"`
 }
 
-// ConnectRequest represents the frontend-bound parameters for starting an SSH terminal session (S1, F-01, F-05, F-07).
+// ConnectRequest represents the frontend-bound parameters for starting an SSH terminal session (S1, F-01, F-05, F-07, F-14).
 type ConnectRequest struct {
-	Address    string       `json:"address"`
-	Port       uint16       `json:"port"`
-	Username   string       `json:"username"`
-	Password   string       `json:"password"`
-	PrivateKey string       `json:"privateKey"`
-	Passphrase string       `json:"passphrase"`
-	UseAgent   bool         `json:"useAgent,omitempty"`
-	Size       TerminalSize `json:"size"`
+	Address        string       `json:"address"`
+	Port           uint16       `json:"port"`
+	Username       string       `json:"username"`
+	Password       string       `json:"password"`
+	PrivateKey     string       `json:"privateKey"`
+	Passphrase     string       `json:"passphrase"`
+	UseAgent       bool         `json:"useAgent,omitempty"`
+	ProxyProfileID string       `json:"proxyProfileId,omitempty"`
+	ProxyJump      string       `json:"proxyJump,omitempty"`
+	ProxyCommand   string       `json:"proxyCommand,omitempty"`
+	Size           TerminalSize `json:"size"`
 }
 
 // TerminalDataEvent is emitted from the Go backend to the frontend when remote PTY output arrives (F-07).
@@ -98,7 +101,13 @@ const (
 // Returning true trusts and records the key; returning false aborts the handshake.
 type KnownHostDecisionFunc func(info HostKeyInfo) (trust bool, err error)
 
-// SshSessionConfig holds connection parameters for opening an SSH session.
+// SocksAuth holds optional credentials for authenticating against a SOCKS5 proxy (F-14).
+type SocksAuth struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+// SshSessionConfig holds connection parameters for opening an SSH session (F-01, F-04, F-06, F-14, F-25).
 type SshSessionConfig struct {
 	HostID          string
 	Address         string
@@ -109,6 +118,10 @@ type SshSessionConfig struct {
 	AllowLegacyAlgs bool
 	Auth            SshAuthConfig
 	OnFirstSeenKey  KnownHostDecisionFunc
+	JumpChain       []SshSessionConfig // Intermediate SSH hops (ProxyJump)
+	ProxyCommand    string             // Local command with %h / %p substitution (ProxyCommand)
+	SocksProxy      string             // SOCKS5 proxy address (e.g. 127.0.0.1:1080)
+	SocksAuth       *SocksAuth         // SOCKS5 username/password auth
 }
 
 // SshShellStreams provides access to a remote PTY shell's standard streams and resize/close lifecycle.
@@ -258,7 +271,40 @@ type TerminalEngine interface {
 	Close(ctx context.Context, sessionID string) error
 }
 
-// HostRecord represents a configured SSH target stored inside the encrypted vault (Spec Section 8, F-01, F-10).
+// ProxyProfileType defines the proxying mechanism for a ProxyProfile (Spec Section 8, F-14).
+type ProxyProfileType string
+
+const (
+	ProxyTypeJump    ProxyProfileType = "jump"    // ProxyJump (SSH bastion hops)
+	ProxyTypeCommand ProxyProfileType = "command" // ProxyCommand (arbitrary process stream)
+	ProxyTypeSocks5  ProxyProfileType = "socks5"  // SOCKS5 proxy server
+)
+
+// ProxyProfile represents a saved proxying configuration stored in the encrypted vault (Spec Section 8, F-14).
+type ProxyProfile struct {
+	ID            string           `json:"id"`
+	Name          string           `json:"name"`
+	Type          ProxyProfileType `json:"type"` // "jump", "command", "socks5"
+	JumpHostIDs   []string         `json:"jumpHostIds,omitempty"`
+	Command       string           `json:"command,omitempty"`
+	SocksAddress  string           `json:"socksAddress,omitempty"`
+	SocksUsername string           `json:"socksUsername,omitempty"`
+	SocksPassword string           `json:"socksPassword,omitempty"`
+}
+
+// ProxyProfileSummary is a non-secret view of a saved proxy profile exposed to the frontend UI (Golden Rule 2, F-14).
+type ProxyProfileSummary struct {
+	ID            string           `json:"id"`
+	Name          string           `json:"name"`
+	Type          ProxyProfileType `json:"type"`
+	JumpHostIDs   []string         `json:"jumpHostIds,omitempty"`
+	Command       string           `json:"command,omitempty"`
+	SocksAddress  string           `json:"socksAddress,omitempty"`
+	SocksUsername string           `json:"socksUsername,omitempty"`
+	HasPassword   bool             `json:"hasPassword,omitempty"`
+}
+
+// HostRecord represents a configured SSH target stored inside the encrypted vault (Spec Section 8, F-01, F-10, F-14).
 type HostRecord struct {
 	ID             string   `json:"id"`
 	Label          string   `json:"label"`
@@ -272,15 +318,18 @@ type HostRecord struct {
 	Favorite       bool     `json:"favorite,omitempty"`
 	JumpChain      []string `json:"jumpChain,omitempty"`
 	ForwardRuleIDs []string `json:"forwardRuleIds,omitempty"`
+	ProxyProfileID string   `json:"proxyProfileId,omitempty"`
+	ProxyCommand   string   `json:"proxyCommand,omitempty"`
 }
 
-// GroupDefaults holds inheritable connection settings for a host group (F-01, F-10).
+// GroupDefaults holds inheritable connection settings for a host group (F-01, F-10, F-14).
 type GroupDefaults struct {
-	Port          uint16 `json:"port,omitempty"`
-	Username      string `json:"username,omitempty"`
-	IdentityID    string `json:"identityId,omitempty"`
-	InitialDir    string `json:"initialDir,omitempty"`
-	KeepaliveSecs uint16 `json:"keepaliveSecs,omitempty"`
+	Port           uint16 `json:"port,omitempty"`
+	Username       string `json:"username,omitempty"`
+	IdentityID     string `json:"identityId,omitempty"`
+	InitialDir     string `json:"initialDir,omitempty"`
+	KeepaliveSecs  uint16 `json:"keepaliveSecs,omitempty"`
+	ProxyProfileID string `json:"proxyProfileId,omitempty"`
 }
 
 // GroupRecord represents a hierarchical host folder stored in the vault (Spec Section 8, F-01).
@@ -313,7 +362,7 @@ type SshKeyRecord struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
-// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03).
+// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14).
 type VaultPayload struct {
 	SchemaVersion int              `json:"schemaVersion"`
 	Hosts         []HostRecord     `json:"hosts"`
@@ -321,6 +370,7 @@ type VaultPayload struct {
 	Identities    []IdentityRecord `json:"identities"`
 	Keys          []SshKeyRecord   `json:"keys"`
 	ForwardRules  []ForwardRule    `json:"forwardRules,omitempty"`
+	ProxyProfiles []ProxyProfile   `json:"proxyProfiles,omitempty"`
 }
 
 // SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).

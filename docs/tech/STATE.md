@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `M1-4` Part 7 (`F-13` — Port Forwarding: Local `-L`, Remote `-R`, Dynamic SOCKS5 `-D`) — COMPLETED
-- **Next Milestone:** `M1-4` Part 8 (`F-14` — Proxy Profiles: ProxyJump, ProxyCommand, and proxychains Export)
+- **Current Milestone:** `M1-4` Part 8 (`F-14` — Proxy Profiles: ProxyJump, ProxyCommand, and proxychains Export) — COMPLETED
+- **Next Milestone:** `M1-4` Part 9 (`F-15` — Snippets with variables like `{{VAR}}` and prompt before execution)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -15,43 +15,64 @@
 - **`M1-4` Part 4 (`F-23` — Local Terminals, ConPTY & Hardware Serial / UART Console)**: Completed (`33683e2`).
 - **`M1-4` Part 5 (`F-10` — New Terminal: Working Directory & Root Shell)**: Completed.
 - **`M1-4` Part 6 (`F-12` — SFTP File Transfer & File Tree Browser)**: Completed (`be3a7e6`).
-- **`M1-4` Part 7 (`F-13` — Port Forwarding: Local `-L`, Remote `-R`, Dynamic SOCKS5 `-D`)**:
-  - **Core Interfaces (`backend/core/interfaces.go`)**:
-    - Defined `ForwardRuleType` (`"L"`, `"R"`, `"D"`), `ForwardRule`, `ForwardTunnelStatus`, and `ForwardTunnel` interface.
-    - Extended `core.VaultPayload` with `ForwardRules []ForwardRule`.
-    - Extended `core.SshTransport` with `StartForwardLocal`, `StartForwardRemote`, `StartForwardDynamic`.
-    - Strict boundary: `backend/core` never imports `golang.org/x/crypto/ssh` or non-standard packages.
-  - **Backend Forwarding Engine (`backend/ssh/forward.go`)**:
-    - Local Forwarding (`-L`): `net.Listen` on local address/port and dials remote target host/port via SSH transport client.
-    - Remote Reverse Forwarding (`-R`): `sshClient.Listen` on remote address/port and dials local target host/port via `net.Dial`.
-    - Dynamic SOCKS5 Proxy (`-D`): RFC 1928 compliant SOCKS5 protocol handler supporting `NO AUTH` (0x00), `CONNECT` (0x01) command, IPv4 (0x01), Domain Name (0x03), and IPv6 (0x04) destination addresses, tunneling traffic transparently via SSH client dialer.
-    - Bidirectional connection copying with thread-safe atomic byte counters (`bytesIn`, `bytesOut`) and active connection tracking.
-    - Comprehensive unit tests with in-memory `net.Pipe()` pairs (`backend/ssh/forward_test.go`).
-  - **Application Service Bindings (`app.go`)**:
-    - Bound methods: `SaveForwardRule`, `DeleteForwardRule`, `ListForwardRules`, `StartForwardTunnel`, `StopForwardTunnel`, `GetActiveTunnels`.
-    - Automated lifecycle: `autoStartForwardRules` auto-initiates configured rules on `ConnectSavedHost`.
-    - Active tunnel cleanup on session disconnect and app shutdown.
-    - Backend tests: `app_test.go` (`TestApp_PortForwarding_F13`).
-  - **Frontend UI & Visual Diagnostics (`frontend/src/components/PortForwardingView.tsx`)**:
-    - Rule configuration form supporting `-L`, `-R`, and `-D` with validation for port ranges (1–65535).
-    - Color-coded badges: `-L` (Green), `-R` (Purple), `-D` (Amber).
-    - Real-time status indicators (`ACTIVE` with glowing green badge / `INACTIVE`).
-    - Bidirectional byte counters (`In`, `Out`) and active connection counters.
-    - Mapping diagram preview (`bind ➔ target`).
-    - Dedicated management modal triggered via top navigation bar button (`⚡ N Tunnels` / `Tunnels ⇄`) and **Tools ▾ -> Port Forwarding (-L, -R, -D)**.
-    - Comprehensive unit tests in `frontend/src/App.test.tsx`.
-    - Standalone binary verified with `wails build`.
+- **`M1-4` Part 7 (`F-13` — Port Forwarding: Local `-L`, Remote `-R`, Dynamic SOCKS5 `-D`)**: Completed.
+- **`M1-4` Part 8 (`F-14` — Proxy Profiles: ProxyJump, ProxyCommand, and proxychains Export)**:
+  - **Core Domain & Data Types (`backend/core/interfaces.go` & `backend/core/hosts.go`)**:
+    - Defined `ProxyProfileType` (`"jump"`, `"command"`, `"socks5"`), `ProxyProfile`, and `ProxyProfileSummary` (masks `SocksPassword` with `HasPassword` boolean).
+    - Extended `HostRecord`, `GroupDefaults`, and `ResolvedHost` with `ProxyProfileID string`, `ProxyCommand string`, and `JumpChain []string`.
+    - Extended `VaultPayload` with `ProxyProfiles []ProxyProfile`.
+    - Extended `VaultSummary` with `ProxyProfiles []ProxyProfileSummary`.
+    - Extended `ConnectRequest` with `ProxyProfileID`, `ProxyJump`, and `ProxyCommand`.
+    - Extended `SshSessionConfig` with `JumpChain []SshSessionConfig`, `ProxyCommand string`, `SocksProxy string`, and `SocksAuth *SocksAuth`.
+    - Group inheritance and host overrides for proxy settings implemented in `ResolveEffectiveHost()`.
+    - Secure summary masking in `BuildVaultSummary()` preventing proxy passwords from ever leaking to frontend.
+  - **OpenSSH ssh_config Parser (`backend/core/sshconfig.go`)**:
+    - Added `ProxyCommand` extraction and global defaults inheritance (`case "proxycommand":`).
+  - **Proxychains Configuration Generator (`backend/core/proxychains.go`)**:
+    - RFC-compliant generator supporting `strict_chain`, `dynamic_chain`, `random_chain`, `round_robin_chain`, `proxy_dns`, `quiet_mode`, read/connect timeouts, and formatted proxies table.
+    - Automatic extraction of active/saved `-D` dynamic SOCKS5 forward rules and SOCKS5 proxy profiles via `BuildDefaultProxychainsOptions()`.
+    - Comprehensive unit tests in `backend/core/proxychains_test.go` (`TestProxychainsExport_F14`).
+  - **SSH Transport Proxy Dialing Engine (`backend/ssh/`)**:
+    - Created `backend/ssh/proc_windows.go` and `backend/ssh/proc_other.go` implementing `setProcAttr(cmd *exec.Cmd)` with `CREATE_NO_WINDOW` (`0x08000000`) on Windows to ensure headless execution without console flash.
+    - Created `backend/ssh/proxy.go` with:
+      - `processConn`: implements `net.Conn` wrapping Stdin/Stdout of spawned ProxyCommand processes with clean process termination on close.
+      - `dialProxyCommand`: expands `%h`, `%p`, `%%` substitutions and executes the command locally.
+      - `dialSocks5`: uses `golang.org/x/net/proxy` with optional username/password auth.
+      - `dialProxyJump`: iterates sequentially through intermediate bastion hops, handshaking SSH on each hop, and dials final target over the last bastion client.
+    - Updated `backend/ssh/transport.go` (`activeSession` tracks `jumpClients []*ssh.Client` and `closers []io.Closer`; `Connect()` branches through proxy dialers; `Disconnect()` cleans up all intermediate hops).
+    - Unit tests in `backend/ssh/proxy_test.go` (`TestProxyCommand_F14`, `TestProxySocks5_F14`, `TestProxyJump_ChainValidation_F14`).
+  - **Application Service Bindings (`app.go` & `app_test.go`)**:
+    - Bound methods: `SaveProxyProfile`, `DeleteProxyProfile`, `ListProxyProfiles`, `GetDefaultProxychainsOptions`, `GenerateProxychainsConfig`, `ExportProxychainsConfig`, `SaveProxychainsFile`.
+    - Updated `ConnectSavedHost` and `ConnectSSH` to resolve jump hops (saved host IDs and `[user@]host[:port]` specs) and apply proxy configurations.
+    - Preserves existing proxy passwords when editing profiles without re-entering credentials.
+    - Comprehensive backend unit tests in `app_test.go` (`TestApp_ProxyProfiles_F14`).
+  - **Frontend UI & Diagnostics (`frontend/src/`)**:
+    - Created `frontend/src/types/proxy.ts` with TypeScript interfaces for profiles and proxychains.
+    - Created `frontend/src/components/ProxychainsExportModal.tsx`: interactive configuration exporter with chain mode selector, timeout controls, DNS leak prevention toggle, hop editor, real-time preview, copy-to-clipboard, download `.conf` file, and save to disk.
+    - Created `frontend/src/components/ProxyProfilesView.tsx`: management modal for Proxy Profiles with Jump Chain hop reordering, ProxyCommand helpers, and SOCKS5 forms with masked password indicators.
+    - Updated `PortForwardingView.tsx`: added `Export proxychains.conf` action button in header.
+    - Updated `App.tsx`:
+      - Added `Proxy Profiles` and `Export proxychains.conf` to top navigation `Tools ▾` dropdown menu.
+      - Added "Proxy & Bastion Settings (F-14)" section in New SSH Host modal.
+      - Added "Default Group Proxy Profile" in New Host Group modal.
+      - Bound all proxy profile and proxychains handlers.
+    - Unit tests in `frontend/src/App.test.tsx` (`manages Proxy Profiles (ProxyJump, ProxyCommand, SOCKS5) and exports proxychains.conf (F-14)`).
+  - Standalone binary verified with `wails build`.
 - **UX Polish & Settings Unification**:
   - **Background Host Connection for Forward Tunnels**: When starting a forward tunnel without an active SSH session, DoubleAgent automatically connects to the rule's associated host in the background via `ConnectSavedHost` and initializes the tunnel.
-  - **Modal Backdrop Click-to-Close**: Clicking the dark background overlay (`e.target === e.currentTarget`) dismisses all modals and dialogs (Port Forwarding, Command Palette, New Host, New Group, Keychain, Import Config, Vault Setup/Unlock, Settings, Host Key Prompt, Serial).
+  - **Modal Backdrop Click-to-Close**: Clicking the dark background overlay (`e.target === e.currentTarget`) dismisses all modals and dialogs.
   - **Unified Settings Tab System (`SettingsView`)**: Consolidated Global Settings into a tabbed interface (Appearance & Terminal, Vault & Security, Keyboard Shortcuts) accessible both as a modal and as a dedicated persistent workspace tab.
 
 ## In Progress
 - None.
 
 ## Next (TODO List)
+- **`F-15`: Snippets with Variables**:
+  - Store reusable command snippets in the encrypted vault with categorization and tags.
+  - Support template variables like `{{HOST}}`, `{{PORT}}`, `{{INTERFACE}}`, `{{CUSTOM}}`.
+  - Interactive parameter query modal/popup before sending the command to active terminal sessions.
+  - Quick-execute snippets from terminal toolbar and Command Palette (`Ctrl+K`).
 - **Creating Custom Shortcuts (Custom Keybindings & Action Shortcuts Manager)**:
   - Allow users to create, customize, and persist keybindings for any DoubleAgent action (e.g. Quick Connect, Open Terminal in Directory, Split Panes, Port Forwarding, Snippet Execution).
   - Configurable prefix/leader key (e.g. `Ctrl+B` or `Ctrl+A`) to eliminate shortcut collisions with terminal CLI applications (e.g. `nano`, `vim`, `htop`).
   - Shortcut conflict detector and one-click reset to factory defaults.
-- **`F-14` (Proxy Profiles: ProxyJump, ProxyCommand, and proxychains Export)**.

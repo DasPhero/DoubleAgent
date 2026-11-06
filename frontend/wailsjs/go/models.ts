@@ -54,6 +54,8 @@ export namespace core {
 	    identityId: string;
 	    tags: string[];
 	    jumpChain: string[];
+	    proxyProfileId?: string;
+	    proxyCommand?: string;
 	    color: string;
 	    favorite: boolean;
 	
@@ -74,6 +76,8 @@ export namespace core {
 	        this.identityId = source["identityId"];
 	        this.tags = source["tags"];
 	        this.jumpChain = source["jumpChain"];
+	        this.proxyProfileId = source["proxyProfileId"];
+	        this.proxyCommand = source["proxyCommand"];
 	        this.color = source["color"];
 	        this.favorite = source["favorite"];
 	    }
@@ -168,6 +172,9 @@ export namespace core {
 	    privateKey: string;
 	    passphrase: string;
 	    useAgent?: boolean;
+	    proxyProfileId?: string;
+	    proxyJump?: string;
+	    proxyCommand?: string;
 	    size: TerminalSize;
 	
 	    static createFrom(source: any = {}) {
@@ -183,6 +190,9 @@ export namespace core {
 	        this.privateKey = source["privateKey"];
 	        this.passphrase = source["passphrase"];
 	        this.useAgent = source["useAgent"];
+	        this.proxyProfileId = source["proxyProfileId"];
+	        this.proxyJump = source["proxyJump"];
+	        this.proxyCommand = source["proxyCommand"];
 	        this.size = this.convertValues(source["size"], TerminalSize);
 	    }
 	
@@ -298,6 +308,7 @@ export namespace core {
 	    identityId?: string;
 	    initialDir?: string;
 	    keepaliveSecs?: number;
+	    proxyProfileId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new GroupDefaults(source);
@@ -310,6 +321,7 @@ export namespace core {
 	        this.identityId = source["identityId"];
 	        this.initialDir = source["initialDir"];
 	        this.keepaliveSecs = source["keepaliveSecs"];
+	        this.proxyProfileId = source["proxyProfileId"];
 	    }
 	}
 	export class GroupRecord {
@@ -361,6 +373,8 @@ export namespace core {
 	    favorite?: boolean;
 	    jumpChain?: string[];
 	    forwardRuleIds?: string[];
+	    proxyProfileId?: string;
+	    proxyCommand?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new HostRecord(source);
@@ -380,6 +394,8 @@ export namespace core {
 	        this.favorite = source["favorite"];
 	        this.jumpChain = source["jumpChain"];
 	        this.forwardRuleIds = source["forwardRuleIds"];
+	        this.proxyProfileId = source["proxyProfileId"];
+	        this.proxyCommand = source["proxyCommand"];
 	    }
 	}
 	
@@ -428,6 +444,121 @@ export namespace core {
 	        this.keyId = source["keyId"];
 	    }
 	}
+	export class ProxyProfile {
+	    id: string;
+	    name: string;
+	    type: string;
+	    jumpHostIds?: string[];
+	    command?: string;
+	    socksAddress?: string;
+	    socksUsername?: string;
+	    socksPassword?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxyProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.jumpHostIds = source["jumpHostIds"];
+	        this.command = source["command"];
+	        this.socksAddress = source["socksAddress"];
+	        this.socksUsername = source["socksUsername"];
+	        this.socksPassword = source["socksPassword"];
+	    }
+	}
+	export class ProxyProfileSummary {
+	    id: string;
+	    name: string;
+	    type: string;
+	    jumpHostIds?: string[];
+	    command?: string;
+	    socksAddress?: string;
+	    socksUsername?: string;
+	    hasPassword?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxyProfileSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.jumpHostIds = source["jumpHostIds"];
+	        this.command = source["command"];
+	        this.socksAddress = source["socksAddress"];
+	        this.socksUsername = source["socksUsername"];
+	        this.hasPassword = source["hasPassword"];
+	    }
+	}
+	export class ProxychainsProxyEntry {
+	    type: string;
+	    host: string;
+	    port: number;
+	    username?: string;
+	    password?: string;
+	    comment?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxychainsProxyEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.comment = source["comment"];
+	    }
+	}
+	export class ProxychainsExportOptions {
+	    chainType: string;
+	    proxyDNS: boolean;
+	    quietMode: boolean;
+	    tcpReadTimeout: number;
+	    tcpConnectTimeout: number;
+	    proxies: ProxychainsProxyEntry[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxychainsExportOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.chainType = source["chainType"];
+	        this.proxyDNS = source["proxyDNS"];
+	        this.quietMode = source["quietMode"];
+	        this.tcpReadTimeout = source["tcpReadTimeout"];
+	        this.tcpConnectTimeout = source["tcpConnectTimeout"];
+	        this.proxies = this.convertValues(source["proxies"], ProxychainsProxyEntry);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	
 	export class SSHConfigHostEntry {
 	    hostAlias: string;
@@ -436,6 +567,7 @@ export namespace core {
 	    port: number;
 	    identityFile: string;
 	    proxyJump: string[];
+	    proxyCommand?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SSHConfigHostEntry(source);
@@ -449,6 +581,7 @@ export namespace core {
 	        this.port = source["port"];
 	        this.identityFile = source["identityFile"];
 	        this.proxyJump = source["proxyJump"];
+	        this.proxyCommand = source["proxyCommand"];
 	    }
 	}
 	export class SSHConfigParseResult {
@@ -649,6 +782,7 @@ export namespace core {
 	    hosts: HostSummary[];
 	    identities: IdentitySummary[];
 	    keys: SshKeySummary[];
+	    proxyProfiles: ProxyProfileSummary[];
 	
 	    static createFrom(source: any = {}) {
 	        return new VaultSummary(source);
@@ -660,6 +794,7 @@ export namespace core {
 	        this.hosts = this.convertValues(source["hosts"], HostSummary);
 	        this.identities = this.convertValues(source["identities"], IdentitySummary);
 	        this.keys = this.convertValues(source["keys"], SshKeySummary);
+	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfileSummary);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
