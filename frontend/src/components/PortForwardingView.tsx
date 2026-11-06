@@ -153,7 +153,7 @@ export function PortForwardingView({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 9999,
+        zIndex: 1000,
         padding: '20px',
       }}
     >

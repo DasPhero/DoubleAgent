@@ -3419,14 +3419,6 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   >
                     Vault Security
                   </button>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    onClick={() => openSettingsTab('appearance')}
-                    title="Global Settings (Ctrl+,)"
-                  >
-                    Global Settings
-                  </button>
                 </nav>
               )}
               <div className="sidebar-header">
@@ -4762,48 +4754,6 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         </div>
       )}
 
-      {hostKeyPrompt && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-label="Verify SSH Host Key"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              void handleHostKeyDecision(false);
-            }
-          }}
-        >
-          <div className="modal-card">
-            <h2>Verify Unknown Host Key (F-06)</h2>
-            <p>
-              Host: <strong>{hostKeyPrompt.hostPattern}:{hostKeyPrompt.port}</strong>
-            </p>
-            <p>
-              Algorithm: <code>{hostKeyPrompt.keyType}</code>
-            </p>
-            <p>
-              Fingerprint: <code>{hostKeyPrompt.fingerprint}</code>
-            </p>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={() => void handleHostKeyDecision(false)}
-              >
-                Reject &amp; Abort
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void handleHostKeyDecision(true)}
-              >
-                Trust Host Key
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showGlobalSettingsModal && (
         <div
           className="modal-backdrop"
@@ -5210,6 +5160,56 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           onStopTunnel={handleStopForwardTunnel}
           onClose={() => setShowPortForwardingModal(false)}
         />
+      )}
+
+      {hostKeyPrompt && (
+        <div
+          className="modal-backdrop host-key-modal-backdrop"
+          style={{ zIndex: 100050 }}
+          role="dialog"
+          aria-label="Verify SSH Host Key"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              void handleHostKeyDecision(false);
+            }
+          }}
+        >
+          <div
+            className="modal-card host-key-card"
+            style={{
+              zIndex: 100051,
+              border: '2px solid var(--accent-bright)',
+              boxShadow: '0 0 32px rgba(45, 212, 191, 0.5)',
+            }}
+          >
+            <h2>Verify Unknown Host Key (F-06)</h2>
+            <p>
+              Host: <strong>{hostKeyPrompt.hostPattern}:{hostKeyPrompt.port}</strong>
+            </p>
+            <p>
+              Algorithm: <code>{hostKeyPrompt.keyType}</code>
+            </p>
+            <p>
+              Fingerprint: <code>{hostKeyPrompt.fingerprint}</code>
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={() => void handleHostKeyDecision(false)}
+              >
+                Reject &amp; Abort
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void handleHostKeyDecision(true)}
+              >
+                Trust Host Key
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
