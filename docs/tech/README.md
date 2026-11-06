@@ -49,12 +49,42 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
 - `App.ImportSSHConfig(configContent string) (core.SSHConfigParseResult, error)`
 - `App.ConnectSavedHost(hostID string, size core.TerminalSize) (string, error)`
 - `App.ConnectSSH(req core.ConnectRequest) (string, error)`
+- `App.OpenTerminalWithOptions(req core.OpenTerminalOptions) (string, error)`
+- `App.OpenLocalTerminal(shellType string, initialDir string, size core.TerminalSize) (string, error)`
+- `App.OpenSerialTerminal(portName string, baudRate int, dataBits int, stopBits int, parity string, size core.TerminalSize) (string, error)`
+- `App.ListSerialPorts() ([]core.SerialPortInfo, error)`
+- `App.DetectSerialPort() (*core.SerialPortInfo, error)`
 - `App.DuplicateSession(sessionID string, size core.TerminalSize) (string, error)`
 - `App.InjectSessionPassword(sessionID string) error`
 - `App.ResolveHostKeyPrompt(host string, port uint16, trust bool) error`
 - `App.WriteTerminal(sessionID string, data string) error`
 - `App.ResizeTerminal(sessionID string, cols uint16, rows uint16) error`
 - `App.DisconnectSession(sessionID string) error`
+- `App.SaveForwardRule(rule core.ForwardRule) error`
+- `App.DeleteForwardRule(ruleID string) error`
+- `App.StartForwardRule(ruleID string) (string, error)`
+- `App.StopForwardRule(tunnelID string) error`
+- `App.ListActiveTunnels() []core.ActiveTunnelSummary`
+- `App.SaveProxyProfile(profile core.ProxyProfile) error`
+- `App.DeleteProxyProfile(profileID string) error`
+- `App.ListProxyProfiles() ([]core.ProxyProfileSummary, error)`
+- `App.GetDefaultProxychainsOptions() core.ProxychainsConfigOptions`
+- `App.GenerateProxychainsConfig(opts core.ProxychainsConfigOptions) (string, error)`
+- `App.ExportProxychainsConfig(opts core.ProxychainsConfigOptions) (string, error)`
+- `App.SaveProxychainsFile(filePath string, content string) error`
+- `App.SaveSnippet(snippet core.Snippet) error`
+- `App.DeleteSnippet(snippetID string) error`
+- `App.ListSnippets() ([]core.Snippet, error)`
+- `App.GetSnippetContext(sessionID string) (*core.SnippetContext, error)`
+- `App.ResolveSnippetTemplate(body string, sessionID string, userValues map[string]string) (string, error)`
+- `App.ExecuteSnippet(sessionID string, snippetID string, userValues map[string]string) error`
+- `App.OpenSFTP(sessionID string) (string, error)`
+- `App.ListSFTPDir(sftpSessionID string, path string) ([]core.SFTPFileEntry, error)`
+- `App.CreateSFTPDir(sftpSessionID string, path string) error`
+- `App.DeleteSFTPItem(sftpSessionID string, path string) error`
+- `App.UploadSFTPFile(sftpSessionID string, localPath string, remotePath string) error`
+- `App.DownloadSFTPFile(sftpSessionID string, remotePath string, localPath string) error`
+- `App.CloseSFTP(sftpSessionID string) error`
 
 ### Backend → Frontend Events
 - `vault:locked` (`bool`): Emitted when the vault is unlocked (`false`), manually locked (`true`), or auto-locked on inactivity (`true`).
