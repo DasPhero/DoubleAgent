@@ -499,7 +499,12 @@ func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, e
 		size.Rows = 24
 	}
 
-	streams, err := a.transport.OpenShell(a.ctx, sessionID, size)
+	var streams *core.SshShellStreams
+	if resolved.InitialDir != "" {
+		streams, err = a.transport.OpenShellWithOptions(a.ctx, sessionID, size, resolved.InitialDir, false)
+	} else {
+		streams, err = a.transport.OpenShell(a.ctx, sessionID, size)
+	}
 	if err != nil {
 		_ = a.transport.Disconnect(a.ctx, sessionID)
 		return "", err
@@ -626,6 +631,25 @@ func (a *App) OpenTerminalWithOptions(targetSessionID string, opts core.Terminal
 
 	if isSerial {
 		return "", errors.New("cannot duplicate serial connection; port is already open")
+	}
+
+	if targetSessionID == "" {
+		ptyOpts := pty.ShellOptions{
+			ShellType:  "",
+			WorkingDir: workingDir,
+			AsRoot:     asRoot,
+			Size:       size,
+		}
+		sess, err := pty.StartShellWithOptions(a.ctx, ptyOpts)
+		if err != nil {
+			return "", err
+		}
+		newID := sess.ID()
+		a.mu.Lock()
+		a.localSessions[newID] = sess
+		a.mu.Unlock()
+		go a.streamReaderLoop(newID, sess.Stdout(), true)
+		return newID, nil
 	}
 
 	if isLocal && locSess != nil {

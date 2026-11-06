@@ -12,19 +12,23 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
 - **New Terminal by Working Directory & Elevated Root Shell (`F-10`)**:
   - Open new tabs or split panes directly positioned in specific directories without having to manually `cd`:
     - **Default Directory (`🏠 Default Dir`)**:
-      - Configurable per-host and inherited from group defaults (`InitialDir`).
+      - Configurable per-host and inherited from group defaults (`InitialDir`) directly in the Add/Edit Host and Group dialogs.
+      - When configured, connecting to a saved host automatically starts in its specified directory.
       - Spawns a new tab/pane positioned in the host's configured default directory or user home.
     - **Current Directory (`📂 Current Dir`)**:
       - Automatic real-time working directory detection via **OSC 7** shell escape sequences (`file://hostname/path`).
-      - Displays the live working directory pill (`📂 /path/to/cwd`) in the pane header.
-      - Spawns a duplicate tab or split pane positioned in the exact CWD of the active session.
+      - Displays the live working directory pill (`📂 /path/to/cwd`) in the pane header and sidebar host badges.
+      - Spawns a duplicate tab or split pane positioned in the exact CWD of the active session. If no session is active, prompts for a target directory.
     - **Elevated Root Shell (`⚡ Root in Dir`)**:
-      - Spawns an elevated/root terminal session (`sudo -s` or WSL root) positioned in the active terminal's CWD.
+      - Spawns an elevated/root terminal session (`sudo -s` or WSL/ConPTY root) positioned in the active terminal's CWD.
       - Visual red indicator badge (`Root`) in the tab title and accent color.
-    - Accessible via toolbar action buttons on active sessions and through the **Tools ▾** menu.
-- **Local Terminals & Hardware Serial / UART Console (`F-23`)**:
+    - Accessible via toolbar action buttons on active sessions, the **Empty State Quick-Start Grid**, and through the **Tools ▾** menu at all times.
+- **Local Terminals & Native Windows ConPTY (`F-23`)**:
+  - **Native Headless ConPTY Engine**:
+    - Windows local shells (PowerShell, Command Prompt, WSL) run entirely headlessly inside xterm.js via Windows Pseudo Console (`CreatePseudoConsole`), with zero external console popups.
+    - Full interactive VT command streaming, prompt rendering, line editing, and resize support.
   - **Local PTY Terminals (PowerShell, Command Prompt, WSL)**:
-    - Open local terminals directly inside DoubleAgent tabs from **Tools ▾**:
+    - Open local terminals directly inside DoubleAgent tabs from **Tools ▾** or the **Empty State Quick-Start**:
       - **Local Shell (PowerShell)**: Launches `powershell.exe` with interactive streaming.
       - **Local Shell (Command Prompt)**: Launches `cmd.exe`.
       - **Local Shell (WSL Linux)**: Launches `wsl.exe` for your default Linux distribution.

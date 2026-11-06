@@ -41,7 +41,22 @@ func TestLocalPTY_Cmd_F23(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	// Wait for prompt before sending input
+	promptSeen := false
+	promptTimeout := time.After(3 * time.Second)
+	for !promptSeen {
+		select {
+		case chunk := <-outCh:
+			t.Logf("INITIAL CHUNK: %q", chunk)
+			if strings.Contains(chunk, ">") {
+				promptSeen = true
+			}
+		case <-promptTimeout:
+			promptSeen = true
+		}
+	}
+
+	time.Sleep(100 * time.Millisecond)
 	_, err = io.WriteString(sess.Stdin(), "echo DOUBLEAGENT_CMD_OK\r\n")
 	if err != nil {
 		t.Fatalf("failed to write to stdin: %v", err)
@@ -54,6 +69,7 @@ loop:
 	for {
 		select {
 		case chunk := <-outCh:
+			t.Logf("CMD CHUNK: %q", chunk)
 			if strings.Contains(chunk, "DOUBLEAGENT_CMD_OK") {
 				found = true
 				break loop
@@ -107,7 +123,22 @@ func TestLocalPTY_PowerShell_F23(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(300 * time.Millisecond)
+	// Wait for prompt before sending input
+	promptSeen := false
+	promptTimeout := time.After(4 * time.Second)
+	for !promptSeen {
+		select {
+		case chunk := <-outCh:
+			t.Logf("PS INITIAL CHUNK: %q", chunk)
+			if strings.Contains(chunk, ">") {
+				promptSeen = true
+			}
+		case <-promptTimeout:
+			promptSeen = true
+		}
+	}
+
+	time.Sleep(100 * time.Millisecond)
 	_, err = io.WriteString(sess.Stdin(), "Write-Output 'POWERSHELL_F23_OK'\r\n")
 	if err != nil {
 		t.Fatalf("failed to write to stdin: %v", err)
@@ -120,6 +151,7 @@ loop:
 	for {
 		select {
 		case chunk := <-outCh:
+			t.Logf("RECEIVED CHUNK: %q", chunk)
 			if strings.Contains(chunk, "POWERSHELL_F23_OK") {
 				found = true
 				break loop

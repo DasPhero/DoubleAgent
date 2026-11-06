@@ -59,6 +59,7 @@ interface GroupDefaults {
   port?: number;
   username?: string;
   identityId?: string;
+  initialDir?: string;
   keepaliveSecs?: number;
 }
 
@@ -75,6 +76,7 @@ interface HostSummary {
   address: string;
   effectivePort: number;
   effectiveUser: string;
+  initialDir?: string;
   keepaliveSecs: number;
   groupId: string;
   identityId: string;
@@ -465,6 +467,7 @@ interface WailsAppBindings {
     port: number;
     groupId: string;
     identityId: string;
+    initialDir?: string;
     tags: string[];
     color?: string;
     favorite: boolean;
@@ -597,7 +600,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     menuCloseTimerRef.current = window.setTimeout(() => {
       setActiveDropdownMenu(null);
       menuCloseTimerRef.current = null;
-    }, 300);
+    }, 400);
   };
 
   const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
@@ -644,6 +647,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [grpPort, setGrpPort] = useState<string>('22');
   const [grpUser, setGrpUser] = useState<string>('root');
   const [grpKeepalive, setGrpKeepalive] = useState<string>('30');
+  const [grpInitialDir, setGrpInitialDir] = useState<string>('');
 
   // Add Host form state
   const [hostLabel, setHostLabel] = useState<string>('');
@@ -656,6 +660,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [hostPass, setHostPass] = useState<string>('');
   const [hostTags, setHostTags] = useState<string>('');
   const [hostColor, setHostColor] = useState<string>('');
+  const [hostInitialDir, setHostInitialDir] = useState<string>('');
 
   const [address, setAddress] = useState<string>('');
   const [port, setPort] = useState<string>('22');
@@ -1378,6 +1383,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       defaultSettings: {
         port: Number(grpPort) || 22,
         username: grpUser.trim() || 'root',
+        initialDir: grpInitialDir.trim() || undefined,
         keepaliveSecs: Number(grpKeepalive) || 30,
       },
     };
@@ -1389,6 +1395,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       setVaultSummary((prev) => ({ ...prev, groups: [...prev.groups, newGroup] }));
     }
     setGrpName('');
+    setGrpInitialDir('');
     setShowAddGroupModal(false);
   };
 
@@ -1426,6 +1433,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         port: parsedPort,
         groupId: hostGroupId,
         identityId,
+        initialDir: hostInitialDir.trim() || undefined,
         tags: tagList,
         color: hostColor,
         favorite: false,
@@ -1436,6 +1444,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       const grp = vaultSummary.groups.find((g) => g.id === hostGroupId);
       const effPort = parsedPort > 0 ? parsedPort : grp?.defaultSettings.port || 22;
       const effUser = hostUser.trim() || grp?.defaultSettings.username || 'root';
+      const effInitialDir = hostInitialDir.trim() || grp?.defaultSettings.initialDir || '';
       setVaultSummary((prev) => ({
         ...prev,
         hosts: [
@@ -1446,6 +1455,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             address: hostAddr.trim(),
             effectivePort: effPort,
             effectiveUser: effUser,
+            initialDir: effInitialDir,
             keepaliveSecs: grp?.defaultSettings.keepaliveSecs || 30,
             groupId: hostGroupId,
             identityId,
@@ -1460,10 +1470,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     setHostLabel('');
     setHostAddr('');
     setHostPort('0');
+    setHostGroupId('');
     setHostUser('');
     setHostPass('');
     setHostTags('');
     setHostColor('');
+    setHostInitialDir('');
     setShowAddHostModal(false);
   };
 
@@ -1937,6 +1949,38 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     splitDir: 'none' | 'horizontal' | 'vertical' = 'none'
   ): Promise<void> => {
     if (!activeTab || !activePane) {
+      const api = getWailsBindings();
+      let targetDir = '';
+      if (mode === 'current') {
+        const inputDir = window.prompt('Enter folder path to open terminal in (e.g. C:\\Projects or /var/www):', '');
+        if (inputDir === null) {
+          return;
+        }
+        targetDir = inputDir.trim();
+      }
+      if (api?.OpenTerminalWithOptions) {
+        try {
+          const newSessionId = await api.OpenTerminalWithOptions('', {
+            mode,
+            workingDir: targetDir,
+            splitDir: 'none',
+            size: { cols: 120, rows: 34 },
+          });
+          const title =
+            mode === 'root'
+              ? `Local Shell (Admin)${targetDir ? ` [${targetDir}]` : ''}`
+              : targetDir
+                ? `Local Shell [${targetDir}]`
+                : 'Local Shell';
+          openSessionTab(newSessionId, title, undefined);
+          setStatusMessage(`Opened ${title}.`);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStatusMessage(`Failed to open terminal (${mode}): ${msg}`);
+        }
+      } else {
+        void handleOpenLocalTerminal('powershell');
+      }
       return;
     }
     const api = getWailsBindings();
@@ -2539,6 +2583,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   className="nav-dropdown-menu"
                   role="menu"
                   aria-label="Vault Menu"
+                  onMouseEnter={() => handleMenuEnter('vault')}
+                  onMouseMove={handleMenuMove}
                 >
                   {vaultLocked ? (
                     <button
@@ -2617,6 +2663,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   className="nav-dropdown-menu"
                   role="menu"
                   aria-label="Tools Menu"
+                  onMouseEnter={() => handleMenuEnter('tools')}
+                  onMouseMove={handleMenuMove}
                 >
                   <button
                     type="button"
@@ -2710,46 +2758,46 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     <span>Serial / UART Console (COM)</span>
                     <span className="nav-dropdown-shortcut">🔌 COM</span>
                   </button>
+                  <div className="nav-dropdown-divider" />
+                  <div className="nav-dropdown-header">New Terminal by Directory (F-10)</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleOpenTerminalDirectory('default');
+                    }}
+                  >
+                    <span>New in Default Directory</span>
+                    <span className="nav-dropdown-shortcut">🏠</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleOpenTerminalDirectory('current');
+                    }}
+                  >
+                    <span>New in Current Directory (CWD)</span>
+                    <span className="nav-dropdown-shortcut">📂</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleOpenTerminalDirectory('root');
+                    }}
+                  >
+                    <span>New Root Shell in Current Directory</span>
+                    <span className="nav-dropdown-shortcut">⚡ root</span>
+                  </button>
                   {activePane && (
                     <>
-                      <div className="nav-dropdown-divider" />
-                      <div className="nav-dropdown-header">New Terminal by Directory (F-10)</div>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="nav-dropdown-item"
-                        onClick={() => {
-                          setActiveDropdownMenu(null);
-                          void handleOpenTerminalDirectory('default');
-                        }}
-                      >
-                        <span>New in Default Directory</span>
-                        <span className="nav-dropdown-shortcut">🏠</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="nav-dropdown-item"
-                        onClick={() => {
-                          setActiveDropdownMenu(null);
-                          void handleOpenTerminalDirectory('current');
-                        }}
-                      >
-                        <span>New in Current Directory (CWD)</span>
-                        <span className="nav-dropdown-shortcut">📂</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="nav-dropdown-item"
-                        onClick={() => {
-                          setActiveDropdownMenu(null);
-                          void handleOpenTerminalDirectory('root');
-                        }}
-                      >
-                        <span>New Root Shell in Current Directory</span>
-                        <span className="nav-dropdown-shortcut">⚡ root</span>
-                      </button>
                       <div className="nav-dropdown-divider" />
                       <button
                         type="button"
@@ -2793,6 +2841,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   className="nav-dropdown-menu"
                   role="menu"
                   aria-label="View Menu"
+                  onMouseEnter={() => handleMenuEnter('view')}
+                  onMouseMove={handleMenuMove}
                 >
                   <button
                     type="button"
@@ -3110,6 +3160,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                             <span>
                               {h.effectiveUser}@{h.address}:{h.effectivePort}
                             </span>
+                            {h.initialDir && (
+                              <span
+                                style={{
+                                  fontSize: '0.68rem',
+                                  color: 'var(--accent-glow)',
+                                  marginTop: '0.1rem',
+                                  display: 'block',
+                                }}
+                                title={`Default Directory: ${h.initialDir}`}
+                              >
+                                📂 {h.initialDir}
+                              </span>
+                            )}
                           </div>
                           <div className="host-card-actions">
                             <button
@@ -3152,6 +3215,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         <span>
                           {h.effectiveUser}@{h.address}:{h.effectivePort}
                         </span>
+                        {h.initialDir && (
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              color: 'var(--accent-glow)',
+                              marginTop: '0.1rem',
+                              display: 'block',
+                            }}
+                            title={`Default Directory: ${h.initialDir}`}
+                          >
+                            📂 {h.initialDir}
+                          </span>
+                        )}
                       </div>
                       <div className="host-card-actions">
                         <button
@@ -3473,8 +3549,99 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             </div>
           </section>
         ) : (
-          <section className="empty-state">
-            <p>{statusMessage}</p>
+          <section className="empty-state" aria-label="Terminal Workspace Quick Start">
+            <div className="empty-state-card">
+              <div className="empty-state-header">
+                <h2>DoubleAgent Terminal Workspace</h2>
+                <p>{statusMessage}</p>
+              </div>
+
+              <div className="empty-state-grid">
+                <div className="empty-state-section">
+                  <h3>⚡ Local Shells</h3>
+                  <div className="empty-state-actions">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => void handleOpenLocalTerminal('powershell')}
+                    >
+                      <span>⚡ PowerShell</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => void handleOpenLocalTerminal('cmd')}
+                    >
+                      <span>💻 Command Prompt</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => void handleOpenLocalTerminal('wsl')}
+                    >
+                      <span>🐧 WSL Linux</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="empty-state-section">
+                  <h3>📂 Terminal Directory Spawning (F-10)</h3>
+                  <div className="empty-state-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => void handleOpenTerminalDirectory('default')}
+                      title="Open local terminal in default working directory"
+                    >
+                      <span>🏠 Default Directory</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => void handleOpenTerminalDirectory('current')}
+                      title="Open terminal in chosen folder"
+                    >
+                      <span>📂 Choose Folder...</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => void handleOpenTerminalDirectory('root')}
+                      title="Open elevated root / admin shell"
+                    >
+                      <span>⚡ Root / Admin</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="empty-state-section">
+                  <h3>🔌 Remote &amp; Serial</h3>
+                  <div className="empty-state-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setShowCommandPalette(true)}
+                    >
+                      <span>🔍 Quick Connect / Hosts (Ctrl+P)</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => void handleOpenSerialModal()}
+                    >
+                      <span>🔌 Hardware Serial / COM</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setShowAddHostModal(true)}
+                    >
+                      <span>➕ New SSH Host</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
         )}
       </div>
@@ -3630,6 +3797,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               value={grpKeepalive}
               onChange={(e) => setGrpKeepalive(e.target.value)}
             />
+            <input
+              aria-label="Default Group Initial Directory"
+              placeholder="Default Initial Directory (e.g. /var/www, optional)"
+              value={grpInitialDir}
+              onChange={(e) => setGrpInitialDir(e.target.value)}
+            />
             <div className="modal-actions">
               <button
                 type="button"
@@ -3728,6 +3901,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               placeholder="Tags (comma-separated, e.g. prod, linux)"
               value={hostTags}
               onChange={(e) => setHostTags(e.target.value)}
+            />
+            <input
+              aria-label="Host Initial Directory"
+              placeholder="Initial Directory (e.g. /var/www or C:\Projects, optional)"
+              value={hostInitialDir}
+              onChange={(e) => setHostInitialDir(e.target.value)}
             />
             <div>
               <label
