@@ -22,6 +22,8 @@ import { ProxychainsExportModal } from './components/ProxychainsExportModal';
 import { FileItem, TransferTask } from './types/sftp';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 import { ProxyProfile, ProxyProfileSummary, ProxychainsExportOptions } from './types/proxy';
+import appLogo from './assets/DoubleAgent_App_Logo.png';
+import brandLogoText from './assets/DoubleAgent_Logo_complete_with_text.png';
 
 const SETTINGS_STORAGE_KEY = 'doubleagent_global_settings_v1';
 
@@ -764,7 +766,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     loadSettingsFromStorage()
   );
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
-  const [settingsActiveTab, setSettingsActiveTab] = useState<'appearance' | 'security' | 'shortcuts'>('appearance');
+  const [settingsActiveTab, setSettingsActiveTab] = useState<'appearance' | 'security' | 'shortcuts' | 'about'>('appearance');
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
 
   // Port Forwarding & Tunnels State (F-13)
@@ -965,7 +967,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   );
 
   const openSettingsTab = useCallback(
-    (subTab: 'appearance' | 'security' | 'shortcuts' = 'appearance'): void => {
+    (subTab: 'appearance' | 'security' | 'shortcuts' | 'about' = 'appearance'): void => {
       setSettingsActiveTab(subTab);
       setTabs((prev) => {
         const existingTab = prev.find((t) => t.tabType === 'settings');
@@ -2969,6 +2971,17 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     >
       <header className="app-header">
         <div className="brand-group">
+          <img
+            src={appLogo}
+            alt="DoubleAgent Logo"
+            className="brand-logo-img"
+            onClick={() => {
+              setSettingsActiveTab('about');
+              setShowGlobalSettingsModal(true);
+            }}
+            title="DoubleAgent SSH Client (Click for About info)"
+            style={{ cursor: 'pointer' }}
+          />
           <h1>DoubleAgent</h1>
           <span className={`status-badge ${vaultLocked ? 'locked' : 'unlocked'}`}>
             {vaultLocked ? 'Vault Locked' : passwordless ? 'Vault Unlocked (No PW)' : 'Vault Unlocked'}
@@ -3055,6 +3068,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     }}
                   >
                     <span>Reset Vault</span>
+                  </button>
+                  <div className="nav-dropdown-divider" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setSettingsActiveTab('about');
+                      setShowGlobalSettingsModal(true);
+                    }}
+                  >
+                    <span>ℹ About DoubleAgent</span>
                   </button>
                 </div>
               )}
@@ -3532,6 +3558,13 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         >
           {sidebarCollapsed ? (
             <div className="sidebar-collapsed-content">
+              <img
+                src={appLogo}
+                alt="DoubleAgent"
+                className="sidebar-collapsed-logo"
+                onClick={() => setSidebarCollapsed(false)}
+                title="DoubleAgent (Click to expand sidebar)"
+              />
               <button
                 type="button"
                 className="sidebar-expand-btn"
@@ -4098,6 +4131,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           <section className="empty-state" aria-label="Terminal Workspace Quick Start">
             <div className="empty-state-card">
               <div className="empty-state-header">
+                <img src={brandLogoText} alt="DoubleAgent" className="empty-state-brand-img" />
                 <h2>DoubleAgent Terminal Workspace</h2>
                 <p>{statusMessage}</p>
               </div>
@@ -4749,6 +4783,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <div className="modal-card">
+            <div className="modal-brand-hero">
+              <img src={brandLogoText} alt="DoubleAgent" className="modal-vault-brand-img" />
+            </div>
             <h2>Initialize Encrypted Vault (F-03)</h2>
             <p>
               Choose how you want to protect your local SSH vault (you can change this anytime in{' '}
@@ -4828,6 +4865,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <form className="modal-card" onSubmit={(e) => void handleVaultUnlock(e)}>
+            <div className="modal-brand-hero">
+              <img src={appLogo} alt="DoubleAgent" className="modal-vault-icon-img" />
+            </div>
             <h2>Unlock Encrypted Vault (F-03)</h2>
             <p>
               Unlock with <strong>Windows Hello / Security Key</strong> (PIN, Fingerprint, YubiKey) or{' '}

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { AppGlobalSettings } from './TerminalView';
+import brandLogoText from '../assets/DoubleAgent_Logo_complete_with_text.png';
 
 export interface SettingsViewProps {
-  activeTab: 'appearance' | 'security' | 'shortcuts';
-  onTabChange: (tab: 'appearance' | 'security' | 'shortcuts') => void;
+  activeTab: 'appearance' | 'security' | 'shortcuts' | 'about';
+  onTabChange: (tab: 'appearance' | 'security' | 'shortcuts' | 'about') => void;
   globalSettings: AppGlobalSettings;
   onUpdateSettings: (partial: Partial<AppGlobalSettings>) => void;
   onResetSettings: () => void;
@@ -178,6 +179,15 @@ export function SettingsView({
           onClick={() => onTabChange('shortcuts')}
         >
           ⌨️ Keyboard Shortcuts
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'about'}
+          className={`settings-tab-btn ${activeTab === 'about' ? 'active' : ''}`}
+          onClick={() => onTabChange('about')}
+        >
+          ℹ About DoubleAgent
         </button>
       </div>
 
@@ -612,6 +622,45 @@ export function SettingsView({
                 </tbody>
               </table>
             )}
+          </section>
+        </div>
+      )}
+
+      {/* Tab 4: About DoubleAgent */}
+      {activeTab === 'about' && (
+        <div className="settings-tab-content">
+          <section className="settings-section" style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
+            <img src={brandLogoText} alt="DoubleAgent" className="about-hero-img" />
+            <h2 style={{ margin: '0.25rem 0', color: 'var(--text-bright)' }}>DoubleAgent SSH Client</h2>
+            <div style={{ display: 'inline-block', padding: '0.2rem 0.65rem', borderRadius: '9999px', background: 'var(--accent-glow)', color: 'var(--accent-text)', fontSize: '0.8rem', fontWeight: 600, marginBottom: '1.25rem' }}>
+              Version 0.1.0 • Native Desktop Build
+            </div>
+            <p style={{ maxWidth: '620px', margin: '0 auto 1.5rem auto', color: 'var(--text-muted)', lineHeight: '1.5', fontSize: '0.88rem' }}>
+              A high-performance, cross-platform native SSH client engineered in Go and React with system WebView shell. Features tabbed &amp; split-pane xterm.js terminals, encrypted local vault, SFTP file browser, port forwarding (-L, -R, -D), proxy chains, and hardware serial UART diagnostics.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', textAlign: 'left', maxWidth: '680px', margin: '0 auto' }}>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.85rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Core Architecture</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-bright)', marginTop: '0.2rem' }}>Go 1.26 + Wails v2</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Single native binary, OS WebView2</div>
+              </div>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.85rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>SSH &amp; SFTP Protocol</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-bright)', marginTop: '0.2rem' }}>golang.org/x/crypto/ssh</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Strict TOFU host-key verification</div>
+              </div>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.85rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Vault Cryptography</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-bright)', marginTop: '0.2rem' }}>Argon2id + XChaCha20-Poly1305</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Windows Hello &amp; FIDO2 quick unlock</div>
+              </div>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.85rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Terminal Engine</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-bright)', marginTop: '0.2rem' }}>xterm.js + ConPTY / PTY</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Truecolor, split panes, in-buffer regex</div>
+              </div>
+            </div>
           </section>
         </div>
       )}

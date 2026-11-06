@@ -8,3 +8,4 @@ import (
 // setProcAttr is a no-op on Unix platforms.
 func setProcAttr(cmd *exec.Cmd) {
 }
+

@@ -264,3 +264,4 @@ func (t *Transport) dialProxyJump(ctx context.Context, chain []core.SshSessionCo
 
 	return targetConn, jumpClients, closers, nil
 }
+
