@@ -165,7 +165,7 @@ export function ProxychainsExportModal({
                 Export proxychains.conf
               </h2>
               <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                RFC-compliant configuration for proxychains and proxychains-ng (F-14)
+                RFC-compliant configuration for proxychains and proxychains-ng
               </p>
             </div>
           </div>

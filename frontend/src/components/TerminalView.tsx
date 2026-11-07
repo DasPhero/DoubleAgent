@@ -425,6 +425,30 @@ export function TerminalView({
           onToggleSearchRef.current?.(sessionId);
           return false;
         }
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+          if (term.hasSelection()) {
+            const sel = term.getSelection();
+            if (sel && navigator.clipboard?.writeText) {
+              void navigator.clipboard.writeText(sel);
+            }
+            return false;
+          }
+          if (e.shiftKey) {
+            return false;
+          }
+          return true;
+        }
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+          e.preventDefault();
+          if (navigator.clipboard?.readText) {
+            void navigator.clipboard.readText().then((text) => {
+              if (text) {
+                inputCallbacks.get(sessionId)?.(text);
+              }
+            });
+          }
+          return false;
+        }
         if (
           (e.ctrlKey || e.metaKey) &&
           (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '_' || e.key === '0')
@@ -466,6 +490,25 @@ export function TerminalView({
       } catch {
         // Ignore parser registration errors in mock environments
       }
+
+      // Right-click: Copy selection if text is selected, or Paste from clipboard if nothing is selected
+      wrapper.addEventListener('contextmenu', (ev: MouseEvent) => {
+        ev.preventDefault();
+        if (term.hasSelection()) {
+          const sel = term.getSelection();
+          if (sel && navigator.clipboard?.writeText) {
+            void navigator.clipboard.writeText(sel);
+          }
+        } else {
+          if (navigator.clipboard?.readText) {
+            void navigator.clipboard.readText().then((text) => {
+              if (text) {
+                inputCallbacks.get(sessionId)?.(text);
+              }
+            });
+          }
+        }
+      });
 
       entry = {
         term,

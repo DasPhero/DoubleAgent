@@ -225,7 +225,7 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
   {
     actionId: 'inject_totp',
     label: 'Inject 2FA / TOTP Code',
-    description: 'Auto-fill current TOTP code into active terminal prompt (F-20)',
+    description: 'Auto-fill current TOTP code into active terminal prompt',
     category: 'sessions',
     defaultKey: 'Ctrl+Shift+O',
     leaderKey: 'o',
@@ -243,7 +243,7 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
   {
     actionId: 'open_totp',
     label: 'TOTP Authenticator Generator',
-    description: 'Open TOTP 2FA authenticator with 30s countdown wheel (F-20)',
+    description: 'Open TOTP 2FA authenticator with 30s countdown wheel',
     category: 'tools',
     defaultKey: 'Alt+O',
     leaderKey: 'O',

@@ -149,7 +149,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <span style={{ fontSize: '1.2rem' }}>⏺</span>
             <div>
-              <h2 style={{ margin: 0 }}>Session Logs &amp; Transcripts (F-21)</h2>
+              <h2 style={{ margin: 0 }}>Session Logs &amp; Transcripts</h2>
               <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)' }}>
                 Per-session timestamped transcripts · Password prompts &amp; 2FA inputs are automatically redacted
               </p>

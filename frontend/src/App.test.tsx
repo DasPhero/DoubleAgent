@@ -90,8 +90,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
   it('manages Keychain generation/import/copy public key (F-04), Agent auth (F-05), and imports ssh_config with unknown directive warnings (F-22)', () => {
     render(<App />);
 
-    // Open Keychain (F-04) and generate Ed25519 key
-    fireEvent.click(screen.getByRole('button', { name: /Keychain \(F-04\)/i }));
+    // Open Keychain and generate Ed25519 key
+    fireEvent.click(screen.getByRole('button', { name: /Keychain/i }));
     fireEvent.change(screen.getByLabelText('Key Label'), { target: { value: 'Laptop Ed25519' } });
     fireEvent.click(screen.getByRole('button', { name: /Generate Keypair/i }));
 
@@ -459,7 +459,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(serialItem);
 
     expect(screen.getByRole('dialog', { name: 'Serial Connection' })).toBeInTheDocument();
-    expect(screen.getByText('Serial / UART Console Connection (F-23)')).toBeInTheDocument();
+    expect(screen.getByText('Serial / UART Console Connection')).toBeInTheDocument();
 
     // Auto-Detect port & baud button exists and operates
     const autoDetectBtn = screen.getByRole('button', { name: /Auto Detect Port & Baud/i });
@@ -653,7 +653,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(await screen.findByRole('tab', { name: /Tab SFTP: SFTP-Server/i })).toBeInTheDocument();
 
       // Verify SFTP Browser View elements are rendered
-      expect(screen.getByText('SFTP Browser (F-12)')).toBeInTheDocument();
+      expect(screen.getByText('SFTP Browser')).toBeInTheDocument();
       expect(screen.getByText('LOCAL')).toBeInTheDocument();
       expect(screen.getByText('REMOTE')).toBeInTheDocument();
       expect(screen.getByText('TRANSFER QUEUE (0)')).toBeInTheDocument();
@@ -784,7 +784,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       fireEvent.click(tunnelsNavBtn);
 
       // Verify Port Forwarding modal opens
-      expect(screen.getByRole('heading', { name: /Port Forwarding & Tunnels \(F-13\)/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Port Forwarding & Tunnels/i })).toBeInTheDocument();
       expect(screen.getByText(/No Port Forwarding Rules configured/i)).toBeInTheDocument();
 
       // 3. Click "+ New Forward Rule"
@@ -841,7 +841,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Close modal
       const closeBtn = screen.getByRole('button', { name: /Close Port Forwarding/i });
       fireEvent.click(closeBtn);
-      expect(screen.queryByRole('heading', { name: /Port Forwarding & Tunnels \(F-13\)/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /Port Forwarding & Tunnels/i })).not.toBeInTheDocument();
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }
@@ -1076,7 +1076,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       fireEvent.click(profilesMenuItem);
 
       // Verify Proxy Profiles modal is open
-      expect(screen.getByText('Proxy Profiles (F-14)')).toBeInTheDocument();
+      expect(screen.getByText('Proxy Profiles')).toBeInTheDocument();
       expect(screen.getByText('Corporate SOCKS5')).toBeInTheDocument();
 
       // Click "+ New Proxy Profile"
@@ -1243,7 +1243,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       fireEvent.click(snippetsMenuItem);
 
       // Verify Snippets Manager modal is open
-      expect(await screen.findByText('Command Snippets (F-15)')).toBeInTheDocument();
+      expect(await screen.findByText('Command Snippets')).toBeInTheDocument();
       expect(screen.getByText('Tail Nginx Logs')).toBeInTheDocument();
 
       // 2. Click "+ New Snippet"
@@ -1666,7 +1666,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     const paletteInput = screen.getByLabelText('Command Palette Input');
     fireEvent.change(paletteInput, { target: { value: 'AS65001' } });
 
-    expect(await screen.findByText(/Notes & Documentation \(F-17\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Notes & Documentation/i)).toBeInTheDocument();
     const noteResultBtn = screen.getByRole('button', { name: /BGP Runbook/i });
     fireEvent.click(noteResultBtn);
 
@@ -1712,12 +1712,12 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(logsDialog).toBeInTheDocument();
 
     // Verify transcript viewer shows timestamped lines & password-echo suppression notice
-    expect(await within(logsDialog).findByText(/PASSWORD ECHO SUPPRESSED - F-21/i)).toBeInTheDocument();
+    expect(await within(logsDialog).findByText(/PASSWORD ECHO SUPPRESSED/i)).toBeInTheDocument();
 
     // Filter transcript lines inside viewer
     const lineFilterInput = within(logsDialog).getByLabelText('Search in Transcript');
     fireEvent.change(lineFilterInput, { target: { value: 'PASSWORD ECHO' } });
-    expect(within(logsDialog).getByText(/PASSWORD ECHO SUPPRESSED - F-21/i)).toBeInTheDocument();
+    expect(within(logsDialog).getByText(/PASSWORD ECHO SUPPRESSED/i)).toBeInTheDocument();
 
     // Close Session Logs modal
     fireEvent.click(within(logsDialog).getByRole('button', { name: 'Close Session Logs' }));

@@ -188,7 +188,7 @@ export function PortForwardingView({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#58a6ff', margin: 0 }}>
-              Port Forwarding &amp; Tunnels (F-13)
+              Port Forwarding &amp; Tunnels
             </h2>
             <span style={{ fontSize: '11px', color: '#8b949e' }}>
               {rules.length} rule{rules.length === 1 ? '' : 's'} • {activeTunnels.length} active tunnel{activeTunnels.length === 1 ? '' : 's'}

@@ -186,7 +186,7 @@ export function SnippetsManagerModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '1.2rem' }}>⚡</span>
             <div>
-              <h2 style={{ margin: 0 }}>Command Snippets (F-15)</h2>
+              <h2 style={{ margin: 0 }}>Command Snippets</h2>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                 Reusable commands with variable injection (<code>{'{{HOST}}'}</code>, <code>{'{{USER}}'}</code>, <code>{'{{PORT}}'}</code>, <code>{'{{CWD}}'}</code>, custom parameters).
               </span>

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -46,13 +47,223 @@ func IsPasswordPromptLine(text string) bool {
 	return passwordPromptRegex.MatchString(lastLine)
 }
 
+type terminalLineBuffer struct {
+	chars []rune
+	col   int
+}
+
 type activeSessionLogger struct {
 	record         SessionLogRecord
 	file           *os.File
-	pendingLine    string
+	lineBuf        terminalLineBuffer
 	echoSuppressed bool
 	secrets        []string
 	nowFunc        func() time.Time
+}
+
+func (l *activeSessionLogger) writeLine(line string, nowTs string) {
+	line = redactSecrets(line, l.secrets)
+	if strings.TrimSpace(line) == "" {
+		return
+	}
+	formatted := fmt.Sprintf("[%s] %s\n", nowTs, line)
+	n, _ := l.file.WriteString(formatted)
+	l.record.ByteCount += int64(n)
+	l.record.LineCount++
+}
+
+func (l *activeSessionLogger) feedChunk(chunk string) {
+	runes := []rune(chunk)
+	n := len(runes)
+	i := 0
+	nowTs := l.nowFunc().UTC().Format("2006-01-02 15:04:05.000")
+
+	for i < n {
+		r := runes[i]
+
+		// 1. ANSI escape sequences
+		if r == 0x1b {
+			i++
+			if i >= n {
+				break
+			}
+			next := runes[i]
+			if next == '[' {
+				// CSI sequence: parse until final byte (0x40 - 0x7E)
+				i++
+				startParam := i
+				for i < n && (runes[i] < 0x40 || runes[i] > 0x7E) {
+					i++
+				}
+				if i < n {
+					finalByte := runes[i]
+					paramStr := string(runes[startParam:i])
+					i++
+
+					switch finalByte {
+					case 'K':
+						// Erase in line
+						switch paramStr {
+						case "", "0":
+							// Erase from cursor to end of line
+							if l.lineBuf.col < len(l.lineBuf.chars) {
+								l.lineBuf.chars = l.lineBuf.chars[:l.lineBuf.col]
+							}
+						case "1":
+							// Erase from start to cursor
+							for k := 0; k < l.lineBuf.col && k < len(l.lineBuf.chars); k++ {
+								l.lineBuf.chars[k] = ' '
+							}
+						case "2":
+							// Erase entire line
+							l.lineBuf.chars = l.lineBuf.chars[:0]
+							l.lineBuf.col = 0
+						}
+					case 'D':
+						count := 1
+						if paramStr != "" {
+							if c, err := strconv.Atoi(paramStr); err == nil && c > 0 {
+								count = c
+							}
+						}
+						l.lineBuf.col -= count
+						if l.lineBuf.col < 0 {
+							l.lineBuf.col = 0
+						}
+					case 'C':
+						count := 1
+						if paramStr != "" {
+							if c, err := strconv.Atoi(paramStr); err == nil && c > 0 {
+								count = c
+							}
+						}
+						l.lineBuf.col += count
+					case 'G':
+						col := 1
+						if paramStr != "" {
+							if c, err := strconv.Atoi(paramStr); err == nil && c > 0 {
+								col = c
+							}
+						}
+						l.lineBuf.col = col - 1
+						if l.lineBuf.col < 0 {
+							l.lineBuf.col = 0
+						}
+					}
+				}
+				continue
+			} else if next == ']' {
+				// OSC sequence: consume until BEL (0x07) or ST (\x1b\)
+				i++
+				for i < n {
+					if runes[i] == 0x07 {
+						i++
+						break
+					}
+					if runes[i] == 0x1b && i+1 < n && runes[i+1] == '\\' {
+						i += 2
+						break
+					}
+					i++
+				}
+				continue
+			} else if next >= 0x40 && next <= 0x5F {
+				i++
+				continue
+			}
+			continue
+		}
+
+		// 2. Control characters
+		if r == '\r' {
+			i++
+			if i < n && runes[i] == '\n' {
+				i++
+				if l.echoSuppressed {
+					l.echoSuppressed = false
+					l.lineBuf.chars = l.lineBuf.chars[:0]
+					l.lineBuf.col = 0
+				} else {
+					line := strings.TrimRight(string(l.lineBuf.chars), " \t\r")
+					l.writeLine(line, nowTs)
+					l.lineBuf.chars = l.lineBuf.chars[:0]
+					l.lineBuf.col = 0
+				}
+				continue
+			}
+			// Lone CR: return cursor to beginning of line (subsequent characters overwrite line)
+			l.lineBuf.col = 0
+			continue
+		}
+
+		if r == '\n' {
+			i++
+			if l.echoSuppressed {
+				l.echoSuppressed = false
+				l.lineBuf.chars = l.lineBuf.chars[:0]
+				l.lineBuf.col = 0
+			} else {
+				line := strings.TrimRight(string(l.lineBuf.chars), " \t\r")
+				l.writeLine(line, nowTs)
+				l.lineBuf.chars = l.lineBuf.chars[:0]
+				l.lineBuf.col = 0
+			}
+			continue
+		}
+
+		if r == 0x08 || r == 0x7F {
+			// Backspace / DEL
+			i++
+			if l.lineBuf.col > 0 {
+				l.lineBuf.col--
+				if l.lineBuf.col < len(l.lineBuf.chars) {
+					l.lineBuf.chars = append(l.lineBuf.chars[:l.lineBuf.col], l.lineBuf.chars[l.lineBuf.col+1:]...)
+				}
+			}
+			continue
+		}
+
+		if r == '\t' {
+			i++
+			if !l.echoSuppressed {
+				nextTab := (l.lineBuf.col/8 + 1) * 8
+				for l.lineBuf.col < nextTab {
+					if l.lineBuf.col < len(l.lineBuf.chars) {
+						l.lineBuf.chars[l.lineBuf.col] = ' '
+					} else {
+						l.lineBuf.chars = append(l.lineBuf.chars, ' ')
+					}
+					l.lineBuf.col++
+				}
+			}
+			continue
+		}
+
+		// Printable character
+		i++
+		if r >= 0x20 {
+			if l.echoSuppressed {
+				continue
+			}
+			for len(l.lineBuf.chars) < l.lineBuf.col {
+				l.lineBuf.chars = append(l.lineBuf.chars, ' ')
+			}
+			if l.lineBuf.col < len(l.lineBuf.chars) {
+				l.lineBuf.chars[l.lineBuf.col] = r
+			} else {
+				l.lineBuf.chars = append(l.lineBuf.chars, r)
+			}
+			l.lineBuf.col++
+
+			currText := string(l.lineBuf.chars)
+			if IsPasswordPromptLine(currText) {
+				l.writeLine(strings.TrimSpace(currText)+" [PASSWORD ECHO SUPPRESSED]", nowTs)
+				l.echoSuppressed = true
+				l.lineBuf.chars = l.lineBuf.chars[:0]
+				l.lineBuf.col = 0
+			}
+		}
+	}
 }
 
 // SessionLogManager manages per-session timestamped log files and enforces password-echo redaction (F-21).
@@ -203,7 +414,8 @@ func (m *SessionLogManager) NotifyInput(sessionID, input string) {
 	}
 	if logger.echoSuppressed && (strings.Contains(input, "\r") || strings.Contains(input, "\n")) {
 		// Discard any buffered echo characters accumulated during the password prompt
-		logger.pendingLine = ""
+		logger.lineBuf.chars = logger.lineBuf.chars[:0]
+		logger.lineBuf.col = 0
 		logger.echoSuppressed = false
 	}
 }
@@ -231,56 +443,7 @@ func (m *SessionLogManager) WriteOutput(sessionID, chunk string) {
 		return
 	}
 
-	cleaned := StripANSI(chunk)
-	if cleaned == "" {
-		return
-	}
-
-	// If echo suppression is currently active (e.g., waiting for user to finish typing password):
-	if logger.echoSuppressed {
-		// Check if chunk contains a newline (meaning the prompt line completed).
-		idx := strings.IndexByte(cleaned, '\n')
-		if idx == -1 {
-			// Still on the password prompt line: never record echoed characters!
-			return
-		}
-		// Newline reached: discard everything before the newline (any echoed password characters)
-		// and resume logging after the newline.
-		logger.echoSuppressed = false
-		cleaned = cleaned[idx+1:]
-	}
-
-	// Check if the incoming chunk ends with a password/passphrase prompt.
-	promptDetected := IsPasswordPromptLine(logger.pendingLine + cleaned)
-
-	combined := logger.pendingLine + cleaned
-	parts := strings.Split(combined, "\n")
-
-	// All elements except the last are complete lines ending with \n
-	nowTs := logger.nowFunc().UTC().Format("2006-01-02 15:04:05.000")
-	for i := 0; i < len(parts)-1; i++ {
-		line := redactSecrets(parts[i], logger.secrets)
-		formatted := fmt.Sprintf("[%s] %s\n", nowTs, line)
-		n, _ := logger.file.WriteString(formatted)
-		logger.record.ByteCount += int64(n)
-		logger.record.LineCount++
-	}
-
-	logger.pendingLine = redactSecrets(parts[len(parts)-1], logger.secrets)
-
-	// If the trailing partial line is a password prompt, flush the prompt text itself with a timestamp
-	// and arm echoSuppressed so any characters echoed while typing the password are never recorded.
-	if promptDetected {
-		if strings.TrimSpace(logger.pendingLine) != "" {
-			formatted := fmt.Sprintf("[%s] %s [PASSWORD ECHO SUPPRESSED]\n", nowTs, strings.TrimSpace(logger.pendingLine))
-			n, _ := logger.file.WriteString(formatted)
-			logger.record.ByteCount += int64(n)
-			logger.record.LineCount++
-			logger.pendingLine = ""
-		}
-		logger.echoSuppressed = true
-	}
-
+	logger.feedChunk(chunk)
 	m.recordsByID[logger.record.ID] = logger.record
 }
 
@@ -296,13 +459,13 @@ func (m *SessionLogManager) StopSession(sessionID string) (SessionLogStatus, err
 
 	now := logger.nowFunc().UTC()
 	nowTs := now.Format("2006-01-02 15:04:05.000")
-	if !logger.echoSuppressed && strings.TrimSpace(logger.pendingLine) != "" {
-		line := redactSecrets(logger.pendingLine, logger.secrets)
-		formatted := fmt.Sprintf("[%s] %s\n", nowTs, line)
-		n, _ := logger.file.WriteString(formatted)
-		logger.record.ByteCount += int64(n)
-		logger.record.LineCount++
-		logger.pendingLine = ""
+	if !logger.echoSuppressed && len(logger.lineBuf.chars) > 0 {
+		line := strings.TrimRight(string(logger.lineBuf.chars), " \t\r")
+		if strings.TrimSpace(line) != "" {
+			logger.writeLine(line, nowTs)
+		}
+		logger.lineBuf.chars = logger.lineBuf.chars[:0]
+		logger.lineBuf.col = 0
 	}
 
 	footer := fmt.Sprintf("[%s] --- Session Log Ended ---\n", nowTs)

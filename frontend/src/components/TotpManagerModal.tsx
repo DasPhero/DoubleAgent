@@ -337,7 +337,6 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
           <div className="modal-title-with-badge">
             <span className="modal-icon">🔐</span>
             <h2>TOTP Authenticator Generator</h2>
-            <span className="modal-badge-f">F-20</span>
           </div>
           <button
             type="button"
@@ -398,7 +397,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
         {showAddEdit && (
           <div className="totp-add-panel">
             <div className="totp-add-header">
-              <h3>{editingId ? 'Edit Authenticator' : 'Add New Authenticator (F-20)'}</h3>
+              <h3>{editingId ? 'Edit Authenticator' : 'Add New Authenticator'}</h3>
               <div className="totp-mode-toggle">
                 {!editingId && (
                   <>

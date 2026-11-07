@@ -401,7 +401,7 @@ export function SftpBrowserView({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontWeight: 600, fontSize: '14px', color: '#58a6ff' }}>
-            SFTP Browser (F-12)
+            SFTP Browser
           </span>
           <span style={{ color: '#8b949e' }}>•</span>
           <span style={{ color: '#c9d1d9' }}>Session: {sessionId} ({hostLabel})</span>

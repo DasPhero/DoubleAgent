@@ -200,7 +200,7 @@ export function ProxyProfilesView({
             <span style={{ fontSize: '1.4rem' }}>🛡️</span>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-bright)' }}>
-                Proxy Profiles (F-14)
+                Proxy Profiles
               </h2>
               <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 Manage ProxyJump bastion chains, ProxyCommand process streaming, and SOCKS5 proxies

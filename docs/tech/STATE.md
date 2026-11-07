@@ -159,6 +159,15 @@
     - Verified in `frontend/src/App.test.tsx` (`manages Session Logging per host and per session with timestamped transcripts and password-echo redaction (F-21)`).
   - Standalone binary verified with `wails build`.
 
+- **UI Refinements, Usability Polish & Bug Fixes**:
+  - **Opaque Menus & Background Opacity**: Defined solid background variables (`--bg-main`, `--bg-panel`, `--bg-dropdown: #0c131f`) eliminating transparent text bleed-through under dropdowns and notes view.
+  - **Terminal Copy & Paste**: Full clipboard integration in xterm.js — `Ctrl+C` copies on selection (preserves `SIGINT` when unselected), `Ctrl+V` and `Ctrl+Shift+V` paste from clipboard, right-click context menu handles copy/paste.
+  - **Full-Window Notes & Split View**: Notes now opens as a full workspace tab with split markdown editor and preview, plus a collapsible navigation tree sidebar (`◀ Hide List` / `📁 Show List`) maximizing editing width.
+  - **Resizable Sidebar**: Added a draggable divider handle (`.sidebar-resizer`) with persistence in `localStorage` bounded from 180px to 650px.
+  - **Terminal Session Log Virtual Line Buffer**: Re-architected `activeSessionLogger.feedChunk` with a virtual line buffer that tracks cursor movements, carriage returns `\r`, backspaces `\b`, and ANSI erase escapes (`\x1b[K`), condensing `apt update` progress bars and readline edits into clean, readable transcripts.
+  - **Modern Sidebar Quick Toolbar**: Replaced bulky wrapped buttons with a sleek 4-button quick action bar (`🔑 Keys`, `⚙️ Config`, `🛡️ Vault`, `📝 Notes`).
+  - **Clean GUI Labels**: Removed all feature numbers (`(F-xx)`) from user-facing UI labels, modals, tooltips, and menus across the entire application.
+
 ## In Progress
 - None (MVP Phase 100% Complete).
 

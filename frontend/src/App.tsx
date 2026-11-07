@@ -211,8 +211,10 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes';
   sftpSessionId?: string;
+  notesHostId?: string;
+  notesInitialNoteId?: string | null;
 }
 
 export const HOST_PALETTE = [
@@ -659,6 +661,51 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [modalError, setModalError] = useState<string>('');
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const saved = window.localStorage.getItem('doubleagent_sidebar_width');
+        const parsed = saved ? parseInt(saved, 10) : 280;
+        return Number.isFinite(parsed) && parsed >= 180 && parsed <= 650 ? parsed : 280;
+      }
+    } catch {
+      // ignore in environments without localStorage
+    }
+    return 280;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState<boolean>(false);
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.min(650, Math.max(180, startWidth + delta));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => {
+      const delta = upEvent.clientX - startX;
+      const finalWidth = Math.min(650, Math.max(180, startWidth + delta));
+      setSidebarWidth(finalWidth);
+      setIsResizingSidebar(false);
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem('doubleagent_sidebar_width', finalWidth.toString());
+        }
+      } catch {
+        // ignore
+      }
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [sidebarWidth]);
   const [serialDetecting, setSerialDetecting] = useState<boolean>(false);
   const [serialDetectResult, setSerialDetectResult] = useState<SerialAutoDetectResult | null>(null);
   const [activeSignalAnalyzers, setActiveSignalAnalyzers] = useState<Set<string>>(new Set());
@@ -1067,6 +1114,42 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             id: paneId,
             sessionId: `settings-${seq}`,
             title: 'Settings ⚙',
+          },
+          activePaneId: paneId,
+        };
+        setActiveTabId(tabId);
+        return [...prev, newTab];
+      });
+    },
+    []
+  );
+
+  const openNotesTab = useCallback(
+    (hostId?: string, noteId?: string | null): void => {
+      setTabs((prev) => {
+        const existingTab = prev.find((t) => t.tabType === 'notes');
+        if (existingTab) {
+          existingTab.notesHostId = hostId;
+          existingTab.notesInitialNoteId = noteId;
+          setActiveTabId(existingTab.id);
+          return [...prev];
+        }
+        tabCounterRef.current += 1;
+        const seq = tabCounterRef.current;
+        const tabId = `notes-tab-${seq}`;
+        const paneId = `notes-pane-${seq}-1`;
+        const newTab: TabItem = {
+          id: tabId,
+          title: 'Notes 📝',
+          color: '#38bdf8',
+          tabType: 'notes',
+          notesHostId: hostId,
+          notesInitialNoteId: noteId,
+          rootNode: {
+            type: 'pane',
+            id: paneId,
+            sessionId: `notes-${seq}`,
+            title: 'Notes 📝',
           },
           activePaneId: paneId,
         };
@@ -1736,14 +1819,14 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         const startedAt = new Date().toISOString();
         const tsFormatted = startedAt.replace('T', ' ').slice(0, 23);
         const transcript =
-          `# DoubleAgent Session Transcript (F-21)\n` +
+          `# DoubleAgent Session Transcript\n` +
           `# Host: ${label || targetSessionId}\n` +
           `# Session ID: ${targetSessionId}\n` +
           `# Started: ${startedAt}\n` +
           `# Security Policy: Password Echo & Sensitive Prompts Redacted\n` +
           `# ------------------------------------------------------------\n` +
           `[${tsFormatted}] ${label || targetSessionId}:~$ session recording active\n` +
-          `[${tsFormatted}] [sudo] password for user: [PASSWORD ECHO SUPPRESSED - F-21]\n`;
+          `[${tsFormatted}] [sudo] password for user: [PASSWORD ECHO SUPPRESSED]\n`;
         localLogTranscriptsRef.current.set(logId, transcript);
         const rec: SessionLogRecord = {
           id: logId,
@@ -1763,7 +1846,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         next.add(targetSessionId);
         return next;
       });
-      setStatusMessage(`⏺ Recording session transcript for ${label || targetSessionId} (F-21).`);
+      setStatusMessage(`⏺ Recording session transcript for ${label || targetSessionId}.`);
     }
   };
 
@@ -2043,7 +2126,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     const proto = opts.proxies[0]?.type || 'socks5';
     const host = opts.proxies[0]?.host || '127.0.0.1';
     const port = opts.proxies[0]?.port || 1080;
-    return `# proxychains.conf - generated by DoubleAgent SSH Client (F-14)\n${opts.chainType}\n${opts.proxyDNS ? 'proxy_dns\n' : ''}tcp_read_time_out ${opts.tcpReadTimeout}\ntcp_connect_time_out ${opts.tcpConnectTimeout}\n\n[ProxyList]\n${proto}    ${host}    ${port}\n`;
+    return `# proxychains.conf - generated by DoubleAgent SSH Client\n${opts.chainType}\n${opts.proxyDNS ? 'proxy_dns\n' : ''}tcp_read_time_out ${opts.tcpReadTimeout}\ntcp_connect_time_out ${opts.tcpConnectTimeout}\n\n[ProxyList]\n${proto}    ${host}    ${port}\n`;
   };
 
   const handleSaveProxychainsFile = async (content: string, targetPath: string): Promise<void> => {
@@ -2470,7 +2553,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
     try {
       await api.InjectTotpCode(sessionId, totpId);
-      setStatusMessage('TOTP 2FA code injected into active terminal prompt (F-20).');
+      setStatusMessage('TOTP 2FA code injected into active terminal prompt.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setStatusMessage(`2FA injection: ${msg}`);
@@ -3062,7 +3145,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   type="button"
                   className="pane-sftp-btn"
                   aria-label={`Open SFTP for ${node.title}`}
-                  title="Open SFTP File Browser (F-12)"
+                  title="Open SFTP File Browser"
                   onClick={(e) => {
                     e.stopPropagation();
                     openSftpTab(node.sessionId, node.title, node.hostId);
@@ -3075,7 +3158,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 type="button"
                 className="pane-snippets-btn"
                 aria-label={`Run Snippet in ${node.title}`}
-                title="Run command snippet in this terminal (F-15)"
+                title="Run command snippet in this terminal"
                 onClick={(e) => {
                   e.stopPropagation();
                   setSnippetActiveSessionId(node.sessionId);
@@ -3088,7 +3171,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 type="button"
                 className={`pane-rec-btn ${activeLogSessions.has(node.sessionId) ? 'recording' : ''}`}
                 aria-label={`Toggle Session Logging for ${node.title}`}
-                title="Toggle Timestamped Session Logging (F-21)"
+                title="Toggle Timestamped Session Logging"
                 onClick={(e) => {
                   e.stopPropagation();
                   void handleToggleSessionLog(node.sessionId, node.title, node.hostId);
@@ -3101,7 +3184,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   type="button"
                   className={`pane-notes-btn ${openNotesDrawerHostId === node.hostId ? 'active' : ''}`}
                   aria-label={`Toggle Host Notes for ${node.title}`}
-                  title="Toggle Host Notes Drawer (F-17)"
+                  title="Toggle Host Notes Drawer"
                   onClick={(e) => {
                     e.stopPropagation();
                     const hid = node.hostId ?? '';
@@ -3711,7 +3794,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       openSettingsTab('security');
                     }}
                   >
-                    <span>Vault Security &amp; Hello (F-03)</span>
+                    <span>Vault Security &amp; Hello</span>
                   </button>
                   <div className="nav-dropdown-divider" />
                   <button
@@ -3936,7 +4019,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       }}
                     >
                       <span>Keychain</span>
-                      <span className="nav-dropdown-shortcut">F-04</span>
+                      <span className="nav-dropdown-shortcut">🔑</span>
                     </button>
 
                     <div className="tools-sub-header">Automation &amp; Networking</div>
@@ -3952,7 +4035,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       }}
                     >
                       <span>Host Notes &amp; Docs</span>
-                      <span className="nav-dropdown-shortcut">📝 F-17</span>
+                      <span className="nav-dropdown-shortcut">📝</span>
                     </button>
                     <button
                       type="button"
@@ -3965,7 +4048,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       }}
                     >
                       <span>Session Logs &amp; Recordings</span>
-                      <span className="nav-dropdown-shortcut">⏺ F-21</span>
+                      <span className="nav-dropdown-shortcut">⏺</span>
                     </button>
                     <button
                       type="button"
@@ -4034,7 +4117,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       }}
                     >
                       <span>Import ssh_config</span>
-                      <span className="nav-dropdown-shortcut">F-22</span>
+                      <span className="nav-dropdown-shortcut">⚙️</span>
                     </button>
                     <button
                       type="button"
@@ -4204,12 +4287,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               )}
             </div>
 
-            {/* Port Forwarding / Tunnels Pill Button (F-13) */}
+            {/* Port Forwarding / Tunnels Pill Button */}
             <button
               type="button"
               className={`nav-menu-trigger ${activeTunnels.length > 0 ? 'active' : ''}`}
               onClick={() => setShowPortForwardingModal(true)}
-              title="Port Forwarding & Tunnels (F-13)"
+              title="Port Forwarding & Tunnels"
               aria-label="Port Forwarding"
               style={
                 activeTunnels.length > 0
@@ -4285,6 +4368,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       <div className="workspace-body">
         <aside
           className={`hosts-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}
+          style={{ width: sidebarCollapsed ? undefined : `${sidebarWidth}px` }}
           aria-label="Hosts and Groups Sidebar"
         >
           {sidebarCollapsed ? (
@@ -4310,48 +4394,56 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           ) : (
             <>
               {!vaultLocked && (
-                <nav className="sidebar-menu-grid" aria-label="Workspace Modules">
+                <nav className="sidebar-quick-toolbar" aria-label="Quick Actions">
                   <button
                     type="button"
-                    className="btn-secondary btn-sm"
+                    className="sidebar-quick-btn"
+                    title="Open SSH Keychain"
+                    aria-label="SSH Keychain"
                     onClick={() => {
                       setModalError('');
                       setShowKeychainModal(true);
                     }}
                   >
-                    Keychain (F-04)
+                    <span>🔑</span>
+                    <span>Keys</span>
                   </button>
                   <button
                     type="button"
-                    className="btn-secondary btn-sm"
+                    className="sidebar-quick-btn"
+                    title="Import ssh_config"
+                    aria-label="Import ssh_config"
                     onClick={() => {
                       setModalError('');
                       setSshConfigResult(null);
                       setShowSSHConfigModal(true);
                     }}
                   >
-                    Import ssh_config
+                    <span>⚙️</span>
+                    <span>Config</span>
                   </button>
                   <button
                     type="button"
-                    className="btn-secondary btn-sm"
+                    className="sidebar-quick-btn"
+                    title="Vault Security & Windows Hello"
+                    aria-label="Vault Security"
                     onClick={() => {
                       setModalError('');
                       openSettingsTab('security');
                     }}
                   >
-                    Vault Security
+                    <span>🛡️</span>
+                    <span>Vault</span>
                   </button>
                   <button
                     type="button"
-                    className="btn-secondary btn-sm"
-                    onClick={() => {
-                      setNotesModalHostId(undefined);
-                      setNotesModalInitialNoteId(null);
-                      setShowNotesModal(true);
-                    }}
+                    className="sidebar-quick-btn"
+                    title="Host Notes & Documentation"
+                    aria-label="Host Notes & Documentation"
+                    onClick={() => openNotesTab()}
                   >
-                    Notes (F-17)
+                    <span>📝</span>
+                    <span>Notes</span>
                   </button>
                 </nav>
               )}
@@ -4462,13 +4554,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                             <button
                               type="button"
                               className="btn-secondary btn-sm"
-                              title={`Open Notes & Docs for ${h.label} (F-17)`}
+                              title={`Open Notes & Docs for ${h.label}`}
                               aria-label={`Notes for ${h.label}`}
-                              onClick={() => {
-                                setNotesModalHostId(h.id);
-                                setNotesModalInitialNoteId(null);
-                                setShowNotesModal(true);
-                              }}
+                              onClick={() => openNotesTab(h.id)}
                             >
                               📝
                             </button>
@@ -4538,13 +4626,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         <button
                           type="button"
                           className="btn-secondary btn-sm"
-                          title={`Open Notes & Docs for ${h.label} (F-17)`}
+                          title={`Open Notes & Docs for ${h.label}`}
                           aria-label={`Notes for ${h.label}`}
-                          onClick={() => {
-                            setNotesModalHostId(h.id);
-                            setNotesModalInitialNoteId(null);
-                            setShowNotesModal(true);
-                          }}
+                          onClick={() => openNotesTab(h.id)}
                         >
                           📝
                         </button>
@@ -4565,6 +4649,17 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         </>
       )}
     </aside>
+
+    {!sidebarCollapsed && (
+      <div
+        className={`sidebar-resizer ${isResizingSidebar ? 'resizing' : ''}`}
+        onMouseDown={handleSidebarResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        title="Drag to resize sidebar"
+      />
+    )}
 
         {tabs.length > 0 && activeTab && activePane ? (
           <section className="terminal-workspace" aria-label="Active Terminal Session">
@@ -4747,7 +4842,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 <button
                   type="button"
                   className={`tab-toggle-btn ${groupTabsByHost ? 'active' : ''}`}
-                  title={groupTabsByHost ? 'Switch to ungrouped flat tabs' : 'Group tabs by host (F-09)'}
+                  title={groupTabsByHost ? 'Switch to ungrouped flat tabs' : 'Group tabs by host'}
                   aria-label={groupTabsByHost ? 'Ungroup Tabs' : 'Group by Host'}
                   onClick={() => setGroupTabsByHost((prev) => !prev)}
                 >
@@ -4787,7 +4882,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   aria-label="New Terminal Default Directory"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => void handleOpenTerminalDirectory('default')}
-                  title="Open new terminal in default working directory (F-10)"
+                  title="Open new terminal in default working directory"
                 >
                   🏠 Default Dir
                 </button>
@@ -4797,7 +4892,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   aria-label="New Terminal Current Directory"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => void handleOpenTerminalDirectory('current')}
-                  title="Open new terminal in current working directory (F-10)"
+                  title="Open new terminal in current working directory"
                 >
                   📂 Current Dir
                 </button>
@@ -4807,7 +4902,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   aria-label="New Terminal Root in Current Directory"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => void handleOpenTerminalDirectory('root')}
-                  title="Open new root / elevated terminal in current working directory (F-10)"
+                  title="Open new root / elevated terminal in current working directory"
                 >
                   ⚡ Root in Dir
                 </button>
@@ -4837,7 +4932,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   className="btn-secondary btn-sm"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => void handleInjectTotp()}
-                  title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt (F-20)"
+                  title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt"
                 >
                   🔐 2FA / TOTP
                 </button>
@@ -4897,6 +4992,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         availableSnippets={vaultSummary.snippets || []}
                         isModal={false}
                       />
+                    ) : tab.tabType === 'notes' ? (
+                      <NotesView
+                        notes={notes}
+                        hosts={vaultSummary.hosts.map((h) => ({
+                          id: h.id,
+                          label: h.label,
+                          address: h.address,
+                        }))}
+                        activeHostId={tab.notesHostId}
+                        initialNoteId={tab.notesInitialNoteId}
+                        onSaveNote={handleSaveNote}
+                        onDeleteNote={handleDeleteNote}
+                        onClose={() => void handleCloseTab(tab.id)}
+                      />
                     ) : (
                       renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)
                     )}
@@ -4917,10 +5026,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   onDeleteNote={handleDeleteNote}
                   onClose={() => setOpenNotesDrawerHostId(null)}
                   onOpenFullNotes={() => {
-                    setNotesModalHostId(openNotesDrawerHostId);
-                    setNotesModalInitialNoteId(null);
+                    const hostIdToOpen = openNotesDrawerHostId;
                     setOpenNotesDrawerHostId(null);
-                    setShowNotesModal(true);
+                    openNotesTab(hostIdToOpen || undefined);
                   }}
                 />
               )}
@@ -4964,7 +5072,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 </div>
 
                 <div className="empty-state-section">
-                  <h3>📂 Terminal Directory Spawning (F-10)</h3>
+                  <h3>📂 Terminal Directory Spawning</h3>
                   <div className="empty-state-actions">
                     <button
                       type="button"
@@ -5037,7 +5145,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <div className="modal-card palette-card">
-            <h2>Command Palette &amp; Quick Connect (F-02)</h2>
+            <h2>Command Palette &amp; Quick Connect</h2>
             <p>
               Fuzzy search saved hosts by <strong>Name</strong>, <strong>Address</strong>, or{' '}
               <strong>Tags</strong>, or type <code>user@host:port</code> to connect directly.
@@ -5154,7 +5262,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                           marginBottom: '0.4rem',
                         }}
                       >
-                        📝 Notes &amp; Documentation (F-17)
+                        📝 Notes &amp; Documentation
                       </div>
                       {matchedNotes.map((n) => {
                         const hostObj = vaultSummary.hosts.find((h) => h.id === n.hostId);
@@ -5218,7 +5326,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <form className="modal-card" onSubmit={(e) => void handleSaveGroup(e)}>
-            <h2>New Host Group (F-01)</h2>
+            <h2>New Host Group</h2>
             <p>Hosts in this group inherit its default Port, Username, and Keepalive.</p>
             <input
               aria-label="Group Name"
@@ -5283,7 +5391,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 checked={grpSessionLogging}
                 onChange={(e) => setGrpSessionLogging(e.target.checked)}
               />
-              Enable Session Logging by default (F-21)
+              Enable Session Logging by default
             </label>
             <div className="modal-actions">
               <button
@@ -5313,7 +5421,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <form className="modal-card" onSubmit={(e) => void handleSaveHost(e)}>
-            <h2>New SSH Host (F-01)</h2>
+            <h2>New SSH Host</h2>
             <p>Leave Port at 0 or Username empty to inherit from the selected Group.</p>
             <input
               aria-label="Host Label"
@@ -5361,8 +5469,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               onChange={(e) => setHostAuthMethod(e.target.value)}
             >
               <option value="password">Password (Vault Encrypted)</option>
-              <option value="key">SSH Key from Keychain (F-04)</option>
-              <option value="agent">Windows OpenSSH Agent / Pageant (F-05)</option>
+              <option value="key">SSH Key from Keychain</option>
+              <option value="agent">Windows OpenSSH Agent / Pageant</option>
             </select>
             {hostAuthMethod === 'password' && (
               <input
@@ -5401,7 +5509,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             />
             <div style={{ margin: '8px 0', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-bright)', marginBottom: '6px', display: 'block' }}>
-                Proxy &amp; Bastion Settings (F-14)
+                Proxy &amp; Bastion Settings
               </label>
               <select
                 aria-label="Host Proxy Profile"
@@ -5442,7 +5550,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   display: 'block',
                 }}
               >
-                Host Color Tag (F-09)
+                Host Color Tag
               </label>
               <div className="color-picker-row" aria-label="Host Color Swatches">
                 <button
@@ -5472,7 +5580,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 checked={hostSessionLogging}
                 onChange={(e) => setHostSessionLogging(e.target.checked)}
               />
-              Enable Session Logging for this Host (F-21)
+              Enable Session Logging for this Host
             </label>
             <div className="modal-actions">
               <button
@@ -5502,7 +5610,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <div className="modal-card palette-card">
-            <h2>SSH Keychain (F-04)</h2>
+            <h2>SSH Keychain</h2>
             <p>
               Generate <strong>Ed25519</strong> / <strong>RSA</strong> keys or import{' '}
               <strong>OpenSSH</strong> and <strong>PuTTY .ppk</strong> private keys into the encrypted Vault.
@@ -5607,7 +5715,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <form className="modal-card palette-card" onSubmit={(e) => void handleImportSSHConfig(e)}>
-            <h2>Import OpenSSH Config (F-22)</h2>
+            <h2>Import OpenSSH Config</h2>
             <p>
               Paste your <code>~/.ssh/config</code> below. Imports <strong>Host</strong>,{' '}
               <strong>HostName</strong>, <strong>User</strong>, <strong>Port</strong>,{' '}
@@ -5667,7 +5775,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             <div className="modal-brand-hero">
               <img src={brandLogoText} alt="DoubleAgent" className="modal-vault-brand-img" />
             </div>
-            <h2>Initialize Encrypted Vault (F-03)</h2>
+            <h2>Initialize Encrypted Vault</h2>
             <p>
               Choose how you want to protect your local SSH vault (you can change this anytime in{' '}
               <strong>Vault Security</strong>):
@@ -5749,7 +5857,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             <div className="modal-brand-hero">
               <img src={appLogo} alt="DoubleAgent" className="modal-vault-icon-img" />
             </div>
-            <h2>Unlock Encrypted Vault (F-03)</h2>
+            <h2>Unlock Encrypted Vault</h2>
             <p>
               Unlock with <strong>Windows Hello / Security Key</strong> (PIN, Fingerprint, YubiKey) or{' '}
               {passwordless ? 'click Unlock below:' : 'enter your Master Password below:'}
@@ -5821,7 +5929,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <form className="modal-card" onSubmit={(e) => void handleChangePassword(e)}>
-            <h2>Vault Security &amp; Windows Hello (F-03)</h2>
+            <h2>Vault Security &amp; Windows Hello</h2>
             <p>
               {passwordless
                 ? 'Your vault currently has no Master Password. Set one below to protect it.'
@@ -5927,7 +6035,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           }}
         >
           <div className="modal-card">
-            <h2>Serial / UART Console Connection (F-23)</h2>
+            <h2>Serial / UART Console Connection</h2>
             <form onSubmit={(e) => void handleConnectSerial(e)}>
               {modalError && <p className="status-banner error">{modalError}</p>}
 
@@ -6370,8 +6478,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           <div
             className="modal-card"
             style={{
-              width: 'min(1080px, 95vw)',
-              height: 'min(740px, 90vh)',
+              width: 'calc(100vw - 2.5rem)',
+              height: 'calc(100vh - 2.5rem)',
+              maxWidth: 'none',
+              maxHeight: 'none',
               padding: 0,
               overflow: 'hidden',
               display: 'flex',
@@ -6389,6 +6499,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               initialNoteId={notesModalInitialNoteId}
               onSaveNote={handleSaveNote}
               onDeleteNote={handleDeleteNote}
+              onOpenAsTab={() => {
+                const hid = notesModalHostId;
+                const nid = notesModalInitialNoteId;
+                setShowNotesModal(false);
+                openNotesTab(hid, nid);
+              }}
               onClose={() => setShowNotesModal(false)}
             />
           </div>
@@ -6429,7 +6545,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               boxShadow: '0 0 32px rgba(45, 212, 191, 0.5)',
             }}
           >
-            <h2>Verify Unknown Host Key (F-06)</h2>
+            <h2>Verify Unknown Host Key</h2>
             <p>
               Host: <strong>{hostKeyPrompt.hostPattern}:{hostKeyPrompt.port}</strong>
             </p>

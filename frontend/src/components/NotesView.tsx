@@ -9,6 +9,7 @@ interface NotesViewProps {
   initialNoteId?: string | null;
   onSaveNote: (note: NotePage) => Promise<void>;
   onDeleteNote: (id: string) => Promise<void>;
+  onOpenAsTab?: () => void;
   onClose?: () => void;
 }
 
@@ -19,6 +20,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
   initialNoteId,
   onSaveNote,
   onDeleteNote,
+  onOpenAsTab,
   onClose,
 }) => {
   const [selectedHostFilter, setSelectedHostFilter] = useState<string>(activeHostId || 'all');
@@ -27,6 +29,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'split' | 'edit' | 'preview'>('split');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     if (initialNoteId) {
@@ -200,11 +203,30 @@ export const NotesView: React.FC<NotesViewProps> = ({
       {/* Top Header */}
       <div className="notes-header">
         <div className="notes-header-left">
+          <button
+            type="button"
+            className="notes-tool-btn"
+            style={{ flex: 'none', padding: '0.25rem 0.55rem', marginRight: '0.35rem' }}
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            title={isSidebarCollapsed ? 'Show Notes List' : 'Hide Notes List (Full-Width Editor)'}
+          >
+            {isSidebarCollapsed ? '📁 Show List' : '◀ Hide List'}
+          </button>
           <span className="notes-header-icon">📝</span>
-          <h2 className="notes-header-title">Host Notes & Documentation (F-17)</h2>
+          <h2 className="notes-header-title">Host Notes & Documentation</h2>
           <span className="notes-count-badge">{filteredNotes.length} items</span>
         </div>
         <div className="notes-header-right">
+          {onOpenAsTab && (
+            <button
+              type="button"
+              className="notes-tool-btn"
+              onClick={onOpenAsTab}
+              title="Open as full workspace tab"
+            >
+              ⤢ Tab View
+            </button>
+          )}
           {onClose && (
             <button
               type="button"
@@ -221,7 +243,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
       <div className="notes-body">
         {/* Left Navigation Tree */}
-        <div className="notes-sidebar">
+        <div className={`notes-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
           {/* Host Filter Dropdown */}
           <div className="notes-filter-box">
             <label className="notes-filter-label" htmlFor="host-filter-select">Scope:</label>
