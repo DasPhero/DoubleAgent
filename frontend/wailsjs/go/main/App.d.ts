@@ -22,6 +22,8 @@ export function DeleteGroup(arg1:string):Promise<void>;
 
 export function DeleteHost(arg1:string):Promise<void>;
 
+export function DeleteNote(arg1:string):Promise<void>;
+
 export function DeleteProxyProfile(arg1:string):Promise<void>;
 
 export function DeleteRemoteItem(arg1:string,arg2:string):Promise<void>;
@@ -54,6 +56,8 @@ export function GetAllTotpCodes():Promise<Array<core.TotpCodeResponse>>;
 
 export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOptions>;
 
+export function GetNote(arg1:string):Promise<core.NotePage>;
+
 export function GetSnippetContext(arg1:string):Promise<core.SnippetContext>;
 
 export function GetTotpCode(arg1:string):Promise<core.TotpCodeResponse>;
@@ -77,6 +81,8 @@ export function InjectTotpCode(arg1:string,arg2:string):Promise<void>;
 export function ListForwardRules():Promise<Array<core.ForwardRule>>;
 
 export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
+
+export function ListNotes(arg1:string):Promise<Array<core.NotePage>>;
 
 export function ListProxyProfiles():Promise<Array<core.ProxyProfileSummary>>;
 
@@ -112,6 +118,8 @@ export function SaveHost(arg1:core.HostRecord):Promise<void>;
 
 export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
 
+export function SaveNote(arg1:core.NotePage):Promise<core.NotePage>;
+
 export function SaveProxyProfile(arg1:core.ProxyProfile):Promise<void>;
 
 export function SaveProxychainsFile(arg1:string,arg2:string):Promise<void>;
@@ -121,6 +129,8 @@ export function SaveSnippet(arg1:core.Snippet):Promise<void>;
 export function SaveTotpRecord(arg1:core.TotpRecord):Promise<void>;
 
 export function SearchCommandPalette(arg1:string):Promise<core.CommandPaletteResponse>;
+
+export function SearchNotes(arg1:string):Promise<Array<core.NoteSearchResult>>;
 
 export function SendSerialBreak(arg1:string):Promise<void>;
 

@@ -73,6 +73,7 @@ type VaultSummary struct {
 	ProxyProfiles []ProxyProfileSummary `json:"proxyProfiles"`
 	Snippets      []Snippet             `json:"snippets"`
 	TotpRecords   []TotpSummary         `json:"totpRecords"`
+	Notes         []NotePageSummary     `json:"notes"`
 }
 
 // ResolveEffectiveHost computes the effective Port, Username, IdentityID, KeepaliveSecs, and SshAuthConfig
@@ -318,6 +319,11 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		})
 	}
 
+	noteSummaries := make([]NotePageSummary, 0, len(payload.Notes))
+	for _, np := range payload.Notes {
+		noteSummaries = append(noteSummaries, BuildNoteSummary(np))
+	}
+
 	return VaultSummary{
 		Groups:        groups,
 		Hosts:         hosts,
@@ -326,6 +332,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		ProxyProfiles: proxySummaries,
 		Snippets:      snippets,
 		TotpRecords:   totpSummaries,
+		Notes:         noteSummaries,
 	}
 }
 

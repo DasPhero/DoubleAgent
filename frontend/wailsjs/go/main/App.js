@@ -42,6 +42,10 @@ export function DeleteHost(arg1) {
   return window['go']['main']['App']['DeleteHost'](arg1);
 }
 
+export function DeleteNote(arg1) {
+  return window['go']['main']['App']['DeleteNote'](arg1);
+}
+
 export function DeleteProxyProfile(arg1) {
   return window['go']['main']['App']['DeleteProxyProfile'](arg1);
 }
@@ -106,6 +110,10 @@ export function GetDefaultProxychainsOptions() {
   return window['go']['main']['App']['GetDefaultProxychainsOptions']();
 }
 
+export function GetNote(arg1) {
+  return window['go']['main']['App']['GetNote'](arg1);
+}
+
 export function GetSnippetContext(arg1) {
   return window['go']['main']['App']['GetSnippetContext'](arg1);
 }
@@ -152,6 +160,10 @@ export function ListForwardRules() {
 
 export function ListLocalDir(arg1) {
   return window['go']['main']['App']['ListLocalDir'](arg1);
+}
+
+export function ListNotes(arg1) {
+  return window['go']['main']['App']['ListNotes'](arg1);
 }
 
 export function ListProxyProfiles() {
@@ -222,6 +234,10 @@ export function SaveIdentity(arg1) {
   return window['go']['main']['App']['SaveIdentity'](arg1);
 }
 
+export function SaveNote(arg1) {
+  return window['go']['main']['App']['SaveNote'](arg1);
+}
+
 export function SaveProxyProfile(arg1) {
   return window['go']['main']['App']['SaveProxyProfile'](arg1);
 }
@@ -240,6 +256,10 @@ export function SaveTotpRecord(arg1) {
 
 export function SearchCommandPalette(arg1) {
   return window['go']['main']['App']['SearchCommandPalette'](arg1);
+}
+
+export function SearchNotes(arg1) {
+  return window['go']['main']['App']['SearchNotes'](arg1);
 }
 
 export function SendSerialBreak(arg1) {

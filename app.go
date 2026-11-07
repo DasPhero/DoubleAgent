@@ -2419,3 +2419,163 @@ func (a *App) InjectTotpCode(sessionID string, totpID string) error {
 	// Write code + newline directly into terminal session stdin
 	return a.WriteTerminal(sessionID, code+"\n")
 }
+
+// SaveNote creates or updates a hierarchical note or folder in the encrypted vault (F-17, Golden Rule 2).
+func (a *App) SaveNote(note core.NotePage) (core.NotePage, error) {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.NotePage{}, err
+	}
+
+	now := time.Now().UTC()
+	if strings.TrimSpace(note.ID) == "" {
+		note.ID = fmt.Sprintf("note-%d", now.UnixNano())
+	}
+	note.Title = strings.TrimSpace(note.Title)
+	if note.Title == "" {
+		if note.IsFolder {
+			note.Title = "New Folder"
+		} else {
+			note.Title = "Untitled Note"
+		}
+	}
+	if note.Type == "" {
+		note.Type = "markdown"
+	}
+	// Prevent direct self-parenting cycle
+	if note.ParentID == note.ID {
+		note.ParentID = ""
+	}
+	note.UpdatedAt = now
+
+	found := false
+	for i := range payload.Notes {
+		if payload.Notes[i].ID == note.ID {
+			if note.CreatedAt.IsZero() {
+				note.CreatedAt = payload.Notes[i].CreatedAt
+			}
+			payload.Notes[i] = note
+			found = true
+			break
+		}
+	}
+	if !found {
+		if note.CreatedAt.IsZero() {
+			note.CreatedAt = now
+		}
+		if note.Order == 0 {
+			note.Order = len(payload.Notes) + 1
+		}
+		payload.Notes = append(payload.Notes, note)
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return core.NotePage{}, err
+	}
+	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	return note, nil
+}
+
+// DeleteNote removes a note or folder (and any nested child pages/folders) from the vault (F-17).
+func (a *App) DeleteNote(noteID string) error {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	// Collect noteID and all recursive descendants
+	toRemove := map[string]bool{noteID: true}
+	changed := true
+	for changed {
+		changed = false
+		for _, n := range payload.Notes {
+			if n.ParentID != "" && toRemove[n.ParentID] && !toRemove[n.ID] {
+				toRemove[n.ID] = true
+				changed = true
+			}
+		}
+	}
+
+	filtered := make([]core.NotePage, 0, len(payload.Notes))
+	for _, n := range payload.Notes {
+		if !toRemove[n.ID] {
+			filtered = append(filtered, n)
+		}
+	}
+	payload.Notes = filtered
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	return nil
+}
+
+// ListNotes returns notes from the encrypted vault, optionally filtered by hostID ("", "all", "global", or specific host ID) (F-17).
+func (a *App) ListNotes(hostID string) ([]core.NotePage, error) {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	if payload.Notes == nil {
+		return []core.NotePage{}, nil
+	}
+
+	scope := strings.TrimSpace(hostID)
+	if scope == "" || scope == "all" {
+		return payload.Notes, nil
+	}
+	if scope == "global" {
+		res := core.FilterNotesByHost(payload.Notes, "")
+		if res == nil {
+			return []core.NotePage{}, nil
+		}
+		return res, nil
+	}
+	res := core.FilterNotesByHost(payload.Notes, scope)
+	if res == nil {
+		return []core.NotePage{}, nil
+	}
+	return res, nil
+}
+
+// GetNote retrieves a single NotePage by ID from the vault (F-17).
+func (a *App) GetNote(noteID string) (*core.NotePage, error) {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range payload.Notes {
+		if payload.Notes[i].ID == noteID {
+			n := payload.Notes[i]
+			return &n, nil
+		}
+	}
+	return nil, fmt.Errorf("note %q not found", noteID)
+}
+
+// SearchNotes performs full-text search across all note titles and markdown bodies in the vault (F-17, F-02).
+func (a *App) SearchNotes(query string) ([]core.NoteSearchResult, error) {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	results := core.SearchNotes(payload.Notes, query)
+	if results == nil {
+		return []core.NoteSearchResult{}, nil
+	}
+	return results, nil
+}

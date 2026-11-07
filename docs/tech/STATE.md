@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** TOTP Authenticator Generator & 2FA Terminal Prompt Injection (`F-20` / Spec Line 130) — COMPLETED
-- **Next Milestone:** `F-17` — Host Notes & Markdown Documentation (per-host notes, folders, subpages, markdown preview, searchable)
+- **Current Milestone:** `F-17` — Host Notes & Markdown Documentation (per-host notes, folders, subpages, safe markdown preview, searchable) — COMPLETED
+- **Next Milestone:** `F-21` — Session Logging (per-session recording with timestamps, per-host toggle, password-echo never logged)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -124,12 +124,27 @@
     - Keyboard shortcut bindings (`Alt+O`, `Ctrl+Shift+O`, and Tmux Leader `o`/`O`).
     - Comprehensive unit test in `frontend/src/App.test.tsx` (`supports TOTP authenticator generator, live countdown, and terminal 2FA prompt injection (F-20)`).
   - Standalone binary verified with `wails build`.
+- **`M1-4` Part 12 (`F-17` — Host Notes & Markdown Documentation)**:
+  - **Core Domain & Encrypted Vault Storage (`backend/core/` & `backend/vault/`)**:
+    - Defined `NotePage`, `NotePageSummary`, and `NoteSearchResult` in `backend/core/interfaces.go`.
+    - Extended `VaultPayload` with `Notes []NotePage` and `VaultSummary` with `Notes []NotePageSummary`.
+    - Implemented `BuildNoteSummary`, `FilterNotesByHost`, `FilterNoteSummariesByHost`, `SearchNotes` (case-insensitive full-text search with snippet extraction and match count), and `NewNotePage` in `backend/core/notes.go`.
+    - Unit tests verified in `backend/core/notes_test.go` (`TestNotes_BuildSummaryAndFilter_F17`, `TestNotes_SearchNotes_F17`).
+  - **Application Service Bindings (`app.go` & `app_test.go`)**:
+    - Bound `SaveNote`, `DeleteNote` (recursive deletion of child subpages/subfolders), `ListNotes`, `GetNote`, and `SearchNotes`.
+    - Unit tests verified in `app_test.go` (`TestApp_Notes_F17`).
+  - **Frontend Safe Markdown AST & Notes UI (`frontend/src/`, Golden Rule 2)**:
+    - Created `frontend/src/components/MarkdownRenderer.tsx`: pure React element AST Markdown renderer (headings, bold, italic, strikethrough, inline code, fenced code blocks with 1-click Copy button, bullet/numbered lists, interactive task checkboxes `[ ]`/`[x]`, tables, blockquotes, and protocol-sanitized links blocking `javascript:`/`data:`). Zero `innerHTML` or `dangerouslySetInnerHTML`.
+    - Unit tests verified in `frontend/src/components/MarkdownRenderer.test.tsx`.
+    - Created `frontend/src/components/NotesView.tsx` (full notes manager with host filter, search, folder/subpage tree, Edit/Split/Preview modes, and formatting toolbar) and `frontend/src/components/HostNotesDrawer.tsx` (collapsible right-side drawer in active host terminal sessions).
+    - Integrated into `App.tsx` (`Tools ▾ -> Host Notes & Docs`, sidebar `Notes (F-17)` & host card `📝` buttons, terminal pane header `📝 Notes` drawer toggle, and `Ctrl+K` Command Palette full-text search).
+    - End-to-end frontend test verified in `frontend/src/App.test.tsx` (`manages Host Notes with folders, subpages, safe markdown rendering, host drawer, and Command Palette search (F-17)`).
+  - Standalone binary verified with `wails build`.
 
 ## In Progress
 - None.
 
 ## Next (TODO List)
-- **`F-17`: Host Notes & Markdown Documentation**:
-  - Store per-host notes in encrypted vault with folders, subpages, and hierarchical organization.
-  - Live Markdown renderer and editor (code blocks, checkboxes, tables, links).
-  - Searchable across all hosts via Command Palette (`Ctrl+K`) and dedicated notes pane.
+- **`F-21`: Session Logging**:
+  - Per-session terminal output recording with timestamps and per-host toggle.
+  - Security rule: password-echo / credential injection is never logged.

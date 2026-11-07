@@ -446,6 +446,140 @@ export namespace core {
 	        this.totpId = source["totpId"];
 	    }
 	}
+	export class NotePage {
+	    id: string;
+	    hostId?: string;
+	    parentId?: string;
+	    isFolder: boolean;
+	    title: string;
+	    type: string;
+	    body: string;
+	    order: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new NotePage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.hostId = source["hostId"];
+	        this.parentId = source["parentId"];
+	        this.isFolder = source["isFolder"];
+	        this.title = source["title"];
+	        this.type = source["type"];
+	        this.body = source["body"];
+	        this.order = source["order"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class NotePageSummary {
+	    id: string;
+	    hostId?: string;
+	    parentId?: string;
+	    isFolder: boolean;
+	    title: string;
+	    type: string;
+	    order: number;
+	    snippet?: string;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new NotePageSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.hostId = source["hostId"];
+	        this.parentId = source["parentId"];
+	        this.isFolder = source["isFolder"];
+	        this.title = source["title"];
+	        this.type = source["type"];
+	        this.order = source["order"];
+	        this.snippet = source["snippet"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class NoteSearchResult {
+	    note: NotePageSummary;
+	    matchSnippet: string;
+	    matchCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new NoteSearchResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.note = this.convertValues(source["note"], NotePageSummary);
+	        this.matchSnippet = source["matchSnippet"];
+	        this.matchCount = source["matchCount"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ProxyProfile {
 	    id: string;
 	    name: string;
@@ -954,6 +1088,7 @@ export namespace core {
 	    proxyProfiles: ProxyProfileSummary[];
 	    snippets: Snippet[];
 	    totpRecords: TotpSummary[];
+	    notes: NotePageSummary[];
 	
 	    static createFrom(source: any = {}) {
 	        return new VaultSummary(source);
@@ -968,6 +1103,7 @@ export namespace core {
 	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfileSummary);
 	        this.snippets = this.convertValues(source["snippets"], Snippet);
 	        this.totpRecords = this.convertValues(source["totpRecords"], TotpSummary);
+	        this.notes = this.convertValues(source["notes"], NotePageSummary);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

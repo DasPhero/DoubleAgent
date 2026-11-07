@@ -908,3 +908,104 @@ func TestApp_Totp_F20(t *testing.T) {
 		t.Errorf("expected 1 record after delete, got %d", len(listAfter))
 	}
 }
+
+func TestApp_Notes_F17(t *testing.T) {
+	fake := newFakeSshTransport()
+	tmpVault := filepath.Join(t.TempDir(), "test_notes.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(fake, nil, store, func(_ context.Context, _ string, _ ...interface{}) {})
+
+	// 1. Save a host
+	if err := app.SaveHost(core.HostRecord{
+		ID:      "host-web",
+		Label:   "Web Cluster 01",
+		Address: "192.168.10.20",
+		Port:    22,
+	}); err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+
+	// 2. Create a folder for host-web (F-17)
+	folder, err := app.SaveNote(core.NotePage{
+		ID:       "folder-runbooks",
+		HostID:   "host-web",
+		IsFolder: true,
+		Title:    "Operations Runbooks",
+	})
+	if err != nil {
+		t.Fatalf("SaveNote folder failed: %v", err)
+	}
+	if !folder.IsFolder || folder.Title != "Operations Runbooks" {
+		t.Errorf("unexpected folder: %+v", folder)
+	}
+
+	// 3. Create a subpage inside the folder (F-17)
+	subpage, err := app.SaveNote(core.NotePage{
+		ID:       "note-nginx",
+		HostID:   "host-web",
+		ParentID: "folder-runbooks",
+		IsFolder: false,
+		Title:    "Nginx Reload & TLS Renewal",
+		Type:     "markdown",
+		Body:     "# Nginx Runbook\n\nRun `sudo systemctl reload nginx` after certbot renew.",
+	})
+	if err != nil {
+		t.Fatalf("SaveNote subpage failed: %v", err)
+	}
+	if subpage.ParentID != "folder-runbooks" {
+		t.Errorf("expected parent folder-runbooks, got %q", subpage.ParentID)
+	}
+
+	// 4. Create a global note
+	_, err = app.SaveNote(core.NotePage{
+		ID:       "note-global",
+		HostID:   "",
+		IsFolder: false,
+		Title:    "Incident Response Contacts",
+		Body:     "PagerDuty escalation policy and security team contacts.",
+	})
+	if err != nil {
+		t.Fatalf("SaveNote global failed: %v", err)
+	}
+
+	// 5. ListNotes by scope
+	allNotes, err := app.ListNotes("all")
+	if err != nil || len(allNotes) != 3 {
+		t.Fatalf("expected 3 total notes, got %d (err: %v)", len(allNotes), err)
+	}
+
+	hostNotes, err := app.ListNotes("host-web")
+	if err != nil || len(hostNotes) != 2 {
+		t.Fatalf("expected 2 host-web notes, got %d (err: %v)", len(hostNotes), err)
+	}
+
+	globalNotes, err := app.ListNotes("global")
+	if err != nil || len(globalNotes) != 1 {
+		t.Fatalf("expected 1 global note, got %d (err: %v)", len(globalNotes), err)
+	}
+
+	// 6. GetNote
+	fetched, err := app.GetNote("note-nginx")
+	if err != nil || fetched.Title != "Nginx Reload & TLS Renewal" {
+		t.Fatalf("GetNote failed: %+v, err: %v", fetched, err)
+	}
+
+	// 7. SearchNotes (F-17, F-02)
+	searchRes, err := app.SearchNotes("systemctl reload nginx")
+	if err != nil || len(searchRes) != 1 || searchRes[0].Note.ID != "note-nginx" {
+		t.Fatalf("SearchNotes failed: %+v, err: %v", searchRes, err)
+	}
+
+	// 8. Delete folder recursively deletes child subpages
+	if err := app.DeleteNote("folder-runbooks"); err != nil {
+		t.Fatalf("DeleteNote folder failed: %v", err)
+	}
+	remaining, _ := app.ListNotes("all")
+	if len(remaining) != 1 || remaining[0].ID != "note-global" {
+		t.Fatalf("expected only note-global remaining after recursive folder delete, got %+v", remaining)
+	}
+}

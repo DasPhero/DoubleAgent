@@ -158,6 +158,24 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
       - Spawns an elevated/root terminal session (`sudo -s` or WSL/ConPTY root) positioned in the active terminal's CWD.
       - Visual red indicator badge (`Root`) in the tab title and accent color.
     - Accessible via toolbar action buttons on active sessions, the **Empty State Quick-Start Grid**, and through the **Tools ▾** menu at all times.
+- **Host Notes & Markdown Documentation (`F-17`)**:
+  - **Encrypted Per-Host & Global Notes**:
+    - Store rich Markdown runbooks, network documentation, and operational checklists inside the encrypted Vault (`doubleagent.vault`).
+    - Organize notes hierarchically into **Folders** and **Subpages**, linked either to a specific saved **Host** or stored as **Global Workspace Notes**.
+  - **Safe React AST Markdown Renderer**:
+    - Renders headings, bold, italic, strikethrough, inline code, fenced code blocks with a 1-click **`📋 Copy`** button, bulleted/numbered lists, interactive task checkboxes (`- [ ]` / `- [x]`), tables, blockquotes, and sanitized links (`https://`, `http://`, `mailto:`).
+    - Zero raw HTML injection (`innerHTML` is never used): any literal HTML tags inside notes are safely rendered as plain text.
+  - **Dedicated Notes Manager & In-Session Host Notes Drawer**:
+    - Open the full **Host Notes & Documentation** manager from **Tools ▾ → Host Notes & Docs**, the sidebar **Notes (F-17)** button, or the **`📝`** icon on any host card. Supports **Edit**, **Split**, and **Preview** modes with a formatting toolbar.
+    - While connected to a host session, click **`📝 Notes`** in the terminal pane header to slide out the collapsible right-hand **Host Notes Drawer** for quick viewing, task check-off, and editing alongside your live terminal.
+  - **Full-Text Search (`Ctrl+K`)**:
+    - Search across all note titles and Markdown bodies inside the Notes Manager or directly from the **`Ctrl+K` Command Palette**.
+- **TOTP Authenticator Generator & 2FA Injection (`F-20`)**:
+  - Manage RFC 6238 TOTP 2FA authenticators inside the encrypted Vault via **Tools ▾ → TOTP Authenticator Generator**.
+  - Paste `otpauth://totp/...` URIs or enter Base32 secrets manually, view live 30-second countdown wheels, copy 6/8-digit tokens, or click **`🔐 2FA / TOTP`** in the terminal toolbar to inject the active host's 2FA code directly into the remote PTY prompt without exposing the seed to the frontend.
+- **Command Snippets & Dynamic Variables (`F-15`)**:
+  - Create reusable command templates via **Tools ▾ → Command Snippets & Variables** or the **`⚡ Snippets`** button in any terminal pane header.
+  - Automatically injects session context (`{{HOST}}`, `{{IP}}`, `{{USER}}`, `{{PORT}}`, `{{CWD}}`, `{{TIMESTAMP}}`, `{{LOCAL_IP}}`, `{{PASSWORD}}`) and prompts for custom parameters (`{{VAR=default:hint}}`) before execution.
 - **Local Terminals & Native Windows ConPTY (`F-23`)**:
   - **Native Headless ConPTY Engine**:
     - Windows local shells (PowerShell, Command Prompt, WSL) run entirely headlessly inside xterm.js via Windows Pseudo Console (`CreatePseudoConsole`), with zero external console popups.

@@ -431,7 +431,42 @@ type TotpCodeResponse struct {
 	Period           int    `json:"period"`
 }
 
-// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14, F-15, F-20).
+// NotePage describes a hierarchical markdown note or documentation document linked to a host or global (Spec Line 129, Line 210, F-17).
+type NotePage struct {
+	ID        string    `json:"id"`
+	HostID    string    `json:"hostId,omitempty"`   // empty for global / workspace notes
+	ParentID  string    `json:"parentId,omitempty"` // empty for root page / folder
+	IsFolder  bool      `json:"isFolder"`           // true if folder container
+	Title     string    `json:"title"`
+	Type      string    `json:"type"`               // "markdown" or "table"
+	Body      string    `json:"body"`
+	Order     int       `json:"order"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// NotePageSummary describes the non-secret metadata and preview snippet of a note page (F-17).
+type NotePageSummary struct {
+	ID        string    `json:"id"`
+	HostID    string    `json:"hostId,omitempty"`
+	ParentID  string    `json:"parentId,omitempty"`
+	IsFolder  bool      `json:"isFolder"`
+	Title     string    `json:"title"`
+	Type      string    `json:"type"`
+	Order     int       `json:"order"`
+	Snippet   string    `json:"snippet,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// NoteSearchResult represents a full-text search match in notes (F-17, F-02).
+type NoteSearchResult struct {
+	Note         NotePageSummary `json:"note"`
+	MatchSnippet string          `json:"matchSnippet"`
+	MatchCount   int             `json:"matchCount"`
+}
+
+// VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14, F-15, F-17, F-20).
 type VaultPayload struct {
 	SchemaVersion int              `json:"schemaVersion"`
 	Hosts         []HostRecord     `json:"hosts"`
@@ -442,6 +477,7 @@ type VaultPayload struct {
 	ProxyProfiles []ProxyProfile   `json:"proxyProfiles,omitempty"`
 	Snippets      []Snippet        `json:"snippets,omitempty"`
 	TotpRecords   []TotpRecord     `json:"totpRecords,omitempty"`
+	Notes         []NotePage       `json:"notes,omitempty"`
 }
 
 // SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).

@@ -1594,4 +1594,84 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       delete (window as unknown as { go?: unknown }).go;
     }
   });
+
+  it('manages Host Notes with folders, subpages, safe markdown rendering, host drawer, and Command Palette search (F-17)', async () => {
+    render(<App initialLocked={false} />);
+
+    // 1. Add a host so we can link notes to it and test the Host Notes Drawer
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Core Router' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.0.0.254' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Host' }));
+    expect(await screen.findByText('Core Router')).toBeInTheDocument();
+
+    // 2. Open Host Notes via Tools -> Host Notes & Docs
+    fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Host Notes & Docs/i }));
+
+    const notesDialog = screen.getByRole('dialog', { name: 'Host Notes & Documentation' });
+    expect(notesDialog).toBeInTheDocument();
+
+    // 3. Create a Folder
+    fireEvent.click(screen.getByRole('button', { name: '+ Folder' }));
+    expect(await screen.findByDisplayValue('New Folder')).toBeInTheDocument();
+
+    // 4. Create a Note and edit its title & markdown body (including raw HTML to verify safe rendering)
+    fireEvent.click(screen.getByRole('button', { name: '+ Note' }));
+    const titleInput = await screen.findByLabelText('Note title');
+    fireEvent.change(titleInput, { target: { value: 'BGP Runbook' } });
+
+    const bodyInput = screen.getByLabelText('Note markdown editor');
+    fireEvent.change(bodyInput, {
+      target: {
+        value: '# BGP Peering\n- [ ] Verify AS65001 neighbor\n<img src=x onerror=alert(1)>',
+      },
+    });
+
+    // Link note to Core Router host
+    const hostLinkSelect = screen.getByLabelText('Link note to host');
+    const hostOptions = within(hostLinkSelect).getAllByRole('option');
+    const coreRouterOpt = hostOptions.find((o) => o.textContent?.includes('Core Router'));
+    if (coreRouterOpt) {
+      fireEvent.change(hostLinkSelect, {
+        target: { value: (coreRouterOpt as HTMLOptionElement).value },
+      });
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: /💾 Save Note/i }));
+
+    // Verify safe Markdown preview renders heading and literal HTML text without injecting an <img> tag
+    expect(screen.getByRole('heading', { name: 'BGP Peering' })).toBeInTheDocument();
+    expect(notesDialog.querySelector('img')).toBeNull();
+
+    // Close Notes Modal
+    fireEvent.click(screen.getByRole('button', { name: 'Close Notes' }));
+
+    // 5. Connect to Core Router and toggle the in-session Host Notes Drawer
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    const drawerBtn = await screen.findByRole('button', { name: /Toggle Host Notes for Core Router/i });
+    fireEvent.click(drawerBtn);
+
+    const drawer = await screen.findByRole('complementary', { name: 'Host Documentation Drawer' });
+    expect(drawer).toBeInTheDocument();
+    expect(within(drawer).getAllByText(/BGP Runbook/i).length).toBeGreaterThan(0);
+
+    // Close Drawer
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Close Notes Drawer' }));
+
+    // 6. Search Notes via Command Palette (Ctrl+K)
+    fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Command Palette/i }));
+
+    const paletteInput = screen.getByLabelText('Command Palette Input');
+    fireEvent.change(paletteInput, { target: { value: 'AS65001' } });
+
+    expect(await screen.findByText(/Notes & Documentation \(F-17\)/i)).toBeInTheDocument();
+    const noteResultBtn = screen.getByRole('button', { name: /BGP Runbook/i });
+    fireEvent.click(noteResultBtn);
+
+    // Clicking the Command Palette result opens NotesView focused on BGP Runbook
+    expect(await screen.findByRole('dialog', { name: 'Host Notes & Documentation' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('BGP Runbook')).toBeInTheDocument();
+  });
 });

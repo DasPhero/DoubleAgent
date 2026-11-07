@@ -27,6 +27,9 @@ import { SnippetsManagerModal } from './components/SnippetsManagerModal';
 import { SnippetRunModal } from './components/SnippetRunModal';
 import { TotpSummary, TotpRecord, TotpCodeResponse } from './types/totp';
 import { TotpManagerModal } from './components/TotpManagerModal';
+import { NotePage, NotePageSummary, NoteSearchResult } from './types/note';
+import { NotesView } from './components/NotesView';
+import { HostNotesDrawer } from './components/HostNotesDrawer';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -149,6 +152,7 @@ interface VaultSummary {
   proxyProfiles?: ProxyProfileSummary[];
   snippets?: Snippet[];
   totpRecords?: TotpSummary[];
+  notes?: NotePageSummary[];
 }
 
 interface QuickConnectTarget {
@@ -578,6 +582,11 @@ interface WailsAppBindings {
   GetAllTotpCodes?: () => Promise<TotpCodeResponse[]>;
   ParseOTPAuthURI?: (uri: string) => Promise<TotpRecord>;
   InjectTotpCode?: (sessionId: string, totpId: string) => Promise<void>;
+  SaveNote?: (note: NotePage) => Promise<NotePage>;
+  DeleteNote?: (noteId: string) => Promise<void>;
+  ListNotes?: (hostId: string) => Promise<NotePage[]>;
+  GetNote?: (noteId: string) => Promise<NotePage>;
+  SearchNotes?: (query: string) => Promise<NoteSearchResult[]>;
 }
 
 export interface SerialAutoDetectResult {
@@ -820,6 +829,13 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
   // TOTP Authenticator Generator State (F-20)
   const [showTotpModal, setShowTotpModal] = useState<boolean>(false);
+
+  // Host Notes & Markdown Documentation State (F-17)
+  const [notes, setNotes] = useState<NotePage[]>([]);
+  const [showNotesModal, setShowNotesModal] = useState<boolean>(false);
+  const [notesModalHostId, setNotesModalHostId] = useState<string | undefined>(undefined);
+  const [notesModalInitialNoteId, setNotesModalInitialNoteId] = useState<string | null>(null);
+  const [openNotesDrawerHostId, setOpenNotesDrawerHostId] = useState<string | null>(null);
 
   // Terminal Search state (F-11)
   const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
@@ -1078,6 +1094,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           if (!updatedSt.vaultLocked) {
             const summary = await api.GetVaultSummary();
             setVaultSummary(summary);
+            if (api.ListNotes) {
+              const allNotes = await api.ListNotes('all');
+              setNotes(allNotes || []);
+            }
           }
           return;
         } catch {
@@ -1091,6 +1111,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       if (!st.vaultLocked) {
         const summary = await api.GetVaultSummary();
         setVaultSummary(summary);
+        if (api.ListNotes) {
+          const allNotes = await api.ListNotes('all');
+          setNotes(allNotes || []);
+        }
         if (api.ListForwardRules) {
           const rules = await api.ListForwardRules();
           setForwardRules(rules || []);
@@ -1101,6 +1125,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         }
       } else {
         setVaultSummary({ groups: [], hosts: [], identities: [] });
+        setNotes([]);
+        setShowNotesModal(false);
+        setOpenNotesDrawerHostId(null);
         setForwardRules([]);
         setActiveTunnels([]);
       }
@@ -1911,6 +1938,64 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         snippets: (prev.snippets || []).filter((s) => s.id !== snippetId),
       }));
       setStatusMessage('Snippet deleted.');
+    }
+  };
+
+  const handleSaveNote = async (note: NotePage): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.SaveNote) {
+      try {
+        await api.SaveNote(note);
+        await refreshVaultState();
+        setStatusMessage(`Saved ${note.isFolder ? 'folder' : 'note'} "${note.title}".`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Save note failed: ${msg}`);
+      }
+    } else {
+      setNotes((prev) => {
+        const id = note.id || `note-${Date.now()}`;
+        const now = new Date().toISOString();
+        const updated: NotePage = {
+          ...note,
+          id,
+          createdAt: note.createdAt || now,
+          updatedAt: now,
+        };
+        const exists = prev.some((n) => n.id === id);
+        return exists ? prev.map((n) => (n.id === id ? updated : n)) : [...prev, updated];
+      });
+      setStatusMessage(`Saved ${note.isFolder ? 'folder' : 'note'} "${note.title}".`);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.DeleteNote) {
+      try {
+        await api.DeleteNote(noteId);
+        await refreshVaultState();
+        setStatusMessage('Note deleted.');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Delete note failed: ${msg}`);
+      }
+    } else {
+      setNotes((prev) => {
+        const toDelete = new Set<string>([noteId]);
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const n of prev) {
+            if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+              toDelete.add(n.id);
+              changed = true;
+            }
+          }
+        }
+        return prev.filter((n) => !toDelete.has(n.id));
+      });
+      setStatusMessage('Note deleted.');
     }
   };
 
@@ -2842,6 +2927,21 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               >
                 ⚡ Snippets
               </button>
+              {node.hostId && (
+                <button
+                  type="button"
+                  className={`pane-notes-btn ${openNotesDrawerHostId === node.hostId ? 'active' : ''}`}
+                  aria-label={`Toggle Host Notes for ${node.title}`}
+                  title="Toggle Host Notes Drawer (F-17)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const hid = node.hostId ?? '';
+                    setOpenNotesDrawerHostId((prev) => (prev === hid ? null : hid));
+                  }}
+                >
+                  📝 Notes
+                </button>
+              )}
               {isPaneActive ? (
                 <span className="pane-active-indicator">● Active</span>
               ) : (
@@ -3677,6 +3777,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       className="nav-dropdown-item"
                       onClick={() => {
                         setActiveDropdownMenu(null);
+                        setNotesModalHostId(activeTab?.hostId);
+                        setNotesModalInitialNoteId(null);
+                        setShowNotesModal(true);
+                      }}
+                    >
+                      <span>Host Notes &amp; Docs</span>
+                      <span className="nav-dropdown-shortcut">📝 F-17</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
                         setShowSnippetsModal(true);
                       }}
                     >
@@ -4046,6 +4160,17 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   >
                     Vault Security
                   </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => {
+                      setNotesModalHostId(undefined);
+                      setNotesModalInitialNoteId(null);
+                      setShowNotesModal(true);
+                    }}
+                  >
+                    Notes (F-17)
+                  </button>
                 </nav>
               )}
               <div className="sidebar-header">
@@ -4154,6 +4279,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                             </button>
                             <button
                               type="button"
+                              className="btn-secondary btn-sm"
+                              title={`Open Notes & Docs for ${h.label} (F-17)`}
+                              aria-label={`Notes for ${h.label}`}
+                              onClick={() => {
+                                setNotesModalHostId(h.id);
+                                setNotesModalInitialNoteId(null);
+                                setShowNotesModal(true);
+                              }}
+                            >
+                              📝
+                            </button>
+                            <button
+                              type="button"
                               className="btn-danger btn-sm"
                               onClick={() => void handleDeleteHost(h.id)}
                               aria-label={`Delete ${h.label}`}
@@ -4214,6 +4352,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                           onClick={() => void handleOpenHostSftp(h)}
                         >
                           SFTP
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          title={`Open Notes & Docs for ${h.label} (F-17)`}
+                          aria-label={`Notes for ${h.label}`}
+                          onClick={() => {
+                            setNotesModalHostId(h.id);
+                            setNotesModalInitialNoteId(null);
+                            setShowNotesModal(true);
+                          }}
+                        >
+                          📝
                         </button>
                         <button
                           type="button"
@@ -4570,6 +4721,27 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   </div>
                 );
               })}
+              {openNotesDrawerHostId && (
+                <HostNotesDrawer
+                  isOpen={Boolean(openNotesDrawerHostId)}
+                  hostId={openNotesDrawerHostId}
+                  notes={notes}
+                  hosts={vaultSummary.hosts.map((h) => ({
+                    id: h.id,
+                    label: h.label,
+                    address: h.address,
+                  }))}
+                  onSaveNote={handleSaveNote}
+                  onDeleteNote={handleDeleteNote}
+                  onClose={() => setOpenNotesDrawerHostId(null)}
+                  onOpenFullNotes={() => {
+                    setNotesModalHostId(openNotesDrawerHostId);
+                    setNotesModalInitialNoteId(null);
+                    setOpenNotesDrawerHostId(null);
+                    setShowNotesModal(true);
+                  }}
+                />
+              )}
             </div>
           </section>
         ) : (
@@ -4773,6 +4945,70 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   </button>
                 ))
               )}
+
+              {!vaultLocked &&
+                paletteQuery.trim().length > 0 &&
+                (() => {
+                  const q = paletteQuery.trim().toLowerCase();
+                  const matchedNotes = notes.filter(
+                    (n) =>
+                      n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q)
+                  );
+                  if (matchedNotes.length === 0) return null;
+                  return (
+                    <div
+                      style={{
+                        marginTop: '0.75rem',
+                        paddingTop: '0.5rem',
+                        borderTop: '1px solid var(--border-color)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          color: 'var(--text-muted)',
+                          marginBottom: '0.4rem',
+                        }}
+                      >
+                        📝 Notes &amp; Documentation (F-17)
+                      </div>
+                      {matchedNotes.map((n) => {
+                        const hostObj = vaultSummary.hosts.find((h) => h.id === n.hostId);
+                        return (
+                          <button
+                            key={n.id}
+                            type="button"
+                            className="palette-item"
+                            onClick={() => {
+                              setShowCommandPalette(false);
+                              setPaletteQuery('');
+                              setNotesModalHostId(n.hostId || undefined);
+                              setNotesModalInitialNoteId(n.id);
+                              setShowNotesModal(true);
+                            }}
+                          >
+                            <div className="palette-item-main">
+                              <strong>
+                                {n.isFolder ? '📁 ' : '📄 '}
+                                {n.title}
+                              </strong>
+                              <span>
+                                {hostObj
+                                  ? `Host: ${hostObj.label} (${hostObj.address})`
+                                  : 'Global Note'}
+                              </span>
+                            </div>
+                            <div className="palette-tags">
+                              <span className="kbd-badge">Open Note ↵</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
             </div>
 
             <div className="modal-actions">
@@ -5918,6 +6154,45 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           onRefreshVault={refreshVaultState}
           onClose={() => setShowTotpModal(false)}
         />
+      )}
+
+      {showNotesModal && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-label="Host Notes & Documentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowNotesModal(false);
+            }
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{
+              width: 'min(1080px, 95vw)',
+              height: 'min(740px, 90vh)',
+              padding: 0,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <NotesView
+              notes={notes}
+              hosts={vaultSummary.hosts.map((h) => ({
+                id: h.id,
+                label: h.label,
+                address: h.address,
+              }))}
+              activeHostId={notesModalHostId}
+              initialNoteId={notesModalInitialNoteId}
+              onSaveNote={handleSaveNote}
+              onDeleteNote={handleDeleteNote}
+              onClose={() => setShowNotesModal(false)}
+            />
+          </div>
+        </div>
       )}
 
       {hostKeyPrompt && (
