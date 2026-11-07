@@ -22,10 +22,11 @@ type ResolvedHost struct {
 	ProxyProfileID string        `json:"proxyProfileId,omitempty"`
 	ProxyCommand   string        `json:"proxyCommand,omitempty"`
 	JumpChain      []string      `json:"jumpChain,omitempty"`
+	SessionLogging bool          `json:"sessionLogging"`
 	Auth           SshAuthConfig `json:"-"`
 }
 
-// HostSummary is a non-secret view of a saved host exposed to the frontend UI (Golden Rule 2, F-14).
+// HostSummary is a non-secret view of a saved host exposed to the frontend UI (Golden Rule 2, F-14, F-21).
 type HostSummary struct {
 	ID             string   `json:"id"`
 	Label          string   `json:"label"`
@@ -42,6 +43,7 @@ type HostSummary struct {
 	ProxyCommand   string   `json:"proxyCommand,omitempty"`
 	Color          string   `json:"color"`
 	Favorite       bool     `json:"favorite"`
+	SessionLogging bool     `json:"sessionLogging"`
 }
 
 // IdentitySummary is a non-secret view of a saved identity exposed to the frontend UI (Golden Rule 2).
@@ -116,6 +118,7 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 	effectiveInitialDir := ""
 	effectiveProxyProfileID := ""
 	effectiveProxyCommand := ""
+	effectiveSessionLogging := false
 	jumpChain := append([]string(nil), target.JumpChain...)
 
 	// 1. Apply inherited group settings from top-most ancestor down to immediate group
@@ -138,9 +141,12 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 		if g.DefaultSettings.ProxyProfileID != "" {
 			effectiveProxyProfileID = g.DefaultSettings.ProxyProfileID
 		}
+		if g.DefaultSettings.SessionLogging != nil {
+			effectiveSessionLogging = *g.DefaultSettings.SessionLogging
+		}
 	}
 
-	// 2. Host value overrides group value (F-01, F-14 acceptance criteria)
+	// 2. Host value overrides group value (F-01, F-14, F-21 acceptance criteria)
 	if target.Port != 0 {
 		effectivePort = target.Port
 	}
@@ -155,6 +161,9 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 	}
 	if target.ProxyCommand != "" {
 		effectiveProxyCommand = target.ProxyCommand
+	}
+	if target.SessionLogging != nil {
+		effectiveSessionLogging = *target.SessionLogging
 	}
 
 	var authCfg SshAuthConfig
@@ -192,6 +201,7 @@ func ResolveEffectiveHost(hostID string, payload VaultPayload) (ResolvedHost, er
 		ProxyProfileID: effectiveProxyProfileID,
 		ProxyCommand:   effectiveProxyCommand,
 		JumpChain:      jumpChain,
+		SessionLogging: effectiveSessionLogging,
 		Auth:           authCfg,
 	}, nil
 }
@@ -252,6 +262,10 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		proxyProfileID := h.ProxyProfileID
 		proxyCommand := h.ProxyCommand
 		var initialDir string
+		var sessionLogging bool
+		if h.SessionLogging != nil {
+			sessionLogging = *h.SessionLogging
+		}
 		if err == nil {
 			port = resolved.Port
 			user = resolved.Username
@@ -260,6 +274,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			initialDir = resolved.InitialDir
 			proxyProfileID = resolved.ProxyProfileID
 			proxyCommand = resolved.ProxyCommand
+			sessionLogging = resolved.SessionLogging
 		}
 		tags := h.Tags
 		if tags == nil {
@@ -285,6 +300,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			ProxyCommand:   proxyCommand,
 			Color:          h.Color,
 			Favorite:       h.Favorite,
+			SessionLogging: sessionLogging,
 		})
 	}
 

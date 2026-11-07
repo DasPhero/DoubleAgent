@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-17` — Host Notes & Markdown Documentation (per-host notes, folders, subpages, safe markdown preview, searchable) — COMPLETED
-- **Next Milestone:** `F-21` — Session Logging (per-session recording with timestamps, per-host toggle, password-echo never logged)
+- **Current Milestone:** `F-21` — Session Logging (per-session recording with timestamps, per-host toggle, password-echo / credential redaction) — COMPLETED (All MVP features complete!)
+- **Next Milestone:** `F-26` (Broadcast / Multi-Execution Input — v1 Phase)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -141,10 +141,30 @@
     - End-to-end frontend test verified in `frontend/src/App.test.tsx` (`manages Host Notes with folders, subpages, safe markdown rendering, host drawer, and Command Palette search (F-17)`).
   - Standalone binary verified with `wails build`.
 
-## In Progress
-- None.
+- **`M1-4` Part 13 (`F-21` — Session Logging with Timestamps, Per-Host Toggle & Password-Echo Redaction)**:
+  - **Core Domain & Session Log Manager (`backend/core/interfaces.go`, `backend/core/hosts.go`, `backend/core/logging.go`)**:
+    - Added `SessionLogging *bool` to `HostRecord` and `GroupDefaults`, plus `SessionLogging bool` to `ResolvedHost` and `HostSummary` with group-to-host inheritance in `ResolveEffectiveHost()`.
+    - Defined `SessionLogRecord` and `SessionLogStatus` structs in `backend/core/interfaces.go`.
+    - Implemented `StripANSI`, `IsPasswordPromptLine`, and thread-safe `SessionLogManager` in `backend/core/logging.go`:
+      - Writes timestamped lines (`[YYYY-MM-DD HH:MM:SS.000] `) stripped of CSI/OSC/ANSI escape codes.
+      - Automatically detects password/passphrase/PIN/`sudo`/verification prompts and suppresses any echoed characters until newline (`[PASSWORD ECHO SUPPRESSED - F-21]`), plus scrubs registered secrets (`RegisterSensitiveValue` / `SuppressNextEcho`).
+    - Verified in `backend/core/logging_test.go` (`TestSessionLogManager_TimestampsAndPasswordRedaction_F21`).
+  - **Application Service Bindings (`app.go` & `app_test.go`)**:
+    - Integrated `SessionLogManager` into `ConnectSavedHost` (auto-starts logging when `resolved.SessionLogging` is true and registers host password for redaction), `WriteTerminal` (`NotifyInput`), `InjectSessionPassword`, `InjectTotpCode`, `DisconnectSession`, and `streamReaderLoop` (`WriteOutput` + `StopSession`).
+    - Bound `StartSessionLogging`, `StopSessionLogging`, `GetSessionLogStatus`, `ListSessionLogs`, `ReadSessionLog`, `DeleteSessionLog`, and `ExportSessionLog`.
+    - Verified in `app_test.go` (`TestApp_SessionLogging_F21`).
+  - **Frontend UI & Safe Transcript Viewer (`frontend/src/`, Golden Rule 2)**:
+    - Created `frontend/src/types/sessionLog.ts` and `frontend/src/components/SessionLogsModal.tsx` (renders transcript lines strictly as React text nodes, zero `innerHTML`).
+    - Added group/host `SessionLogging` checkboxes, live per-pane `⏺ REC` / `⚪ Log` toggle button, and `Tools ▾ -> Session Logs & Recordings (⏺ F-21)`.
+    - Verified in `frontend/src/App.test.tsx` (`manages Session Logging per host and per session with timestamped transcripts and password-echo redaction (F-21)`).
+  - Standalone binary verified with `wails build`.
 
-## Next (TODO List)
-- **`F-21`: Session Logging**:
-  - Per-session terminal output recording with timestamps and per-host toggle.
-  - Security rule: password-echo / credential injection is never logged.
+## In Progress
+- None (MVP Phase 100% Complete).
+
+## Next (TODO List — v1 Phase)
+- **`F-26`: Broadcast / Multi-Execution Input**: Send keystrokes/commands simultaneously to selected split panes or tabs.
+- **`F-27`: Auto-Reconnect & Session Restore**: Automatic backoff reconnect on dropped SSH sessions and workspace tab restoration.
+- **`F-28`: Remote File Edit**: Edit remote SFTP files in-place with automatic re-upload on save.
+- **`F-29`: Encrypted Vault Sync / Export**: Export/import encrypted vault bundles across machines.
+- **`F-37`: Interactive Network Map**: `react-flow` topology view of hosts, groups, jump chains, and active tunnels.

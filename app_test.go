@@ -1009,3 +1009,93 @@ func TestApp_Notes_F17(t *testing.T) {
 		t.Fatalf("expected only note-global remaining after recursive folder delete, got %+v", remaining)
 	}
 }
+
+func TestApp_SessionLogging_F21(t *testing.T) {
+	fake := newFakeSshTransport()
+	tmpDir := t.TempDir()
+	tmpVault := filepath.Join(tmpDir, "test_logging.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	var app *App
+	app = NewAppWithDependencies(fake, nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+	app.logMgr = core.NewSessionLogManager(filepath.Join(tmpDir, "logs"))
+
+	// 1. Save identity with password and host with SessionLogging = true
+	if err := app.SaveIdentity(core.IdentityRecord{
+		ID:         "id-log",
+		Label:      "Audit User",
+		Username:   "auditor",
+		AuthMethod: core.AuthPassword,
+		Password:   "TopSecretAuditPass99!",
+	}); err != nil {
+		t.Fatalf("SaveIdentity failed: %v", err)
+	}
+
+	enableLog := true
+	if err := app.SaveHost(core.HostRecord{
+		ID:             "host-logged",
+		Label:          "Audit DB Server",
+		Address:        "10.20.30.40",
+		Port:           22,
+		IdentityID:     "id-log",
+		SessionLogging: &enableLog,
+	}); err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+
+	// 2. ConnectSavedHost should automatically start session logging because SessionLogging is true
+	sessID, err := app.ConnectSavedHost("host-logged", core.TerminalSize{Cols: 80, Rows: 24})
+	if err != nil {
+		t.Fatalf("ConnectSavedHost failed: %v", err)
+	}
+
+	st, err := app.GetSessionLogStatus(sessID)
+	if err != nil || !st.Active || st.LogID == "" {
+		t.Fatalf("expected active session log after ConnectSavedHost, got %+v (err: %v)", st, err)
+	}
+
+	// 3. Simulate output & password prompt via logMgr (and InjectSessionPassword)
+	app.logMgr.WriteOutput(sessID, "auditor@db:~$ sudo -i\r\n[sudo] password for auditor: ")
+	if err := app.InjectSessionPassword(sessID); err != nil {
+		t.Fatalf("InjectSessionPassword failed: %v", err)
+	}
+	// Even if remote echoed the password before newline, it must be suppressed
+	app.logMgr.WriteOutput(sessID, "TopSecretAuditPass99!\r\nroot@db:~# whoami\r\nroot\r\n")
+
+	// 4. Stop logging and read transcript
+	stoppedSt, err := app.StopSessionLogging(sessID)
+	if err != nil || stoppedSt.Active {
+		t.Fatalf("StopSessionLogging failed: %+v, err: %v", stoppedSt, err)
+	}
+
+	transcript, err := app.ReadSessionLog(st.LogID)
+	if err != nil {
+		t.Fatalf("ReadSessionLog failed: %v", err)
+	}
+	if !strings.Contains(transcript, "root@db:~# whoami") {
+		t.Fatalf("expected whoami command in transcript, got:\n%s", transcript)
+	}
+	if strings.Contains(transcript, "TopSecretAuditPass99!") {
+		t.Fatalf("SECURITY VIOLATION: password leaked into session transcript:\n%s", transcript)
+	}
+
+	logs, err := app.ListSessionLogs()
+	if err != nil || len(logs) != 1 {
+		t.Fatalf("expected 1 session log record, got %d (err: %v)", len(logs), err)
+	}
+
+	if err := app.DeleteSessionLog(st.LogID); err != nil {
+		t.Fatalf("DeleteSessionLog failed: %v", err)
+	}
+}

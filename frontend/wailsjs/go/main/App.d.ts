@@ -30,6 +30,8 @@ export function DeleteRemoteItem(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteSSHKey(arg1:string):Promise<void>;
 
+export function DeleteSessionLog(arg1:string):Promise<void>;
+
 export function DeleteSnippet(arg1:string):Promise<void>;
 
 export function DeleteTotpRecord(arg1:string):Promise<void>;
@@ -44,6 +46,8 @@ export function ExecuteSnippet(arg1:string,arg2:string,arg3:Record<string, strin
 
 export function ExportProxychainsConfig():Promise<string>;
 
+export function ExportSessionLog(arg1:string,arg2:string):Promise<void>;
+
 export function GenerateProxychainsConfig(arg1:core.ProxychainsExportOptions):Promise<string>;
 
 export function GenerateSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
@@ -57,6 +61,8 @@ export function GetAllTotpCodes():Promise<Array<core.TotpCodeResponse>>;
 export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOptions>;
 
 export function GetNote(arg1:string):Promise<core.NotePage>;
+
+export function GetSessionLogStatus(arg1:string):Promise<core.SessionLogStatus>;
 
 export function GetSnippetContext(arg1:string):Promise<core.SnippetContext>;
 
@@ -90,6 +96,8 @@ export function ListRemoteDir(arg1:string,arg2:string):Promise<Array<core.FileIt
 
 export function ListSerialPorts():Promise<Array<core.SerialPortInfo>>;
 
+export function ListSessionLogs():Promise<Array<core.SessionLogRecord>>;
+
 export function ListSnippets():Promise<Array<core.Snippet>>;
 
 export function ListTotpRecords():Promise<Array<core.TotpSummary>>;
@@ -101,6 +109,8 @@ export function OpenLocalTerminal(arg1:string,arg2:core.TerminalSize):Promise<st
 export function OpenTerminalWithOptions(arg1:string,arg2:core.TerminalSpawnOptions):Promise<string>;
 
 export function ParseOTPAuthURI(arg1:string):Promise<core.TotpRecord>;
+
+export function ReadSessionLog(arg1:string):Promise<string>;
 
 export function ResetVault():Promise<void>;
 
@@ -140,11 +150,15 @@ export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
 
 export function StartForwardTunnel(arg1:string,arg2:string):Promise<string>;
 
+export function StartSessionLogging(arg1:string):Promise<core.SessionLogStatus>;
+
 export function StartSftpDownload(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function StartSftpUpload(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function StopForwardTunnel(arg1:string):Promise<void>;
+
+export function StopSessionLogging(arg1:string):Promise<core.SessionLogStatus>;
 
 export function UnlockVault(arg1:string):Promise<void>;
 

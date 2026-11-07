@@ -30,6 +30,8 @@ import { TotpManagerModal } from './components/TotpManagerModal';
 import { NotePage, NotePageSummary, NoteSearchResult } from './types/note';
 import { NotesView } from './components/NotesView';
 import { HostNotesDrawer } from './components/HostNotesDrawer';
+import { SessionLogRecord, SessionLogStatus } from './types/sessionLog';
+import { SessionLogsModal } from './components/SessionLogsModal';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -86,6 +88,7 @@ interface GroupDefaults {
   initialDir?: string;
   keepaliveSecs?: number;
   proxyProfileId?: string;
+  sessionLogging?: boolean;
 }
 
 interface GroupRecord {
@@ -111,6 +114,7 @@ interface HostSummary {
   proxyProfileId?: string;
   proxyCommand?: string;
   jumpChain?: string[];
+  sessionLogging?: boolean;
 }
 
 interface IdentitySummary {
@@ -509,6 +513,7 @@ interface WailsAppBindings {
     proxyProfileId?: string;
     proxyCommand?: string;
     jumpChain?: string[];
+    sessionLogging?: boolean;
   }) => Promise<void>;
   DeleteHost: (hostId: string) => Promise<void>;
   GenerateSSHKey?: (label: string, keyType: string, passphrase: string) => Promise<SshKeySummary>;
@@ -587,6 +592,13 @@ interface WailsAppBindings {
   ListNotes?: (hostId: string) => Promise<NotePage[]>;
   GetNote?: (noteId: string) => Promise<NotePage>;
   SearchNotes?: (query: string) => Promise<NoteSearchResult[]>;
+  StartSessionLogging?: (sessionId: string) => Promise<SessionLogStatus>;
+  StopSessionLogging?: (sessionId: string) => Promise<SessionLogStatus>;
+  GetSessionLogStatus?: (sessionId: string) => Promise<SessionLogStatus>;
+  ListSessionLogs?: () => Promise<SessionLogRecord[]>;
+  ReadSessionLog?: (logId: string) => Promise<string>;
+  DeleteSessionLog?: (logId: string) => Promise<void>;
+  ExportSessionLog?: (logId: string, targetPath: string) => Promise<void>;
 }
 
 export interface SerialAutoDetectResult {
@@ -728,6 +740,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [grpKeepalive, setGrpKeepalive] = useState<string>('30');
   const [grpInitialDir, setGrpInitialDir] = useState<string>('');
   const [grpProxyProfileId, setGrpProxyProfileId] = useState<string>('');
+  const [grpSessionLogging, setGrpSessionLogging] = useState<boolean>(false);
 
   // Add Host form state
   const [hostLabel, setHostLabel] = useState<string>('');
@@ -744,6 +757,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [hostProxyProfileId, setHostProxyProfileId] = useState<string>('');
   const [hostProxyCommand, setHostProxyCommand] = useState<string>('');
   const [hostProxyJump, setHostProxyJump] = useState<string>('');
+  const [hostSessionLogging, setHostSessionLogging] = useState<boolean>(false);
 
   const [address, setAddress] = useState<string>('');
   const [port, setPort] = useState<string>('22');
@@ -836,6 +850,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [notesModalHostId, setNotesModalHostId] = useState<string | undefined>(undefined);
   const [notesModalInitialNoteId, setNotesModalInitialNoteId] = useState<string | null>(null);
   const [openNotesDrawerHostId, setOpenNotesDrawerHostId] = useState<string | null>(null);
+
+  // Session Logging State (F-21)
+  const [showSessionLogsModal, setShowSessionLogsModal] = useState<boolean>(false);
+  const [sessionLogs, setSessionLogs] = useState<SessionLogRecord[]>([]);
+  const [activeLogSessions, setActiveLogSessions] = useState<Set<string>>(new Set());
+  const localLogTranscriptsRef = useRef<Map<string, string>>(new Map());
 
   // Terminal Search state (F-11)
   const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
@@ -1539,6 +1559,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         initialDir: grpInitialDir.trim() || undefined,
         keepaliveSecs: Number(grpKeepalive) || 30,
         proxyProfileId: grpProxyProfileId || undefined,
+        sessionLogging: grpSessionLogging ? true : undefined,
       },
     };
     const api = getWailsBindings();
@@ -1551,6 +1572,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     setGrpName('');
     setGrpInitialDir('');
     setGrpProxyProfileId('');
+    setGrpSessionLogging(false);
     setShowAddGroupModal(false);
   };
 
@@ -1601,6 +1623,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         proxyProfileId: hostProxyProfileId || undefined,
         proxyCommand: hostProxyCommand.trim() || undefined,
         jumpChain: jumpChainList,
+        sessionLogging: hostSessionLogging ? true : undefined,
       });
       await refreshVaultState();
     } else {
@@ -1609,6 +1632,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       const effPort = parsedPort > 0 ? parsedPort : grp?.defaultSettings.port || 22;
       const effUser = hostUser.trim() || grp?.defaultSettings.username || 'root';
       const effInitialDir = hostInitialDir.trim() || grp?.defaultSettings.initialDir || '';
+      const effSessionLogging = hostSessionLogging || Boolean(grp?.defaultSettings.sessionLogging);
       setVaultSummary((prev) => ({
         ...prev,
         hosts: [
@@ -1629,6 +1653,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             proxyProfileId: hostProxyProfileId || undefined,
             proxyCommand: hostProxyCommand.trim() || undefined,
             jumpChain: jumpChainList,
+            sessionLogging: effSessionLogging,
           },
         ],
       }));
@@ -1646,7 +1671,128 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     setHostProxyProfileId('');
     setHostProxyCommand('');
     setHostProxyJump('');
+    setHostSessionLogging(false);
     setShowAddHostModal(false);
+  };
+
+  const refreshSessionLogs = useCallback(async (): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.ListSessionLogs) {
+      try {
+        const list = await api.ListSessionLogs();
+        setSessionLogs(list || []);
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const handleToggleSessionLog = async (
+    targetSessionId: string,
+    label?: string,
+    hostId?: string
+  ): Promise<void> => {
+    const api = getWailsBindings();
+    const isCurrentlyRecording = activeLogSessions.has(targetSessionId);
+
+    if (isCurrentlyRecording) {
+      if (api?.StopSessionLogging) {
+        try {
+          await api.StopSessionLogging(targetSessionId);
+          await refreshSessionLogs();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStatusMessage(`Stop session logging failed: ${msg}`);
+          return;
+        }
+      } else {
+        const endedAt = new Date().toISOString();
+        setSessionLogs((prev) =>
+          prev.map((rec) =>
+            rec.sessionId === targetSessionId && rec.active
+              ? { ...rec, active: false, endedAt }
+              : rec
+          )
+        );
+      }
+      setActiveLogSessions((prev) => {
+        const next = new Set(prev);
+        next.delete(targetSessionId);
+        return next;
+      });
+      setStatusMessage(`⏹ Session logging stopped for ${label || targetSessionId}.`);
+    } else {
+      if (api?.StartSessionLogging) {
+        try {
+          await api.StartSessionLogging(targetSessionId);
+          await refreshSessionLogs();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStatusMessage(`Start session logging failed: ${msg}`);
+          return;
+        }
+      } else {
+        const logId = `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const startedAt = new Date().toISOString();
+        const tsFormatted = startedAt.replace('T', ' ').slice(0, 23);
+        const transcript =
+          `# DoubleAgent Session Transcript (F-21)\n` +
+          `# Host: ${label || targetSessionId}\n` +
+          `# Session ID: ${targetSessionId}\n` +
+          `# Started: ${startedAt}\n` +
+          `# Security Policy: Password Echo & Sensitive Prompts Redacted\n` +
+          `# ------------------------------------------------------------\n` +
+          `[${tsFormatted}] ${label || targetSessionId}:~$ session recording active\n` +
+          `[${tsFormatted}] [sudo] password for user: [PASSWORD ECHO SUPPRESSED - F-21]\n`;
+        localLogTranscriptsRef.current.set(logId, transcript);
+        const rec: SessionLogRecord = {
+          id: logId,
+          sessionId: targetSessionId,
+          hostId: hostId || '',
+          hostLabel: label || targetSessionId,
+          filePath: `logs/${logId}.log`,
+          startedAt,
+          byteCount: transcript.length,
+          lineCount: transcript.split('\n').filter(Boolean).length,
+          active: true,
+        };
+        setSessionLogs((prev) => [rec, ...prev]);
+      }
+      setActiveLogSessions((prev) => {
+        const next = new Set(prev);
+        next.add(targetSessionId);
+        return next;
+      });
+      setStatusMessage(`⏺ Recording session transcript for ${label || targetSessionId} (F-21).`);
+    }
+  };
+
+  const handleReadSessionLog = async (logId: string): Promise<string> => {
+    const api = getWailsBindings();
+    if (api?.ReadSessionLog) {
+      return await api.ReadSessionLog(logId);
+    }
+    return localLogTranscriptsRef.current.get(logId) || '';
+  };
+
+  const handleDeleteSessionLog = async (logId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.DeleteSessionLog) {
+      await api.DeleteSessionLog(logId);
+      await refreshSessionLogs();
+    } else {
+      localLogTranscriptsRef.current.delete(logId);
+      setSessionLogs((prev) => prev.filter((r) => r.id !== logId));
+    }
+    setStatusMessage('Deleted session log transcript.');
+  };
+
+  const handleExportSessionLog = async (logId: string, targetPath: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.ExportSessionLog) {
+      await api.ExportSessionLog(logId, targetPath);
+    }
+    setStatusMessage(`Exported session log to ${targetPath}.`);
   };
 
   const handleConnectSavedHost = async (host: HostSummary): Promise<void> => {
@@ -1654,6 +1800,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     if (!api) {
       const previewId = `sess-preview-${host.id}-${Date.now()}`;
       openSessionTab(previewId, host.label, host.id, host.color);
+      if (host.sessionLogging) {
+        void handleToggleSessionLog(previewId, host.label, host.id);
+      }
       setStatusMessage(`Connected to ${host.label}`);
       return;
     }
@@ -1661,6 +1810,14 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     try {
       const id = await api.ConnectSavedHost(host.id, { cols: 120, rows: 34 });
       openSessionTab(id, host.label, host.id, host.color);
+      if (host.sessionLogging) {
+        setActiveLogSessions((prev) => {
+          const next = new Set(prev);
+          next.add(id);
+          return next;
+        });
+        void refreshSessionLogs();
+      }
       setStatusMessage(`Connected to ${host.label}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -2927,6 +3084,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               >
                 ⚡ Snippets
               </button>
+              <button
+                type="button"
+                className={`pane-rec-btn ${activeLogSessions.has(node.sessionId) ? 'recording' : ''}`}
+                aria-label={`Toggle Session Logging for ${node.title}`}
+                title="Toggle Timestamped Session Logging (F-21)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleToggleSessionLog(node.sessionId, node.title, node.hostId);
+                }}
+              >
+                {activeLogSessions.has(node.sessionId) ? '⏺ REC' : '⚪ Log'}
+              </button>
               {node.hostId && (
                 <button
                   type="button"
@@ -3784,6 +3953,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     >
                       <span>Host Notes &amp; Docs</span>
                       <span className="nav-dropdown-shortcut">📝 F-17</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void refreshSessionLogs();
+                        setShowSessionLogsModal(true);
+                      }}
+                    >
+                      <span>Session Logs &amp; Recordings</span>
+                      <span className="nav-dropdown-shortcut">⏺ F-21</span>
                     </button>
                     <button
                       type="button"
@@ -5094,6 +5276,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 </option>
               ))}
             </select>
+            <label className="checkbox-label" style={{ marginTop: '0.25rem' }}>
+              <input
+                type="checkbox"
+                aria-label="Default Group Session Logging"
+                checked={grpSessionLogging}
+                onChange={(e) => setGrpSessionLogging(e.target.checked)}
+              />
+              Enable Session Logging by default (F-21)
+            </label>
             <div className="modal-actions">
               <button
                 type="button"
@@ -5274,6 +5465,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 ))}
               </div>
             </div>
+            <label className="checkbox-label" style={{ marginTop: '0.35rem' }}>
+              <input
+                type="checkbox"
+                aria-label="Enable Host Session Logging"
+                checked={hostSessionLogging}
+                onChange={(e) => setHostSessionLogging(e.target.checked)}
+              />
+              Enable Session Logging for this Host (F-21)
+            </label>
             <div className="modal-actions">
               <button
                 type="button"
@@ -6193,6 +6393,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             />
           </div>
         </div>
+      )}
+
+      {showSessionLogsModal && (
+        <SessionLogsModal
+          logs={sessionLogs}
+          onRefreshLogs={refreshSessionLogs}
+          onReadLog={handleReadSessionLog}
+          onDeleteLog={handleDeleteSessionLog}
+          onExportLog={handleExportSessionLog}
+          onStopActiveLog={async (sid) => {
+            await handleToggleSessionLog(sid);
+          }}
+          onClose={() => setShowSessionLogsModal(false)}
+        />
       )}
 
       {hostKeyPrompt && (

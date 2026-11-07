@@ -58,6 +58,10 @@ export function DeleteSSHKey(arg1) {
   return window['go']['main']['App']['DeleteSSHKey'](arg1);
 }
 
+export function DeleteSessionLog(arg1) {
+  return window['go']['main']['App']['DeleteSessionLog'](arg1);
+}
+
 export function DeleteSnippet(arg1) {
   return window['go']['main']['App']['DeleteSnippet'](arg1);
 }
@@ -86,6 +90,10 @@ export function ExportProxychainsConfig() {
   return window['go']['main']['App']['ExportProxychainsConfig']();
 }
 
+export function ExportSessionLog(arg1, arg2) {
+  return window['go']['main']['App']['ExportSessionLog'](arg1, arg2);
+}
+
 export function GenerateProxychainsConfig(arg1) {
   return window['go']['main']['App']['GenerateProxychainsConfig'](arg1);
 }
@@ -112,6 +120,10 @@ export function GetDefaultProxychainsOptions() {
 
 export function GetNote(arg1) {
   return window['go']['main']['App']['GetNote'](arg1);
+}
+
+export function GetSessionLogStatus(arg1) {
+  return window['go']['main']['App']['GetSessionLogStatus'](arg1);
 }
 
 export function GetSnippetContext(arg1) {
@@ -178,6 +190,10 @@ export function ListSerialPorts() {
   return window['go']['main']['App']['ListSerialPorts']();
 }
 
+export function ListSessionLogs() {
+  return window['go']['main']['App']['ListSessionLogs']();
+}
+
 export function ListSnippets() {
   return window['go']['main']['App']['ListSnippets']();
 }
@@ -200,6 +216,10 @@ export function OpenTerminalWithOptions(arg1, arg2) {
 
 export function ParseOTPAuthURI(arg1) {
   return window['go']['main']['App']['ParseOTPAuthURI'](arg1);
+}
+
+export function ReadSessionLog(arg1) {
+  return window['go']['main']['App']['ReadSessionLog'](arg1);
 }
 
 export function ResetVault() {
@@ -278,6 +298,10 @@ export function StartForwardTunnel(arg1, arg2) {
   return window['go']['main']['App']['StartForwardTunnel'](arg1, arg2);
 }
 
+export function StartSessionLogging(arg1) {
+  return window['go']['main']['App']['StartSessionLogging'](arg1);
+}
+
 export function StartSftpDownload(arg1, arg2, arg3) {
   return window['go']['main']['App']['StartSftpDownload'](arg1, arg2, arg3);
 }
@@ -288,6 +312,10 @@ export function StartSftpUpload(arg1, arg2, arg3) {
 
 export function StopForwardTunnel(arg1) {
   return window['go']['main']['App']['StopForwardTunnel'](arg1);
+}
+
+export function StopSessionLogging(arg1) {
+  return window['go']['main']['App']['StopSessionLogging'](arg1);
 }
 
 export function UnlockVault(arg1) {

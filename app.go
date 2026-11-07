@@ -45,6 +45,7 @@ type App struct {
 	sftpClients      map[string]core.SftpClient
 	transferTasks    map[string]*activeTransferTask
 	activeTunnels    map[string]core.ForwardTunnel
+	logMgr           *core.SessionLogManager
 }
 
 type activeTransferTask struct {
@@ -58,6 +59,14 @@ func defaultVaultPath() string {
 		return "doubleagent.vault"
 	}
 	return filepath.Join(cfgDir, "DoubleAgent", "doubleagent.vault")
+}
+
+func defaultLogsDir() string {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil || cfgDir == "" {
+		return filepath.Join(os.TempDir(), "doubleagent-logs")
+	}
+	return filepath.Join(cfgDir, "DoubleAgent", "logs")
 }
 
 // NewApp creates a new App application struct with the default SSH transport and encrypted Vault store.
@@ -103,6 +112,7 @@ func NewAppWithDependencies(
 		sftpClients:      make(map[string]core.SftpClient),
 		transferTasks:    make(map[string]*activeTransferTask),
 		activeTunnels:    make(map[string]core.ForwardTunnel),
+		logMgr:           core.NewSessionLogManager(defaultLogsDir()),
 	}
 
 	if vaultStore == nil {
@@ -633,6 +643,13 @@ func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, e
 	}
 	a.mu.Unlock()
 
+	if resolved.SessionLogging && a.logMgr != nil {
+		_, _ = a.logMgr.StartSession(sessionID, hostID, resolved.Label)
+		if resolved.Auth.Password != "" {
+			a.logMgr.RegisterSensitiveValue(sessionID, resolved.Auth.Password)
+		}
+	}
+
 	go a.streamReaderLoop(sessionID, streams.Stdout, true)
 	go a.streamReaderLoop(sessionID, streams.Stderr, false)
 
@@ -1050,6 +1067,9 @@ func (a *App) SendSerialBreak(sessionID string) error {
 // WriteTerminal writes user keystrokes from xterm.js into the active SSH, local shell, or serial port stdin (F-07, F-23).
 func (a *App) WriteTerminal(sessionID string, data string) error {
 	a.vaultStore.Touch()
+	if a.logMgr != nil {
+		a.logMgr.NotifyInput(sessionID, data)
+	}
 	a.mu.Lock()
 	locSess, isLocal := a.localSessions[sessionID]
 	serPort, isSerial := a.serialSessions[sessionID]
@@ -1118,6 +1138,11 @@ func (a *App) InjectSessionPassword(sessionID string) error {
 		return errors.New("no password stored for this session")
 	}
 
+	if a.logMgr != nil {
+		a.logMgr.RegisterSensitiveValue(sessionID, secret)
+		a.logMgr.SuppressNextEcho(sessionID)
+	}
+
 	_, err := io.WriteString(streams.Stdin, secret)
 	return err
 }
@@ -1150,6 +1175,10 @@ func (a *App) DisconnectSession(sessionID string) error {
 		a.emit(a.ctx, "forward:tunnels-updated", a.GetActiveTunnels())
 	}
 
+	if a.logMgr != nil {
+		_, _ = a.logMgr.StopSession(sessionID)
+	}
+
 	if isLocal && locSess != nil {
 		return locSess.Close()
 	}
@@ -1169,6 +1198,9 @@ func (a *App) streamReaderLoop(sessionID string, r io.Reader, emitExitOnEOF bool
 		if n > 0 {
 			sanitized := StripOSC52Sequences(buf[:n])
 			if len(sanitized) > 0 {
+				if a.logMgr != nil {
+					a.logMgr.WriteOutput(sessionID, string(sanitized))
+				}
 				a.emit(a.ctx, "terminal:data", core.TerminalDataEvent{
 					SessionID: sessionID,
 					Data:      string(sanitized),
@@ -1177,6 +1209,9 @@ func (a *App) streamReaderLoop(sessionID string, r io.Reader, emitExitOnEOF bool
 		}
 		if err != nil {
 			if emitExitOnEOF {
+				if a.logMgr != nil {
+					_, _ = a.logMgr.StopSession(sessionID)
+				}
 				a.mu.Lock()
 				delete(a.activeStreams, sessionID)
 				delete(a.localSessions, sessionID)
@@ -2416,6 +2451,11 @@ func (a *App) InjectTotpCode(sessionID string, totpID string) error {
 		return fmt.Errorf("failed to generate totp code: %w", err)
 	}
 
+	if a.logMgr != nil {
+		a.logMgr.RegisterSensitiveValue(sessionID, code)
+		a.logMgr.SuppressNextEcho(sessionID)
+	}
+
 	// Write code + newline directly into terminal session stdin
 	return a.WriteTerminal(sessionID, code+"\n")
 }
@@ -2578,4 +2618,94 @@ func (a *App) SearchNotes(query string) ([]core.NoteSearchResult, error) {
 		return []core.NoteSearchResult{}, nil
 	}
 	return results, nil
+}
+
+// StartSessionLogging starts timestamped session recording for sessionID (F-21).
+func (a *App) StartSessionLogging(sessionID string) (core.SessionLogStatus, error) {
+	a.vaultStore.Touch()
+	if a.logMgr == nil {
+		return core.SessionLogStatus{}, errors.New("session log manager not initialized")
+	}
+
+	a.mu.Lock()
+	hostID := a.sessionHostID[sessionID]
+	cachedPW := a.sessionPasswords[sessionID]
+	req, hasReq := a.sessionRequests[sessionID]
+	a.mu.Unlock()
+
+	hostLabel := sessionID
+	if hostID != "" {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			for _, h := range payload.Hosts {
+				if h.ID == hostID {
+					hostLabel = h.Label
+					break
+				}
+			}
+		}
+	} else if hasReq && req.Address != "" {
+		hostLabel = fmt.Sprintf("%s@%s:%d", req.Username, req.Address, req.Port)
+	}
+
+	st, err := a.logMgr.StartSession(sessionID, hostID, hostLabel)
+	if err != nil {
+		return core.SessionLogStatus{}, err
+	}
+	if cachedPW != "" {
+		a.logMgr.RegisterSensitiveValue(sessionID, cachedPW)
+	}
+	return st, nil
+}
+
+// StopSessionLogging stops and flushes the active session log for sessionID (F-21).
+func (a *App) StopSessionLogging(sessionID string) (core.SessionLogStatus, error) {
+	a.vaultStore.Touch()
+	if a.logMgr == nil {
+		return core.SessionLogStatus{}, errors.New("session log manager not initialized")
+	}
+	return a.logMgr.StopSession(sessionID)
+}
+
+// GetSessionLogStatus returns the current recording status for sessionID (F-21).
+func (a *App) GetSessionLogStatus(sessionID string) (core.SessionLogStatus, error) {
+	if a.logMgr == nil {
+		return core.SessionLogStatus{SessionID: sessionID, Active: false}, nil
+	}
+	return a.logMgr.GetStatus(sessionID), nil
+}
+
+// ListSessionLogs returns all recorded session log entries ordered newest-first (F-21).
+func (a *App) ListSessionLogs() ([]core.SessionLogRecord, error) {
+	a.vaultStore.Touch()
+	if a.logMgr == nil {
+		return []core.SessionLogRecord{}, nil
+	}
+	return a.logMgr.ListRecords(), nil
+}
+
+// ReadSessionLog returns the full timestamped transcript of a recorded session log (F-21).
+func (a *App) ReadSessionLog(logID string) (string, error) {
+	a.vaultStore.Touch()
+	if a.logMgr == nil {
+		return "", errors.New("session log manager not initialized")
+	}
+	return a.logMgr.ReadLog(logID)
+}
+
+// DeleteSessionLog stops (if active) and removes a session log file from disk (F-21).
+func (a *App) DeleteSessionLog(logID string) error {
+	a.vaultStore.Touch()
+	if a.logMgr == nil {
+		return errors.New("session log manager not initialized")
+	}
+	return a.logMgr.DeleteLog(logID)
+}
+
+// ExportSessionLog exports a recorded session log to targetPath on disk (F-21).
+func (a *App) ExportSessionLog(logID string, targetPath string) error {
+	a.vaultStore.Touch()
+	if a.logMgr == nil {
+		return errors.New("session log manager not initialized")
+	}
+	return a.logMgr.ExportLog(logID, targetPath)
 }

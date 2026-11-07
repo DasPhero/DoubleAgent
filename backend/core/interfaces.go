@@ -304,7 +304,7 @@ type ProxyProfileSummary struct {
 	HasPassword   bool             `json:"hasPassword,omitempty"`
 }
 
-// HostRecord represents a configured SSH target stored inside the encrypted vault (Spec Section 8, F-01, F-10, F-14).
+// HostRecord represents a configured SSH target stored inside the encrypted vault (Spec Section 8, F-01, F-10, F-14, F-21).
 type HostRecord struct {
 	ID             string   `json:"id"`
 	Label          string   `json:"label"`
@@ -320,9 +320,10 @@ type HostRecord struct {
 	ForwardRuleIDs []string `json:"forwardRuleIds,omitempty"`
 	ProxyProfileID string   `json:"proxyProfileId,omitempty"`
 	ProxyCommand   string   `json:"proxyCommand,omitempty"`
+	SessionLogging *bool    `json:"sessionLogging,omitempty"`
 }
 
-// GroupDefaults holds inheritable connection settings for a host group (F-01, F-10, F-14).
+// GroupDefaults holds inheritable connection settings for a host group (F-01, F-10, F-14, F-21).
 type GroupDefaults struct {
 	Port           uint16 `json:"port,omitempty"`
 	Username       string `json:"username,omitempty"`
@@ -330,6 +331,7 @@ type GroupDefaults struct {
 	InitialDir     string `json:"initialDir,omitempty"`
 	KeepaliveSecs  uint16 `json:"keepaliveSecs,omitempty"`
 	ProxyProfileID string `json:"proxyProfileId,omitempty"`
+	SessionLogging *bool  `json:"sessionLogging,omitempty"`
 }
 
 // GroupRecord represents a hierarchical host folder stored in the vault (Spec Section 8, F-01).
@@ -464,6 +466,30 @@ type NoteSearchResult struct {
 	Note         NotePageSummary `json:"note"`
 	MatchSnippet string          `json:"matchSnippet"`
 	MatchCount   int             `json:"matchCount"`
+}
+
+// SessionLogRecord describes a recorded terminal session log file with timestamps (Spec Line 131, F-21).
+type SessionLogRecord struct {
+	ID        string `json:"id"`
+	SessionID string `json:"sessionId"`
+	HostID    string `json:"hostId,omitempty"`
+	HostLabel string `json:"hostLabel"`
+	StartedAt string `json:"startedAt"`
+	EndedAt   string `json:"endedAt,omitempty"`
+	FilePath  string `json:"filePath"`
+	ByteCount int64  `json:"byteCount"`
+	LineCount int    `json:"lineCount"`
+	Active    bool   `json:"active"`
+}
+
+// SessionLogStatus describes the live recording state of an active terminal session (F-21).
+type SessionLogStatus struct {
+	SessionID string `json:"sessionId"`
+	LogID     string `json:"logId,omitempty"`
+	Active    bool   `json:"active"`
+	FilePath  string `json:"filePath,omitempty"`
+	ByteCount int64  `json:"byteCount"`
+	LineCount int    `json:"lineCount"`
 }
 
 // VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14, F-15, F-17, F-20).

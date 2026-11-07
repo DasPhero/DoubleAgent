@@ -58,6 +58,7 @@ export namespace core {
 	    proxyCommand?: string;
 	    color: string;
 	    favorite: boolean;
+	    sessionLogging: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new HostSummary(source);
@@ -80,6 +81,7 @@ export namespace core {
 	        this.proxyCommand = source["proxyCommand"];
 	        this.color = source["color"];
 	        this.favorite = source["favorite"];
+	        this.sessionLogging = source["sessionLogging"];
 	    }
 	}
 	export class HostSearchResult {
@@ -309,6 +311,7 @@ export namespace core {
 	    initialDir?: string;
 	    keepaliveSecs?: number;
 	    proxyProfileId?: string;
+	    sessionLogging?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new GroupDefaults(source);
@@ -322,6 +325,7 @@ export namespace core {
 	        this.initialDir = source["initialDir"];
 	        this.keepaliveSecs = source["keepaliveSecs"];
 	        this.proxyProfileId = source["proxyProfileId"];
+	        this.sessionLogging = source["sessionLogging"];
 	    }
 	}
 	export class GroupRecord {
@@ -375,6 +379,7 @@ export namespace core {
 	    forwardRuleIds?: string[];
 	    proxyProfileId?: string;
 	    proxyCommand?: string;
+	    sessionLogging?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new HostRecord(source);
@@ -396,6 +401,7 @@ export namespace core {
 	        this.forwardRuleIds = source["forwardRuleIds"];
 	        this.proxyProfileId = source["proxyProfileId"];
 	        this.proxyCommand = source["proxyCommand"];
+	        this.sessionLogging = source["sessionLogging"];
 	    }
 	}
 	
@@ -824,6 +830,58 @@ export namespace core {
 	        this.deviceType = source["deviceType"];
 	        this.isUsb = source["isUsb"];
 	        this.isConnected = source["isConnected"];
+	    }
+	}
+	export class SessionLogRecord {
+	    id: string;
+	    sessionId: string;
+	    hostId?: string;
+	    hostLabel: string;
+	    startedAt: string;
+	    endedAt?: string;
+	    filePath: string;
+	    byteCount: number;
+	    lineCount: number;
+	    active: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SessionLogRecord(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sessionId = source["sessionId"];
+	        this.hostId = source["hostId"];
+	        this.hostLabel = source["hostLabel"];
+	        this.startedAt = source["startedAt"];
+	        this.endedAt = source["endedAt"];
+	        this.filePath = source["filePath"];
+	        this.byteCount = source["byteCount"];
+	        this.lineCount = source["lineCount"];
+	        this.active = source["active"];
+	    }
+	}
+	export class SessionLogStatus {
+	    sessionId: string;
+	    logId?: string;
+	    active: boolean;
+	    filePath?: string;
+	    byteCount: number;
+	    lineCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SessionLogStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.logId = source["logId"];
+	        this.active = source["active"];
+	        this.filePath = source["filePath"];
+	        this.byteCount = source["byteCount"];
+	        this.lineCount = source["lineCount"];
 	    }
 	}
 	export class SnippetVariable {

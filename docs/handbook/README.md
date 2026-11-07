@@ -6,9 +6,23 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-18`, & `F-23`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, & `F-23`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Session Logging & Timestamped Transcripts (`F-21` / Spec Line 131 & 153)**:
+  - **Per-Host & Group-Inherited Toggle**:
+    - Enable **Session Logging (`F-21`)** when creating or editing a **Host Group** (to automatically record all hosts in that group) or on an individual **SSH Host**.
+    - When connecting to a host with Session Logging enabled, DoubleAgent automatically starts recording the session transcript and activates the **`⏺ REC`** badge in the terminal pane header.
+  - **Live Per-Session Recording Toggle**:
+    - Click **`⚪ Log`** / **`⏺ REC`** in any terminal split-pane header to start or stop timestamped transcript recording on the fly for SSH, local PTY, or serial sessions.
+  - **Clean Timestamped Output & ANSI Stripping**:
+    - Every recorded line is prefixed with a millisecond-precision timestamp (`[YYYY-MM-DD HH:MM:SS.mmm] `) and stripped of raw ANSI/VT100/OSC control sequences so `.log` files are clean and human-readable.
+  - **Password-Echo & Secret Redaction (`Passwort-Echo nie mitschneiden`)**:
+    - Automatically detects password, passphrase, PIN, `sudo`, and 2FA/TOTP prompts in terminal streams and suppresses any echoed input characters until newline completion.
+    - Passwords and TOTP tokens injected via **Inject Password** or **Inject 2FA Code** are registered with the session logger and scrubbed (`[REDACTED]`) if they ever appear in output.
+  - **Session Logs & Recordings Viewer (`Tools ▾ -> Session Logs & Recordings`)**:
+    - Browse all active and archived session transcripts, filter by host or date, search lines inside a transcript, copy to clipboard, download `.log` files, export to a custom disk path, stop active recordings, or delete old logs.
+    - All transcript lines are rendered via safe React text nodes (never `innerHTML`).
 - **Custom Shortcuts & Leader Key Prefix Mode (`F-18` / Spec Line 190)**:
   - **Leader Key / Prefix Mode (Tmux & Screen Style)**:
     - Eliminate keyboard shortcut collisions with terminal programs (`nano`, `vim`, `htop`, `tmux`) by enabling Leader Key Mode in Settings.

@@ -1674,4 +1674,53 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(await screen.findByRole('dialog', { name: 'Host Notes & Documentation' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('BGP Runbook')).toBeInTheDocument();
   });
+
+  it('manages Session Logging per host and per session with timestamped transcripts and password-echo redaction (F-21)', async () => {
+    render(<App initialLocked={false} />);
+
+    // 1. Create a host with Session Logging enabled by default (F-21)
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Audit Bastion' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.90.0.10' } });
+
+    const enableLoggingCheckbox = screen.getByLabelText('Enable Host Session Logging');
+    fireEvent.click(enableLoggingCheckbox);
+    expect(enableLoggingCheckbox).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Host' }));
+    expect(await screen.findByText('Audit Bastion')).toBeInTheDocument();
+
+    // 2. Connect to Audit Bastion — session logging should automatically start (⏺ REC)
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    const recBtn = await screen.findByRole('button', { name: /Toggle Session Logging for Audit Bastion/i });
+    expect(recBtn).toHaveTextContent('⏺ REC');
+    expect(recBtn).toHaveClass('recording');
+
+    // 3. Toggle session logging off and back on from the terminal pane header
+    fireEvent.click(recBtn);
+    expect(recBtn).toHaveTextContent('⚪ Log');
+    expect(recBtn).not.toHaveClass('recording');
+
+    fireEvent.click(recBtn);
+    expect(recBtn).toHaveTextContent('⏺ REC');
+
+    // 4. Open Session Logs & Recordings via Tools -> Session Logs & Recordings (F-21)
+    fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Session Logs & Recordings/i }));
+
+    const logsDialog = await screen.findByRole('dialog', { name: 'Session Logs & Recordings' });
+    expect(logsDialog).toBeInTheDocument();
+
+    // Verify transcript viewer shows timestamped lines & password-echo suppression notice
+    expect(await within(logsDialog).findByText(/PASSWORD ECHO SUPPRESSED - F-21/i)).toBeInTheDocument();
+
+    // Filter transcript lines inside viewer
+    const lineFilterInput = within(logsDialog).getByLabelText('Search in Transcript');
+    fireEvent.change(lineFilterInput, { target: { value: 'PASSWORD ECHO' } });
+    expect(within(logsDialog).getByText(/PASSWORD ECHO SUPPRESSED - F-21/i)).toBeInTheDocument();
+
+    // Close Session Logs modal
+    fireEvent.click(within(logsDialog).getByRole('button', { name: 'Close Session Logs' }));
+    expect(screen.queryByRole('dialog', { name: 'Session Logs & Recordings' })).not.toBeInTheDocument();
+  });
 });
