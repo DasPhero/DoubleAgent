@@ -10,6 +10,7 @@ interface HostNotesDrawerProps {
   onSaveNote: (note: NotePage) => Promise<void>;
   onDeleteNote: (id: string) => Promise<void>;
   onClose: () => void;
+  onPinSplit?: () => void;
   onOpenFullNotes?: () => void;
 }
 
@@ -21,6 +22,7 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
   onSaveNote,
   onDeleteNote,
   onClose,
+  onPinSplit,
   onOpenFullNotes,
 }) => {
   const host = useMemo(() => hosts.find((h) => h.id === hostId), [hosts, hostId]);
@@ -104,6 +106,17 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
           </div>
         </div>
         <div className="drawer-actions">
+          {onPinSplit && (
+            <button
+              type="button"
+              className="drawer-action-btn"
+              onClick={onPinSplit}
+              title="Pin notes as a horizontal split view alongside terminal"
+              aria-label="Pin Notes as Split View"
+            >
+              📌 Pin Split
+            </button>
+          )}
           {onOpenFullNotes && (
             <button
               type="button"

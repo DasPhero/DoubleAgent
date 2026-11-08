@@ -188,6 +188,8 @@ export type WorkspaceNode =
       hostId?: string;
       title: string;
       cwd?: string;
+      paneType?: 'terminal' | 'notes';
+      notesHostId?: string;
     }
   | {
       type: 'split';
@@ -202,6 +204,8 @@ export interface PaneItem {
   hostId?: string;
   title: string;
   cwd?: string;
+  paneType?: 'terminal' | 'notes';
+  notesHostId?: string;
 }
 
 export interface TabItem {
@@ -259,6 +263,8 @@ export function collectPanes(node: WorkspaceNode | null): PaneItem[] {
         hostId: node.hostId,
         title: node.title,
         cwd: node.cwd,
+        paneType: node.paneType,
+        notesHostId: node.notesHostId,
       },
     ];
   }
@@ -2764,6 +2770,43 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     setTimeout(() => focusersRef.current.get(newSessionId)?.(), 50);
   };
 
+  const handlePinNotesSplit = (targetHostId?: string): void => {
+    if (!activeTab || !activePane) {
+      return;
+    }
+    const hostId = targetHostId || activePane.hostId || activeTab.hostId;
+    const hostObj = vaultSummary.hosts.find((h) => h.id === hostId);
+    const hostLabel = hostObj?.label || hostObj?.address || 'Host Notes';
+
+    tabCounterRef.current += 1;
+    const newPaneId = `pane-notes-${tabCounterRef.current}`;
+    const newPane: WorkspaceNode = {
+      type: 'pane',
+      id: newPaneId,
+      sessionId: `notes-sess-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      hostId,
+      title: `Notes: ${hostLabel}`,
+      paneType: 'notes',
+      notesHostId: hostId,
+    };
+
+    setOpenNotesDrawerHostId(null);
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id !== activeTab.id) {
+          return t;
+        }
+        const updatedRoot = splitPaneInTree(t.rootNode, activePane.id, newPane, 'horizontal');
+        return {
+          ...t,
+          rootNode: updatedRoot,
+          activePaneId: newPaneId,
+        };
+      })
+    );
+    setStatusMessage(`Pinned notes as horizontal split view for ${hostLabel}.`);
+  };
+
   const handleOpenTerminalDirectory = async (
     mode: 'default' | 'current' | 'root',
     splitDir: 'none' | 'horizontal' | 'vertical' = 'none'
@@ -3008,6 +3051,71 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     totalPanes: number
   ): React.JSX.Element => {
     if (node.type === 'pane') {
+      if (node.paneType === 'notes') {
+        const isPaneActive = node.id === tab.activePaneId;
+        return (
+          <div
+            key={node.id}
+            className={`split-pane split-notes-pane ${isPaneActive ? 'active' : ''}`}
+            aria-label={`Notes Pane ${node.title}`}
+            onClick={() => {
+              setTabs((prev) =>
+                prev.map((t) => (t.id === tab.id ? { ...t, activePaneId: node.id } : t))
+              );
+            }}
+          >
+            <div className="split-pane-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
+                <span className="drawer-icon">📝</span>
+                <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                  {node.title}
+                </span>
+              </div>
+              <div className="pane-header-actions">
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  title="Open as full workspace tab"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openNotesTab(node.notesHostId || node.hostId);
+                  }}
+                >
+                  ⤢ Full Tab
+                </button>
+                <button
+                  type="button"
+                  className="pane-close-btn"
+                  title="Close Notes Split"
+                  aria-label="Close Notes Pane"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleClosePane(tab.id, node.id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <NotesView
+                notes={notes}
+                hosts={vaultSummary.hosts.map((h) => ({
+                  id: h.id,
+                  label: h.label,
+                  address: h.address,
+                }))}
+                activeHostId={node.notesHostId || node.hostId}
+                onSaveNote={handleSaveNote}
+                onDeleteNote={handleDeleteNote}
+                onOpenAsTab={() => openNotesTab(node.notesHostId || node.hostId)}
+                onClose={() => void handleClosePane(tab.id, node.id)}
+              />
+            </div>
+          </div>
+        );
+      }
+
       const isPaneActive = node.id === tab.activePaneId;
       const currentSize = paneFontSizes.get(node.sessionId) || globalSettings.fontSize;
       return (
@@ -3180,19 +3288,34 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 {activeLogSessions.has(node.sessionId) ? '⏺ REC' : '⚪ Log'}
               </button>
               {node.hostId && (
-                <button
-                  type="button"
-                  className={`pane-notes-btn ${openNotesDrawerHostId === node.hostId ? 'active' : ''}`}
-                  aria-label={`Toggle Host Notes for ${node.title}`}
-                  title="Toggle Host Notes Drawer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const hid = node.hostId ?? '';
-                    setOpenNotesDrawerHostId((prev) => (prev === hid ? null : hid));
-                  }}
-                >
-                  📝 Notes
-                </button>
+                <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className={`pane-notes-btn ${openNotesDrawerHostId === node.hostId ? 'active' : ''}`}
+                    aria-label={`Toggle Host Notes for ${node.title}`}
+                    title="Toggle Host Notes Drawer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const hid = node.hostId ?? '';
+                      setOpenNotesDrawerHostId((prev) => (prev === hid ? null : hid));
+                    }}
+                  >
+                    📝 Notes
+                  </button>
+                  <button
+                    type="button"
+                    className="pane-notes-btn"
+                    style={{ borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '4px', paddingRight: '4px' }}
+                    aria-label={`Pin Notes Split for ${node.title}`}
+                    title="Pin notes as horizontal split view alongside terminal"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePinNotesSplit(node.hostId);
+                    }}
+                  >
+                    📌
+                  </button>
+                </div>
               )}
               {isPaneActive ? (
                 <span className="pane-active-indicator">● Active</span>
@@ -4851,100 +4974,114 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               </div>
             </div>
 
-            <div className="terminal-toolbar">
-              <span>
-                Active Session: <strong>{statusMessage}</strong>
-              </span>
-              <div className="terminal-toolbar-actions">
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  aria-label="Split Horizontal"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void handleSplitPane('horizontal')}
-                  title="Split active pane horizontally (side-by-side)"
-                >
-                  Split ⬌
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  aria-label="Split Vertical"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void handleSplitPane('vertical')}
-                  title="Split active pane vertically (stacked)"
-                >
-                  Split ⬍
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  aria-label="New Terminal Default Directory"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void handleOpenTerminalDirectory('default')}
-                  title="Open new terminal in default working directory"
-                >
-                  🏠 Default Dir
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  aria-label="New Terminal Current Directory"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void handleOpenTerminalDirectory('current')}
-                  title="Open new terminal in current working directory"
-                >
-                  📂 Current Dir
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  aria-label="New Terminal Root in Current Directory"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void handleOpenTerminalDirectory('root')}
-                  title="Open new root / elevated terminal in current working directory"
-                >
-                  ⚡ Root in Dir
-                </button>
-                {activeTabPanes.length > 1 && (
+            {activeTab.tabType !== 'notes' && activeTab.tabType !== 'settings' && activeTab.tabType !== 'sftp' && (
+              <div className="terminal-toolbar">
+                <span>
+                  Active Session: <strong>{statusMessage}</strong>
+                </span>
+                <div className="terminal-toolbar-actions">
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
-                    aria-label="Next Pane"
+                    aria-label="Split Horizontal"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={handleCyclePaneFocus}
-                    title="Cycle keyboard focus to the next split pane (Alt+ArrowDown)"
+                    onClick={() => void handleSplitPane('horizontal')}
+                    title="Split active pane horizontally (side-by-side)"
                   >
-                    Next Pane ⇥
+                    Split ⬌
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void handleInjectPassword()}
-                  title="Injects the stored password directly from the Go Vault into the terminal without pressing Enter"
-                >
-                  Inject Password
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void handleInjectTotp()}
-                  title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt"
-                >
-                  🔐 2FA / TOTP
-                </button>
-                <button
-                  type="button"
-                  className="btn-danger btn-sm"
-                  onClick={() => void handleDisconnect()}
-                >
-                  Disconnect
-                </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    aria-label="Split Vertical"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void handleSplitPane('vertical')}
+                    title="Split active pane vertically (stacked)"
+                  >
+                    Split ⬍
+                  </button>
+                  {activePane?.hostId && (
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm"
+                      aria-label="Pin Notes Split"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handlePinNotesSplit(activePane.hostId)}
+                      title="Pin host notes as horizontal split view alongside terminal"
+                    >
+                      📌 Notes Split
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    aria-label="New Terminal Default Directory"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void handleOpenTerminalDirectory('default')}
+                    title="Open new terminal in default working directory"
+                  >
+                    🏠 Default Dir
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    aria-label="New Terminal Current Directory"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void handleOpenTerminalDirectory('current')}
+                    title="Open new terminal in current working directory"
+                  >
+                    📂 Current Dir
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    aria-label="New Terminal Root in Current Directory"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void handleOpenTerminalDirectory('root')}
+                    title="Open new root / elevated terminal in current working directory"
+                  >
+                    ⚡ Root in Dir
+                  </button>
+                  {activeTabPanes.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm"
+                      aria-label="Next Pane"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={handleCyclePaneFocus}
+                      title="Cycle keyboard focus to the next split pane (Alt+ArrowDown)"
+                    >
+                      Next Pane ⇥
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void handleInjectPassword()}
+                    title="Injects the stored password directly from the Go Vault into the terminal without pressing Enter"
+                  >
+                    Inject Password
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void handleInjectTotp()}
+                    title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt"
+                  >
+                    🔐 2FA / TOTP
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-danger btn-sm"
+                    onClick={() => void handleDisconnect()}
+                  >
+                    Disconnect
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="workspace-tabs-content" aria-label="Terminal Split Grid">
               {tabs.map((tab) => {
@@ -5025,6 +5162,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   onSaveNote={handleSaveNote}
                   onDeleteNote={handleDeleteNote}
                   onClose={() => setOpenNotesDrawerHostId(null)}
+                  onPinSplit={() => handlePinNotesSplit(openNotesDrawerHostId)}
                   onOpenFullNotes={() => {
                     const hostIdToOpen = openNotesDrawerHostId;
                     setOpenNotesDrawerHostId(null);
@@ -6475,19 +6613,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             }
           }}
         >
-          <div
-            className="modal-card"
-            style={{
-              width: 'calc(100vw - 2.5rem)',
-              height: 'calc(100vh - 2.5rem)',
-              maxWidth: 'none',
-              maxHeight: 'none',
-              padding: 0,
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
+          <div className="modal-card notes-modal-card">
             <NotesView
               notes={notes}
               hosts={vaultSummary.hosts.map((h) => ({

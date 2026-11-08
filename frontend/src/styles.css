@@ -1079,7 +1079,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 20000 !important;
 }
 
 .modal-card {
@@ -3030,6 +3030,8 @@ body,
   background-color: #0b0f19 !important;
   color: var(--text-main);
   overflow: hidden;
+  position: relative;
+  min-height: 0;
 }
 
 .notes-header {
@@ -3039,6 +3041,34 @@ body,
   padding: 0.6rem 1rem;
   background-color: #0f172a !important;
   border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+}
+
+.notes-modal-card {
+  width: calc(100vw - 2rem) !important;
+  height: calc(100vh - 2rem) !important;
+  max-width: calc(100vw - 2rem) !important;
+  max-height: calc(100vh - 2rem) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: auto !important;
+  border-radius: 8px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85) !important;
+  border: 1px solid var(--border-accent) !important;
+}
+
+.split-notes-pane {
+  background-color: #0b0f19 !important;
+  border: 1px solid var(--border-accent);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 280px;
+  min-height: 0;
 }
 
 .notes-header-left {

@@ -1656,8 +1656,19 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(drawer).toBeInTheDocument();
     expect(within(drawer).getAllByText(/BGP Runbook/i).length).toBeGreaterThan(0);
 
-    // Close Drawer
-    fireEvent.click(within(drawer).getByRole('button', { name: 'Close Notes Drawer' }));
+    // 5b. Pin notes as a horizontal split view from drawer
+    const pinSplitBtn = within(drawer).getByRole('button', { name: 'Pin Notes as Split View' });
+    fireEvent.click(pinSplitBtn);
+
+    // Notes split pane appears alongside the active terminal
+    const splitNotesPane = await screen.findByLabelText(/Notes Pane Notes: Core Router/i);
+    expect(splitNotesPane).toBeInTheDocument();
+    expect(within(splitNotesPane).getByRole('button', { name: /Tab/i })).toBeInTheDocument();
+
+    // Close the split notes pane
+    const closeNotesSplitBtn = within(splitNotesPane).getByRole('button', { name: 'Close notes pane' });
+    fireEvent.click(closeNotesSplitBtn);
+    expect(screen.queryByLabelText(/Notes Pane Notes: Core Router/i)).toBeNull();
 
     // 6. Search Notes via Command Palette (Ctrl+K)
     fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
