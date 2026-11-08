@@ -1099,3 +1099,56 @@ func TestApp_SessionLogging_F21(t *testing.T) {
 		t.Fatalf("DeleteSessionLog failed: %v", err)
 	}
 }
+
+func TestApp_BroadcastInput_F26(t *testing.T) {
+	fake := newFakeSshTransport()
+	tmpVault := filepath.Join(t.TempDir(), "test_broadcast.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	var app *App
+	app = NewAppWithDependencies(fake, nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	sessID1, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "10.0.0.1",
+		Port:     22,
+		Username: "node1",
+		Password: "pw1",
+		Size:     core.TerminalSize{Cols: 80, Rows: 24},
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH 1 failed: %v", err)
+	}
+
+	sessID2, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "10.0.0.2",
+		Port:     22,
+		Username: "node2",
+		Password: "pw2",
+		Size:     core.TerminalSize{Cols: 80, Rows: 24},
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH 2 failed: %v", err)
+	}
+
+	// Broadcast command to both sessions simultaneously
+	cmd := "sudo systemctl restart nginx\n"
+	if err := app.BroadcastInput([]string{sessID1, sessID2}, cmd); err != nil {
+		t.Fatalf("BroadcastInput failed: %v", err)
+	}
+
+	// Verify broadcast command was delivered to stdin
+	if !strings.Contains(fake.stdinBuf.String(), cmd) {
+		t.Fatalf("expected broadcast command %q in stdin, got %q", cmd, fake.stdinBuf.String())
+	}
+}

@@ -6,6 +6,10 @@ export function AutoDetectSerial(arg1) {
   return window['go']['main']['App']['AutoDetectSerial'](arg1);
 }
 
+export function BroadcastInput(arg1, arg2) {
+  return window['go']['main']['App']['BroadcastInput'](arg1, arg2);
+}
+
 export function CancelTransfer(arg1) {
   return window['go']['main']['App']['CancelTransfer'](arg1);
 }

@@ -4,6 +4,8 @@ import {core} from '../models';
 
 export function AutoDetectSerial(arg1:string):Promise<core.SerialAutoDetectResult>;
 
+export function BroadcastInput(arg1:Array<string>,arg2:string):Promise<void>;
+
 export function CancelTransfer(arg1:string):Promise<void>;
 
 export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;

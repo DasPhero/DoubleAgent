@@ -1735,4 +1735,78 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(within(logsDialog).getByRole('button', { name: 'Close Session Logs' }));
     expect(screen.queryByRole('dialog', { name: 'Session Logs & Recordings' })).not.toBeInTheDocument();
   });
+
+  it('supports Broadcast / Multi-Execution Input across split panes with glowing visual indicators and disarm controls (F-26)', async () => {
+    render(<App initialLocked={false} />);
+
+    // 1. Create a host and connect to open a terminal tab
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Cluster Node' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.10.1.1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Host' }));
+    expect(await screen.findByText('Cluster Node')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    const pane1 = await screen.findByLabelText('Pane Cluster Node');
+    expect(pane1).toBeInTheDocument();
+
+    // 2. Split pane horizontally: creates second split pane
+    fireEvent.click(screen.getByRole('button', { name: 'Split Horizontal' }));
+    const pane2 = await screen.findByLabelText('Pane Cluster Node (H-Split #2)');
+    expect(pane2).toBeInTheDocument();
+
+    // 3. Toggle Broadcast Input via toolbar button
+    const broadcastToggleBtn = screen.getByRole('button', { name: 'Toggle Broadcast Input' });
+    fireEvent.click(broadcastToggleBtn);
+
+    // 4. Verify Broadcast status pill in top header
+    const broadcastStatusPill = await screen.findByRole('status', { name: 'Broadcast Input Mode Active' });
+    expect(broadcastStatusPill).toBeInTheDocument();
+    expect(broadcastStatusPill).toHaveTextContent(/BROADCAST \(2 sessions\)/i);
+
+    // 5. Verify glowing indicators and badges on both participating panes
+    const currentPane1 = screen.getByLabelText('Pane Cluster Node');
+    const currentPane2 = screen.getByLabelText('Pane Cluster Node (H-Split #2)');
+    expect(currentPane1).toHaveClass('is-broadcasting');
+    expect(currentPane2).toHaveClass('is-broadcasting');
+    expect(within(currentPane1).getByText('🔴 BROADCAST')).toBeInTheDocument();
+    expect(within(currentPane2).getByText('🔴 BROADCAST')).toBeInTheDocument();
+
+    const castBtn1 = within(currentPane1).getByRole('button', { name: /Toggle Broadcast for Cluster Node/i });
+    const castBtn2 = within(currentPane2).getByRole('button', { name: /Toggle Broadcast for Cluster Node \(H-Split #2\)/i });
+    expect(castBtn1).toHaveTextContent('📡 ACTIVE');
+    expect(castBtn2).toHaveTextContent('📡 ACTIVE');
+
+    // 6. Test custom pane selection: toggle off pane2 from broadcast group
+    fireEvent.click(castBtn2);
+    expect(castBtn2).toHaveTextContent('📡 Cast');
+    expect(screen.getByLabelText('Pane Cluster Node (H-Split #2)')).not.toHaveClass('is-broadcasting');
+    expect(screen.getByLabelText('Pane Cluster Node')).toHaveClass('is-broadcasting');
+    expect(broadcastStatusPill).toHaveTextContent(/BROADCAST \(1 sessions\)/i);
+
+    // Re-include pane2 into broadcast group
+    fireEvent.click(castBtn2);
+    expect(castBtn2).toHaveTextContent('📡 ACTIVE');
+    expect(screen.getByLabelText('Pane Cluster Node (H-Split #2)')).toHaveClass('is-broadcasting');
+    expect(broadcastStatusPill).toHaveTextContent(/BROADCAST \(2 sessions\)/i);
+
+    // 7. Test Disarm via status pill Disarm button
+    const disarmBtn = within(broadcastStatusPill).getByRole('button', { name: 'Disarm Broadcast Mode' });
+    fireEvent.click(disarmBtn);
+    expect(screen.queryByRole('status', { name: 'Broadcast Input Mode Active' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Cluster Node')).not.toHaveClass('is-broadcasting');
+    expect(screen.getByLabelText('Pane Cluster Node (H-Split #2)')).not.toHaveClass('is-broadcasting');
+
+    // 8. Test Toggle via Tools Dropdown Menu & Disarm via Escape key
+    fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
+    const broadcastMenuItem = screen.getByRole('menuitem', { name: /Broadcast Input Mode/i });
+    fireEvent.click(broadcastMenuItem);
+
+    expect(await screen.findByRole('status', { name: 'Broadcast Input Mode Active' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Cluster Node')).toHaveClass('is-broadcasting');
+
+    // Press Escape key -> disarms broadcast mode
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('status', { name: 'Broadcast Input Mode Active' })).not.toBeInTheDocument();
+  });
 });

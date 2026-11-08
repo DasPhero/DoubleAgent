@@ -29,7 +29,8 @@ export type ShortcutActionId =
   | 'open_totp'
   | 'open_proxy_profiles'
   | 'open_sftp'
-  | 'lock_vault';
+  | 'lock_vault'
+  | 'toggle_broadcast';
 
 export interface ShortcutDefinition {
   actionId: ShortcutActionId;
@@ -171,6 +172,14 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
     category: 'terminal',
     defaultKey: 'Ctrl+0',
     leaderKey: '0',
+  },
+  {
+    actionId: 'toggle_broadcast',
+    label: 'Toggle Broadcast Input Mode',
+    description: 'Broadcast keystrokes simultaneously to multiple terminal split panes or tabs',
+    category: 'terminal',
+    defaultKey: 'Alt+B',
+    leaderKey: 'B',
   },
 
   // Sessions & CWD

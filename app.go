@@ -1091,6 +1091,22 @@ func (a *App) WriteTerminal(sessionID string, data string) error {
 	return core.ErrSessionNotFound
 }
 
+// BroadcastInput writes user input simultaneously to multiple active terminal sessions (F-26).
+func (a *App) BroadcastInput(sessionIDs []string, data string) error {
+	a.vaultStore.Touch()
+	var firstErr error
+	for _, sid := range sessionIDs {
+		sid = strings.TrimSpace(sid)
+		if sid == "" {
+			continue
+		}
+		if err := a.WriteTerminal(sid, data); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
 // ResizeTerminal updates the terminal window size when xterm.js resizes (F-07, F-23).
 func (a *App) ResizeTerminal(sessionID string, cols uint16, rows uint16) error {
 	a.mu.Lock()

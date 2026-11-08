@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-21` — Session Logging (per-session recording with timestamps, per-host toggle, password-echo / credential redaction) — COMPLETED (All MVP features complete!)
-- **Next Milestone:** `F-26` (Broadcast / Multi-Execution Input — v1 Phase)
+- **Current Milestone:** `F-26` — Broadcast / Multi-Execution Input — COMPLETED!
+- **Next Milestone:** `F-27` (Auto-Reconnect & Session Restore — v1 Phase)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -170,11 +170,29 @@
   - **Notes Horizontal Split View Pinning**: In addition to full workspace tabs, users can now pin host documentation directly alongside an active terminal as a horizontal split view (`📌 Pin Split` from the Host Notes Drawer, `📌 Notes` from the pane header, and `📌 Notes Split` from the active terminal toolbar). When pinned, the split pane directly embeds the clean, compact `HostNotesDrawer` overlay view (pill note selector tabs, inline Markdown renderer with interactive task checkboxes, title heading, quick editor, and `⤢ Full View` tab launcher) instead of the heavy multi-column tree view. Closing the split restores full terminal width seamlessly.
   - **Notes View Header Glitch & Sizing Fix**: Elevated `.modal-backdrop` z-index to `20000 !important` and updated `.notes-modal-card` to responsive full-screen bounds (`calc(100vw - 2rem)` and `calc(100vh - 2rem)`), completely preventing `.app-header` (`z-index: 9999`) from overlapping the top bar and maximizing space for markdown editing and preview.
 
+- **`F-26` — Broadcast / Multi-Execution Input**:
+  - **Go Backend Dispatcher (`app.go` & `app_test.go`)**:
+    - Implemented `BroadcastInput(sessionIDs []string, data string) error` in `app.go`. Simultaneously writes user keystrokes, commands, and escape sequences to multiple sessions.
+    - Added unit test `TestApp_BroadcastInput_F26` in `app_test.go` verifying multi-session dispatching.
+  - **Frontend Architecture (`frontend/src/`)**:
+    - Created `frontend/src/types/broadcast.ts` (`BroadcastScope = 'tab' | 'all' | 'custom'`, `BroadcastState`).
+    - Added `'toggle_broadcast'` to `ShortcutActionId` and default keybinding `Alt+B` with leader key `'B'` in `frontend/src/types/shortcuts.ts`.
+    - Wired `handleToggleBroadcast` and `handleToggleSessionBroadcast` in `App.tsx`.
+    - Keystroke fan-out in `handleTerminalInput`: when broadcast is active, dispatches input simultaneously to all target sessions via `BroadcastInput` binding or multi-session fallback.
+    - Escape key disarms broadcast mode immediately.
+  - **Vivid Visual Indicators ("Deutliche Markierung")**:
+    - **Header Status Pill**: Live glowing red status pill in the top header (`.broadcast-status-pill`) with animated pulsing dot (`.broadcast-pulse-dot`), session count badge (`📡 BROADCAST (N sessions)`), and quick `✕ Disarm` button.
+    - **Glowing Pane Outlines**: Active broadcast panes gain `.is-broadcasting` with red border and glow box-shadow.
+    - **Pane Header Badges & Actions**: Each participating split pane displays a bright red `🔴 BROADCAST` badge and a toggleable `📡 ACTIVE` / `📡 Cast` header button.
+    - **Toolbar & Dropdown Controls**: Toolbar button `📡 Broadcast` toggles active tab broadcast; Tools dropdown offers `Broadcast Input Mode` (`Alt+B`) and `Broadcast to All Terminals`.
+  - **Tests & Verification**:
+    - Vitest end-to-end integration test `supports Broadcast / Multi-Execution Input across split panes with glowing visual indicators and disarm controls (F-26)` in `frontend/src/App.test.tsx` (passes cleanly).
+    - Standalone binary verified with `wails build`.
+
 ## In Progress
-- None (MVP Phase 100% Complete).
+- None (v1 Phase Milestone F-26 Complete).
 
 ## Next (TODO List — v1 Phase)
-- **`F-26`: Broadcast / Multi-Execution Input**: Send keystrokes/commands simultaneously to selected split panes or tabs.
 - **`F-27`: Auto-Reconnect & Session Restore**: Automatic backoff reconnect on dropped SSH sessions and workspace tab restoration.
 - **`F-28`: Remote File Edit**: Edit remote SFTP files in-place with automatic re-upload on save.
 - **`F-29`: Encrypted Vault Sync / Export**: Export/import encrypted vault bundles across machines.

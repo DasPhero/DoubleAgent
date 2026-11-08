@@ -6,9 +6,23 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, & `F-23`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, & `F-26`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Broadcast / Multi-Execution Input (`F-26`)**:
+  - **Simultaneous Keystroke Dispatch**:
+    - Simultaneously sends typed keyboard input, shell commands, and control keys to multiple selected terminal sessions (split panes or tabs).
+    - Backed by native Go backend dispatching (`BroadcastInput`) without blocking the system PTY / SSH write loop or freezing the UI renderer.
+  - **Prominent Visual Indicators ("Deutliche Markierung")**:
+    - **Top Header Status Pill**: Glowing red pill badge (`📡 BROADCAST (N sessions)`) with live pulsing dot and an instant `✕ Disarm` button.
+    - **Split Pane Glowing Borders**: All participating terminal panes are highlighted with a glowing red border and inner shadow (`.is-broadcasting`).
+    - **Per-Pane Badges & Toggles**: Each participating pane header displays a bright `🔴 BROADCAST` badge and a `📡 ACTIVE` / `📡 Cast` toggle button.
+  - **Multiple Broadcast Scopes & Custom Grouping**:
+    - **Tab Scope (Default)**: Broadcasts to all split panes within the current active tab (`Alt+B` or toolbar **`📡 Broadcast`**).
+    - **All Terminals Scope**: Broadcasts across all open terminal tabs via **Tools ▾ -> Broadcast to All Terminals**.
+    - **Custom Selection**: Click **`📡 Cast`** / **`📡 ACTIVE`** on individual pane headers to add or remove specific sessions from the broadcast group on the fly.
+  - **Instant Disarm Controls**:
+    - Press **`Escape`** or **`Alt+B`**, click **`✕ Disarm`** on the status pill, or click **`Disarm Broadcast Mode`** in the Tools dropdown to instantly disarm broadcast input and return to single-terminal focus.
 - **Session Logging & Timestamped Transcripts (`F-21` / Spec Line 131 & 153)**:
   - **Per-Host & Group-Inherited Toggle**:
     - Enable **Session Logging (`F-21`)** when creating or editing a **Host Group** (to automatically record all hosts in that group) or on an individual **SSH Host**.

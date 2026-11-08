@@ -32,6 +32,7 @@ import { NotesView } from './components/NotesView';
 import { HostNotesDrawer } from './components/HostNotesDrawer';
 import { SessionLogRecord, SessionLogStatus } from './types/sessionLog';
 import { SessionLogsModal } from './components/SessionLogsModal';
+import { BroadcastScope, BroadcastState } from './types/broadcast';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -607,6 +608,7 @@ interface WailsAppBindings {
   ReadSessionLog?: (logId: string) => Promise<string>;
   DeleteSessionLog?: (logId: string) => Promise<void>;
   ExportSessionLog?: (logId: string, targetPath: string) => Promise<void>;
+  BroadcastInput?: (sessionIDs: string[], data: string) => Promise<void>;
 }
 
 export interface SerialAutoDetectResult {
@@ -909,6 +911,13 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [sessionLogs, setSessionLogs] = useState<SessionLogRecord[]>([]);
   const [activeLogSessions, setActiveLogSessions] = useState<Set<string>>(new Set());
   const localLogTranscriptsRef = useRef<Map<string, string>>(new Map());
+
+  // Broadcast / Multi-Execution Input State (F-26)
+  const [broadcastState, setBroadcastState] = useState<BroadcastState>({
+    enabled: false,
+    scope: 'tab',
+    customSessionIds: [],
+  });
 
   // Terminal Search state (F-11)
   const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
@@ -2355,13 +2364,108 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
   };
 
-  const handleTerminalInput = useCallback((id: string, data: string): void => {
-    lastTxDataRef.current.set(id, data);
-    const api = getWailsBindings();
-    if (api) {
-      void api.WriteTerminal(id, data);
+  const getBroadcastTargetSessionIds = useCallback((): string[] => {
+    if (!broadcastState.enabled) return [];
+    if (broadcastState.scope === 'tab') {
+      if (!activeTab) return [];
+      const panes = collectPanes(activeTab.rootNode);
+      return panes.filter((p) => p.paneType !== 'notes').map((p) => p.sessionId);
     }
-  }, []);
+    if (broadcastState.scope === 'all') {
+      const allPanes: string[] = [];
+      tabs.forEach((t) => {
+        if (t.tabType === 'terminal' || !t.tabType) {
+          const panes = collectPanes(t.rootNode);
+          panes.forEach((p) => {
+            if (p.paneType !== 'notes') {
+              allPanes.push(p.sessionId);
+            }
+          });
+        }
+      });
+      return allPanes;
+    }
+    if (broadcastState.scope === 'custom') {
+      return broadcastState.customSessionIds;
+    }
+    return [];
+  }, [broadcastState, activeTab, tabs]);
+
+  const handleToggleBroadcast = useCallback((scope?: BroadcastScope): void => {
+    setBroadcastState((prev) => {
+      const newEnabled = !prev.enabled || (scope !== undefined && scope !== prev.scope);
+      const newScope = scope || prev.scope;
+      setStatusMessage(
+        newEnabled
+          ? `Broadcast Input ACTIVE (${newScope === 'tab' ? 'Current Tab' : newScope === 'all' ? 'All Terminals' : 'Custom Selection'}). Keystrokes are sent to all participating sessions.`
+          : 'Broadcast Input disarmed.'
+      );
+      let custom = prev.customSessionIds;
+      if (newEnabled && newScope === 'custom' && custom.length === 0 && activePane) {
+        custom = [activePane.sessionId];
+      }
+      return {
+        enabled: newEnabled,
+        scope: newScope,
+        customSessionIds: custom,
+      };
+    });
+  }, [activePane]);
+
+  const handleToggleSessionBroadcast = useCallback((sid: string): void => {
+    setBroadcastState((prev) => {
+      let currentSelection: string[] = [];
+      if (prev.scope === 'custom') {
+        currentSelection = prev.customSessionIds;
+      } else if (prev.enabled) {
+        currentSelection = getBroadcastTargetSessionIds();
+      }
+
+      const isSelected = currentSelection.includes(sid);
+      const updated = isSelected
+        ? currentSelection.filter((id) => id !== sid)
+        : [...currentSelection, sid];
+
+      const newEnabled = updated.length > 0;
+      setStatusMessage(
+        newEnabled
+          ? `Broadcast Input custom selection updated (${updated.length} sessions).`
+          : 'Broadcast Input disarmed.'
+      );
+      return {
+        enabled: newEnabled,
+        scope: 'custom',
+        customSessionIds: updated,
+      };
+    });
+  }, [getBroadcastTargetSessionIds]);
+
+  const handleTerminalInput = useCallback(
+    (id: string, data: string): void => {
+      lastTxDataRef.current.set(id, data);
+      const api = getWailsBindings();
+      if (!api) return;
+
+      const broadcastTargets = getBroadcastTargetSessionIds();
+      if (broadcastState.enabled && broadcastTargets.includes(id) && broadcastTargets.length > 1) {
+        // Multi-execution broadcast across all target sessions
+        broadcastTargets.forEach((targetId) => {
+          lastTxDataRef.current.set(targetId, data);
+        });
+        const anyApi = api as unknown as { BroadcastInput?: (sids: string[], d: string) => Promise<void> };
+        if (typeof anyApi.BroadcastInput === 'function') {
+          void anyApi.BroadcastInput(broadcastTargets, data);
+        } else {
+          broadcastTargets.forEach((targetId) => {
+            void api.WriteTerminal(targetId, data);
+          });
+        }
+      } else {
+        void api.WriteTerminal(id, data);
+      }
+    },
+    [broadcastState.enabled, getBroadcastTargetSessionIds]
+  );
 
   const handleTerminalResize = useCallback((id: string, cols: number, rows: number): void => {
     const api = getWailsBindings();
@@ -3086,10 +3190,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
       const isPaneActive = node.id === tab.activePaneId;
       const currentSize = paneFontSizes.get(node.sessionId) || globalSettings.fontSize;
+      const isBroadcastingThis = getBroadcastTargetSessionIds().includes(node.sessionId);
       return (
         <div
           key={node.id}
-          className={`split-pane ${isPaneActive ? 'active' : ''}`}
+          className={`split-pane ${isPaneActive ? 'active' : ''} ${isBroadcastingThis ? 'is-broadcasting' : ''}`}
           aria-label={`Pane ${node.title}`}
           onClick={() => {
             setTabs((prev) =>
@@ -3100,6 +3205,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         >
           <div className="split-pane-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
+              {isBroadcastingThis && (
+                <span className="pane-broadcast-badge" title="Broadcast Input ACTIVE on this pane">
+                  🔴 BROADCAST
+                </span>
+              )}
               <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                 {node.title}
               </span>
@@ -3254,6 +3364,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 }}
               >
                 {activeLogSessions.has(node.sessionId) ? '⏺ REC' : '⚪ Log'}
+              </button>
+              <button
+                type="button"
+                className={`pane-broadcast-btn ${isBroadcastingThis ? 'active' : ''}`}
+                aria-label={`Toggle Broadcast for ${node.title}`}
+                title={isBroadcastingThis ? 'Terminal is receiving broadcast input. Click to toggle.' : 'Click to add terminal to broadcast group.'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleSessionBroadcast(node.sessionId);
+                }}
+              >
+                {isBroadcastingThis ? '📡 ACTIVE' : '📡 Cast'}
               </button>
               {node.hostId && (
                 <div style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -3629,6 +3751,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       case 'lock_vault':
         void handleVaultLock();
         break;
+      case 'toggle_broadcast':
+        handleToggleBroadcast();
+        break;
     }
   };
 
@@ -3654,8 +3779,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
-      // 1. Escape key cancels overlays and disarms leader mode
+      // 1. Escape key cancels overlays and disarms leader mode / broadcast mode
       if (e.key === 'Escape') {
+        if (broadcastState.enabled) {
+          handleToggleBroadcast();
+          return;
+        }
         setLeaderArmed(false);
         if (leaderTimerRef.current) {
           clearTimeout(leaderTimerRef.current);
@@ -3772,6 +3901,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     leaderArmed,
     activePane,
     searchOpenPanes,
+    broadcastState.enabled,
+    handleToggleBroadcast,
   ]);
 
   const filteredHosts = vaultSummary.hosts.filter((h) => {
@@ -3815,6 +3946,28 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             >
               ⌨️ LEADER ({globalSettings.leaderKey || 'Ctrl+B'})
             </span>
+          )}
+          {broadcastState.enabled && (
+            <div
+              className="broadcast-status-pill"
+              role="status"
+              aria-label="Broadcast Input Mode Active"
+              title="Broadcast Input ACTIVE: keystrokes will be sent to all participating terminals. Click to disarm."
+            >
+              <span className="broadcast-pulse-dot" />
+              <span className="broadcast-banner-label">
+                📡 BROADCAST ({getBroadcastTargetSessionIds().length} sessions)
+              </span>
+              <button
+                type="button"
+                className="broadcast-disarm-btn"
+                onClick={() => handleToggleBroadcast()}
+                title="Disarm Broadcast Mode (Esc / Alt+B)"
+                aria-label="Disarm Broadcast Mode"
+              >
+                ✕ Disarm
+              </button>
+            </div>
           )}
           {vaultLocked && (
             <button type="button" className="btn-primary" onClick={handleOpenVaultButton}>
@@ -4114,6 +4267,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     </button>
 
                     <div className="tools-sub-header">Automation &amp; Networking</div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={`nav-dropdown-item ${broadcastState.enabled ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        handleToggleBroadcast();
+                      }}
+                    >
+                      <span>{broadcastState.enabled ? '🔴 Disarm Broadcast Mode' : '📡 Broadcast Input Mode'}</span>
+                      <span className="nav-dropdown-shortcut">Alt+B</span>
+                    </button>
                     <button
                       type="button"
                       role="menuitem"
@@ -5024,6 +5189,16 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       Next Pane ⇥
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className={`btn-sm ${broadcastState.enabled ? 'btn-danger' : 'btn-secondary'}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleToggleBroadcast(broadcastState.enabled ? undefined : 'tab')}
+                    title="Toggle Broadcast Input (Alt+B). Simultaneously sends typed keystrokes to multiple terminals."
+                    aria-label="Toggle Broadcast Input"
+                  >
+                    📡 {broadcastState.enabled ? `Broadcasting (${getBroadcastTargetSessionIds().length})` : 'Broadcast'}
+                  </button>
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
