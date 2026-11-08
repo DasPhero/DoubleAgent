@@ -1660,10 +1660,11 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     const pinSplitBtn = within(drawer).getByRole('button', { name: 'Pin Notes as Split View' });
     fireEvent.click(pinSplitBtn);
 
-    // Notes split pane appears alongside the active terminal
+    // Notes split pane appears alongside the active terminal rendering the clean Host Notes Drawer
     const splitNotesPane = await screen.findByLabelText(/Notes Pane Notes: Core Router/i);
     expect(splitNotesPane).toBeInTheDocument();
-    expect(within(splitNotesPane).getAllByRole('button', { name: /Tab/i }).length).toBeGreaterThan(0);
+    expect(within(splitNotesPane).getByRole('button', { name: /Open Full Notes/i })).toBeInTheDocument();
+    expect(within(splitNotesPane).getAllByText(/BGP Runbook/i).length).toBeGreaterThan(0);
 
     // Close the split notes pane
     const closeNotesSplitBtn = within(splitNotesPane).getByRole('button', { name: /Close Notes Pane/i });

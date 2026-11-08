@@ -3053,6 +3053,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     if (node.type === 'pane') {
       if (node.paneType === 'notes') {
         const isPaneActive = node.id === tab.activePaneId;
+        const targetHostId = node.notesHostId || node.hostId || '';
         return (
           <div
             key={node.id}
@@ -3064,54 +3065,21 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               );
             }}
           >
-            <div className="split-pane-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
-                <span className="drawer-icon">📝</span>
-                <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                  {node.title}
-                </span>
-              </div>
-              <div className="pane-header-actions">
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  title="Open as full workspace tab"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openNotesTab(node.notesHostId || node.hostId);
-                  }}
-                >
-                  ⤢ Full Tab
-                </button>
-                <button
-                  type="button"
-                  className="pane-close-btn"
-                  title="Close Notes Split"
-                  aria-label="Close Notes Pane"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleClosePane(tab.id, node.id);
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <NotesView
-                notes={notes}
-                hosts={vaultSummary.hosts.map((h) => ({
-                  id: h.id,
-                  label: h.label,
-                  address: h.address,
-                }))}
-                activeHostId={node.notesHostId || node.hostId}
-                onSaveNote={handleSaveNote}
-                onDeleteNote={handleDeleteNote}
-                onOpenAsTab={() => openNotesTab(node.notesHostId || node.hostId)}
-                onClose={() => void handleClosePane(tab.id, node.id)}
-              />
-            </div>
+            <HostNotesDrawer
+              isOpen={true}
+              isPinned={true}
+              hostId={targetHostId}
+              notes={notes}
+              hosts={vaultSummary.hosts.map((h) => ({
+                id: h.id,
+                label: h.label,
+                address: h.address,
+              }))}
+              onSaveNote={handleSaveNote}
+              onDeleteNote={handleDeleteNote}
+              onClose={() => void handleClosePane(tab.id, node.id)}
+              onOpenFullNotes={() => openNotesTab(targetHostId || undefined)}
+            />
           </div>
         );
       }

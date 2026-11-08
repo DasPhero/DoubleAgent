@@ -3138,13 +3138,30 @@ body,
 }
 
 .split-notes-pane {
-  background-color: #0b0f19 !important;
+  background-color: #0f172a !important;
   border: 1px solid var(--border-accent);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-width: 280px;
   min-height: 0;
+  height: 100%;
+}
+
+.host-notes-drawer.is-pinned,
+.split-notes-pane .host-notes-drawer {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-left: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+  z-index: 1 !important;
+  flex: 1 !important;
+  background-color: transparent !important;
 }
 
 .notes-header-left {

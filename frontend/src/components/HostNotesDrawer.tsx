@@ -12,6 +12,7 @@ interface HostNotesDrawerProps {
   onClose: () => void;
   onPinSplit?: () => void;
   onOpenFullNotes?: () => void;
+  isPinned?: boolean;
 }
 
 export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
@@ -24,9 +25,15 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
   onClose,
   onPinSplit,
   onOpenFullNotes,
+  isPinned = false,
 }) => {
   const host = useMemo(() => hosts.find((h) => h.id === hostId), [hosts, hostId]);
-  const hostNotes = useMemo(() => notes.filter((n) => n.hostId === hostId), [notes, hostId]);
+  const hostNotes = useMemo(() => {
+    if (!hostId) {
+      return notes.filter((n) => !n.hostId);
+    }
+    return notes.filter((n) => n.hostId === hostId);
+  }, [notes, hostId]);
 
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
     hostNotes.length > 0 ? hostNotes[0].id : null
@@ -95,18 +102,24 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
   };
 
   return (
-    <div className="host-notes-drawer open" role="complementary" aria-label="Host Documentation Drawer">
+    <div
+      className={`host-notes-drawer ${isPinned ? 'is-pinned' : 'open'}`}
+      role="complementary"
+      aria-label="Host Documentation Drawer"
+    >
       {/* Drawer Header */}
       <div className="drawer-header">
         <div className="drawer-title-box">
           <span className="drawer-icon">📝</span>
           <div className="drawer-titles">
-            <span className="drawer-sub">Host Notes</span>
-            <span className="drawer-host-name">{host?.label || host?.address || 'Host'}</span>
+            <span className="drawer-sub">{isPinned ? 'Pinned Notes' : 'Host Notes'}</span>
+            <span className="drawer-host-name">
+              {host?.label || host?.address || (hostId ? 'Host' : 'Global Notes')}
+            </span>
           </div>
         </div>
         <div className="drawer-actions">
-          {onPinSplit && (
+          {!isPinned && onPinSplit && (
             <button
               type="button"
               className="drawer-action-btn"
@@ -122,7 +135,8 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
               type="button"
               className="drawer-action-btn"
               onClick={onOpenFullNotes}
-              title="Open Full Notes Manager"
+              title="Open full notes editor in workspace tab"
+              aria-label="Open Full Notes"
             >
               ⤢ Full View
             </button>
@@ -131,8 +145,8 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
             type="button"
             className="drawer-close-btn"
             onClick={onClose}
-            title="Close Notes Drawer"
-            aria-label="Close Notes Drawer"
+            title={isPinned ? 'Close Pinned Notes' : 'Close Notes Drawer'}
+            aria-label={isPinned ? 'Close Notes Pane' : 'Close Notes Drawer'}
           >
             ✕
           </button>
