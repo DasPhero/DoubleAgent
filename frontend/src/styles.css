@@ -515,8 +515,8 @@ body,
 }
 
 .sidebar-quick-toolbar {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.35rem;
   margin-bottom: 0.65rem;
   padding: 0.25rem;
@@ -526,7 +526,6 @@ body,
 }
 
 .sidebar-quick-btn {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -540,7 +539,21 @@ body,
   border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
   transition: all 0.15s ease;
+}
+
+.sidebar-quick-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sidebar-quick-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-quick-btn:hover {
@@ -548,6 +561,69 @@ body,
   border-color: var(--accent-bright);
   color: #fff;
   box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* Narrow Sidebar (220px to 279px): break quick buttons into 2 rows of 2 */
+.hosts-sidebar.narrow .sidebar-quick-toolbar {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem;
+}
+
+.hosts-sidebar.narrow .sidebar-quick-btn {
+  padding: 0.4rem 0.35rem;
+}
+
+/* Compact Sidebar (< 220px): switch to icon-only mode so buttons never overlap */
+.hosts-sidebar.compact .sidebar-quick-toolbar {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+}
+
+.hosts-sidebar.compact .sidebar-quick-btn {
+  padding: 0.4rem 0.2rem;
+}
+
+.hosts-sidebar.compact .sidebar-quick-btn .sidebar-quick-text {
+  display: none !important;
+}
+
+/* Responsive sidebar header when narrow / compact */
+.hosts-sidebar.narrow .sidebar-header,
+.hosts-sidebar.compact .sidebar-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.hosts-sidebar.narrow .sidebar-actions,
+.hosts-sidebar.compact .sidebar-actions {
+  display: flex;
+  width: 100%;
+  gap: 0.35rem;
+}
+
+.hosts-sidebar.narrow .sidebar-actions button,
+.hosts-sidebar.compact .sidebar-actions button {
+  flex: 1;
+  text-align: center;
+}
+
+/* Responsive host card when narrow / compact */
+.hosts-sidebar.narrow .host-card,
+.hosts-sidebar.compact .host-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.hosts-sidebar.narrow .host-card-actions,
+.hosts-sidebar.compact .host-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding-top: 0.35rem;
+  width: 100%;
 }
 
 .sidebar-collapsed-content {

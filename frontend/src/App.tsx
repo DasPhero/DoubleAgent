@@ -4490,7 +4490,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
       <div className="workspace-body">
         <aside
-          className={`hosts-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}
+          className={`hosts-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${
+            sidebarWidth < 280 ? 'narrow' : ''
+          } ${sidebarWidth < 220 ? 'compact' : ''}`}
           style={{ width: sidebarCollapsed ? undefined : `${sidebarWidth}px` }}
           aria-label="Hosts and Groups Sidebar"
         >
@@ -4528,8 +4530,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       setShowKeychainModal(true);
                     }}
                   >
-                    <span>🔑</span>
-                    <span>Keys</span>
+                    <span className="sidebar-quick-icon">🔑</span>
+                    <span className="sidebar-quick-text">Keys</span>
                   </button>
                   <button
                     type="button"
@@ -4542,8 +4544,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       setShowSSHConfigModal(true);
                     }}
                   >
-                    <span>⚙️</span>
-                    <span>Config</span>
+                    <span className="sidebar-quick-icon">⚙️</span>
+                    <span className="sidebar-quick-text">Config</span>
                   </button>
                   <button
                     type="button"
@@ -4555,8 +4557,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       openSettingsTab('security');
                     }}
                   >
-                    <span>🛡️</span>
-                    <span>Vault</span>
+                    <span className="sidebar-quick-icon">🛡️</span>
+                    <span className="sidebar-quick-text">Vault</span>
                   </button>
                   <button
                     type="button"
@@ -4565,8 +4567,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     aria-label="Host Notes & Documentation"
                     onClick={() => openNotesTab()}
                   >
-                    <span>📝</span>
-                    <span>Notes</span>
+                    <span className="sidebar-quick-icon">📝</span>
+                    <span className="sidebar-quick-text">Notes</span>
                   </button>
                 </nav>
               )}
