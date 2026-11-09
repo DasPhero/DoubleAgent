@@ -597,6 +597,8 @@ export namespace core {
 	    paneType?: string;
 	    notesHostId?: string;
 	    sftpSessionId?: string;
+	    editSessionId?: string;
+	    editRemotePath?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PaneItem(source);
@@ -612,6 +614,8 @@ export namespace core {
 	        this.paneType = source["paneType"];
 	        this.notesHostId = source["notesHostId"];
 	        this.sftpSessionId = source["sftpSessionId"];
+	        this.editSessionId = source["editSessionId"];
+	        this.editRemotePath = source["editRemotePath"];
 	    }
 	}
 	export class ProxyProfile {
@@ -730,6 +734,84 @@ export namespace core {
 	}
 	
 	
+	export class RemoteConflictInfo {
+	    hasConflict: boolean;
+	    remotePath: string;
+	    initialModTime: number;
+	    remoteModTime: number;
+	    initialSize: number;
+	    remoteSize: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteConflictInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hasConflict = source["hasConflict"];
+	        this.remotePath = source["remotePath"];
+	        this.initialModTime = source["initialModTime"];
+	        this.remoteModTime = source["remoteModTime"];
+	        this.initialSize = source["initialSize"];
+	        this.remoteSize = source["remoteSize"];
+	        this.message = source["message"];
+	    }
+	}
+	export class RemoteEditResult {
+	    success: boolean;
+	    conflict: boolean;
+	    remoteModTime: number;
+	    remoteSize: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteEditResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.conflict = source["conflict"];
+	        this.remoteModTime = source["remoteModTime"];
+	        this.remoteSize = source["remoteSize"];
+	        this.message = source["message"];
+	    }
+	}
+	export class RemoteEditSession {
+	    id: string;
+	    sessionId: string;
+	    remotePath: string;
+	    localPath: string;
+	    filename: string;
+	    initialModTime: number;
+	    initialSize: number;
+	    initialHash: string;
+	    status: string;
+	    lastUploadedAt: number;
+	    hasConflict: boolean;
+	    errorMessage?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteEditSession(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sessionId = source["sessionId"];
+	        this.remotePath = source["remotePath"];
+	        this.localPath = source["localPath"];
+	        this.filename = source["filename"];
+	        this.initialModTime = source["initialModTime"];
+	        this.initialSize = source["initialSize"];
+	        this.initialHash = source["initialHash"];
+	        this.status = source["status"];
+	        this.lastUploadedAt = source["lastUploadedAt"];
+	        this.hasConflict = source["hasConflict"];
+	        this.errorMessage = source["errorMessage"];
+	    }
+	}
 	export class SSHConfigHostEntry {
 	    hostAlias: string;
 	    hostName: string;
@@ -1037,6 +1119,8 @@ export namespace core {
 	    paneType?: string;
 	    notesHostId?: string;
 	    sftpSessionId?: string;
+	    editSessionId?: string;
+	    editRemotePath?: string;
 	    direction?: string;
 	    children?: WorkspaceNode[];
 	    ratios?: number[];
@@ -1056,6 +1140,8 @@ export namespace core {
 	        this.paneType = source["paneType"];
 	        this.notesHostId = source["notesHostId"];
 	        this.sftpSessionId = source["sftpSessionId"];
+	        this.editSessionId = source["editSessionId"];
+	        this.editRemotePath = source["editRemotePath"];
 	        this.direction = source["direction"];
 	        this.children = this.convertValues(source["children"], WorkspaceNode);
 	        this.ratios = source["ratios"];

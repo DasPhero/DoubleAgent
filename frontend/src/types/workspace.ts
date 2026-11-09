@@ -17,6 +17,8 @@ export interface PersistedPaneItem {
   paneType?: string;
   notesHostId?: string;
   sftpSessionId?: string;
+  editSessionId?: string;
+  editRemotePath?: string;
 }
 
 export interface PersistedWorkspaceNode {
@@ -29,6 +31,8 @@ export interface PersistedWorkspaceNode {
   paneType?: string;
   notesHostId?: string;
   sftpSessionId?: string;
+  editSessionId?: string;
+  editRemotePath?: string;
   direction?: SplitDirection;
   children?: PersistedWorkspaceNode[];
   ratios?: number[];
@@ -43,7 +47,7 @@ export interface PersistedTabItem {
   panes?: PersistedPaneItem[];
   rootNode: PersistedWorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor';
   notesHostId?: string;
 }
 

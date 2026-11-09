@@ -36,7 +36,9 @@ export type CyberIconName =
   | 'swap'
   | 'next-pane'
   | 'network'
-  | 'map';
+  | 'map'
+  | 'edit'
+  | 'save';
 
 export interface CyberIconProps {
   name: CyberIconName;
@@ -341,6 +343,21 @@ export const CyberIcon: React.FC<CyberIconProps> = ({
           <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
           <line x1="8" y1="2" x2="8" y2="18" />
           <line x1="16" y1="6" x2="16" y2="22" />
+        </svg>
+      );
+    case 'edit':
+      return (
+        <svg {...commonProps}>
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          <path d="m15 5 4 4" />
+        </svg>
+      );
+    case 'save':
+      return (
+        <svg {...commonProps}>
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+          <polyline points="17 21 17 13 7 13 7 21" />
+          <polyline points="7 3 7 8 15 8" />
         </svg>
       );
   }

@@ -159,7 +159,8 @@ func (f *fakeSftpClient) Upload(_ context.Context, _, _ string, onProgress func(
 	}
 	return nil
 }
-func (f *fakeSftpClient) Download(_ context.Context, _, _ string, onProgress func(int64, int64)) error {
+func (f *fakeSftpClient) Download(_ context.Context, _, localPath string, onProgress func(int64, int64)) error {
+	_ = os.WriteFile(localPath, []byte("sample remote file content"), 0o600)
 	if onProgress != nil {
 		onProgress(42, 42)
 	}
@@ -1258,5 +1259,90 @@ func TestApp_WorkspacePersistence_F27(t *testing.T) {
 	}
 	if len(cleared.Tabs) != 0 {
 		t.Errorf("expected 0 tabs after clear, got %d", len(cleared.Tabs))
+	}
+}
+
+func TestApp_RemoteEditOperations_F28(t *testing.T) {
+	fake := newFakeSshTransport()
+	var app *App
+	events := make([]string, 0)
+	var mu sync.Mutex
+	app = NewAppWithTransport(fake, nil, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		mu.Lock()
+		events = append(events, eventName)
+		mu.Unlock()
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	sessID, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "127.0.0.1",
+		Port:     22,
+		Username: "user",
+		Password: "password",
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH failed: %v", err)
+	}
+	defer app.DisconnectSession(sessID)
+
+	// 1. Start remote edit
+	remotePath := "/etc/nginx/nginx.conf"
+	sess, err := app.StartRemoteEdit(sessID, remotePath)
+	if err != nil {
+		t.Fatalf("StartRemoteEdit failed: %v", err)
+	}
+	if sess.RemotePath != remotePath {
+		t.Errorf("expected remotePath %q, got %q", remotePath, sess.RemotePath)
+	}
+	if sess.Status != core.RemoteEditStatusActive {
+		t.Errorf("expected status active, got %q", sess.Status)
+	}
+
+	// 2. Read local staged content
+	content, err := app.GetRemoteEditContent(sess.ID)
+	if err != nil {
+		t.Fatalf("GetRemoteEditContent failed: %v", err)
+	}
+	if content != "sample remote file content" {
+		t.Errorf("unexpected content %q", content)
+	}
+
+	// 3. Check active edit sessions
+	activeList := app.ListActiveRemoteEdits()
+	if len(activeList) != 1 || activeList[0].ID != sess.ID {
+		t.Errorf("unexpected active edits list: %+v", activeList)
+	}
+
+	// 4. Check conflict (should be false since remote unchanged)
+	conflict, err := app.CheckRemoteConflict(sess.ID)
+	if err != nil {
+		t.Fatalf("CheckRemoteConflict failed: %v", err)
+	}
+	if conflict.HasConflict {
+		t.Errorf("expected no conflict initially, got %+v", conflict)
+	}
+
+	// 5. Save remote content
+	newContent := "updated remote content in app test"
+	res, err := app.SaveRemoteEditContent(sess.ID, newContent, false)
+	if err != nil {
+		t.Fatalf("SaveRemoteEditContent failed: %v", err)
+	}
+	if !res.Success || res.Conflict {
+		t.Errorf("expected successful save, got %+v", res)
+	}
+
+	// 6. Close remote edit
+	if err := app.CloseRemoteEdit(sess.ID); err != nil {
+		t.Fatalf("CloseRemoteEdit failed: %v", err)
+	}
+	if len(app.ListActiveRemoteEdits()) != 0 {
+		t.Errorf("expected 0 active edits after close, got %d", len(app.ListActiveRemoteEdits()))
 	}
 }

@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,6 +49,7 @@ type App struct {
 	transferTasks    map[string]*activeTransferTask
 	activeTunnels    map[string]core.ForwardTunnel
 	logMgr           *core.SessionLogManager
+	remoteEditMgr    *core.RemoteEditManager
 	workspaceStore   data.WorkspaceStore
 }
 
@@ -123,6 +126,7 @@ func NewAppWithDependencies(
 		transferTasks:    make(map[string]*activeTransferTask),
 		activeTunnels:    make(map[string]core.ForwardTunnel),
 		logMgr:           core.NewSessionLogManager(defaultLogsDir()),
+		remoteEditMgr:    core.NewRemoteEditManager(""),
 	}
 
 	if vaultStore == nil {
@@ -1635,6 +1639,119 @@ func (a *App) GetActiveTransfers() []core.TransferTask {
 		result = append(result, t.task)
 	}
 	return result
+}
+
+// StartRemoteEdit downloads a remote file to a local staging cache and begins tracking its lifecycle (F-28).
+func (a *App) StartRemoteEdit(sessionID string, remotePath string) (core.RemoteEditSession, error) {
+	client, err := a.getOrOpenSftp(sessionID)
+	if err != nil {
+		return core.RemoteEditSession{}, fmt.Errorf("open sftp for session: %w", err)
+	}
+
+	sess, err := a.remoteEditMgr.StartEdit(a.ctx, client, sessionID, remotePath)
+	if err != nil {
+		return core.RemoteEditSession{}, err
+	}
+
+	// Start local file watcher to auto-sync external editor saves
+	_ = a.remoteEditMgr.StartWatcher(sess.ID, func(editID string) {
+		res, syncErr := a.remoteEditMgr.AutoSyncLocalFile(a.ctx, client, editID)
+		if syncErr != nil {
+			a.emit(a.ctx, "remote-edit:changed", core.RemoteEditEvent{
+				EditSessionID: editID,
+				Status:        core.RemoteEditStatusConflict,
+				HasConflict:   true,
+				Message:       syncErr.Error(),
+			})
+			return
+		}
+		a.emit(a.ctx, "remote-edit:changed", core.RemoteEditEvent{
+			EditSessionID: editID,
+			Status:        core.RemoteEditStatusActive,
+			HasConflict:   false,
+			Message:       res.Message,
+		})
+	})
+
+	return *sess, nil
+}
+
+// GetRemoteEditContent reads the staged local copy of an edited remote file (F-28).
+func (a *App) GetRemoteEditContent(editID string) (string, error) {
+	return a.remoteEditMgr.ReadContent(editID)
+}
+
+// SaveRemoteEditContent updates the local staged file and uploads to the remote server, validating conflicts (F-28).
+func (a *App) SaveRemoteEditContent(editID string, content string, force bool) (core.RemoteEditResult, error) {
+	sess, err := a.remoteEditMgr.GetSession(editID)
+	if err != nil {
+		return core.RemoteEditResult{}, err
+	}
+	client, err := a.getOrOpenSftp(sess.SessionID)
+	if err != nil {
+		return core.RemoteEditResult{}, fmt.Errorf("open sftp for session: %w", err)
+	}
+
+	res, err := a.remoteEditMgr.SaveContent(a.ctx, client, editID, content, force)
+	if err != nil {
+		if res != nil {
+			return *res, err
+		}
+		return core.RemoteEditResult{}, err
+	}
+
+	a.emit(a.ctx, "remote-edit:status", core.RemoteEditEvent{
+		EditSessionID: editID,
+		Status:        core.RemoteEditStatusActive,
+		HasConflict:   false,
+		Message:       res.Message,
+	})
+
+	return *res, nil
+}
+
+// CheckRemoteConflict checks if the remote server file was modified in parallel by another process/user (F-28).
+func (a *App) CheckRemoteConflict(editID string) (core.RemoteConflictInfo, error) {
+	sess, err := a.remoteEditMgr.GetSession(editID)
+	if err != nil {
+		return core.RemoteConflictInfo{}, err
+	}
+	client, err := a.getOrOpenSftp(sess.SessionID)
+	if err != nil {
+		return core.RemoteConflictInfo{}, fmt.Errorf("open sftp for session: %w", err)
+	}
+	info, err := a.remoteEditMgr.CheckConflict(a.ctx, client, editID)
+	if err != nil {
+		return core.RemoteConflictInfo{}, err
+	}
+	return *info, nil
+}
+
+// OpenExternalEditor launches the local staged file in the user's OS default editor (F-28).
+func (a *App) OpenExternalEditor(editID string) error {
+	sess, err := a.remoteEditMgr.GetSession(editID)
+	if err != nil {
+		return err
+	}
+	localPath := sess.LocalPath
+
+	var cmd *exec.Cmd
+	if goruntime.GOOS == "windows" {
+		cmd = exec.Command("cmd.exe", "/c", "start", "", localPath)
+	} else {
+		cmd = exec.Command("xdg-open", localPath)
+	}
+	return cmd.Start()
+}
+
+// CloseRemoteEdit cleans up the local staging directory and stops background watchers (F-28).
+func (a *App) CloseRemoteEdit(editID string) error {
+	return a.remoteEditMgr.Close(editID)
+}
+
+// ListActiveRemoteEdits returns all currently active remote file editing sessions (F-28).
+func (a *App) ListActiveRemoteEdits() []core.RemoteEditSession {
+	return a.remoteEditMgr.ListSessions()
 }
 
 // autoStartForwardRules starts any port forwarding rules configured for auto-start with a given host (F-13).

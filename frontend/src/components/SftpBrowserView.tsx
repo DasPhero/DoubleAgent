@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FileItem, TransferTask, TransferProgressEvent } from '../types/sftp';
+import { RemoteEditSession } from '../types/remoteEdit';
 
 export interface SftpApi {
   listLocalDir?: (path: string) => Promise<FileItem[]>;
@@ -10,6 +11,7 @@ export interface SftpApi {
   deleteRemoteItem?: (sessionId: string, path: string) => Promise<void>;
   cancelTransfer?: (taskId: string) => Promise<void>;
   getActiveTransfers?: () => Promise<TransferTask[]>;
+  startRemoteEdit?: (sessionId: string, remotePath: string) => Promise<RemoteEditSession>;
 }
 
 export interface SftpBrowserViewProps {
@@ -20,6 +22,7 @@ export interface SftpBrowserViewProps {
   api: SftpApi;
   eventsOn?: (eventName: string, callback: (data: unknown) => void) => () => void;
   onClose?: () => void;
+  onOpenRemoteEdit?: (session: RemoteEditSession) => void;
 }
 
 export function formatBytes(bytes: number): string {
@@ -73,6 +76,7 @@ export function SftpBrowserView({
   api,
   eventsOn,
   onClose,
+  onOpenRemoteEdit,
 }: SftpBrowserViewProps): React.JSX.Element {
   // Local Pane State
   const [localPath, setLocalPath] = useState<string>(initialLocalPath);
@@ -280,6 +284,28 @@ export function SftpBrowserView({
       loadRemoteDir(remotePath);
     } catch (err: unknown) {
       alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  // Remote File Edit handler (F-28)
+  const handleStartRemoteEdit = async (item: FileItem) => {
+    const isDir = item.IsDir ?? item.isDir;
+    if (isDir) return;
+    try {
+      let sess: RemoteEditSession | null = null;
+      if (api.startRemoteEdit) {
+        sess = await api.startRemoteEdit(sessionId, item.path);
+      } else {
+        const appApi = (window as unknown as { go?: { main?: { App?: { StartRemoteEdit?: (sid: string, p: string) => Promise<RemoteEditSession> } } } })?.go?.main?.App;
+        if (appApi?.StartRemoteEdit) {
+          sess = await appApi.StartRemoteEdit(sessionId, item.path);
+        }
+      }
+      if (sess && onOpenRemoteEdit) {
+        onOpenRemoteEdit(sess);
+      }
+    } catch (err: unknown) {
+      alert(`Start Remote Edit failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -750,22 +776,40 @@ export function SftpBrowserView({
             {selectedRemoteItem && (
               <>
                 {!(selectedRemoteItem.IsDir ?? selectedRemoteItem.isDir) && (
-                  <button
-                    title="Download to Local"
-                    onClick={() => handleStartDownload(selectedRemoteItem)}
-                    style={{
-                      padding: '2px 10px',
-                      backgroundColor: '#1f6feb',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    ⬅ Download
-                  </button>
+                  <>
+                    <button
+                      title="Edit Remote File (F-28)"
+                      onClick={() => void handleStartRemoteEdit(selectedRemoteItem)}
+                      style={{
+                        padding: '2px 10px',
+                        backgroundColor: 'rgba(45, 212, 191, 0.2)',
+                        color: 'var(--accent-glow)',
+                        border: '1px solid rgba(45, 212, 191, 0.4)',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
+                      title="Download to Local"
+                      onClick={() => handleStartDownload(selectedRemoteItem)}
+                      style={{
+                        padding: '2px 10px',
+                        backgroundColor: '#1f6feb',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ⬅ Download
+                    </button>
+                  </>
                 )}
                 <button
                   title="Delete Item"
@@ -867,6 +911,8 @@ export function SftpBrowserView({
                     onDoubleClick={() => {
                       if (isDir) {
                         loadRemoteDir(item.path);
+                      } else {
+                        void handleStartRemoteEdit(item);
                       }
                     }}
                     style={{

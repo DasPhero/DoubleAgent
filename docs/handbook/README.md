@@ -6,9 +6,37 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, & `F-37`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, & `F-37`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Remote File Edit & Auto-Upload with Parallel Conflict Detection (`F-28` / Spec Line 56, 137, 223)**:
+  - **In-App Syntax & Line Editor**:
+    - Open any text file on the remote server for editing directly from the SFTP File Browser:
+      - Select a file and click the **`✏️ Edit`** toolbar button, **OR**
+      - Double-click any non-directory file in the remote file tree.
+    - Displays line numbers gutter, live character & line counts, and real-time status pills:
+      - `✓ Synced` (clean, synchronized with server).
+      - `● Unsaved` (amber pill when local buffer contains unsaved changes).
+    - Built-in keyboard shortcuts:
+      - **`Ctrl+S`**: Save and immediately upload changes to the remote server.
+      - **`Tab`**: Indents by 2 spaces instead of losing focus.
+  - **Parallel Modification Conflict Detection & HUD Resolution Modal**:
+    - When you save, DoubleAgent compares server modification timestamps and content hashes against the snapshot taken when you opened the file.
+    - If another user, script, or process modified the remote file on the server in parallel:
+      - The normal save is safely blocked to prevent accidental overwrites.
+      - An interactive **Parallel Conflict Detected** HUD modal appears with side-by-side metadata:
+        - When you opened the file vs. current file state on server (timestamp and size in bytes).
+      - **Resolution Controls**:
+        - **`Overwrite Remote (Force Upload)`**: Explicitly force-pushes your local version to the server, overriding remote modifications.
+        - **`Discard Local & Reload`**: Discards your unsaved local buffer and reloads the fresh server copy.
+        - **`Cancel / Keep Local Unsaved`**: Closes the dialog and preserves your local buffer so you can inspect or copy your changes before deciding.
+  - **External Editor Auto-Sync**:
+    - Click **`Open in Local Editor`** to stage the file and launch it in your system's default text editor (e.g., VS Code, Sublime Text, Notepad++).
+    - A background file watcher automatically detects when you press Save in your external editor, verifies timestamps, and auto-syncs the changes to the remote server with real-time HUD status telemetry.
+  - **Multi-Window & Workspace Split Integration**:
+    - Open as a dedicated full-tab view (`tabType: 'editor'`).
+    - Dock into any split workspace pane (`paneType: 'editor'`) side-by-side with live terminals or notes.
+    - Undock from split panes back into dedicated standalone tabs with one click.
 - **Interactive Network Topology Map / "Netzwerkkarte" (`F-37` / Spec Line 58, 90, 139, 271, 273)**:
   - **Visual Topology & Interactive Graph**:
     - Powered by `react-flow` (v11, MIT licensed) for smooth pan/zoom, interactive node drag-and-drop, and high-performance physics-based layouts.

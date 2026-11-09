@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-37` — Interactive Network Topology Map ("Netzwerkkarte") with react-flow — COMPLETED!
-- **Next Milestone:** `F-28` (Remote File Edit — v1 Phase)
+- **Current Milestone:** `F-28` — Remote File Edit & Auto-Upload with Conflict Detection — COMPLETED!
+- **Next Milestone:** `F-29` (Encrypted Vault Sync & Merge)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -288,9 +288,37 @@
       - Frontend lint: 0 warnings, 0 errors (`eslint . --max-warnings 0`).
       - Standalone binary: verified and compiled via `wails build` into `build/bin/DoubleAgent.exe`.
 
+- **`M1-4` Part 10 (`F-28` — Remote File Edit, Auto-Upload & Parallel Conflict Detection)**:
+    - **Backend Remote Edit Manager (`backend/core/remote_edit.go`)**:
+      - Manages remote file editing sessions with isolated local staging cache in `os.TempDir()/doubleagent_remote_edit/<editID>/<filename>`.
+      - Snapshots initial remote metadata: `InitialModTime` (`int64`), `InitialSize` (`int64`), and 128-bit FNV content hash (`hash/fnv`), strictly conforming to Golden Rule 4 (zero forbidden crypto/ssh/pty imports in `backend/core`).
+      - Validates remote modification timestamps on save/upload (`Ctrl+S`).
+      - Parallel Conflict Detection: blocks save and returns conflict details if the remote file on the server was changed by another user/process since download.
+      - Supports forced overwrite (`force: true`) when the user explicitly chooses to override remote changes.
+      - Background file watcher (`StartWatcher`) observes local staging files; modifications from external system editors (VS Code, Notepad, etc.) trigger automatic validation and re-upload events (`remote-edit:changed`).
+      - Full lifecycle cleanup on close and application exit (`Close`, `CloseAll`).
+      - Unit tests in `backend/core/remote_edit_test.go` (`TestRemoteEdit_Lifecycle_F28`, `TestRemoteEdit_ConflictDetection_F28`, `TestRemoteEdit_Watcher_F28`, `TestRemoteEdit_CloseAndCleanup_F28`).
+    - **Application Service Bindings (`app.go`)**:
+      - Bound methods: `StartRemoteEdit`, `GetRemoteEditContent`, `SaveRemoteEditContent`, `CheckRemoteConflict`, `OpenExternalEditor`, `CloseRemoteEdit`, `ListActiveRemoteEdits`.
+      - Unit tests in `app_test.go` (`TestApp_RemoteEditOperations_F28`).
+    - **Frontend UI & Components (`frontend/src/`)**:
+      - Created `frontend/src/types/remoteEdit.ts` with TypeScript interfaces.
+      - Created `frontend/src/components/RemoteEditorView.tsx`: complete in-app editor with line numbers gutter, status pills (`● Unsaved` / `✓ Synced`), keyboard shortcuts (`Ctrl+S`, `Tab` indentation), external editor launch button, reload, conflict check, and interactive Conflict Resolution HUD modal:
+        - *Overwrite Remote (Force Upload)* (`force: true`).
+        - *Discard Local & Reload Server Version*.
+        - *Cancel / Keep Local Unsaved*.
+      - Integrated with SFTP Browser (`SftpBrowserView.tsx`): added `✏️ Edit` button in toolbar and double-click to open remote non-directory files.
+      - Integrated with Workspace: open as dedicated tab (`tabType: 'editor'`), dock into split pane (`paneType: 'editor'`), undock with one click, and drag-and-drop support.
+      - Increased button icon-text padding in launcher view (`frontend/src/styles.css`).
+    - **Testing & Verification**:
+      - Frontend unit tests: 26 passed in Vitest (`npm --prefix frontend run test -- --run`).
+      - Go backend tests: all packages green (`go test ./...`).
+      - Go vet: clean (`go vet ./...`).
+      - Frontend lint: 0 warnings, 0 errors (`eslint . --max-warnings 0`).
+      - Standalone binary: verified and compiled via `wails build` into `build/bin/DoubleAgent.exe`.
+
 ## In Progress
-- None (v1 Phase Milestone F-37 Complete).
+- None (v1 Phase Milestone F-28 Complete).
 
 ## Next (TODO List — v1 Phase)
-- **`F-28`: Remote File Edit**: Edit remote SFTP files in-place with automatic re-upload on save.
-- **`F-29`: Encrypted Vault Sync / Export**: Export/import encrypted vault bundles across machines.
+- **`F-29`: Vault File Sync**: Sync vault across Google Drive/Syncthing with conflict detection and merge.

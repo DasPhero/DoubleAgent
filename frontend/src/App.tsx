@@ -36,6 +36,8 @@ import { BroadcastScope, BroadcastState } from './types/broadcast';
 import { WorkspaceState, ReconnectState, PersistedTabItem, PersistedWorkspaceNode } from './types/workspace';
 import { CyberIcon } from './components/CyberIcon';
 import { NetworkMapView } from './components/NetworkMapView';
+import { RemoteEditorView } from './components/RemoteEditorView';
+import { RemoteEditSession, RemoteConflictInfo } from './types/remoteEdit';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -191,7 +193,8 @@ export type DockablePaneType =
   | 'sftp'
   | 'snippets'
   | 'launcher'
-  | 'network-map';
+  | 'network-map'
+  | 'editor';
 
 export type DropZonePosition = 'left' | 'right' | 'top' | 'bottom' | 'center';
 
@@ -209,7 +212,8 @@ export type WorkspaceDragPayload =
         | 'local-powershell'
         | 'local-cmd'
         | 'local-bash'
-        | 'network-map';
+        | 'network-map'
+        | 'editor';
       hostId?: string;
       title: string;
     };
@@ -225,6 +229,8 @@ export type WorkspaceNode =
       paneType?: DockablePaneType;
       notesHostId?: string;
       sftpSessionId?: string;
+      editSessionId?: string;
+      editRemotePath?: string;
     }
   | {
       type: 'split';
@@ -243,6 +249,8 @@ export interface PaneItem {
   paneType?: DockablePaneType;
   notesHostId?: string;
   sftpSessionId?: string;
+  editSessionId?: string;
+  editRemotePath?: string;
 }
 
 export interface TabItem {
@@ -252,10 +260,12 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor';
   sftpSessionId?: string;
   notesHostId?: string;
   notesInitialNoteId?: string | null;
+  editSessionId?: string;
+  editRemotePath?: string;
 }
 
 export const HOST_PALETTE = [
@@ -811,6 +821,19 @@ interface WailsAppBindings {
   SaveWorkspace?: (state: WorkspaceState) => Promise<void>;
   LoadWorkspace?: () => Promise<WorkspaceState>;
   ClearWorkspace?: () => Promise<void>;
+  StartRemoteEdit?: (sessionId: string, remotePath: string) => Promise<RemoteEditSession>;
+  GetRemoteEditContent?: (editId: string) => Promise<string>;
+  SaveRemoteEditContent?: (editId: string, content: string, force: boolean) => Promise<{
+    success: boolean;
+    conflict: boolean;
+    remoteModTime: number;
+    remoteSize: number;
+    message: string;
+  }>;
+  CheckRemoteConflict?: (editId: string) => Promise<RemoteConflictInfo>;
+  OpenExternalEditor?: (editId: string) => Promise<void>;
+  CloseRemoteEdit?: (editId: string) => Promise<void>;
+  ListActiveRemoteEdits?: () => Promise<RemoteEditSession[]>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1536,6 +1559,47 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       return [...prev, newTab];
     });
   }, []);
+
+  const openRemoteEditorTab = useCallback(
+    (session: RemoteEditSession, hostId?: string): void => {
+      setTabs((prev) => {
+        const existingTab = prev.find((t) => t.editSessionId === session.id);
+        if (existingTab) {
+          setActiveTabId(existingTab.id);
+          return prev;
+        }
+        tabCounterRef.current += 1;
+        const seq = tabCounterRef.current;
+        const tabId = `editor-tab-${seq}`;
+        const paneId = `editor-pane-${seq}-1`;
+        const fileName = session.filename || session.remotePath.split('/').pop() || 'File';
+        const color = getEffectiveHostColor(hostId, undefined, fileName);
+        const newTab: TabItem = {
+          id: tabId,
+          title: `Edit: ${fileName}`,
+          hostId,
+          color,
+          tabType: 'editor',
+          editSessionId: session.id,
+          editRemotePath: session.remotePath,
+          rootNode: {
+            type: 'pane',
+            id: paneId,
+            sessionId: `editor-${session.id}`,
+            hostId,
+            title: `Edit: ${fileName}`,
+            paneType: 'editor',
+            editSessionId: session.id,
+            editRemotePath: session.remotePath,
+          },
+          activePaneId: paneId,
+        };
+        setActiveTabId(tabId);
+        return [...prev, newTab];
+      });
+    },
+    []
+  );
 
   const getActiveSessionHostIds = useCallback((): string[] => {
     const ids = new Set<string>();
@@ -3416,7 +3480,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       activeTab.tabType === 'notes' ||
       activeTab.tabType === 'settings' ||
       activeTab.tabType === 'sftp' ||
-      activeTab.tabType === 'network-map'
+      activeTab.tabType === 'network-map' ||
+      activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
       const seqFirst = tabCounterRef.current;
@@ -4086,7 +4151,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       activeTab.tabType === 'notes' ||
       activeTab.tabType === 'settings' ||
       activeTab.tabType === 'sftp' ||
-      activeTab.tabType === 'network-map'
+      activeTab.tabType === 'network-map' ||
+      activeTab.tabType === 'editor'
     ) {
       await handleConnectSavedHost(host);
       return;
@@ -4154,7 +4220,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       | 'local-powershell'
       | 'local-cmd'
       | 'local-bash'
-      | 'network-map',
+      | 'network-map'
+      | 'editor',
     zone: Exclude<DropZonePosition, 'center'> = 'right',
     targetPaneIdOverride?: string,
     explicitHostId?: string
@@ -4291,7 +4358,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       activeTab.tabType === 'notes' ||
       activeTab.tabType === 'settings' ||
       activeTab.tabType === 'sftp' ||
-      activeTab.tabType === 'network-map'
+      activeTab.tabType === 'network-map' ||
+      activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
       const newTabId = `tab-view-${tabCounterRef.current}`;
@@ -4347,7 +4415,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       color: getEffectiveHostColor(paneNode.hostId, undefined, paneNode.title),
       rootNode: paneNode,
       activePaneId: paneNode.id,
-      tabType: 'terminal',
+      tabType: paneNode.paneType === 'editor' ? 'editor' : 'terminal',
+      editSessionId: paneNode.editSessionId,
+      editRemotePath: paneNode.editRemotePath,
     };
 
     setTabs((prev) => {
@@ -5257,9 +5327,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       getWailsBindings()?.CancelTransfer?.(tid) ?? Promise.resolve(),
                     getActiveTransfers: () =>
                       getWailsBindings()?.GetActiveTransfers?.() ?? Promise.resolve([]),
+                    startRemoteEdit: (sid, p) =>
+                      getWailsBindings()?.StartRemoteEdit?.(sid, p) ??
+                      Promise.reject(new Error('StartRemoteEdit unavailable')),
                   }}
                   eventsOn={getWailsRuntime()?.EventsOn}
                   onClose={() => void handleClosePane(tab.id, node.id)}
+                  onOpenRemoteEdit={(sess) => {
+                    openRemoteEditorTab(sess, node.hostId || tab.hostId);
+                  }}
                 />
               )}
             </div>
@@ -5363,6 +5439,119 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 onOpenNotes={(hostId) => openNotesTab(hostId)}
                 onClose={() => void handleClosePane(tab.id, node.id)}
                 isDocked={true}
+              />
+            </div>
+            {renderPaneDropOverlay(tab, node)}
+          </div>
+        );
+      }
+
+      if (node.paneType === 'editor') {
+        const editSession: RemoteEditSession = {
+          id: node.editSessionId || node.sessionId.replace('editor-', ''),
+          sessionId: node.sessionId,
+          remotePath: node.editRemotePath || '',
+          localPath: '',
+          filename: node.title.replace('Edit: ', ''),
+          initialModTime: 0,
+          initialSize: 0,
+          initialHash: '',
+          status: 'active',
+          lastUploadedAt: 0,
+          hasConflict: false,
+        };
+        return (
+          <div
+            key={node.id}
+            className={`split-pane split-widget-pane split-editor-pane ${isPaneActive ? 'active' : ''} ${isDragSource ? 'is-dragging-pane' : ''}`}
+            aria-label={`Remote Editor Pane ${node.title}`}
+            {...commonPaneDragEvents}
+            onClick={() => {
+              setTabs((prev) =>
+                prev.map((t) => (t.id === tab.id ? { ...t, activePaneId: node.id } : t))
+              );
+            }}
+          >
+            <div
+              className="split-pane-header"
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                startWorkspaceDrag({
+                  type: 'pane',
+                  tabId: tab.id,
+                  paneId: node.id,
+                  title: node.title,
+                });
+              }}
+              onDragEnd={() => startWorkspaceDrag(null)}
+              title="Drag header to rearrange or dock pane"
+            >
+              <div className="pane-header-left">
+                <span className="pane-drag-handle" aria-hidden="true">
+                  <CyberIcon name="grip" size={12} />
+                </span>
+                <span className="pane-widget-icon">
+                  <CyberIcon name="edit" size={13} />
+                </span>
+                <span className="pane-title-text" title={node.title}>
+                  {node.title}
+                </span>
+              </div>
+              <div className="pane-header-actions">
+                {isPaneActive ? (
+                  <span className="pane-active-indicator">● ACTIVE</span>
+                ) : (
+                  <span className="pane-inactive-hint">FOCUS</span>
+                )}
+                {totalPanes > 1 && (
+                  <button
+                    type="button"
+                    className="pane-undock-btn"
+                    aria-label={`Undock Pane ${node.title}`}
+                    title="Undock pane into its own standalone tab"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUndockPaneToTab(tab.id, node.id);
+                    }}
+                  >
+                    <CyberIcon name="undock" size={12} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="pane-close-btn"
+                  aria-label={`Close Pane ${node.title}`}
+                  title="Close Docked Editor Pane"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleClosePane(tab.id, node.id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="docked-widget-body" style={{ flex: 1, minHeight: 0 }}>
+              <RemoteEditorView
+                editSession={editSession}
+                api={{
+                  GetRemoteEditContent: (eid) =>
+                    getWailsBindings()?.GetRemoteEditContent?.(eid) ?? Promise.resolve(''),
+                  SaveRemoteEditContent: (eid, content, force) =>
+                    getWailsBindings()?.SaveRemoteEditContent?.(eid, content, force) ??
+                    Promise.resolve({ success: true, conflict: false, remoteModTime: 0, remoteSize: 0, message: '' }),
+                  CheckRemoteConflict: (eid) =>
+                    getWailsBindings()?.CheckRemoteConflict?.(eid) ??
+                    Promise.resolve({ hasConflict: false, remotePath: '', initialModTime: 0, remoteModTime: 0, initialSize: 0, remoteSize: 0, message: '' }),
+                  OpenExternalEditor: (eid) =>
+                    getWailsBindings()?.OpenExternalEditor?.(eid) ?? Promise.resolve(),
+                  CloseRemoteEdit: (eid) =>
+                    getWailsBindings()?.CloseRemoteEdit?.(eid) ?? Promise.resolve(),
+                }}
+                eventsOn={getWailsRuntime()?.EventsOn}
+                onClose={() => void handleClosePane(tab.id, node.id)}
+                isSplitPane={true}
               />
             </div>
             {renderPaneDropOverlay(tab, node)}
@@ -7639,7 +7828,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             {activeTab.tabType !== 'notes' &&
               activeTab.tabType !== 'settings' &&
               activeTab.tabType !== 'sftp' &&
-              activeTab.tabType !== 'network-map' && (
+              activeTab.tabType !== 'network-map' &&
+              activeTab.tabType !== 'editor' && (
               <div className="terminal-toolbar hud-command-strip">
                 <div className="hud-telemetry-readout" title={statusMessage}>
                   <span className="hud-telemetry-dot" />
@@ -8037,9 +8227,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                           deleteRemoteItem: (sid, p) => getWailsBindings()?.DeleteRemoteItem?.(sid, p) ?? Promise.resolve(),
                           cancelTransfer: (tid) => getWailsBindings()?.CancelTransfer?.(tid) ?? Promise.resolve(),
                           getActiveTransfers: () => getWailsBindings()?.GetActiveTransfers?.() ?? Promise.resolve([]),
+                          startRemoteEdit: (sid, p) =>
+                            getWailsBindings()?.StartRemoteEdit?.(sid, p) ??
+                            Promise.reject(new Error('StartRemoteEdit unavailable')),
                         }}
                         eventsOn={getWailsRuntime()?.EventsOn}
                         onClose={() => void handleCloseTab(tab.id)}
+                        onOpenRemoteEdit={(sess) => {
+                          openRemoteEditorTab(sess, tab.hostId);
+                        }}
                       />
                     ) : tab.tabType === 'settings' ? (
                       <SettingsView
@@ -8095,6 +8291,39 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         onOpenNotes={(hostId) => openNotesTab(hostId)}
                         onClose={() => void handleCloseTab(tab.id)}
                         isDocked={false}
+                      />
+                    ) : tab.tabType === 'editor' && tab.editSessionId ? (
+                      <RemoteEditorView
+                        editSession={{
+                          id: tab.editSessionId,
+                          sessionId: tab.rootNode.type === 'pane' ? tab.rootNode.sessionId : '',
+                          remotePath: tab.editRemotePath || '',
+                          localPath: '',
+                          filename: tab.title.replace('Edit: ', ''),
+                          initialModTime: 0,
+                          initialSize: 0,
+                          initialHash: '',
+                          status: 'active',
+                          lastUploadedAt: 0,
+                          hasConflict: false,
+                        }}
+                        api={{
+                          GetRemoteEditContent: (eid) =>
+                            getWailsBindings()?.GetRemoteEditContent?.(eid) ?? Promise.resolve(''),
+                          SaveRemoteEditContent: (eid, content, force) =>
+                            getWailsBindings()?.SaveRemoteEditContent?.(eid, content, force) ??
+                            Promise.resolve({ success: true, conflict: false, remoteModTime: 0, remoteSize: 0, message: '' }),
+                          CheckRemoteConflict: (eid) =>
+                            getWailsBindings()?.CheckRemoteConflict?.(eid) ??
+                            Promise.resolve({ hasConflict: false, remotePath: '', initialModTime: 0, remoteModTime: 0, initialSize: 0, remoteSize: 0, message: '' }),
+                          OpenExternalEditor: (eid) =>
+                            getWailsBindings()?.OpenExternalEditor?.(eid) ?? Promise.resolve(),
+                          CloseRemoteEdit: (eid) =>
+                            getWailsBindings()?.CloseRemoteEdit?.(eid) ?? Promise.resolve(),
+                        }}
+                        eventsOn={getWailsRuntime()?.EventsOn}
+                        onClose={() => void handleCloseTab(tab.id)}
+                        isSplitPane={false}
                       />
                     ) : (
                       renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)

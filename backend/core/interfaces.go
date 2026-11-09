@@ -507,6 +507,60 @@ type VaultPayload struct {
 	Notes         []NotePage       `json:"notes,omitempty"`
 }
 
+// RemoteEditStatus defines the synchronization status of a remote edited file (F-28).
+type RemoteEditStatus string
+
+const (
+	RemoteEditStatusActive   RemoteEditStatus = "active"
+	RemoteEditStatusSyncing  RemoteEditStatus = "syncing"
+	RemoteEditStatusConflict RemoteEditStatus = "conflict"
+	RemoteEditStatusClosed   RemoteEditStatus = "closed"
+)
+
+// RemoteEditSession tracks an active remote file editing lifecycle (F-28).
+type RemoteEditSession struct {
+	ID             string           `json:"id"`
+	SessionID      string           `json:"sessionId"`
+	RemotePath     string           `json:"remotePath"`
+	LocalPath      string           `json:"localPath"`
+	Filename       string           `json:"filename"`
+	InitialModTime int64            `json:"initialModTime"`
+	InitialSize    int64            `json:"initialSize"`
+	InitialHash    string           `json:"initialHash"`
+	Status         RemoteEditStatus `json:"status"`
+	LastUploadedAt int64            `json:"lastUploadedAt"`
+	HasConflict    bool             `json:"hasConflict"`
+	ErrorMessage   string           `json:"errorMessage,omitempty"`
+}
+
+// RemoteEditResult contains the outcome of saving/uploading an edited remote file (F-28).
+type RemoteEditResult struct {
+	Success       bool   `json:"success"`
+	Conflict      bool   `json:"conflict"`
+	RemoteModTime int64  `json:"remoteModTime"`
+	RemoteSize    int64  `json:"remoteSize"`
+	Message       string `json:"message"`
+}
+
+// RemoteConflictInfo describes parallel server modification details (F-28).
+type RemoteConflictInfo struct {
+	HasConflict    bool   `json:"hasConflict"`
+	RemotePath     string `json:"remotePath"`
+	InitialModTime int64  `json:"initialModTime"`
+	RemoteModTime  int64  `json:"remoteModTime"`
+	InitialSize    int64  `json:"initialSize"`
+	RemoteSize     int64  `json:"remoteSize"`
+	Message        string `json:"message"`
+}
+
+// RemoteEditEvent is emitted over Wails when remote file status changes or auto-upload occurs (F-28).
+type RemoteEditEvent struct {
+	EditSessionID string           `json:"editSessionId"`
+	Status        RemoteEditStatus `json:"status"`
+	HasConflict   bool             `json:"hasConflict"`
+	Message       string           `json:"message,omitempty"`
+}
+
 // SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).
 // Implementations live in backend/vault; the master key never leaves the Go process.
 type SecretStore interface {

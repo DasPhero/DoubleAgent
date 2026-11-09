@@ -18,8 +18,16 @@ export function ChangeVaultPassword(arg1, arg2) {
   return window['go']['main']['App']['ChangeVaultPassword'](arg1, arg2);
 }
 
+export function CheckRemoteConflict(arg1) {
+  return window['go']['main']['App']['CheckRemoteConflict'](arg1);
+}
+
 export function ClearWorkspace() {
   return window['go']['main']['App']['ClearWorkspace']();
+}
+
+export function CloseRemoteEdit(arg1) {
+  return window['go']['main']['App']['CloseRemoteEdit'](arg1);
 }
 
 export function ConnectSSH(arg1) {
@@ -130,6 +138,10 @@ export function GetNote(arg1) {
   return window['go']['main']['App']['GetNote'](arg1);
 }
 
+export function GetRemoteEditContent(arg1) {
+  return window['go']['main']['App']['GetRemoteEditContent'](arg1);
+}
+
 export function GetSessionLogStatus(arg1) {
   return window['go']['main']['App']['GetSessionLogStatus'](arg1);
 }
@@ -174,6 +186,10 @@ export function InjectTotpCode(arg1, arg2) {
   return window['go']['main']['App']['InjectTotpCode'](arg1, arg2);
 }
 
+export function ListActiveRemoteEdits() {
+  return window['go']['main']['App']['ListActiveRemoteEdits']();
+}
+
 export function ListForwardRules() {
   return window['go']['main']['App']['ListForwardRules']();
 }
@@ -216,6 +232,10 @@ export function LoadWorkspace() {
 
 export function LockVault() {
   return window['go']['main']['App']['LockVault']();
+}
+
+export function OpenExternalEditor(arg1) {
+  return window['go']['main']['App']['OpenExternalEditor'](arg1);
 }
 
 export function OpenLocalTerminal(arg1, arg2) {
@@ -278,6 +298,10 @@ export function SaveProxychainsFile(arg1, arg2) {
   return window['go']['main']['App']['SaveProxychainsFile'](arg1, arg2);
 }
 
+export function SaveRemoteEditContent(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveRemoteEditContent'](arg1, arg2, arg3);
+}
+
 export function SaveSnippet(arg1) {
   return window['go']['main']['App']['SaveSnippet'](arg1);
 }
@@ -316,6 +340,10 @@ export function SetWorkspaceStore(arg1) {
 
 export function StartForwardTunnel(arg1, arg2) {
   return window['go']['main']['App']['StartForwardTunnel'](arg1, arg2);
+}
+
+export function StartRemoteEdit(arg1, arg2) {
+  return window['go']['main']['App']['StartRemoteEdit'](arg1, arg2);
 }
 
 export function StartSessionLogging(arg1) {

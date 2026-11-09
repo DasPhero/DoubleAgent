@@ -30,6 +30,8 @@ type WorkspaceNode struct {
 	PaneType      string            `json:"paneType,omitempty"`
 	NotesHostID   string            `json:"notesHostId,omitempty"`
 	SftpSessionID string            `json:"sftpSessionId,omitempty"`
+	EditSessionID string            `json:"editSessionId,omitempty"`
+	EditRemotePath string           `json:"editRemotePath,omitempty"`
 	Direction     SplitDirection    `json:"direction,omitempty"`
 	Children      []*WorkspaceNode  `json:"children,omitempty"`
 	Ratios        []float64         `json:"ratios,omitempty"`
@@ -45,6 +47,8 @@ type PaneItem struct {
 	PaneType      string `json:"paneType,omitempty"`
 	NotesHostID   string `json:"notesHostId,omitempty"`
 	SftpSessionID string `json:"sftpSessionId,omitempty"`
+	EditSessionID string `json:"editSessionId,omitempty"`
+	EditRemotePath string `json:"editRemotePath,omitempty"`
 }
 
 // TabItem represents an open terminal tab containing an arbitrary nested split tree of panes (F-08, F-27).

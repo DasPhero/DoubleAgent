@@ -11,7 +11,11 @@ export function CancelTransfer(arg1:string):Promise<void>;
 
 export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;
 
+export function CheckRemoteConflict(arg1:string):Promise<core.RemoteConflictInfo>;
+
 export function ClearWorkspace():Promise<void>;
+
+export function CloseRemoteEdit(arg1:string):Promise<void>;
 
 export function ConnectSSH(arg1:core.ConnectRequest):Promise<string>;
 
@@ -67,6 +71,8 @@ export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOpt
 
 export function GetNote(arg1:string):Promise<core.NotePage>;
 
+export function GetRemoteEditContent(arg1:string):Promise<string>;
+
 export function GetSessionLogStatus(arg1:string):Promise<core.SessionLogStatus>;
 
 export function GetSnippetContext(arg1:string):Promise<core.SnippetContext>;
@@ -89,6 +95,8 @@ export function InjectSessionPassword(arg1:string):Promise<void>;
 
 export function InjectTotpCode(arg1:string,arg2:string):Promise<void>;
 
+export function ListActiveRemoteEdits():Promise<Array<core.RemoteEditSession>>;
+
 export function ListForwardRules():Promise<Array<core.ForwardRule>>;
 
 export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
@@ -110,6 +118,8 @@ export function ListTotpRecords():Promise<Array<core.TotpSummary>>;
 export function LoadWorkspace():Promise<core.WorkspaceState>;
 
 export function LockVault():Promise<void>;
+
+export function OpenExternalEditor(arg1:string):Promise<void>;
 
 export function OpenLocalTerminal(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
@@ -141,6 +151,8 @@ export function SaveProxyProfile(arg1:core.ProxyProfile):Promise<void>;
 
 export function SaveProxychainsFile(arg1:string,arg2:string):Promise<void>;
 
+export function SaveRemoteEditContent(arg1:string,arg2:string,arg3:boolean):Promise<core.RemoteEditResult>;
+
 export function SaveSnippet(arg1:core.Snippet):Promise<void>;
 
 export function SaveTotpRecord(arg1:core.TotpRecord):Promise<void>;
@@ -160,6 +172,8 @@ export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
 export function SetWorkspaceStore(arg1:data.WorkspaceStore):Promise<void>;
 
 export function StartForwardTunnel(arg1:string,arg2:string):Promise<string>;
+
+export function StartRemoteEdit(arg1:string,arg2:string):Promise<core.RemoteEditSession>;
 
 export function StartSessionLogging(arg1:string):Promise<core.SessionLogStatus>;
 

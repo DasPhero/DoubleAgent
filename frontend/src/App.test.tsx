@@ -1,8 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 import { TotpRecord } from './types/totp';
+import { RemoteEditorView } from './components/RemoteEditorView';
+import { RemoteEditSession } from './types/remoteEdit';
 
 describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, and Hosts/Groups (F-01, F-03)', () => {
   it('starts in theme-locked (Dark Crimson), switches to theme-unlocked (Teal) on unlock, and manages Groups and Hosts with inheritance (F-01)', () => {
@@ -2255,5 +2257,157 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }
+  });
+
+  it('supports Remote File Edit with auto-upload, external editor, and parallel conflict detection HUD (F-28)', async () => {
+    let mockContent = 'server {\n  listen 80;\n  server_name localhost;\n}\n';
+    let saveCount = 0;
+    let forceUsed = false;
+    let simulateConflict = false;
+    let externalEditorOpened = false;
+
+    const mockSession: RemoteEditSession = {
+      id: 'edit-sess-test-1',
+      sessionId: 'ssh-sess-1',
+      remotePath: '/etc/nginx/nginx.conf',
+      localPath: '/tmp/test/nginx.conf',
+      filename: 'nginx.conf',
+      initialModTime: 1700000000,
+      initialSize: 52,
+      initialHash: 'abcdef012345',
+      status: 'active',
+      lastUploadedAt: 0,
+      hasConflict: false,
+    };
+
+    const mockApi = {
+      GetRemoteEditContent: async (editId: string) => {
+        void editId;
+        return mockContent;
+      },
+      SaveRemoteEditContent: async (editId: string, newContent: string, force: boolean) => {
+        void editId;
+        saveCount++;
+        forceUsed = force;
+        if (simulateConflict && !force) {
+          return {
+            success: false,
+            conflict: true,
+            remoteModTime: 1700000500,
+            remoteSize: 85,
+            message: 'Remote file was modified on server by another process.',
+          };
+        }
+        mockContent = newContent;
+        return {
+          success: true,
+          conflict: false,
+          remoteModTime: 1700000100,
+          remoteSize: newContent.length,
+          message: 'Saved and uploaded.',
+        };
+      },
+      CheckRemoteConflict: async (editId: string) => {
+        void editId;
+        if (simulateConflict) {
+          return {
+            hasConflict: true,
+            remotePath: '/etc/nginx/nginx.conf',
+            initialModTime: 1700000000,
+            remoteModTime: 1700000500,
+            initialSize: 52,
+            remoteSize: 85,
+            message: 'Server modification detected.',
+          };
+        }
+        return {
+          hasConflict: false,
+          remotePath: '/etc/nginx/nginx.conf',
+          initialModTime: 1700000000,
+          remoteModTime: 1700000000,
+          initialSize: 52,
+          remoteSize: 52,
+          message: 'In sync.',
+        };
+      },
+      OpenExternalEditor: async (editId: string) => {
+        void editId;
+        externalEditorOpened = true;
+      },
+      CloseRemoteEdit: async (editId: string) => {
+        void editId;
+      },
+    };
+
+    const onSavedMock = vi.fn();
+    const onCloseMock = vi.fn();
+
+    render(
+      <RemoteEditorView
+        editSession={mockSession}
+        hostLabel="Production-Server"
+        api={mockApi}
+        onSaved={onSavedMock}
+        onClose={onCloseMock}
+      />
+    );
+
+    // 1. Verify initial file load and telemetry header
+    expect(await screen.findByText('nginx.conf')).toBeInTheDocument();
+    expect(screen.getByText('/etc/nginx/nginx.conf')).toBeInTheDocument();
+    expect(screen.getByText(/Production-Server/i)).toBeInTheDocument();
+    expect(screen.getByText('✓ Synced')).toBeInTheDocument();
+
+    const textarea = screen.getByLabelText(/Remote file content for nginx.conf/i) as HTMLTextAreaElement;
+    expect(textarea.value).toBe(mockContent);
+
+    // 2. Modify content in editor
+    fireEvent.change(textarea, { target: { value: 'server {\n  listen 443 ssl;\n}\n' } });
+    expect(await screen.findByText('● Unsaved')).toBeInTheDocument();
+
+    // 3. Save modified content
+    const saveBtn = screen.getByRole('button', { name: /Save Remote \(Ctrl\+S\)/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(saveCount).toBe(1);
+      expect(forceUsed).toBe(false);
+      expect(mockContent).toContain('listen 443 ssl');
+      expect(onSavedMock).toHaveBeenCalled();
+    });
+
+    // 4. Test External Editor button
+    const extBtn = screen.getByRole('button', { name: /Open in Local Editor/i });
+    fireEvent.click(extBtn);
+    expect(externalEditorOpened).toBe(true);
+
+    // 5. Test Parallel Conflict Detection (F-28)
+    simulateConflict = true;
+    fireEvent.change(textarea, { target: { value: 'server {\n  listen 8080;\n}\n' } });
+    fireEvent.click(saveBtn);
+
+    // Verify Conflict Modal appears with warnings and actions
+    expect(await screen.findByText(/Parallel Conflict Detected!/i)).toBeInTheDocument();
+    expect(screen.getByText(/The file on the remote server was modified after you opened it/i)).toBeInTheDocument();
+
+    const forceBtn = screen.getByRole('button', { name: /Overwrite Remote \(Force Upload\)/i });
+    const reloadBtn = screen.getByRole('button', { name: /Discard Local & Reload/i });
+    const keepBtn = screen.getByRole('button', { name: /Cancel \/ Keep Local Unsaved/i });
+
+    expect(forceBtn).toBeInTheDocument();
+    expect(reloadBtn).toBeInTheDocument();
+    expect(keepBtn).toBeInTheDocument();
+
+    // Test Force Overwrite
+    fireEvent.click(forceBtn);
+    await waitFor(() => {
+      expect(forceUsed).toBe(true);
+      expect(screen.queryByText(/PARALLEL CONFLICT DETECTED/i)).not.toBeInTheDocument();
+    });
+
+    // 6. Test Close
+    const closeBtn = screen.getByRole('button', { name: /Close Remote Editor/i });
+    fireEvent.click(closeBtn);
+    expect(onCloseMock).toHaveBeenCalled();
   });
 });
