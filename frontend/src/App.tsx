@@ -182,7 +182,7 @@ interface CommandPaletteResponse {
 
 export type SplitDirection = 'none' | 'horizontal' | 'vertical';
 
-export type DockablePaneType = 'terminal' | 'notes' | 'totp' | 'sftp' | 'snippets';
+export type DockablePaneType = 'terminal' | 'notes' | 'totp' | 'sftp' | 'snippets' | 'launcher';
 
 export type DropZonePosition = 'left' | 'right' | 'top' | 'bottom' | 'center';
 
@@ -496,6 +496,20 @@ export function movePaneInTree(
   const withoutSource = removePaneFromTree(root, sourcePaneId);
   if (!withoutSource) return root;
   return dockNodeInTree(withoutSource, targetPaneId, sourceNode, zone);
+}
+
+export function replacePaneInTree(
+  root: WorkspaceNode,
+  targetPaneId: string,
+  replacementPane: Extract<WorkspaceNode, { type: 'pane' }>
+): WorkspaceNode {
+  if (root.type === 'pane') {
+    return root.id === targetPaneId ? replacementPane : root;
+  }
+  return {
+    ...root,
+    children: root.children.map((child) => replacePaneInTree(child, targetPaneId, replacementPane)),
+  };
 }
 
 export function updateSplitRatiosInTree(
@@ -1245,36 +1259,82 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const activeTabPanes = activeTab ? collectPanes(activeTab.rootNode) : [];
   const activePane =
     activeTabPanes.find((p) => p.id === activeTab?.activePaneId) || activeTabPanes[0] || null;
-  const sessionId = activePane?.sessionId || null;
+  const sessionId =
+    activePane && (!activePane.paneType || activePane.paneType === 'terminal')
+      ? activePane.sessionId
+      : null;
 
   const writersRef = useRef<Map<string, (chunk: string) => void>>(new Map());
   const pendingDataBuffers = useRef<Map<string, string[]>>(new Map());
   const focusersRef = useRef<Map<string, () => void>>(new Map());
   const tabCounterRef = useRef<number>(0);
+  const targetLauncherRef = useRef<{ tabId: string; paneId: string } | null>(null);
 
   const openSessionTab = useCallback(
     (newSessionId: string, title: string, hostId?: string, explicitColor?: string): void => {
       tabCounterRef.current += 1;
       const seq = tabCounterRef.current;
-      const tabId = `tab-${seq}`;
       const paneId = `pane-${seq}-1`;
       const color = getEffectiveHostColor(hostId, explicitColor, title);
-      const newTab: TabItem = {
-        id: tabId,
-        title,
-        hostId,
-        color,
-        rootNode: {
-          type: 'pane',
-          id: paneId,
-          sessionId: newSessionId,
-          hostId,
+      const explicitLauncherTarget = targetLauncherRef.current;
+      targetLauncherRef.current = null;
+
+      setTabs((prev) => {
+        const targetTab = explicitLauncherTarget
+          ? prev.find((t) => t.id === explicitLauncherTarget.tabId)
+          : prev.find((t) => {
+              const ap = collectPanes(t.rootNode).find((p) => p.id === t.activePaneId);
+              return ap?.paneType === 'launcher';
+            });
+
+        if (targetTab) {
+          const targetPaneId = explicitLauncherTarget
+            ? explicitLauncherTarget.paneId
+            : targetTab.activePaneId;
+          const replacementPane: Extract<WorkspaceNode, { type: 'pane' }> = {
+            type: 'pane',
+            id: paneId,
+            sessionId: newSessionId,
+            hostId,
+            title,
+            paneType: 'terminal',
+          };
+          const wasSingleLauncherPane =
+            targetTab.rootNode.type === 'pane' && targetTab.rootNode.id === targetPaneId;
+          const updatedRoot = replacePaneInTree(targetTab.rootNode, targetPaneId, replacementPane);
+          setActiveTabId(targetTab.id);
+          return prev.map((t) =>
+            t.id === targetTab.id
+              ? {
+                  ...t,
+                  title: wasSingleLauncherPane || t.title === 'New Connection' ? title : t.title,
+                  hostId: wasSingleLauncherPane || !t.hostId ? hostId : t.hostId,
+                  color: wasSingleLauncherPane ? color : t.color,
+                  rootNode: updatedRoot,
+                  activePaneId: paneId,
+                }
+              : t
+          );
+        }
+
+        const tabId = `tab-${seq}`;
+        const newTab: TabItem = {
+          id: tabId,
           title,
-        },
-        activePaneId: paneId,
-      };
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(tabId);
+          hostId,
+          color,
+          rootNode: {
+            type: 'pane',
+            id: paneId,
+            sessionId: newSessionId,
+            hostId,
+            title,
+          },
+          activePaneId: paneId,
+        };
+        setActiveTabId(tabId);
+        return [...prev, newTab];
+      });
     },
     []
   );
@@ -3032,8 +3092,108 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
   };
 
+  const handleOpenNewConnectionTab = (): void => {
+    tabCounterRef.current += 1;
+    const seq = tabCounterRef.current;
+    const tabId = `tab-launcher-${seq}`;
+    const paneId = `pane-launcher-${seq}`;
+    const newTab: TabItem = {
+      id: tabId,
+      title: 'New Connection',
+      color: '#14b8a6',
+      tabType: 'terminal',
+      rootNode: {
+        type: 'pane',
+        id: paneId,
+        sessionId: `launcher-sess-${seq}-${Date.now()}`,
+        title: 'New Connection',
+        paneType: 'launcher',
+      },
+      activePaneId: paneId,
+    };
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(tabId);
+    setStatusMessage('Opened New Connection tab.');
+  };
+
+  const handleOpenNewConnectionSplit = (
+    zone: Exclude<DropZonePosition, 'center'> = 'right',
+    targetPaneIdOverride?: string
+  ): void => {
+    tabCounterRef.current += 1;
+    const seq = tabCounterRef.current;
+    const newPaneId = `pane-launcher-${seq}`;
+    const newLauncherPane: Extract<WorkspaceNode, { type: 'pane' }> = {
+      type: 'pane',
+      id: newPaneId,
+      sessionId: `launcher-sess-${seq}-${Date.now()}`,
+      title: 'New Connection',
+      paneType: 'launcher',
+    };
+
+    if (
+      !activeTab ||
+      !activePane ||
+      activeTab.tabType === 'notes' ||
+      activeTab.tabType === 'settings' ||
+      activeTab.tabType === 'sftp'
+    ) {
+      tabCounterRef.current += 1;
+      const seqFirst = tabCounterRef.current;
+      const firstPaneId = `pane-launcher-${seqFirst}`;
+      const firstLauncherPane: Extract<WorkspaceNode, { type: 'pane' }> = {
+        type: 'pane',
+        id: firstPaneId,
+        sessionId: `launcher-sess-${seqFirst}-${Date.now()}`,
+        title: 'New Connection',
+        paneType: 'launcher',
+      };
+      const direction: 'horizontal' | 'vertical' =
+        zone === 'left' || zone === 'right' ? 'horizontal' : 'vertical';
+      const tabId = `tab-split-launcher-${seq}`;
+      const newTab: TabItem = {
+        id: tabId,
+        title: 'New Connection',
+        color: '#14b8a6',
+        tabType: 'terminal',
+        rootNode: {
+          type: 'split',
+          id: `split-launcher-${seq}`,
+          direction,
+          children:
+            zone === 'left' || zone === 'top'
+              ? [newLauncherPane, firstLauncherPane]
+              : [firstLauncherPane, newLauncherPane],
+          ratios: [50, 50],
+        },
+        activePaneId: newPaneId,
+      };
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(tabId);
+      setShowAddToViewMenu(false);
+      setStatusMessage(`Opened New Connection split view (${direction}).`);
+      return;
+    }
+
+    const targetId = targetPaneIdOverride || activePane.id;
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTab.id
+          ? {
+              ...t,
+              rootNode: dockNodeInTree(t.rootNode, targetId, newLauncherPane, zone),
+              activePaneId: newPaneId,
+            }
+          : t
+      )
+    );
+    setShowAddToViewMenu(false);
+    setStatusMessage(`Opened New Connection split (${zone}).`);
+  };
+
   const handleSplitPane = async (direction: 'horizontal' | 'vertical'): Promise<void> => {
-    if (!activeTab || !activePane) {
+    if (!activeTab || !activePane || activePane.paneType === 'launcher') {
+      handleOpenNewConnectionSplit(direction === 'horizontal' ? 'right' : 'bottom');
       return;
     }
     const api = getWailsBindings();
@@ -3122,7 +3282,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     mode: 'default' | 'current' | 'root',
     splitDir: 'none' | 'horizontal' | 'vertical' = 'none'
   ): Promise<void> => {
-    if (!activeTab || !activePane) {
+    if (!activeTab || !activePane || activePane.paneType === 'launcher') {
       const api = getWailsBindings();
       let targetDir = '';
       if (mode === 'current') {
@@ -3964,6 +4124,246 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     );
   };
 
+  const renderNewConnectionLauncher = (launcherCtx?: {
+    tabId: string;
+    paneId: string;
+    isPrimary: boolean;
+  }): React.JSX.Element => {
+    const isPrimary = launcherCtx ? launcherCtx.isPrimary : true;
+    const labelSuffix = isPrimary ? '' : ` (${launcherCtx?.paneId})`;
+    const armLauncherTarget = () => {
+      if (launcherCtx) {
+        targetLauncherRef.current = { tabId: launcherCtx.tabId, paneId: launcherCtx.paneId };
+        setActiveTabId(launcherCtx.tabId);
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === launcherCtx.tabId ? { ...t, activePaneId: launcherCtx.paneId } : t
+          )
+        );
+      } else {
+        targetLauncherRef.current = null;
+      }
+    };
+
+    return (
+      <div className={`empty-state-card ${launcherCtx ? 'is-pane-launcher-card' : ''}`}>
+        <div className="empty-state-header">
+          <img src={appLogo} alt="DoubleAgent" className="empty-state-brand-img" />
+          <h2>{launcherCtx ? 'New Connection' : 'DoubleAgent Terminal Workspace'}</h2>
+          <p>
+            {launcherCtx
+              ? 'Connect via Direct SSH, launch a local shell, or pick a saved host for this pane.'
+              : 'Direct SSH, local shells, and multi-pane workspace launcher.'}
+          </p>
+        </div>
+
+        {/* Direct SSH Connection Bar moved from top-right header into New Connection view */}
+        <div className="launcher-direct-connect-panel">
+          <div className="launcher-direct-connect-label">
+            <CyberIcon name="terminal" size={13} />
+            <span>Direct SSH Connection</span>
+          </div>
+          <form
+            className={`quick-connect-bar cyber-quick-connect launcher-quick-connect is-expanded ${quickConnectExpanded ? 'is-focused' : ''}`}
+            onSubmit={(e) => {
+              armLauncherTarget();
+              void handleConnect(e);
+            }}
+          >
+            <span className="quick-connect-prefix" title="Direct SSH Quick Connect">
+              <CyberIcon name="terminal" size={13} />
+              <span>SSH</span>
+            </span>
+            <input
+              ref={isPrimary ? quickConnectInputRef : undefined}
+              className="qc-user-input"
+              aria-label={`Username${labelSuffix}`}
+              placeholder="user"
+              value={username}
+              onFocus={() => setQuickConnectExpanded(true)}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+            <span className="qc-sep">@</span>
+            <input
+              className="qc-host-input"
+              aria-label={`Host Address${labelSuffix}`}
+              placeholder="host / IP (or user@host:port)"
+              value={address}
+              onFocus={() => setQuickConnectExpanded(true)}
+              onChange={(e) => {
+                const val = e.target.value;
+                const match = val.match(/^([^@\s]+)@([^:\s]+)(?::(\d+))?$/);
+                if (match) {
+                  setUsername(match[1]);
+                  setAddress(match[2]);
+                  if (match[3]) setPort(match[3]);
+                } else {
+                  setAddress(val);
+                }
+              }}
+              required
+            />
+            <span className="qc-sep">:</span>
+            <input
+              aria-label={`Port${labelSuffix}`}
+              className="port-input qc-port-input"
+              placeholder="22"
+              value={port}
+              onFocus={() => setQuickConnectExpanded(true)}
+              onChange={(e) => setPort(e.target.value)}
+              required
+            />
+            <input
+              className="qc-pass-input"
+              aria-label={`Password${labelSuffix}`}
+              type="password"
+              placeholder="Password (opt)"
+              value={password}
+              onFocus={() => setQuickConnectExpanded(true)}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="btn-primary btn-sm qc-submit-btn"
+              aria-label={`Connect SSH${labelSuffix}`}
+            >
+              Connect SSH
+            </button>
+          </form>
+        </div>
+
+        <div className="empty-state-grid">
+          <div className="empty-state-section">
+            <h3>
+              <CyberIcon name="terminal" size={14} /> Local Shells
+            </h3>
+            <div className="empty-state-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  armLauncherTarget();
+                  void handleOpenLocalTerminal('powershell');
+                }}
+              >
+                <CyberIcon name="bolt" size={13} />
+                <span>PowerShell</span>
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  armLauncherTarget();
+                  void handleOpenLocalTerminal('cmd');
+                }}
+              >
+                <CyberIcon name="terminal" size={13} />
+                <span>Command Prompt</span>
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  armLauncherTarget();
+                  void handleOpenLocalTerminal('wsl');
+                }}
+              >
+                <CyberIcon name="terminal" size={13} />
+                <span>WSL Linux</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="empty-state-section">
+            <h3>
+              <CyberIcon name="folder" size={14} /> Terminal Directory Spawning
+            </h3>
+            <div className="empty-state-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  armLauncherTarget();
+                  void handleOpenTerminalDirectory('default');
+                }}
+                title="Open local terminal in default working directory"
+              >
+                <CyberIcon name="home" size={13} />
+                <span>Default Directory</span>
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  armLauncherTarget();
+                  void handleOpenTerminalDirectory('current');
+                }}
+                title="Open terminal in chosen folder"
+              >
+                <CyberIcon name="folder" size={13} />
+                <span>Choose Folder...</span>
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  armLauncherTarget();
+                  void handleOpenTerminalDirectory('root');
+                }}
+                title="Open elevated root / admin shell"
+              >
+                <CyberIcon name="bolt" size={13} />
+                <span>Root / Admin</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="empty-state-section">
+            <h3>
+              <CyberIcon name="serial" size={14} /> Remote &amp; Serial
+            </h3>
+            <div className="empty-state-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  armLauncherTarget();
+                  setShowCommandPalette(true);
+                }}
+              >
+                <CyberIcon name="search" size={13} />
+                <span>Quick Connect / Hosts (Ctrl+K)</span>
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  armLauncherTarget();
+                  setShowAddHostModal(true);
+                }}
+              >
+                <CyberIcon name="plus" size={13} />
+                <span>New SSH Host</span>
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  armLauncherTarget();
+                  void handleOpenSerialModal();
+                }}
+              >
+                <CyberIcon name="serial" size={13} />
+                <span>Hardware Serial / COM</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderWorkspaceNode = (
     node: WorkspaceNode,
     tab: TabItem,
@@ -3996,6 +4396,122 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           handleExecuteDropOnPane(tab, node.id);
         },
       };
+
+      if (node.paneType === 'launcher') {
+        const allTabLauncherPanes = collectPanes(tab.rootNode).filter(
+          (p) => p.paneType === 'launcher'
+        );
+        const primaryLauncherId =
+          allTabLauncherPanes.find((p) => p.id === tab.activePaneId)?.id ||
+          allTabLauncherPanes[0]?.id;
+        const isPrimaryLauncher = tab.id === activeTab?.id && node.id === primaryLauncherId;
+        return (
+          <div
+            key={node.id}
+            className={`split-pane split-launcher-pane ${isPaneActive ? 'active' : ''} ${isDragSource ? 'is-dragging-pane' : ''}`}
+            aria-label={`Pane ${node.title}`}
+            {...commonPaneDragEvents}
+            onClick={() => {
+              setTabs((prev) =>
+                prev.map((t) => (t.id === tab.id ? { ...t, activePaneId: node.id } : t))
+              );
+            }}
+          >
+            <div
+              className="split-pane-header"
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                startWorkspaceDrag({
+                  type: 'pane',
+                  tabId: tab.id,
+                  paneId: node.id,
+                  title: node.title,
+                });
+              }}
+              onDragEnd={() => startWorkspaceDrag(null)}
+              title="Drag header to rearrange or dock New Connection pane"
+            >
+              <div className="pane-header-left">
+                <span className="pane-drag-handle" aria-hidden="true">
+                  <CyberIcon name="grip" size={12} />
+                </span>
+                <span className="pane-widget-icon">
+                  <CyberIcon name="plus" size={13} />
+                </span>
+                <span className="pane-title-text" title={node.title}>
+                  {node.title}
+                </span>
+              </div>
+              <div className="pane-header-actions">
+                {isPaneActive ? (
+                  <span className="pane-active-indicator">● ACTIVE</span>
+                ) : (
+                  <span className="pane-inactive-hint">FOCUS</span>
+                )}
+                <button
+                  type="button"
+                  className="pane-undock-btn"
+                  aria-label={`Split Horizontal ${node.title}`}
+                  title="Open another New Connection split beside this pane"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenNewConnectionSplit('right', node.id);
+                  }}
+                >
+                  <CyberIcon name="split-h" size={12} />
+                </button>
+                <button
+                  type="button"
+                  className="pane-undock-btn"
+                  aria-label={`Split Vertical ${node.title}`}
+                  title="Open another New Connection split below this pane"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenNewConnectionSplit('bottom', node.id);
+                  }}
+                >
+                  <CyberIcon name="split-v" size={12} />
+                </button>
+                {totalPanes > 1 && (
+                  <button
+                    type="button"
+                    className="pane-undock-btn"
+                    aria-label={`Undock Pane ${node.title}`}
+                    title="Undock pane into its own standalone tab"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUndockPaneToTab(tab.id, node.id);
+                    }}
+                  >
+                    <CyberIcon name="undock" size={12} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="pane-close-btn"
+                  aria-label={`Close Pane ${node.title}`}
+                  title="Close New Connection Pane"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleClosePane(tab.id, node.id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="launcher-pane-body">
+              {renderNewConnectionLauncher({
+                tabId: tab.id,
+                paneId: node.id,
+                isPrimary: isPrimaryLauncher,
+              })}
+            </div>
+            {renderPaneDropOverlay(tab, node)}
+          </div>
+        );
+      }
 
       if (node.paneType === 'notes') {
         const targetHostId = node.notesHostId || node.hostId || '';
@@ -5012,9 +5528,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       <header className="app-header">
         <div className="brand-group">
           <img
-            src={appLogo}
+            src={brandLogoText}
             alt="DoubleAgent Logo"
-            className="brand-logo-img"
+            className="brand-logo-wordmark-img"
             onClick={() => {
               setSettingsActiveTab('about');
               setShowGlobalSettingsModal(true);
@@ -5022,10 +5538,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             title="DoubleAgent SSH Client (Click for About info)"
             style={{ cursor: 'pointer' }}
           />
-          <h1>DoubleAgent</h1>
-          <span className={`status-badge ${vaultLocked ? 'locked' : 'unlocked'}`}>
-            {vaultLocked ? 'Vault Locked' : passwordless ? 'Vault Unlocked (No PW)' : 'Vault Unlocked'}
-          </span>
+          <h1 className="sr-only">DoubleAgent</h1>
           {leaderArmed && (
             <span
               className="leader-status-pill"
@@ -5523,7 +6036,30 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     type="button"
                     role="menuitem"
                     className="nav-dropdown-item"
-                    disabled={!activePane}
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      handleOpenNewConnectionTab();
+                    }}
+                  >
+                    <span>New Connection Tab</span>
+                    <span className="nav-dropdown-shortcut">+ Tab</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      handleOpenNewConnectionSplit('right');
+                    }}
+                  >
+                    <span>New Connection Split</span>
+                    <span className="nav-dropdown-shortcut">+ Split</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
                     onClick={() => {
                       setActiveDropdownMenu(null);
                       void handleSplitPane('horizontal');
@@ -5536,7 +6072,6 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     type="button"
                     role="menuitem"
                     className="nav-dropdown-item"
-                    disabled={!activePane}
                     onClick={() => {
                       setActiveDropdownMenu(null);
                       void handleSplitPane('vertical');
@@ -5664,74 +6199,6 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             </button>
           </nav>
         </div>
-
-        <form
-          className={`quick-connect-bar cyber-quick-connect ${quickConnectExpanded ? 'is-expanded' : ''}`}
-          onSubmit={(e) => void handleConnect(e)}
-        >
-          <span className="quick-connect-prefix" title="Direct SSH Quick Connect">
-            <CyberIcon name="terminal" size={13} />
-            <span>SSH</span>
-          </span>
-          <input
-            ref={quickConnectInputRef}
-            className="qc-user-input"
-            aria-label="Username"
-            placeholder="user"
-            value={username}
-            onFocus={() => setQuickConnectExpanded(true)}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-          <span className="qc-sep">@</span>
-          <input
-            className="qc-host-input"
-            aria-label="Host Address"
-            placeholder="host / IP (or user@host:port)"
-            value={address}
-            onFocus={() => setQuickConnectExpanded(true)}
-            onChange={(e) => {
-              const val = e.target.value;
-              const match = val.match(/^([^@\s]+)@([^:\s]+)(?::(\d+))?$/);
-              if (match) {
-                setUsername(match[1]);
-                setAddress(match[2]);
-                if (match[3]) setPort(match[3]);
-              } else {
-                setAddress(val);
-              }
-            }}
-            required
-          />
-          <span className="qc-sep">:</span>
-          <input
-            aria-label="Port"
-            className="port-input qc-port-input"
-            placeholder="22"
-            value={port}
-            onFocus={() => setQuickConnectExpanded(true)}
-            onChange={(e) => setPort(e.target.value)}
-            required
-          />
-          <input
-            className="qc-pass-input"
-            aria-label="Password"
-            type="password"
-            placeholder="Password (opt)"
-            value={password}
-            onFocus={() => setQuickConnectExpanded(true)}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          {sessionId ? (
-            <button type="button" className="btn-danger btn-sm qc-submit-btn" onClick={() => void handleDisconnect()}>
-              Disconnect
-            </button>
-          ) : (
-            <button type="submit" className="btn-primary btn-sm qc-submit-btn">
-              Connect SSH
-            </button>
-          )}
-        </form>
       </header>
 
       <div className="workspace-body">
@@ -6315,6 +6782,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               <div className="tabs-bar-controls">
                 <button
                   type="button"
+                  className="tab-new-btn"
+                  title="Open New Connection Tab"
+                  aria-label="New Connection Tab"
+                  onClick={handleOpenNewConnectionTab}
+                >
+                  <CyberIcon name="plus" size={12} />
+                </button>
+                <button
+                  type="button"
                   className={`tab-toggle-btn ${groupTabsByHost ? 'active' : ''}`}
                   title={groupTabsByHost ? 'Switch to ungrouped flat tabs' : 'Group tabs by host'}
                   aria-label={groupTabsByHost ? 'Ungroup Tabs' : 'Group by Host'}
@@ -6339,6 +6815,17 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 <div className="terminal-toolbar-actions hud-segmented-deck">
                   {/* GROUP 1: Split & Workspace View Builder */}
                   <div className="hud-btn-group">
+                    <button
+                      type="button"
+                      className="hud-seg-btn"
+                      aria-label="New Connection Split"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleOpenNewConnectionSplit('right')}
+                      title="Open a blank New Connection split pane side-by-side"
+                    >
+                      <CyberIcon name="plus" size={12} />
+                      <span>New Split</span>
+                    </button>
                     <button
                       type="button"
                       className="hud-seg-btn"
@@ -6402,6 +6889,25 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                               </button>
                             ))}
                           </div>
+
+                          <div className="add-to-view-section-title">
+                            Blank Split ({addToViewZone})
+                          </div>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="add-to-view-item"
+                            onClick={() => {
+                              setShowAddToViewMenu(false);
+                              handleOpenNewConnectionSplit(addToViewZone);
+                            }}
+                          >
+                            <CyberIcon name="plus" size={12} />
+                            <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>
+                              New Connection View
+                            </span>
+                            <small style={{ color: 'var(--text-muted)' }}>Launcher</small>
+                          </button>
 
                           <div className="add-to-view-section-title">
                             Connect Host into Split ({addToViewZone})
@@ -6752,114 +7258,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           </section>
         ) : (
           <section className="empty-state" aria-label="Terminal Workspace Quick Start">
-            <div className="empty-state-card">
-              <div className="empty-state-header">
-                <img src={brandLogoText} alt="DoubleAgent" className="empty-state-brand-img" />
-                <h2>DoubleAgent Terminal Workspace</h2>
-                <p>{statusMessage}</p>
-              </div>
-
-              <div className="empty-state-grid">
-                <div className="empty-state-section">
-                  <h3>
-                    <CyberIcon name="terminal" size={14} /> Local Shells
-                  </h3>
-                  <div className="empty-state-actions">
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={() => void handleOpenLocalTerminal('powershell')}
-                    >
-                      <CyberIcon name="bolt" size={13} />
-                      <span>PowerShell</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => void handleOpenLocalTerminal('cmd')}
-                    >
-                      <CyberIcon name="terminal" size={13} />
-                      <span>Command Prompt</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => void handleOpenLocalTerminal('wsl')}
-                    >
-                      <CyberIcon name="terminal" size={13} />
-                      <span>WSL Linux</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="empty-state-section">
-                  <h3>
-                    <CyberIcon name="folder" size={14} /> Terminal Directory Spawning
-                  </h3>
-                  <div className="empty-state-actions">
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => void handleOpenTerminalDirectory('default')}
-                      title="Open local terminal in default working directory"
-                    >
-                      <CyberIcon name="home" size={13} />
-                      <span>Default Directory</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => void handleOpenTerminalDirectory('current')}
-                      title="Open terminal in chosen folder"
-                    >
-                      <CyberIcon name="folder" size={13} />
-                      <span>Choose Folder...</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => void handleOpenTerminalDirectory('root')}
-                      title="Open elevated root / admin shell"
-                    >
-                      <CyberIcon name="bolt" size={13} />
-                      <span>Root / Admin</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="empty-state-section">
-                  <h3>
-                    <CyberIcon name="serial" size={14} /> Remote &amp; Serial
-                  </h3>
-                  <div className="empty-state-actions">
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => setShowCommandPalette(true)}
-                    >
-                      <CyberIcon name="search" size={13} />
-                      <span>Quick Connect / Hosts (Ctrl+K)</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => void handleOpenSerialModal()}
-                    >
-                      <CyberIcon name="serial" size={13} />
-                      <span>Hardware Serial / COM</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => setShowAddHostModal(true)}
-                    >
-                      <CyberIcon name="plus" size={13} />
-                      <span>New SSH Host</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {renderNewConnectionLauncher()}
           </section>
         )}
       </div>
@@ -6869,7 +7268,13 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         <div className="hud-status-left">
           <span className={`hud-status-pill ${vaultLocked ? 'locked' : 'unlocked'}`}>
             <CyberIcon name={vaultLocked ? 'lock' : 'unlock'} size={11} />
-            <span>{vaultLocked ? 'VAULT LOCKED' : 'VAULT ARMED'}</span>
+            <span>
+              {vaultLocked
+                ? 'Vault Locked'
+                : passwordless
+                  ? 'Vault Unlocked (No PW)'
+                  : 'Vault Unlocked'}
+            </span>
           </span>
           {activePane ? (
             <span className="hud-status-segment">

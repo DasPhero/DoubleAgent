@@ -221,8 +221,10 @@
     - Added a persistent 23px `.cyber-hud-statusbar` footer at the bottom of the application displaying `VAULT ARMED` / `VAULT LOCKED`, active `TARGET`, `GRID` pane count, active `BROADCAST` / `REC` / `TUNNELS` telemetry pills, and live status readout.
   - **Rack-Blade Sidebar Host Cards (`.rack-blade-card`)**:
     - Redesigned sidebar host cards into compact glassmorphic server-blade rows with a flexible primary `Connect` button and 23px icon-only action buttons (`Split Connect`, `SFTP`, `Notes`, `Delete`) plus double-click-to-connect, eliminating horizontal button overflow even when the sidebar is resized narrow.
-  - **Compact Inline Quick-Connect Bar (`.cyber-quick-connect`)**:
-    - Streamlined the 4-input top header form into a unified glassmorphic `SSH user@host:port` pill bar that also auto-parses pasted `user@host:port` strings inline.
+  - **New Connection Split Launcher ("Out of Thin Air"), Top-Left Wordmark Logo & Neon Header Triggers (`frontend/src/App.tsx`, `frontend/src/styles.css`)**:
+    - **Logo Swap & Clean Top Bar**: Placed `DoubleAgent_Logo_complete_with_text.png` (`.brand-logo-wordmark-img`) in the top-left `.brand-group`, placed `DoubleAgent_App_Logo.png` (`.empty-state-brand-img`) inside the New Connection launcher card, removed the duplicate vault lock badge from `.app-header` (now displayed exclusively in the bottom `.cyber-hud-statusbar` footer), and styled `.nav-menu-trigger` buttons (`Vault ▾`, `Tools ▾`, `View ▾`, `Tunnels ⇄`, `Settings ⚙`) with Cyberpunk Neon borders, text glow, and hover/active luminescence.
+    - **Direct SSH Connection in New Connection View**: Moved the Direct SSH Connection bar (`user @ host : port | Password | Connect SSH`) from the top-right header into `renderNewConnectionLauncher` so every New Connection tab or split pane has direct SSH entry alongside Local Shells, Terminal Directory Spawning, and Remote & Serial (`Quick Connect / Hosts (Ctrl+K)`, `+ New SSH Host`, `Hardware Serial / COM`).
+    - **Blank "New Connection" Splits Out of Thin Air (`paneType: 'launcher'`)**: Added `handleOpenNewConnectionTab`, `handleOpenNewConnectionSplit`, and `replacePaneInTree` so users can open blank splits or tabs from the `+` button in `.tabs-bar`, `+ New Split` in the HUD command strip, `+ View ▾ -> New Connection View`, or `View ▾ -> New Connection Split` / `Split Horizontal` / `Split Vertical`. Launching any connection inside a `'launcher'` split pane replaces that pane in-place with the connected terminal session.
 
 ## In Progress
 - None (v1 Phase Milestone F-26 Complete).

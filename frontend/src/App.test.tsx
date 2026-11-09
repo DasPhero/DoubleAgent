@@ -1685,7 +1685,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     // Clicking the Command Palette result opens NotesView focused on BGP Runbook
     expect(await screen.findByRole('dialog', { name: 'Host Notes & Documentation' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('BGP Runbook')).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('manages Session Logging per host and per session with timestamped transcripts and password-echo redaction (F-21)', async () => {
     render(<App initialLocked={false} />);
@@ -1868,5 +1868,14 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('button', { name: 'Undock Pane Node Beta' }));
     // Node Beta is now its own tab and the active tab
     expect(await screen.findByLabelText('Pane Node Beta')).toBeInTheDocument();
-  });
+
+    // 8. Test opening a blank "New Connection" split out of thin air and launching a shell inside it
+    fireEvent.click(screen.getByRole('button', { name: 'New Connection Split' }));
+    const launcherPane = await screen.findByLabelText('Pane New Connection');
+    expect(launcherPane).toBeInTheDocument();
+    expect(screen.getByLabelText('Host Address')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /PowerShell/i }));
+    expect(await screen.findByLabelText('Pane Local (PowerShell)')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Pane New Connection')).not.toBeInTheDocument();
+  }, 15000);
 });

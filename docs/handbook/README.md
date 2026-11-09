@@ -288,8 +288,10 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
     - Zoom terminal text in any pane via the **`+`** and **`-`** buttons in the pane header, or press **`Ctrl +`** / **`Ctrl -`** (or **`Ctrl + MouseWheel`**).
     - Press **`Ctrl + 0`** to quickly reset the pane's font size to the global default. Current font size is displayed dynamically in each pane header (e.g. `14px`).
   - **Drag-and-Drop Reordering**: Drag any tab pill left or right to reorder your open sessions, or drag it down into the terminal view to merge tabs side-by-side.
-  - **Mixed Nested Splitting**:
-    - Click **Split ⬌** (`Split Horizontal`) or **Split ⬍** (`Split Vertical`) to divide any active pane.
+  - **Mixed Nested Splitting & Blank "New Connection" Splits**:
+    - Click **`+ New Split`** in the HUD command strip (or **`View ▾ -> New Connection Split`** / **`+ View ▾ -> New Connection View`**) to open a blank **New Connection** launcher pane side-by-side out of thin air.
+    - Inside any **New Connection** tab or split pane, connect via **Direct SSH Connection** (`user @ host : port`), launch a **Local Shell** (`PowerShell`, `Command Prompt`, `WSL Linux`), spawn a directory shell, or open `+ New SSH Host` / `Hardware Serial / COM` — the new session automatically replaces that split pane in-place.
+    - Click **Split H** (`Split Horizontal`) or **Split V** (`Split Vertical`) to divide any active pane (or open a New Connection split when no session is focused).
     - Supports arbitrary nested combinations (e.g. splitting horizontally and then splitting the left pane vertically creates two stacked panes on the left alongside a full-height pane on the right).
   - **Close Individual Panes**: Every pane in a split grid has its own **`×`** close button in its header, allowing individual panes to be closed independently. When all panes in a tab are closed, the tab automatically closes.
   - **Keyboard Focus Navigation**:
