@@ -1874,6 +1874,16 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     const launcherPane = await screen.findByLabelText('Pane New Connection');
     expect(launcherPane).toBeInTheDocument();
     expect(screen.getByLabelText('Host Address')).toBeInTheDocument();
+
+    // Verify Direct SSH connection supports SSH Key authentication from Keychain
+    const keyAuthBtn = within(launcherPane).getByRole('button', { name: /^SSH Key$/i });
+    fireEvent.click(keyAuthBtn);
+    expect(within(launcherPane).getByLabelText('SSH Key')).toBeInTheDocument();
+
+    // Switch back to password
+    fireEvent.click(within(launcherPane).getByRole('button', { name: /^Password$/i }));
+    expect(within(launcherPane).getByLabelText('Password')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /PowerShell/i }));
     expect(await screen.findByLabelText('Pane Local (PowerShell)')).toBeInTheDocument();
     expect(screen.queryByLabelText('Pane New Connection')).not.toBeInTheDocument();

@@ -342,7 +342,18 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
     - Click **Reset Vault** if you ever forget your Master Password (archives the old vault to `doubleagent.vault.reset.<timestamp>.bak` and starts fresh).
   - Click **Lock Vault** at any time to wipe the encryption key from memory immediately, or let the automatic inactivity timer lock the vault after 15 minutes.
 - **Quick Connect & Interactive Terminal (`S1` — `F-01`, `F-06`, `F-07`, `F-11`)**:
-  - Enter **Host / IP**, **Port**, **Username**, and **Password** in the top Quick Connect bar and click **Connect SSH**.
+  - **New Connection Workspace & Split Launcher ("Out of Thin Air")**:
+    - Open new connection splits or tabs at any time by clicking the **`+`** tab button, **`+ View ▾ -> New Connection View`**, or **`View ▾ -> New Connection Split`**.
+    - Displays a wide, responsive glassmorphic card with the DoubleAgent emblem and horizontal header text.
+    - **Adaptive Layout**: Automatically organizes into 3 equal columns (`Local Shells`, `Terminal Directory Spawning`, `Remote & Serial`) when wide, and cleanly collapses into 1 vertical column when the window or split pane is narrow (preventing awkward 2-column wrapping).
+    - **Direct SSH Connection with Multiple Authentication Modes**:
+      - Connect directly to ad-hoc servers by entering `[User] @ [Host / IP] : [Port]`.
+      - Supports switching authentication methods:
+        - **Password**: Enter password (optional) for standard password/keyboard-interactive login.
+        - **SSH Key**: Select any private key stored in the Keychain (`vaultSummary.keys`) with an optional key passphrase. Private keys are securely resolved inside the Go backend by `KeyID` and never exposed to the frontend WebView.
+        - **SSH Agent**: Authenticate via Windows OpenSSH Agent or Pageant.
+      - On narrow panes or windows, input fields and authentication options stack into a clean vertical column with a full-width **Connect SSH** action button.
+    - Connecting to a host or spawning a local shell inside a New Connection split replaces that launcher pane in-place with the active terminal session.
   - On first connection to a host, DoubleAgent displays the **Verify Unknown Host Key (`F-06`)** modal with the key algorithm and `SHA256:...` fingerprint.
   - Once connected, an interactive **xterm.js** terminal session opens with 256-color / Truecolor support, automatic window resize (`FitAddon`), and a 10,000-line scrollback buffer.
 - **SSH Transport & Host-Key Security (`S2` — `F-01`, `F-04`, `F-06`, `F-07`, `F-20`)**:

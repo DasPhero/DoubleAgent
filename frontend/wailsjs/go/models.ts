@@ -171,6 +171,7 @@ export namespace core {
 	    port: number;
 	    username: string;
 	    password: string;
+	    keyId?: string;
 	    privateKey: string;
 	    passphrase: string;
 	    useAgent?: boolean;
@@ -189,6 +190,7 @@ export namespace core {
 	        this.port = source["port"];
 	        this.username = source["username"];
 	        this.password = source["password"];
+	        this.keyId = source["keyId"];
 	        this.privateKey = source["privateKey"];
 	        this.passphrase = source["passphrase"];
 	        this.useAgent = source["useAgent"];

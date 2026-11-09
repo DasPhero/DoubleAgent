@@ -677,6 +677,25 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 		authCfg = core.SshAuthConfig{
 			Method: core.AuthAgent,
 		}
+	} else if req.KeyID != "" {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			for _, k := range payload.Keys {
+				if k.ID == req.KeyID {
+					authCfg = core.SshAuthConfig{
+						Method:     core.AuthPrivateKey,
+						PrivateKey: []byte(k.PrivateKey),
+						Passphrase: k.Passphrase,
+					}
+					if req.Passphrase != "" {
+						authCfg.Passphrase = req.Passphrase
+					}
+					break
+				}
+			}
+		}
+		if authCfg.Method == "" {
+			return "", fmt.Errorf("ssh key %s not found in vault", req.KeyID)
+		}
 	} else if req.PrivateKey != "" {
 		authCfg = core.SshAuthConfig{
 			Method:     core.AuthPrivateKey,

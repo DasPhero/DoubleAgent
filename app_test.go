@@ -328,6 +328,47 @@ func TestApp_OpenTerminalWithOptions_F10(t *testing.T) {
 	_ = app.DisconnectSession(rootID)
 }
 
+func TestApp_ConnectSSH_KeyID_F04(t *testing.T) {
+	fake := newFakeSshTransport()
+	tmpVault := filepath.Join(t.TempDir(), "test_keyid.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	var app *App
+	app = NewAppWithDependencies(fake, nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+
+	keySum, err := app.GenerateSSHKey("DevKey", "ed25519", "")
+	if err != nil {
+		t.Fatalf("GenerateSSHKey failed: %v", err)
+	}
+
+	sessID, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "192.168.1.100",
+		Port:     22,
+		Username: "ops",
+		KeyID:    keySum.ID,
+		Size:     core.TerminalSize{Cols: 80, Rows: 24},
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH with KeyID failed: %v", err)
+	}
+	if sessID == "" {
+		t.Fatal("expected non-empty session ID")
+	}
+
+	_ = app.DisconnectSession(sessID)
+}
+
 func TestApp_SftpOperations_F12(t *testing.T) {
 	fake := newFakeSshTransport()
 	var app *App

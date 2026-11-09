@@ -734,6 +734,7 @@ interface WailsAppBindings {
     port: number;
     username: string;
     password: string;
+    keyId?: string;
     privateKey: string;
     passphrase: string;
     useAgent?: boolean;
@@ -1006,6 +1007,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [port, setPort] = useState<string>('22');
   const [username, setUsername] = useState<string>('root');
   const [password, setPassword] = useState<string>('');
+  const [directAuthMethod, setDirectAuthMethod] = useState<'password' | 'key' | 'agent'>('password');
+  const [directKeyId, setDirectKeyId] = useState<string>('');
+  const [directKeyPassphrase, setDirectKeyPassphrase] = useState<string>('');
   const [tabs, setTabs] = useState<TabItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
@@ -2589,9 +2593,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
   const handleConnect = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
+    if (directAuthMethod === 'key' && !directKeyId && (vaultSummary.keys || []).length > 0) {
+      setStatusMessage('Please select an SSH key from the Keychain dropdown.');
+      return;
+    }
     const api = getWailsBindings();
     if (!api) {
-      setStatusMessage('Wails backend not attached in browser preview mode.');
+      const mockSessionId = `sess-direct-${Date.now()}`;
+      const matchedHost = vaultSummary.hosts.find(
+        (h) => h.address.toLowerCase() === address.trim().toLowerCase()
+      );
+      openSessionTab(mockSessionId, `${username}@${address}:${port}`, matchedHost?.id, matchedHost?.color);
+      setPassword('');
+      setDirectKeyPassphrase('');
+      setStatusMessage(`Connected (${username}@${address}:${port})`);
       return;
     }
     setStatusMessage(`Connecting to ${username}@${address}:${port}...`);
@@ -2600,9 +2615,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         address: address.trim(),
         port: Number(port) || 22,
         username: username.trim(),
-        password,
+        password: directAuthMethod === 'password' ? password : '',
+        keyId: directAuthMethod === 'key' ? directKeyId : '',
         privateKey: '',
-        passphrase: '',
+        passphrase: directAuthMethod === 'key' ? directKeyPassphrase : '',
+        useAgent: directAuthMethod === 'agent',
         size: { cols: 120, rows: 34 },
       });
       const matchedHost = vaultSummary.hosts.find(
@@ -2610,6 +2627,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       );
       openSessionTab(id, `${username}@${address}:${port}`, matchedHost?.id, matchedHost?.color);
       setPassword('');
+      setDirectKeyPassphrase('');
       setStatusMessage(`Connected (${username}@${address}:${port})`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -4149,19 +4167,58 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       <div className={`empty-state-card ${launcherCtx ? 'is-pane-launcher-card' : ''}`}>
         <div className="empty-state-header">
           <img src={appLogo} alt="DoubleAgent" className="empty-state-brand-img" />
-          <h2>{launcherCtx ? 'New Connection' : 'DoubleAgent Terminal Workspace'}</h2>
-          <p>
-            {launcherCtx
-              ? 'Connect via Direct SSH, launch a local shell, or pick a saved host for this pane.'
-              : 'Direct SSH, local shells, and multi-pane workspace launcher.'}
-          </p>
+          <div className="empty-state-header-text">
+            <h2>{launcherCtx ? 'New Connection' : 'DoubleAgent Terminal Workspace'}</h2>
+            <p>
+              {launcherCtx
+                ? 'Connect via Direct SSH, launch a local shell, or pick a saved host for this pane.'
+                : 'Direct SSH, local shells, and multi-pane workspace launcher.'}
+            </p>
+          </div>
         </div>
 
         {/* Direct SSH Connection Bar moved from top-right header into New Connection view */}
         <div className="launcher-direct-connect-panel">
-          <div className="launcher-direct-connect-label">
-            <CyberIcon name="terminal" size={13} />
-            <span>Direct SSH Connection</span>
+          <div className="launcher-direct-connect-header">
+            <div className="launcher-direct-connect-label">
+              <CyberIcon name="terminal" size={13} />
+              <span>Direct SSH Connection</span>
+            </div>
+            <div className="launcher-auth-toggle-group" role="radiogroup" aria-label="Authentication Method">
+              <button
+                type="button"
+                className={`auth-toggle-pill ${directAuthMethod === 'password' ? 'active' : ''}`}
+                onClick={() => setDirectAuthMethod('password')}
+                title="Authenticate with Password"
+              >
+                <CyberIcon name="key" size={11} />
+                <span>Password</span>
+              </button>
+              <button
+                type="button"
+                className={`auth-toggle-pill ${directAuthMethod === 'key' ? 'active' : ''}`}
+                onClick={() => {
+                  setDirectAuthMethod('key');
+                  const availableKeys = vaultSummary.keys ?? [];
+                  if (!directKeyId && availableKeys.length > 0) {
+                    setDirectKeyId(availableKeys[0].id);
+                  }
+                }}
+                title="Authenticate with SSH Key from Keychain"
+              >
+                <CyberIcon name="bolt" size={11} />
+                <span>SSH Key</span>
+              </button>
+              <button
+                type="button"
+                className={`auth-toggle-pill ${directAuthMethod === 'agent' ? 'active' : ''}`}
+                onClick={() => setDirectAuthMethod('agent')}
+                title="Authenticate with OS SSH Agent / Pageant"
+              >
+                <CyberIcon name="shield" size={11} />
+                <span>Agent</span>
+              </button>
+            </div>
           </div>
           <form
             className={`quick-connect-bar cyber-quick-connect launcher-quick-connect is-expanded ${quickConnectExpanded ? 'is-focused' : ''}`}
@@ -4170,66 +4227,110 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               void handleConnect(e);
             }}
           >
-            <span className="quick-connect-prefix" title="Direct SSH Quick Connect">
-              <CyberIcon name="terminal" size={13} />
-              <span>SSH</span>
-            </span>
-            <input
-              ref={isPrimary ? quickConnectInputRef : undefined}
-              className="qc-user-input"
-              aria-label={`Username${labelSuffix}`}
-              placeholder="user"
-              value={username}
-              onFocus={() => setQuickConnectExpanded(true)}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-            <span className="qc-sep">@</span>
-            <input
-              className="qc-host-input"
-              aria-label={`Host Address${labelSuffix}`}
-              placeholder="host / IP (or user@host:port)"
-              value={address}
-              onFocus={() => setQuickConnectExpanded(true)}
-              onChange={(e) => {
-                const val = e.target.value;
-                const match = val.match(/^([^@\s]+)@([^:\s]+)(?::(\d+))?$/);
-                if (match) {
-                  setUsername(match[1]);
-                  setAddress(match[2]);
-                  if (match[3]) setPort(match[3]);
-                } else {
-                  setAddress(val);
-                }
-              }}
-              required
-            />
-            <span className="qc-sep">:</span>
-            <input
-              aria-label={`Port${labelSuffix}`}
-              className="port-input qc-port-input"
-              placeholder="22"
-              value={port}
-              onFocus={() => setQuickConnectExpanded(true)}
-              onChange={(e) => setPort(e.target.value)}
-              required
-            />
-            <input
-              className="qc-pass-input"
-              aria-label={`Password${labelSuffix}`}
-              type="password"
-              placeholder="Password (opt)"
-              value={password}
-              onFocus={() => setQuickConnectExpanded(true)}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="btn-primary btn-sm qc-submit-btn"
-              aria-label={`Connect SSH${labelSuffix}`}
-            >
-              Connect SSH
-            </button>
+            <div className="launcher-target-deck">
+              <span className="quick-connect-prefix" title="Direct SSH Quick Connect">
+                <CyberIcon name="terminal" size={13} />
+                <span>SSH</span>
+              </span>
+              <input
+                ref={isPrimary ? quickConnectInputRef : undefined}
+                className="qc-user-input"
+                aria-label={`Username${labelSuffix}`}
+                placeholder="user"
+                value={username}
+                onFocus={() => setQuickConnectExpanded(true)}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+              <span className="qc-sep">@</span>
+              <input
+                className="qc-host-input"
+                aria-label={`Host Address${labelSuffix}`}
+                placeholder="host / IP (or user@host:port)"
+                value={address}
+                onFocus={() => setQuickConnectExpanded(true)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const match = val.match(/^([^@\s]+)@([^:\s]+)(?::(\d+))?$/);
+                  if (match) {
+                    setUsername(match[1]);
+                    setAddress(match[2]);
+                    if (match[3]) setPort(match[3]);
+                  } else {
+                    setAddress(val);
+                  }
+                }}
+                required
+              />
+              <span className="qc-sep">:</span>
+              <input
+                aria-label={`Port${labelSuffix}`}
+                className="port-input qc-port-input"
+                placeholder="22"
+                value={port}
+                onFocus={() => setQuickConnectExpanded(true)}
+                onChange={(e) => setPort(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="launcher-auth-deck">
+              {directAuthMethod === 'password' && (
+                <input
+                  className="qc-pass-input"
+                  aria-label={`Password${labelSuffix}`}
+                  type="password"
+                  placeholder="Password (opt)"
+                  value={password}
+                  onFocus={() => setQuickConnectExpanded(true)}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              )}
+              {directAuthMethod === 'key' && (
+                <div className="qc-key-deck">
+                  <select
+                    className="qc-key-select"
+                    aria-label={`SSH Key${labelSuffix}`}
+                    value={directKeyId}
+                    onChange={(e) => setDirectKeyId(e.target.value)}
+                    required
+                  >
+                    <option value="">Select Key from Keychain...</option>
+                    {(vaultSummary.keys || []).map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.label} ({k.type} · {k.fingerprint})
+                      </option>
+                    ))}
+                    {(vaultSummary.keys || []).length === 0 && (
+                      <option value="" disabled>
+                        No keys in Keychain (+ Add in Tools &gt; Keychain)
+                      </option>
+                    )}
+                  </select>
+                  <input
+                    className="qc-key-pass-input"
+                    aria-label={`Key Passphrase${labelSuffix}`}
+                    type="password"
+                    placeholder="Passphrase (opt)"
+                    value={directKeyPassphrase}
+                    onChange={(e) => setDirectKeyPassphrase(e.target.value)}
+                  />
+                </div>
+              )}
+              {directAuthMethod === 'agent' && (
+                <div className="qc-agent-deck" title="Will authenticate using OS OpenSSH Agent or Pageant">
+                  <CyberIcon name="shield" size={12} />
+                  <span>OS Agent (Pageant / Pipe)</span>
+                </div>
+              )}
+              <button
+                type="submit"
+                className="btn-primary btn-sm qc-submit-btn"
+                aria-label={`Connect SSH${labelSuffix}`}
+              >
+                Connect SSH
+              </button>
+            </div>
           </form>
         </div>
 
