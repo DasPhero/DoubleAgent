@@ -5177,37 +5177,12 @@ button:hover .cyber-svg-icon {
   filter: drop-shadow(0 0 16px rgba(45, 212, 191, 0.45));
 }
 
-.app-header .nav-menu-trigger {
-  background: linear-gradient(180deg, rgba(13, 33, 44, 0.88) 0%, rgba(7, 15, 26, 0.94) 100%) !important;
-  border: 1px solid rgba(45, 212, 191, 0.58) !important;
-  color: var(--accent-glow) !important;
-  text-shadow: 0 0 8px rgba(45, 212, 191, 0.65);
-  box-shadow: 0 0 10px rgba(20, 184, 166, 0.28), inset 0 0 8px rgba(45, 212, 191, 0.14);
-  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0.34rem 0.72rem;
-  border-radius: 6px;
-  transition: all 0.15s ease;
-}
-
-.app-header .nav-menu-trigger:hover,
-.app-header .nav-menu-trigger.active {
-  background: linear-gradient(180deg, rgba(20, 184, 166, 0.28) 0%, rgba(13, 33, 44, 0.96) 100%) !important;
-  border-color: var(--accent-glow) !important;
-  color: #ffffff !important;
-  text-shadow: 0 0 10px var(--accent-glow), 0 0 18px var(--accent);
-  box-shadow: 0 0 16px rgba(45, 212, 191, 0.55), inset 0 0 12px rgba(45, 212, 191, 0.26);
-  transform: translateY(-1px);
-}
-
 .launcher-direct-connect-panel {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
   margin-bottom: 0.85rem;
-  padding: 0.95rem 1.15rem;
+  padding: 0.85rem 1rem;
   background: rgba(6, 11, 21, 0.88);
   border: 1px solid rgba(45, 212, 191, 0.35);
   border-radius: 10px;
@@ -5273,16 +5248,11 @@ button:hover .cyber-svg-icon {
   box-shadow: 0 0 8px rgba(45, 212, 191, 0.28);
 }
 
-.launcher-quick-connect {
-  width: 100%;
-  max-width: none !important;
+.launcher-direct-form {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  background: transparent !important;
-  border: none !important;
-  padding: 0 !important;
-  box-shadow: none !important;
+  gap: 0.55rem;
+  width: 100%;
 }
 
 .launcher-target-deck {
@@ -5290,47 +5260,111 @@ button:hover .cyber-svg-icon {
   align-items: center;
   gap: 0.4rem;
   width: 100%;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
   background: rgba(11, 19, 32, 0.85);
   border: 1px solid rgba(45, 212, 191, 0.3);
   border-radius: 6px;
-  padding: 0.35rem 0.65rem;
+  padding: 0 0.65rem;
   box-sizing: border-box;
+  flex-wrap: nowrap;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.launcher-target-deck:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(45, 212, 191, 0.25);
+}
+
+.launcher-target-deck .quick-connect-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  opacity: 0.85;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .launcher-target-deck .qc-user-input {
-  width: 110px;
-  flex: 0 0 auto;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: var(--text-bright);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.78rem;
+  flex: 0 1 100px;
+  min-width: 55px;
+  text-align: right;
+  padding: 0 0.25rem;
+  box-sizing: border-box;
+}
+
+.launcher-target-deck .qc-sep {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  opacity: 0.75;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .launcher-target-deck .qc-host-input {
-  flex: 1 1 200px;
-  min-width: 140px;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: var(--text-bright);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.78rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  padding: 0 0.35rem;
+  box-sizing: border-box;
 }
 
 .launcher-target-deck .qc-port-input {
-  width: 55px;
-  flex: 0 0 auto;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: var(--text-bright);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.78rem;
+  flex: 0 0 46px;
+  width: 46px;
   text-align: center;
+  padding: 0 0.15rem;
+  box-sizing: border-box;
 }
 
 .launcher-auth-deck {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.55rem;
   width: 100%;
 }
 
 .launcher-auth-deck .qc-pass-input {
-  flex: 1 1 240px;
-  min-width: 180px;
+  flex: 1 1 auto;
+  min-width: 140px;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
   background: rgba(11, 19, 32, 0.85);
   border: 1px solid rgba(45, 212, 191, 0.3);
   border-radius: 6px;
-  padding: 0.4rem 0.75rem;
+  padding: 0 0.75rem;
   color: var(--text-bright);
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.78rem;
   outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .launcher-auth-deck .qc-pass-input:focus {
@@ -5342,21 +5376,26 @@ button:hover .cyber-svg-icon {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 1 1 280px;
-  min-width: 220px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .qc-key-select {
-  flex: 1 1 180px;
-  min-width: 140px;
+  flex: 1 1 auto;
+  min-width: 130px;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
   background: rgba(11, 19, 32, 0.85);
   border: 1px solid rgba(45, 212, 191, 0.3);
   border-radius: 6px;
   color: var(--text-bright);
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.76rem;
-  padding: 0.4rem 0.6rem;
+  padding: 0 0.6rem;
   outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .qc-key-select:focus {
@@ -5365,16 +5404,21 @@ button:hover .cyber-svg-icon {
 }
 
 .qc-key-pass-input {
-  flex: 0 1 150px;
-  min-width: 110px;
+  flex: 0 1 170px;
+  min-width: 100px;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
   background: rgba(11, 19, 32, 0.85);
   border: 1px solid rgba(45, 212, 191, 0.3);
   border-radius: 6px;
   color: var(--text-bright);
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.76rem;
-  padding: 0.4rem 0.6rem;
+  padding: 0 0.6rem;
   outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .qc-key-pass-input:focus {
@@ -5386,57 +5430,41 @@ button:hover .cyber-svg-icon {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  flex: 1 1 240px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.74rem;
   color: var(--accent-glow);
   background: rgba(20, 184, 166, 0.12);
   border: 1px solid rgba(45, 212, 191, 0.3);
   border-radius: 6px;
-  padding: 0.4rem 0.75rem;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
 }
 
 .launcher-auth-deck .qc-submit-btn {
   flex: 0 0 auto;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
   white-space: nowrap;
-  padding: 0.45rem 1.15rem;
-  font-size: 0.8rem;
+  padding: 0 1.25rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @container (max-width: 780px) {
   .launcher-direct-connect-header {
     flex-direction: column;
     align-items: flex-start;
-  }
-  .launcher-target-deck {
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-  .launcher-target-deck .qc-host-input {
-    width: 100%;
-    order: 3;
-    flex: 1 1 100%;
-  }
-  .launcher-auth-deck {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-  .qc-key-deck {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-  }
-  .qc-key-pass-input {
-    width: 100%;
-    flex: none;
-  }
-  .launcher-auth-deck .qc-submit-btn {
-    width: 100%;
-    height: 34px;
-    justify-content: center;
   }
 }
 
@@ -5445,73 +5473,137 @@ button:hover .cyber-svg-icon {
     flex-direction: column;
     align-items: flex-start;
   }
-  .launcher-target-deck {
-    flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-  .launcher-target-deck .qc-host-input {
-    width: 100%;
-    order: 3;
-    flex: 1 1 100%;
-  }
+}
+
+@container (max-width: 520px) {
   .launcher-auth-deck {
     flex-direction: column;
     align-items: stretch;
     gap: 0.5rem;
   }
+  .launcher-auth-deck .qc-pass-input {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
+    box-sizing: border-box;
+  }
   .qc-key-deck {
     flex-direction: column;
     align-items: stretch;
     width: 100%;
+    gap: 0.5rem;
+    flex: none;
+  }
+  .qc-key-select {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
+    box-sizing: border-box;
   }
   .qc-key-pass-input {
     width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
     flex: none;
+    box-sizing: border-box;
+  }
+  .qc-agent-deck {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
+    box-sizing: border-box;
   }
   .launcher-auth-deck .qc-submit-btn {
     width: 100%;
-    height: 34px;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
     justify-content: center;
-  }
-}
-
-@container (max-width: 520px) {
-  .launcher-target-deck {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.4rem;
-  }
-  .launcher-target-deck .quick-connect-prefix {
-    align-self: flex-start;
-  }
-  .launcher-target-deck .qc-sep {
-    display: none;
-  }
-  .launcher-target-deck .qc-user-input,
-  .launcher-target-deck .qc-host-input,
-  .launcher-target-deck .qc-port-input {
-    width: 100%;
-    text-align: left;
+    box-sizing: border-box;
   }
 }
 
 @media (max-width: 520px) {
-  .launcher-target-deck {
+  .launcher-auth-deck {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.4rem;
+    gap: 0.5rem;
   }
+  .launcher-auth-deck .qc-pass-input {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
+    box-sizing: border-box;
+  }
+  .qc-key-deck {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 0.5rem;
+    flex: none;
+  }
+  .qc-key-select {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
+    box-sizing: border-box;
+  }
+  .qc-key-pass-input {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
+    box-sizing: border-box;
+  }
+  .qc-agent-deck {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
+    box-sizing: border-box;
+  }
+  .launcher-auth-deck .qc-submit-btn {
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    flex: none;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+}
+
+@container (max-width: 400px) {
   .launcher-target-deck .quick-connect-prefix {
-    align-self: flex-start;
-  }
-  .launcher-target-deck .qc-sep {
     display: none;
   }
-  .launcher-target-deck .qc-user-input,
-  .launcher-target-deck .qc-host-input,
-  .launcher-target-deck .qc-port-input {
-    width: 100%;
-    text-align: left;
+  .launcher-target-deck .qc-user-input {
+    flex: 0 1 70px;
+    min-width: 45px;
+  }
+}
+
+@media (max-width: 400px) {
+  .launcher-target-deck .quick-connect-prefix {
+    display: none;
+  }
+  .launcher-target-deck .qc-user-input {
+    flex: 0 1 70px;
+    min-width: 45px;
   }
 }
 

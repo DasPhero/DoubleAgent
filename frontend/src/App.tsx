@@ -4221,7 +4221,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             </div>
           </div>
           <form
-            className={`quick-connect-bar cyber-quick-connect launcher-quick-connect is-expanded ${quickConnectExpanded ? 'is-focused' : ''}`}
+            className={`launcher-direct-form ${quickConnectExpanded ? 'is-focused' : ''}`}
             onSubmit={(e) => {
               armLauncherTarget();
               void handleConnect(e);
