@@ -316,9 +316,19 @@
       - Go vet: clean (`go vet ./...`).
       - Frontend lint: 0 warnings, 0 errors (`eslint . --max-warnings 0`).
       - Standalone binary: verified and compiled via `wails build` into `build/bin/DoubleAgent.exe`.
+- **UI & Network Map Polish (`F-37`, `F-13`, `F-08`)**:
+  - **Elevated View Dropdown Z-Index (`frontend/src/styles.css`)**:
+    - Added `position: relative; z-index: 1000` to `.terminal-toolbar` and `.hud-command-strip`, `z-index: 1001` to `.add-to-view-wrapper`, and increased `.add-to-view-popover` to `z-index: 15000` with enhanced shadow and teal glow. Resolves stacking context clipping beneath split panes (`Ares [CWD]`).
+  - **Connect Button Mouseover Contrast (`frontend/src/styles.css`)**:
+    - Overhauled `.rack-connect-btn:hover` with a bright cyber teal gradient (`linear-gradient(135deg, var(--accent-bright), var(--accent-primary))`), high-contrast white text (`#ffffff`), and luminous outer glow (`0 0 14px rgba(20, 184, 166, 0.55)`), removing the pitch-black unreadable hover state.
+  - **Network Topology Map Tunnel Visualization (`F-37` / `F-13`) (`app.go`, `NetworkMapView.tsx`, `App.tsx`)**:
+    - Backend: In `GetActiveTunnels()`, resolved and enriched empty `HostID` on active tunnels using `sessionHostID[st.SessionID]` and vault `ForwardRules[st.RuleID]`.
+    - Frontend: Extended `NetworkMapViewProps` with `forwardRules` and enhanced `isTunnelMatchingHost` to cross-reference `tun.hostId`, `tun.ruleId` from `forwardRules`, and target address.
+    - Added Configured Forward Rules listing in the host inspector panel alongside active tunnels.
+    - Wired `forwardRules` to both docked and full-tab `<NetworkMapView />` instances in `App.tsx`.
 
 ## In Progress
-- None (v1 Phase Milestone F-28 Complete).
+- None (v1 Phase Milestone F-28 Complete & Polish Verified).
 
 ## Next (TODO List — v1 Phase)
 - **`F-29`: Vault File Sync**: Sync vault across Google Drive/Syncthing with conflict detection and merge.

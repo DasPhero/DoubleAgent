@@ -15,7 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { CyberIcon } from './CyberIcon';
-import { ForwardTunnelStatus } from '../types/forward';
+import { ForwardTunnelStatus, ForwardRule } from '../types/forward';
 import { NotePage } from '../types/note';
 import {
   TopologyNodeData,
@@ -29,9 +29,16 @@ import {
 function isTunnelMatchingHost(
   tun: ForwardTunnelStatus,
   hostId: string,
-  hostAddress: string
+  hostAddress: string,
+  forwardRules?: ForwardRule[]
 ): boolean {
-  return tun.hostId === hostId || tun.targetHost === hostAddress;
+  if (tun.hostId && tun.hostId === hostId) return true;
+  if (tun.ruleId && forwardRules) {
+    const matchedRule = forwardRules.find((r) => r.id === tun.ruleId);
+    if (matchedRule && matchedRule.hostId === hostId) return true;
+  }
+  if (tun.targetHost && tun.targetHost === hostAddress) return true;
+  return false;
 }
 
 // ---------------------------------------------------------
@@ -241,6 +248,7 @@ export interface NetworkMapViewProps {
   notes?: NotePage[];
   activeSessionHostIds?: string[];
   activeTunnels?: ForwardTunnelStatus[];
+  forwardRules?: ForwardRule[];
   onConnectHost?: (hostId: string) => void;
   onSplitConnectHost?: (hostId: string) => void;
   onOpenSftp?: (hostId: string, hostLabel: string) => void;
@@ -255,6 +263,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
   notes = [],
   activeSessionHostIds = [],
   activeTunnels = [],
+  forwardRules = [],
   onConnectHost,
   onSplitConnectHost,
   onOpenSftp,
@@ -282,7 +291,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
 
       const isSessionActive = activeSessionHostIds.includes(h.id);
       const isTunnelActive = activeTunnels.some((t) =>
-        isTunnelMatchingHost(t, h.id, h.address)
+        isTunnelMatchingHost(t, h.id, h.address, forwardRules)
       );
       const hasJumpChain = Boolean(h.jumpChain && h.jumpChain.length > 0);
 
@@ -291,7 +300,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
       if (filterMode === 'jumps') return hasJumpChain;
       return true;
     });
-  }, [hosts, searchQuery, filterMode, activeSessionHostIds, activeTunnels]);
+  }, [hosts, searchQuery, filterMode, activeSessionHostIds, activeTunnels, forwardRules]);
 
   // Compute telemetry statistics
   const stats: TopologyStats = useMemo(() => {
@@ -366,7 +375,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
         const group = groups.find((g) => g.id === h.groupId);
         const isSessionActive = activeSessionHostIds.includes(h.id);
         const isTunnelActive = activeTunnels.some((t) =>
-          isTunnelMatchingHost(t, h.id, h.address)
+          isTunnelMatchingHost(t, h.id, h.address, forwardRules)
         );
 
         nodes.push({
@@ -388,7 +397,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             status: isSessionActive ? 'active' : isTunnelActive ? 'tunnel' : 'configured',
             activeSessionsCount: isSessionActive ? 1 : 0,
             activeTunnelsCount: activeTunnels.filter((t) =>
-              isTunnelMatchingHost(t, h.id, h.address)
+              isTunnelMatchingHost(t, h.id, h.address, forwardRules)
             ).length,
             jumpHops: h.jumpChain,
             notesCount: notes.filter((n) => n.hostId === h.id).length,
@@ -407,7 +416,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
         const group = groups.find((g) => g.id === h.groupId);
         const isSessionActive = activeSessionHostIds.includes(h.id);
         const isTunnelActive = activeTunnels.some((t) =>
-          isTunnelMatchingHost(t, h.id, h.address)
+          isTunnelMatchingHost(t, h.id, h.address, forwardRules)
         );
 
         nodes.push({
@@ -429,7 +438,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             status: isSessionActive ? 'active' : isTunnelActive ? 'tunnel' : 'configured',
             activeSessionsCount: isSessionActive ? 1 : 0,
             activeTunnelsCount: activeTunnels.filter((t) =>
-              isTunnelMatchingHost(t, h.id, h.address)
+              isTunnelMatchingHost(t, h.id, h.address, forwardRules)
             ).length,
             jumpHops: h.jumpChain,
             notesCount: notes.filter((n) => n.hostId === h.id).length,
@@ -450,7 +459,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
           const group = groups.find((g) => g.id === h.groupId);
           const isSessionActive = activeSessionHostIds.includes(h.id);
           const isTunnelActive = activeTunnels.some((t) =>
-            isTunnelMatchingHost(t, h.id, h.address)
+            isTunnelMatchingHost(t, h.id, h.address, forwardRules)
           );
 
           nodes.push({
@@ -472,7 +481,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
               status: isSessionActive ? 'active' : isTunnelActive ? 'tunnel' : 'configured',
               activeSessionsCount: isSessionActive ? 1 : 0,
               activeTunnelsCount: activeTunnels.filter((t) =>
-                isTunnelMatchingHost(t, h.id, h.address)
+                isTunnelMatchingHost(t, h.id, h.address, forwardRules)
               ).length,
               jumpHops: h.jumpChain,
               notesCount: notes.filter((n) => n.hostId === h.id).length,
@@ -495,7 +504,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
         const group = groups.find((g) => g.id === h.groupId);
         const isSessionActive = activeSessionHostIds.includes(h.id);
         const isTunnelActive = activeTunnels.some((t) =>
-          isTunnelMatchingHost(t, h.id, h.address)
+          isTunnelMatchingHost(t, h.id, h.address, forwardRules)
         );
 
         nodes.push({
@@ -517,7 +526,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             status: isSessionActive ? 'active' : isTunnelActive ? 'tunnel' : 'configured',
             activeSessionsCount: isSessionActive ? 1 : 0,
             activeTunnelsCount: activeTunnels.filter((t) =>
-              isTunnelMatchingHost(t, h.id, h.address)
+              isTunnelMatchingHost(t, h.id, h.address, forwardRules)
             ).length,
             jumpHops: h.jumpChain,
             notesCount: notes.filter((n) => n.hostId === h.id).length,
@@ -580,7 +589,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
 
       // Check for Active Port Forwarding Tunnels
       const hostTunnels = activeTunnels.filter((t) =>
-        isTunnelMatchingHost(t, h.id, h.address)
+        isTunnelMatchingHost(t, h.id, h.address, forwardRules)
       );
       hostTunnels.forEach((tun) => {
         edges.push({
@@ -603,6 +612,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     notes,
     activeSessionHostIds,
     activeTunnels,
+    forwardRules,
     layoutMode,
     onConnectHost,
     onSplitConnectHost,
@@ -641,9 +651,14 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
   const selectedHostTunnels = useMemo(() => {
     if (!selectedHost) return [];
     return activeTunnels.filter((t) =>
-      isTunnelMatchingHost(t, selectedHost.id, selectedHost.address)
+      isTunnelMatchingHost(t, selectedHost.id, selectedHost.address, forwardRules)
     );
-  }, [selectedHost, activeTunnels]);
+  }, [selectedHost, activeTunnels, forwardRules]);
+
+  const selectedHostRules = useMemo(() => {
+    if (!selectedHost || !forwardRules) return [];
+    return forwardRules.filter((r) => r.hostId === selectedHost.id);
+  }, [selectedHost, forwardRules]);
 
   const selectedHostNotes = useMemo(() => {
     if (!selectedHost) return [];
@@ -858,6 +873,22 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                         <span className="tunnel-mode-pill">-{t.type}</span>
                         <span>
                           {t.bindAddress}:{t.bindPort} &rarr; {t.targetHost || 'localhost'}:{t.targetPort || 'dyn'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedHostRules.length > 0 && (
+                <div className="inspector-field">
+                  <span className="inspector-label">Configured Forward Rules ({selectedHostRules.length})</span>
+                  <div className="inspector-tunnels-list">
+                    {selectedHostRules.map((r) => (
+                      <div key={r.id} className="inspector-tunnel-row">
+                        <span className="tunnel-mode-pill">-{r.type}</span>
+                        <span>
+                          {r.label ? `${r.label}: ` : ''}{r.bindAddress || '127.0.0.1'}:{r.bindPort} &rarr; {r.targetHost || 'localhost'}:{r.targetPort || 'dyn'}
                         </span>
                       </div>
                     ))}

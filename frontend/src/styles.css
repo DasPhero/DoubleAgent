@@ -1140,6 +1140,8 @@ body,
 }
 
 .terminal-toolbar {
+  position: relative;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4466,9 +4468,14 @@ body,
 }
 
 /* + Add to View Popover Menu */
+.add-to-view-wrapper {
+  position: relative;
+  z-index: 1001;
+}
+
 .add-to-view-popover {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 4px);
   left: 0;
   width: 310px;
   max-height: 460px;
@@ -4476,9 +4483,9 @@ body,
   background: #0c131f;
   border: 1px solid var(--border-accent);
   border-radius: 10px;
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.92), 0 0 18px rgba(20, 184, 166, 0.25);
   padding: 0.65rem;
-  z-index: 12000;
+  z-index: 15000;
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
@@ -4800,7 +4807,7 @@ button:hover .cyber-svg-icon {
 
 .rack-action-btn:hover {
   background: rgba(20, 184, 166, 0.18);
-  border-color: var(--accent);
+  border-color: var(--accent-bright);
   color: var(--text-bright);
 }
 
@@ -4808,18 +4815,21 @@ button:hover .cyber-svg-icon {
   flex: 1 1 auto;
   min-width: 0;
   background: rgba(20, 184, 166, 0.16);
-  border-color: rgba(20, 184, 166, 0.42);
-  color: var(--accent-glow);
+  border: 1px solid rgba(20, 184, 166, 0.42);
+  color: var(--accent-bright);
   font-family: 'JetBrains Mono', Consolas, monospace;
-  letter-spacing: 0.03em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   overflow: hidden;
+  transition: all 0.15s ease;
 }
 
 .rack-connect-btn:hover {
-  background: var(--accent);
-  color: #031210;
-  box-shadow: 0 0 10px rgba(20, 184, 166, 0.45);
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-primary)) !important;
+  color: #ffffff !important;
+  border-color: var(--accent-bright) !important;
+  box-shadow: 0 0 14px rgba(20, 184, 166, 0.55), inset 0 0 6px rgba(255, 255, 255, 0.25) !important;
 }
 
 .rack-connect-label {
@@ -4840,6 +4850,8 @@ button:hover .cyber-svg-icon {
 
 /* 3. Segmented HUD Command Strip (Terminal Toolbar) */
 .hud-command-strip {
+  position: relative;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -5424,6 +5424,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 notes={notes}
                 activeSessionHostIds={getActiveSessionHostIds()}
                 activeTunnels={activeTunnels}
+                forwardRules={forwardRules}
                 onConnectHost={(hostId) => {
                   const h = vaultSummary.hosts.find((x) => x.id === hostId);
                   if (h) void handleConnectSavedHost(h);
@@ -8276,6 +8277,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         notes={notes}
                         activeSessionHostIds={getActiveSessionHostIds()}
                         activeTunnels={activeTunnels}
+                        forwardRules={forwardRules}
                         onConnectHost={(hostId) => {
                           const h = vaultSummary.hosts.find((x) => x.id === hostId);
                           if (h) void handleConnectSavedHost(h);

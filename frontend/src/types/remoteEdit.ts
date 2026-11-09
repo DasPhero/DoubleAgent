@@ -39,3 +39,4 @@ export interface RemoteEditEvent {
   hasConflict: boolean;
   message?: string;
 }
+

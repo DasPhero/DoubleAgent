@@ -2002,13 +2002,32 @@ func (a *App) StopForwardTunnel(idOrRuleID string) error {
 
 // GetActiveTunnels returns a snapshot of all active port forwarding tunnels and their current metrics (F-13).
 func (a *App) GetActiveTunnels() []core.ForwardTunnelStatus {
+	ruleHostMap := make(map[string]string)
+	if a.vaultStore != nil {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			for _, r := range payload.ForwardRules {
+				if r.HostID != "" {
+					ruleHostMap[r.ID] = r.HostID
+				}
+			}
+		}
+	}
+
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	result := make([]core.ForwardTunnelStatus, 0, len(a.activeTunnels))
 	for _, tun := range a.activeTunnels {
 		if tun != nil {
-			result = append(result, tun.GetStatus())
+			st := tun.GetStatus()
+			if st.HostID == "" {
+				if hid, ok := a.sessionHostID[st.SessionID]; ok && hid != "" {
+					st.HostID = hid
+				} else if rhid, ok := ruleHostMap[st.RuleID]; ok && rhid != "" {
+					st.HostID = rhid
+				}
+			}
+			result = append(result, st)
 		}
 	}
 	return result
