@@ -321,6 +321,21 @@
     - Added `position: relative; z-index: 1000` to `.terminal-toolbar` and `.hud-command-strip`, `z-index: 1001` to `.add-to-view-wrapper`, and increased `.add-to-view-popover` to `z-index: 15000` with enhanced shadow and teal glow. Resolves stacking context clipping beneath split panes (`Ares [CWD]`).
   - **Connect Button Mouseover Contrast (`frontend/src/styles.css`)**:
     - Overhauled `.rack-connect-btn:hover` with a bright cyber teal gradient (`linear-gradient(135deg, var(--accent-bright), var(--accent-primary))`), high-contrast white text (`#ffffff`), and luminous outer glow (`0 0 14px rgba(20, 184, 166, 0.55)`), removing the pitch-black unreadable hover state.
+  - **Dedicated Background SSH Sessions for Tunnels (`F-13`, `F-37`) (`frontend/src/App.tsx`)**:
+    - Discontinued reusing interactive terminal sessions for port forwarding tunnels to prevent channel multiplexing errors and unexpected disconnects.
+    - Always dials a dedicated fresh background SSH session via `api.ConnectSavedHost` strictly for the tunnel without creating interactive terminal tabs or polluting the workspace.
+    - Cleanly closes the background session via `api.DisconnectSession` when stopping the tunnel if no tabs are attached.
+  - **Clean Cold Boot & Disabled Zombie Session Restore (`F-27`) (`frontend/src/App.tsx`, `TerminalView.tsx`, `SettingsView.tsx`)**:
+    - Changed `DEFAULT_SETTINGS.sessionRestoreEnabled` to `false` by default.
+    - Guarded `restoreWorkspace` in `App.tsx` so the app launches fresh into a clean New Connection workspace deck instead of restoring dead placeholder tabs with broken overlays.
+  - **Complete Cyberpunk HUD UI Design Rehaul (`frontend/src/styles.css`, `frontend/src/App.tsx`)**:
+    - **Visual Atmosphere**: Deep obsidian / void background (`#060913`) layered with a subtle holographic circuit grid pattern (`36px 36px`) and scanline telemetry styling.
+    - **Chamfered / Beveled Frames**: Precision angled cut corners (`clip-path: polygon(...)`) applied consistently across server blades, buttons, command strip groups, launcher deck, and modal headers.
+    - **Corner Reticles (`┌ ┐ └ ┘`)**: High-tech double-line corner brackets and accent ticks framing active split panes (`.split-pane.active`), the New Connection command deck, and HUD panels.
+    - **Hazard Stripes & Telemetry**: Integrated `///` hazard ribbons, segmented indicators `||||||`, and live telemetry pills (`[ SYS: ARMED ]`, `[ PROTO: SSH-2.0 ]`, `[ CRYPTO: CHACHA20-POLY1305 ]`).
+    - **Sidebar Server Blades (`.rack-blade-card`, `.rack-connect-btn`)**: Redesigned server blade cards with glowing left cyan power rail and high-contrast, chamfered `[ ▶ CONNECT ]` buttons (`#00f0ff` text, subtle cyan glow, smooth hover transition) eliminating the dark unreadable buttons and abrasive solid neon block hover.
+    - **New Connection Command Deck (`.empty-state-card`, `.launcher-direct-connect-panel`)**: Redesigned into a futuristic cyber command deck featuring a circular radar reticle backing for the DoubleAgent logo, chamfered Auth Method selector (`Password`, `SSH Key`, `Agent`), non-stretching fixed-height input rows with robust narrow-screen stacking, and bold cyan action buttons (`[ ▶ CONNECT SSH ]`, Local Shells, Spawning).
+    - **HUD Command Strip & Top Bar**: Chamfered tech buttons for `+ View`, `~ Dir`, `CWD`, `Root`, and neon crimson `Disconnect`, with sharp, clean dropdown menus and elevated z-index stacking.
   - **Network Topology Map Tunnel Visualization & Offline Start (`F-37` / `F-13`) (`app.go`, `NetworkMapView.tsx`, `App.tsx`, `styles.css`)**:
     - Backend: In `GetActiveTunnels()`, resolved and enriched empty `HostID` on active tunnels using `sessionHostID[st.SessionID]` and vault `ForwardRules[st.RuleID]`.
     - Auto-Connect on Tunnel Start: Enhanced `handleStartTunnelWithHost` to check for an existing live SSH session on the target host; if none exists, it connects to the saved host in the background via `ConnectSavedHost` first, opens the session tab, and immediately establishes the port forwarding tunnel.

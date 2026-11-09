@@ -2066,7 +2066,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     };
 
     try {
-      render(<App initialLocked={false} />);
+      render(<App initialLocked={false} initialSettings={{ sessionRestoreEnabled: true }} />);
 
       // 1. Verify workspace layout restored from workspace.json
       expect(await screen.findByRole('tab', { name: /Restored Server/i })).toBeInTheDocument();

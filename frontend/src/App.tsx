@@ -51,7 +51,7 @@ const SETTINGS_STORAGE_KEY = 'doubleagent_global_settings_v1';
 
 function loadSettingsFromStorage(): AppGlobalSettings {
   try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    const raw = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(SETTINGS_STORAGE_KEY) : null;
     if (raw) {
       const parsed = JSON.parse(raw);
       return { ...DEFAULT_SETTINGS, ...parsed };
@@ -64,7 +64,9 @@ function loadSettingsFromStorage(): AppGlobalSettings {
 
 function saveSettingsToStorage(settings: AppGlobalSettings): void {
   try {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    }
   } catch {
     // ignore
   }
@@ -922,7 +924,13 @@ function sanitizeTabForPersistence(t: TabItem): PersistedTabItem {
   };
 }
 
-export function App({ initialLocked = false }: { initialLocked?: boolean } = {}): React.JSX.Element {
+export function App({
+  initialLocked = false,
+  initialSettings,
+}: {
+  initialLocked?: boolean;
+  initialSettings?: Partial<AppGlobalSettings>;
+} = {}): React.JSX.Element {
   const [vaultLocked, setVaultLocked] = useState<boolean>(initialLocked);
   const [vaultInitialized, setVaultInitialized] = useState<boolean>(!initialLocked);
   const [passwordless, setPasswordless] = useState<boolean>(!initialLocked);
@@ -1146,9 +1154,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   >(new Map());
 
   // Global Settings state
-  const [globalSettings, setGlobalSettings] = useState<AppGlobalSettings>(() =>
-    loadSettingsFromStorage()
-  );
+  const [globalSettings, setGlobalSettings] = useState<AppGlobalSettings>(() => {
+    const loaded = loadSettingsFromStorage();
+    return initialSettings ? { ...loaded, ...initialSettings } : loaded;
+  });
   const globalSettingsRef = useRef<AppGlobalSettings>(globalSettings);
   useEffect(() => {
     globalSettingsRef.current = globalSettings;
@@ -1886,6 +1895,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   useEffect(() => {
     let mounted = true;
     const restoreWorkspace = async (): Promise<void> => {
+      // If session restore is disabled, keep app clean and do not rehydrate dead restored- sessions
+      if (globalSettingsRef.current.sessionRestoreEnabled !== true) {
+        return;
+      }
       const api = getWailsBindings();
       if (!api || !api.LoadWorkspace) return;
       try {
@@ -2621,75 +2634,59 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const handleStartTunnelWithHost = async (hostId: string, ruleId: string): Promise<void> => {
     const host = vaultSummary.hosts.find((h) => h.id === hostId);
     const api = getWailsBindings();
-    if (!api?.StartForwardTunnel) {
+    if (!api?.StartForwardTunnel || !api?.ConnectSavedHost) {
       setStatusMessage('Wails backend not available to start tunnel.');
       return;
     }
 
-    // 1. Check if there is already an active session for this host
-    let targetSessionId = '';
-    for (const t of tabs) {
-      const panes = collectPanes(t.rootNode);
-      for (const p of panes) {
-        if (
-          p.hostId === hostId &&
-          (!p.paneType || p.paneType === 'terminal') &&
-          p.sessionId &&
-          !p.sessionId.startsWith('restored-') &&
-          !p.sessionId.startsWith('local-') &&
-          !p.sessionId.startsWith('serial-')
-        ) {
-          targetSessionId = p.sessionId;
-          break;
-        }
-      }
-      if (targetSessionId) break;
-    }
-
-    // 2. If no active session, connect in background first
-    if (!targetSessionId) {
-      if (!api.ConnectSavedHost) {
-        setStatusMessage('Wails backend ConnectSavedHost not available.');
-        return;
-      }
-      setStatusMessage(`Connecting to ${host ? host.label : hostId} in background...`);
-      try {
-        targetSessionId = await api.ConnectSavedHost(hostId, { cols: 80, rows: 24 });
-        if (host) {
-          openSessionTab(targetSessionId, host.label, host.id, host.color);
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setStatusMessage(`Failed to connect & start tunnel: ${msg}`);
-        throw err;
-      }
-    }
-
-    // 3. Start tunnel
+    setStatusMessage(`Connecting dedicated background session to ${host ? host.label : hostId} for tunnel...`);
     try {
-      await api.StartForwardTunnel(targetSessionId, ruleId);
+      // ALWAYS dial a fresh dedicated background session specifically for this tunnel
+      const bgSessionId = await api.ConnectSavedHost(hostId, { cols: 80, rows: 24 });
+      await api.StartForwardTunnel(bgSessionId, ruleId);
       await refreshForwardState();
-      setStatusMessage(`Started tunnel on ${host ? host.label : hostId}.`);
+      setStatusMessage(`Started tunnel on ${host ? host.label : hostId} (dedicated background session).`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage(`Start tunnel failed: ${msg}`);
+      setStatusMessage(`Failed to start tunnel: ${msg}`);
       throw err;
     }
   };
 
-  const handleStopForwardTunnel = async (tunnelId: string): Promise<void> => {
+  const handleStopForwardTunnel = async (tunnelIdOrRuleId: string): Promise<void> => {
     const api = getWailsBindings();
+    const targetTunnel = activeTunnels.find(
+      (t) => t.id === tunnelIdOrRuleId || t.ruleId === tunnelIdOrRuleId
+    );
+    const tunnelSessionId = targetTunnel?.sessionId;
+
     if (api?.StopForwardTunnel) {
       try {
-        await api.StopForwardTunnel(tunnelId);
+        await api.StopForwardTunnel(tunnelIdOrRuleId);
         await refreshForwardState();
-        setStatusMessage('Stopped tunnel.');
+
+        // If the session was a dedicated background session (not attached to any open tab/pane),
+        // cleanly close it so no background connection leaks.
+        if (tunnelSessionId && api.DisconnectSession) {
+          const isSessionInUseByTabs = tabs.some((t) => {
+            const panes = collectPanes(t.rootNode);
+            return panes.some((p) => p.sessionId === tunnelSessionId);
+          });
+          if (!isSessionInUseByTabs) {
+            try {
+              await api.DisconnectSession(tunnelSessionId);
+            } catch {
+              // Ignore cleanup error if already closed
+            }
+          }
+        }
+        setStatusMessage('Stopped tunnel and closed background session.');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         setStatusMessage(`Stop tunnel failed: ${msg}`);
       }
     } else {
-      setActiveTunnels((prev) => prev.filter((t) => t.id !== tunnelId));
+      setActiveTunnels((prev) => prev.filter((t) => t.id !== tunnelIdOrRuleId && t.ruleId !== tunnelIdOrRuleId));
     }
   };
 

@@ -446,7 +446,7 @@ export function SettingsView({
                   aria-label="Workspace Session Restore"
                   type="checkbox"
                   style={{ width: 'auto' }}
-                  checked={globalSettings.sessionRestoreEnabled !== false}
+                  checked={Boolean(globalSettings.sessionRestoreEnabled)}
                   onChange={(e) => onUpdateSettings({ sessionRestoreEnabled: e.target.checked })}
                 />
                 <span>Restore open tabs, split panes, and layout on launch (workspace.json)</span>

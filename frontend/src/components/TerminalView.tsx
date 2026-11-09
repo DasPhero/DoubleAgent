@@ -42,7 +42,7 @@ export const DEFAULT_SETTINGS: AppGlobalSettings = {
   customShortcuts: [],
   autoReconnect: true,
   maxReconnectAttempts: 5,
-  sessionRestoreEnabled: true,
+  sessionRestoreEnabled: false,
 };
 
 export function getThemeColors(theme: string) {

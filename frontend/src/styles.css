@@ -1,19 +1,23 @@
 :root {
   color-scheme: dark;
-  --bg-base: #090d14;
-  --bg-main: #0b0f19;
-  --bg-panel: #0f172a;
-  --bg-dropdown: #0c131f;
-  --bg-glass: rgba(15, 23, 34, 0.95);
-  --bg-card: #0d1522;
-  --border-accent: rgba(20, 184, 166, 0.28);
+  --bg-base: #060913;
+  --bg-main: #080d1a;
+  --bg-panel: #0b1224;
+  --bg-dropdown: #060b16;
+  --bg-glass: rgba(8, 14, 26, 0.96);
+  --bg-card: #091020;
+  --border-accent: rgba(0, 240, 255, 0.35);
   --border-subtle: rgba(148, 163, 184, 0.16);
   --accent-primary: #0d9488;
-  --accent-bright: #14b8a6;
-  --accent-glow: rgba(20, 184, 166, 0.22);
+  --accent-bright: #00f0ff;
+  --accent-glow: rgba(0, 240, 255, 0.28);
   --accent-text: #5eead4;
   --text-main: #e2e8f0;
   --text-muted: #94a3b8;
+  --hud-cyan: #00f0ff;
+  --hud-crimson: #ff003c;
+  --hud-amber: #ffaa00;
+  --hud-magenta: #ec4899;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-base);
   color: var(--text-main);
@@ -30,32 +34,38 @@ body,
   overscroll-behavior: none !important;
 }
 
-/* Dark Crimson / Red theme when the Vault is LOCKED */
+/* Dark Crimson / Red theme when the Vault is LOCKED (Cyberpunk Armed / Warning) */
 .app-shell.theme-locked {
-  --bg-base: #11080a;
-  --bg-glass: rgba(28, 11, 15, 0.82);
-  --bg-card: rgba(34, 13, 18, 0.9);
-  --border-accent: rgba(239, 68, 68, 0.34);
+  --bg-base: #0f0609;
+  --bg-glass: rgba(24, 8, 14, 0.94);
+  --bg-card: rgba(28, 10, 16, 0.94);
+  --border-accent: rgba(255, 0, 60, 0.45);
   --accent-primary: #b91c1c;
-  --accent-bright: #ef4444;
-  --accent-glow: rgba(239, 68, 68, 0.24);
+  --accent-bright: #ff003c;
+  --accent-glow: rgba(255, 0, 60, 0.35);
   --accent-text: #fca5a5;
-  background: radial-gradient(circle at top right, rgba(185, 28, 28, 0.18), transparent 55%),
+  background: radial-gradient(circle at top right, rgba(255, 0, 60, 0.14), transparent 55%),
+    linear-gradient(rgba(255, 0, 60, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 0, 60, 0.02) 1px, transparent 1px),
     var(--bg-base);
+  background-size: auto, 36px 36px, 36px 36px, auto;
 }
 
 /* Theme presets when the Vault is UNLOCKED */
 .app-shell.theme-unlocked.theme-teal {
-  --bg-base: #090d14;
-  --bg-glass: rgba(15, 23, 34, 0.78);
-  --bg-card: rgba(17, 26, 39, 0.88);
-  --border-accent: rgba(20, 184, 166, 0.28);
+  --bg-base: #060913;
+  --bg-glass: rgba(8, 14, 26, 0.92);
+  --bg-card: rgba(10, 16, 30, 0.92);
+  --border-accent: rgba(0, 240, 255, 0.35);
   --accent-primary: #0d9488;
-  --accent-bright: #14b8a6;
-  --accent-glow: rgba(20, 184, 166, 0.22);
+  --accent-bright: #00f0ff;
+  --accent-glow: rgba(0, 240, 255, 0.28);
   --accent-text: #5eead4;
-  background: radial-gradient(circle at top right, rgba(13, 148, 136, 0.16), transparent 55%),
+  background: radial-gradient(circle at top right, rgba(0, 240, 255, 0.12), transparent 55%),
+    linear-gradient(rgba(0, 240, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.02) 1px, transparent 1px),
     var(--bg-base);
+  background-size: auto, 36px 36px, 36px 36px, auto;
 }
 
 .app-shell.theme-unlocked.theme-dracula {
@@ -435,35 +445,61 @@ body,
 .btn-primary,
 .btn-secondary,
 .btn-danger {
-  border: none;
-  border-radius: 6px;
+  border: 1px solid transparent;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   padding: 0.4rem 0.85rem;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: filter 0.15s ease, border-color 0.15s ease;
+  transition: all 0.14s ease;
 }
 
 .btn-sm {
-  padding: 0.25rem 0.55rem;
-  font-size: 0.75rem;
+  padding: 0.24rem 0.55rem;
+  font-size: 0.72rem;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent-bright), var(--accent-primary));
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.22), rgba(13, 148, 136, 0.35));
+  border-color: #00f0ff;
+  color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.btn-primary:hover {
+  background: rgba(0, 240, 255, 0.38);
   color: #ffffff;
-  box-shadow: 0 2px 10px var(--accent-glow);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.6);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background-color: rgba(30, 41, 59, 0.72);
+  background: rgba(13, 20, 34, 0.85);
   color: var(--text-main);
-  border: 1px solid var(--border-accent);
+  border-color: rgba(0, 240, 255, 0.25);
+}
+
+.btn-secondary:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
 }
 
 .btn-danger {
-  background-color: rgba(220, 38, 38, 0.85);
+  background: rgba(255, 0, 60, 0.18);
+  border-color: rgba(255, 0, 60, 0.5);
+  color: #ff4d6d;
+}
+
+.btn-danger:hover {
+  background: rgba(255, 0, 60, 0.35);
   color: #ffffff;
+  border-color: #ff003c;
+  box-shadow: 0 0 14px rgba(255, 0, 60, 0.6);
+  transform: translateY(-1px);
 }
 
 .workspace-body {
@@ -478,8 +514,8 @@ body,
   width: 280px;
   min-width: 180px;
   max-width: 650px;
-  border-right: 1px solid var(--border-accent);
-  background-color: #0c131f;
+  border-right: 1px solid rgba(0, 240, 255, 0.25);
+  background: linear-gradient(180deg, #070c18 0%, #050811 100%);
   display: flex;
   flex-direction: column;
   padding: 0.85rem;
@@ -782,17 +818,42 @@ body,
 }
 
 .empty-state-card {
-  max-width: 980px;
+  max-width: 1040px;
   width: 100%;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-accent);
-  border-radius: 12px;
-  padding: 1.8rem 2rem;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  background: linear-gradient(135deg, rgba(8, 14, 26, 0.96) 0%, rgba(4, 8, 16, 0.98) 100%);
+  border: 1px solid rgba(0, 240, 255, 0.32);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+  padding: 1.8rem 2.2rem;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.75), 0 0 28px rgba(0, 240, 255, 0.08), inset 0 0 18px rgba(0, 240, 255, 0.03);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
   container-type: inline-size;
+  position: relative;
+}
+
+.empty-state-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-top: 2px solid #00f0ff;
+  border-left: 2px solid #00f0ff;
+  pointer-events: none;
+}
+
+.empty-state-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-bottom: 2px solid #00f0ff;
+  border-right: 2px solid #00f0ff;
+  pointer-events: none;
 }
 
 .empty-state-header {
@@ -803,14 +864,18 @@ body,
 }
 
 .empty-state-brand-img {
-  width: 60px;
-  height: 60px;
-  max-width: 60px;
-  max-height: 60px;
+  width: 68px;
+  height: 68px;
+  max-width: 68px;
+  max-height: 68px;
   object-fit: contain;
   margin: 0;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 16px rgba(45, 212, 191, 0.45));
+  filter: drop-shadow(0 0 18px rgba(0, 240, 255, 0.55));
+  border-radius: 10px;
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, rgba(6, 11, 21, 0.5) 70%, transparent 80%);
+  box-shadow: 0 0 0 1px rgba(0, 240, 255, 0.35), 0 0 18px rgba(0, 240, 255, 0.2);
+  padding: 4px;
 }
 
 .empty-state-header-text {
@@ -822,11 +887,14 @@ body,
 }
 
 .empty-state-header h2 {
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 1.35rem;
-  font-weight: 700;
-  color: #f8fafc;
+  font-weight: 800;
+  color: #ffffff;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
 }
 
 .empty-state-header p {
@@ -858,54 +926,78 @@ body,
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  padding: 1rem;
-  background-color: rgba(15, 23, 34, 0.6);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  background: linear-gradient(135deg, rgba(10, 16, 29, 0.9) 0%, rgba(5, 9, 18, 0.95) 100%);
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(0, 240, 255, 0.03);
 }
 
 .empty-state-section h3 {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--text-main);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #00f0ff;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   margin: 0;
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+  padding-bottom: 0.4rem;
 }
 
 .empty-state-section h3 .cyber-svg-icon,
 .empty-state-section h3 .cyber-icon,
 .empty-state-section h3 svg {
   flex-shrink: 0;
-  margin-right: 0.75rem !important;
+  margin-right: 0.4rem !important;
 }
 
 .empty-state-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .empty-state-actions button {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.85rem;
-  padding: 0.55rem 0.95rem;
-  font-size: 0.82rem;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  padding: 0.52rem 0.9rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, rgba(13, 20, 36, 0.9) 0%, rgba(8, 13, 24, 0.95) 100%);
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  border-left: 3px solid rgba(0, 240, 255, 0.6);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  color: var(--text-bright);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.empty-state-actions button:hover {
+  background: rgba(0, 240, 255, 0.16) !important;
+  border-color: #00f0ff !important;
+  border-left-color: #00f0ff !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.35), inset 0 0 8px rgba(0, 240, 255, 0.15) !important;
+  transform: translateX(3px);
 }
 
 .empty-state-actions button .cyber-svg-icon,
 .empty-state-actions button .cyber-icon,
 .empty-state-actions button svg {
   flex-shrink: 0;
-  margin-right: 0.75rem !important;
+  margin-right: 0.4rem !important;
 }
 
 .empty-state-actions button span {
   display: inline-block;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 
 .terminal-workspace {
@@ -913,7 +1005,7 @@ body,
   display: flex;
   flex-direction: column;
   padding: 0.5rem;
-  background-color: rgba(9, 13, 20, 0.85);
+  background-color: rgba(6, 9, 18, 0.95);
   overflow: hidden;
   gap: 0.45rem;
 }
@@ -930,22 +1022,26 @@ body,
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 6px;
-  background-color: rgba(15, 23, 34, 0.78);
-  border: 1px solid var(--border-subtle);
+  padding: 0.35rem 0.75rem;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+  background-color: rgba(10, 16, 28, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.2);
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.75rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
   cursor: grab;
   user-select: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .tab-pill.active {
-  background-color: var(--accent-glow);
-  border-color: var(--accent-bright);
-  color: #f8fafc;
+  background-color: rgba(0, 240, 255, 0.15);
+  border-color: #00f0ff;
+  border-top: 2px solid #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 -2px 10px rgba(0, 240, 255, 0.4), inset 0 0 8px rgba(0, 240, 255, 0.1);
 }
 
 .tab-dot {
@@ -1029,19 +1125,46 @@ body,
   flex: 1;
   display: flex;
   flex-direction: column;
-  border-radius: 6px;
-  border: 1px solid var(--border-subtle);
-  background-color: #0f1117;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  background-color: #060912;
   overflow: hidden !important;
   overscroll-behavior: contain !important;
   min-width: 0;
   min-height: 0;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
 }
 
 .split-pane.active {
-  border-color: var(--accent-bright);
-  box-shadow: 0 0 0 1px var(--accent-glow);
+  border-color: #00f0ff !important;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.25), inset 0 0 12px rgba(0, 240, 255, 0.04) !important;
+}
+
+.split-pane.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid #00f0ff;
+  border-left: 2px solid #00f0ff;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.split-pane.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-bottom: 2px solid #00f0ff;
+  border-right: 2px solid #00f0ff;
+  pointer-events: none;
+  z-index: 20;
 }
 
 .split-pane-header {
@@ -1555,22 +1678,25 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.32rem 0.65rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  border-radius: 6px;
-  background-color: rgba(15, 23, 34, 0.75);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
+  padding: 0.28rem 0.65rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+  background-color: rgba(9, 15, 27, 0.9);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  color: #cbd5e1;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .nav-menu-trigger:hover,
 .nav-menu-trigger.active {
-  border-color: var(--accent-bright);
-  background-color: var(--accent-glow);
-  color: #f8fafc;
+  border-color: #00f0ff;
+  background-color: rgba(0, 240, 255, 0.14);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
 }
 
 .nav-dropdown-menu {
@@ -1580,12 +1706,12 @@ body,
   margin-top: 0;
   z-index: 10001;
   min-width: 230px;
-  background-color: #0c131f !important;
+  background-color: #060b16 !important;
   opacity: 1 !important;
-  border: 1px solid rgba(20, 184, 166, 0.45);
-  border-radius: 6px;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
   padding: 0.35rem 0.3rem;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 240, 255, 0.12);
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -4712,25 +4838,26 @@ button:hover .cyber-svg-icon {
   font-weight: 700;
 }
 
-/* 2. Rack-Blade Sidebar Host Cards (Zero Horizontal Overflow) */
+/* 2. Rack-Blade Sidebar Host Cards (Zero Horizontal Overflow, Cyberpunk HUD) */
 .rack-blade-card {
   display: flex;
   flex-direction: column;
   gap: 0.38rem !important;
   padding: 0.48rem 0.55rem !important;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.82) 0%, rgba(9, 14, 26, 0.92) 100%) !important;
-  border: 1px solid rgba(148, 163, 184, 0.14) !important;
-  border-left: 2px solid var(--accent) !important;
-  border-radius: 6px !important;
+  background: linear-gradient(135deg, rgba(10, 16, 28, 0.96) 0%, rgba(6, 10, 18, 0.98) 100%) !important;
+  border: 1px solid rgba(0, 240, 255, 0.22) !important;
+  border-left: 3px solid var(--accent, #00f0ff) !important;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px)) !important;
   backdrop-filter: blur(10px);
   transition: all 0.14s ease;
   overflow: hidden;
   min-width: 0;
+  position: relative;
 }
 
 .rack-blade-card:hover {
-  border-color: rgba(20, 184, 166, 0.45) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), inset 0 0 12px rgba(20, 184, 166, 0.06);
+  border-color: rgba(0, 240, 255, 0.6) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65), inset 0 0 14px rgba(0, 240, 255, 0.08);
 }
 
 .rack-blade-card .host-info {
@@ -4747,11 +4874,13 @@ button:hover .cyber-svg-icon {
 }
 
 .host-title-row strong {
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.8rem;
-  color: var(--text-bright);
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: 0.02em;
 }
 
 .host-address-line {
@@ -4770,7 +4899,7 @@ button:hover .cyber-svg-icon {
   gap: 0.25rem;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.65rem;
-  color: var(--accent-glow);
+  color: #00f0ff;
   margin-top: 0.1rem;
   white-space: nowrap;
   overflow: hidden;
@@ -4794,9 +4923,9 @@ button:hover .cyber-svg-icon {
   height: 23px;
   min-width: 24px;
   padding: 0 0.35rem;
-  background: rgba(30, 41, 59, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 4px;
+  background: rgba(13, 20, 34, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
   color: var(--text-main);
   font-size: 0.68rem;
   font-weight: 600;
@@ -4806,30 +4935,37 @@ button:hover .cyber-svg-icon {
 }
 
 .rack-action-btn:hover {
-  background: rgba(20, 184, 166, 0.18);
-  border-color: var(--accent-bright);
-  color: var(--text-bright);
+  background: rgba(0, 240, 255, 0.18);
+  border-color: #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.35);
 }
 
 .rack-connect-btn {
   flex: 1 1 auto;
   min-width: 0;
-  background: rgba(20, 184, 166, 0.16);
-  border: 1px solid rgba(20, 184, 166, 0.42);
-  color: var(--accent-bright);
+  height: 23px;
+  background: rgba(0, 240, 255, 0.12) !important;
+  border: 1px solid rgba(0, 240, 255, 0.5) !important;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)) !important;
+  color: #00f0ff !important;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.4);
   overflow: hidden;
   transition: all 0.15s ease;
 }
 
 .rack-connect-btn:hover {
-  background: linear-gradient(135deg, var(--accent-bright), var(--accent-primary)) !important;
+  background: rgba(0, 240, 255, 0.28) !important;
   color: #ffffff !important;
-  border-color: var(--accent-bright) !important;
-  box-shadow: 0 0 14px rgba(20, 184, 166, 0.55), inset 0 0 6px rgba(255, 255, 255, 0.25) !important;
+  border-color: #00f0ff !important;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.8) !important;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.45), inset 0 0 8px rgba(0, 240, 255, 0.2) !important;
+  transform: translateY(-1px);
 }
 
 .rack-connect-label {
@@ -4848,7 +4984,7 @@ button:hover .cyber-svg-icon {
   color: #fca5a5;
 }
 
-/* 3. Segmented HUD Command Strip (Terminal Toolbar) */
+/* 3. Segmented HUD Command Strip (Terminal Toolbar, Cyberpunk HUD) */
 .hud-command-strip {
   position: relative;
   z-index: 1000;
@@ -4858,8 +4994,8 @@ button:hover .cyber-svg-icon {
   gap: 0.5rem;
   padding: 0.28rem 0.6rem !important;
   min-height: 34px;
-  background: linear-gradient(90deg, rgba(8, 13, 24, 0.92) 0%, rgba(12, 20, 35, 0.88) 100%) !important;
-  border-bottom: 1px solid rgba(20, 184, 166, 0.22) !important;
+  background: linear-gradient(90deg, rgba(6, 11, 22, 0.96) 0%, rgba(9, 15, 29, 0.94) 100%) !important;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.28) !important;
   backdrop-filter: blur(12px);
 }
 
@@ -4879,8 +5015,8 @@ button:hover .cyber-svg-icon {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent-glow);
-  box-shadow: 0 0 6px var(--accent-glow);
+  background: #00f0ff;
+  box-shadow: 0 0 6px #00f0ff;
   flex-shrink: 0;
 }
 
@@ -4888,11 +5024,11 @@ button:hover .cyber-svg-icon {
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  padding: 0.08rem 0.3rem;
-  background: rgba(20, 184, 166, 0.14);
-  border: 1px solid rgba(20, 184, 166, 0.32);
-  border-radius: 3px;
-  color: var(--accent-glow);
+  padding: 0.08rem 0.35rem;
+  background: rgba(0, 240, 255, 0.14);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  clip-path: polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 3px 100%, 0 calc(100% - 3px));
+  color: #00f0ff;
   flex-shrink: 0;
 }
 
@@ -4915,9 +5051,9 @@ button:hover .cyber-svg-icon {
 .hud-btn-group {
   display: inline-flex;
   align-items: center;
-  background: rgba(6, 10, 19, 0.78);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 6px;
+  background: rgba(6, 10, 19, 0.88);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   padding: 1px;
   gap: 1px;
 }
@@ -4930,7 +5066,7 @@ button:hover .cyber-svg-icon {
   padding: 0 0.48rem;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: 2px;
   color: var(--text-main);
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 0.7rem;
@@ -4943,24 +5079,35 @@ button:hover .cyber-svg-icon {
 
 .hud-seg-btn:hover,
 .hud-seg-btn.active {
-  background: rgba(20, 184, 166, 0.18);
-  color: var(--accent-glow);
-  box-shadow: inset 0 0 8px rgba(20, 184, 166, 0.18);
+  background: rgba(0, 240, 255, 0.18);
+  color: #00f0ff;
+  box-shadow: inset 0 0 8px rgba(0, 240, 255, 0.2);
 }
 
 .hud-seg-btn.is-danger-active {
-  background: rgba(239, 68, 68, 0.25);
+  background: rgba(255, 0, 60, 0.25);
   color: #fecaca;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 10px rgba(255, 0, 60, 0.4);
 }
 
 .hud-disconnect-btn {
   height: 26px;
-  padding: 0 0.6rem !important;
+  padding: 0 0.65rem !important;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.7rem !important;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+  background: rgba(255, 0, 60, 0.14) !important;
+  border: 1px solid rgba(255, 0, 60, 0.5) !important;
+  color: #ff4d6d !important;
+}
+
+.hud-disconnect-btn:hover {
+  background: rgba(255, 0, 60, 0.32) !important;
+  border-color: #ff003c !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(255, 0, 60, 0.55) !important;
 }
 
 /* 4. Uncrushable 26px Sci-Fi Pane Header */
@@ -5216,11 +5363,36 @@ button:hover .cyber-svg-icon {
   flex-direction: column;
   gap: 0.65rem;
   margin-bottom: 0.85rem;
-  padding: 0.85rem 1rem;
-  background: rgba(6, 11, 21, 0.88);
-  border: 1px solid rgba(45, 212, 191, 0.35);
-  border-radius: 10px;
-  box-shadow: 0 0 18px rgba(20, 184, 166, 0.12), inset 0 0 12px rgba(45, 212, 191, 0.06);
+  padding: 0.95rem 1.15rem;
+  background: linear-gradient(135deg, rgba(8, 14, 26, 0.96) 0%, rgba(4, 8, 16, 0.98) 100%);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  box-shadow: 0 0 22px rgba(0, 240, 255, 0.12), inset 0 0 16px rgba(0, 240, 255, 0.04);
+  position: relative;
+}
+
+.launcher-direct-connect-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid #00f0ff;
+  border-left: 2px solid #00f0ff;
+  pointer-events: none;
+}
+
+.launcher-direct-connect-panel::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-bottom: 2px solid #00f0ff;
+  border-right: 2px solid #00f0ff;
+  pointer-events: none;
 }
 
 .launcher-direct-connect-header {
@@ -5235,51 +5407,52 @@ button:hover .cyber-svg-icon {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.74rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent-glow);
+  letter-spacing: 0.08em;
+  color: #00f0ff;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
 }
 
 .launcher-auth-toggle-group {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  background: rgba(15, 23, 42, 0.75);
+  background: rgba(10, 16, 29, 0.9);
   padding: 0.18rem;
-  border-radius: 6px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
 }
 
 .auth-toggle-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.22rem 0.6rem;
+  padding: 0.22rem 0.65rem;
   border: 1px solid transparent;
-  border-radius: 4px;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
   background: transparent;
   color: var(--text-muted);
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.68rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .auth-toggle-pill:hover {
-  color: var(--text-bright);
-  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  background: rgba(0, 240, 255, 0.1);
 }
 
 .auth-toggle-pill.active {
-  background: rgba(20, 184, 166, 0.24);
-  border-color: var(--accent);
-  color: var(--accent-glow);
-  font-weight: 700;
-  box-shadow: 0 0 8px rgba(45, 212, 191, 0.28);
+  background: rgba(0, 240, 255, 0.22);
+  border-color: #00f0ff;
+  color: #00f0ff;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
 }
 
 .launcher-direct-form {
@@ -5297,9 +5470,9 @@ button:hover .cyber-svg-icon {
   height: 38px;
   min-height: 38px;
   max-height: 38px;
-  background: rgba(11, 19, 32, 0.85);
-  border: 1px solid rgba(45, 212, 191, 0.3);
-  border-radius: 6px;
+  background: rgba(9, 15, 28, 0.92);
+  border: 1px solid rgba(0, 240, 255, 0.32);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   padding: 0 0.65rem;
   box-sizing: border-box;
   flex-wrap: nowrap;
@@ -5307,8 +5480,8 @@ button:hover .cyber-svg-icon {
 }
 
 .launcher-target-deck:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 10px rgba(45, 212, 191, 0.25);
+  border-color: #00f0ff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
 }
 
 .launcher-target-deck .quick-connect-prefix {
@@ -5317,9 +5490,9 @@ button:hover .cyber-svg-icon {
   gap: 0.25rem;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--accent);
-  opacity: 0.85;
+  font-weight: 800;
+  color: #00f0ff;
+  opacity: 0.9;
   flex-shrink: 0;
   user-select: none;
 }
@@ -5328,10 +5501,10 @@ button:hover .cyber-svg-icon {
   background: transparent !important;
   border: none !important;
   outline: none !important;
-  color: var(--text-bright);
+  color: #ffffff;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.78rem;
-  flex: 0 1 100px;
+  flex: 0 1 110px;
   min-width: 55px;
   text-align: right;
   padding: 0 0.25rem;
@@ -5341,9 +5514,9 @@ button:hover .cyber-svg-icon {
 .launcher-target-deck .qc-sep {
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--accent);
-  opacity: 0.75;
+  font-weight: 800;
+  color: #00f0ff;
+  opacity: 0.8;
   flex-shrink: 0;
   user-select: none;
 }
@@ -5352,7 +5525,7 @@ button:hover .cyber-svg-icon {
   background: transparent !important;
   border: none !important;
   outline: none !important;
-  color: var(--text-bright);
+  color: #ffffff;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.78rem;
   flex: 1 1 auto;
@@ -5366,7 +5539,7 @@ button:hover .cyber-svg-icon {
   background: transparent !important;
   border: none !important;
   outline: none !important;
-  color: var(--text-bright);
+  color: #ffffff;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.78rem;
   flex: 0 0 46px;
@@ -5389,11 +5562,11 @@ button:hover .cyber-svg-icon {
   height: 38px;
   min-height: 38px;
   max-height: 38px;
-  background: rgba(11, 19, 32, 0.85);
-  border: 1px solid rgba(45, 212, 191, 0.3);
-  border-radius: 6px;
+  background: rgba(9, 15, 28, 0.92);
+  border: 1px solid rgba(0, 240, 255, 0.32);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   padding: 0 0.75rem;
-  color: var(--text-bright);
+  color: #ffffff;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.78rem;
   outline: none;
@@ -5402,8 +5575,8 @@ button:hover .cyber-svg-icon {
 }
 
 .launcher-auth-deck .qc-pass-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  border-color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
 }
 
 .qc-key-deck {
@@ -5420,10 +5593,10 @@ button:hover .cyber-svg-icon {
   height: 38px;
   min-height: 38px;
   max-height: 38px;
-  background: rgba(11, 19, 32, 0.85);
-  border: 1px solid rgba(45, 212, 191, 0.3);
-  border-radius: 6px;
-  color: var(--text-bright);
+  background: rgba(9, 15, 28, 0.92);
+  border: 1px solid rgba(0, 240, 255, 0.32);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  color: #ffffff;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.76rem;
   padding: 0 0.6rem;
@@ -5433,8 +5606,8 @@ button:hover .cyber-svg-icon {
 }
 
 .qc-key-select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  border-color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
 }
 
 .qc-key-pass-input {
@@ -5443,10 +5616,10 @@ button:hover .cyber-svg-icon {
   height: 38px;
   min-height: 38px;
   max-height: 38px;
-  background: rgba(11, 19, 32, 0.85);
-  border: 1px solid rgba(45, 212, 191, 0.3);
-  border-radius: 6px;
-  color: var(--text-bright);
+  background: rgba(9, 15, 28, 0.92);
+  border: 1px solid rgba(0, 240, 255, 0.32);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  color: #ffffff;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.76rem;
   padding: 0 0.6rem;
@@ -5456,8 +5629,8 @@ button:hover .cyber-svg-icon {
 }
 
 .qc-key-pass-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  border-color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
 }
 
 .qc-agent-deck {
@@ -5471,10 +5644,11 @@ button:hover .cyber-svg-icon {
   max-height: 38px;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.74rem;
-  color: var(--accent-glow);
-  background: rgba(20, 184, 166, 0.12);
-  border: 1px solid rgba(45, 212, 191, 0.3);
-  border-radius: 6px;
+  font-weight: 700;
+  color: #00f0ff;
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   padding: 0 0.75rem;
   box-sizing: border-box;
 }
@@ -5485,14 +5659,30 @@ button:hover .cyber-svg-icon {
   min-height: 38px;
   max-height: 38px;
   white-space: nowrap;
-  padding: 0 1.25rem;
+  padding: 0 1.35rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(13, 148, 136, 0.32) 100%);
+  border: 1px solid #00f0ff;
+  color: #00f0ff;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.35), inset 0 0 8px rgba(0, 240, 255, 0.15);
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.launcher-auth-deck .qc-submit-btn:hover {
+  background: rgba(0, 240, 255, 0.36);
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.65), inset 0 0 10px rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
 }
 
 @container (max-width: 780px) {
@@ -7224,22 +7414,25 @@ button:hover .cyber-svg-icon {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  background: linear-gradient(135deg, var(--accent-bright), var(--accent-primary));
-  color: #ffffff;
-  border: 1px solid var(--accent-bright);
-  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.22), rgba(13, 148, 136, 0.35));
+  color: #00f0ff;
+  border: 1px solid #00f0ff;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0.35rem 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.65rem;
   cursor: pointer;
-  box-shadow: 0 0 10px rgba(20, 184, 166, 0.35);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
   transition: all 0.15s ease;
 }
 
 .hud-btn-primary:hover {
-  box-shadow: 0 0 14px rgba(20, 184, 166, 0.65);
+  background: rgba(0, 240, 255, 0.35);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.65);
   transform: translateY(-1px);
 }
 
@@ -7248,24 +7441,25 @@ button:hover .cyber-svg-icon {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  background: rgba(239, 68, 68, 0.16);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  border-radius: 4px;
+  background: rgba(255, 0, 60, 0.16);
+  color: #ff4d6d;
+  border: 1px solid rgba(255, 0, 60, 0.5);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0.35rem 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.65rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .hud-btn-danger:hover {
-  background: #ef4444;
+  background: rgba(255, 0, 60, 0.35);
   color: #ffffff;
-  border-color: #ef4444;
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.55);
+  border-color: #ff003c;
+  box-shadow: 0 0 14px rgba(255, 0, 60, 0.55);
 }
 
 .hud-btn-outline {
@@ -7273,17 +7467,23 @@ button:hover .cyber-svg-icon {
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: var(--accent-glow);
-  border: 1px dashed rgba(20, 184, 166, 0.4);
-  border-radius: 4px;
+  color: #00f0ff;
+  border: 1px dashed rgba(0, 240, 255, 0.45);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.35rem 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.65rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .hud-btn-outline:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+}
   background: rgba(20, 184, 166, 0.12);
   border-color: var(--accent-bright);
   color: #ffffff;
