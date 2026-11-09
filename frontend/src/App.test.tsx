@@ -2102,4 +2102,158 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       delete (window as unknown as { go?: unknown }).go;
     }
   });
+
+  it('visualizes hosts, subnets, jump chains, and tunnels in Interactive Network Topology Map and supports docking and Steuerpult (F-37)', async () => {
+    (window as unknown as { go: unknown }).go = {
+      main: {
+        App: {
+          HealthCheck: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            milestone: 'M1-4',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: true,
+            quickUnlockReady: false,
+          }),
+          GetVaultSummary: async () => ({
+            initialized: true,
+            locked: false,
+            passwordless: true,
+            hosts: [
+              {
+                id: 'host-bastion-1',
+                label: 'Bastion-Alpha',
+                address: '10.0.1.5',
+                effectivePort: 22,
+                effectiveUser: 'admin',
+                groupId: 'grp-infra',
+                identityId: 'id-key',
+                tags: ['bastion', 'dmz'],
+                color: '#f59e0b',
+                favorite: true,
+                keepaliveSecs: 30,
+              },
+              {
+                id: 'host-internal-db',
+                label: 'Internal-Postgres',
+                address: '10.0.2.10',
+                effectivePort: 5432,
+                effectiveUser: 'postgres',
+                groupId: 'grp-infra',
+                identityId: 'id-key',
+                tags: ['database', 'prod'],
+                color: '#10b981',
+                favorite: false,
+                keepaliveSecs: 30,
+                jumpChain: ['host-bastion-1'],
+              },
+            ],
+            groups: [
+              {
+                id: 'grp-infra',
+                name: 'Infrastructure',
+                color: '#38bdf8',
+                defaultSettings: { port: 22, username: 'root' },
+              },
+            ],
+            identities: [],
+            sshKeys: [],
+            snippets: [],
+            tunnels: [],
+            proxies: [],
+          }),
+          GetForwardRules: async () => [],
+          GetActiveTunnels: async () => [
+            {
+              id: 'tun-live-1',
+              ruleId: 'rule-db',
+              sessionId: 'sess-bastion',
+              hostId: 'host-internal-db',
+              type: 'L',
+              bindAddress: '127.0.0.1',
+              bindPort: 5433,
+              targetHost: '10.0.2.10',
+              targetPort: 5432,
+              status: 'active',
+              bytesIn: 4096,
+              bytesOut: 8192,
+              activeConns: 2,
+            },
+          ],
+          GetNotes: async () => [],
+          ConnectSavedHost: async () => 'sess-connected-f37',
+        },
+      },
+    };
+
+    try {
+      render(<App initialLocked={false} />);
+
+      // Wait for vault to load hosts and groups in sidebar
+      expect(await screen.findByText('Infrastructure')).toBeInTheDocument();
+
+      // 1. Open Tools dropdown and launch Network Topology Map tab
+      const toolsMenuBtn = await screen.findByRole('button', { name: /Tools/i });
+      fireEvent.click(toolsMenuBtn);
+      const openMapBtn = await screen.findByText(/Interactive Network Topology Map/i);
+      expect(openMapBtn).toBeInTheDocument();
+      fireEvent.click(openMapBtn);
+
+      // 2. Verify Network Topology Map region rendered
+      const mapRegion = await screen.findByRole('region', { name: 'Network Topology Map' });
+      expect(mapRegion).toBeInTheDocument();
+
+      // 3. Verify Steuerpult HUD telemetry counters (Hosts, Subnets, Tunnels, Jumps)
+      expect(within(mapRegion).getByText('All (2)')).toBeInTheDocument();
+      expect(within(mapRegion).getByText(/⇄ Tunnels \(1\)/i)).toBeInTheDocument();
+      expect(within(mapRegion).getByText('Hosts')).toBeInTheDocument();
+      expect(within(mapRegion).getByText('Subnets')).toBeInTheDocument();
+
+      // 4. Verify Nodes on the map: Client node, Bastion host, and Target DB
+      expect(within(mapRegion).getByText('DoubleAgent Client')).toBeInTheDocument();
+      expect(within(mapRegion).getByText('Internal-Postgres')).toBeInTheDocument();
+
+      // 5. Verify Filter and Search in Steuerpult
+      const searchInput = within(mapRegion).getByPlaceholderText('Filter hosts, IPs, tags...');
+      fireEvent.change(searchInput, { target: { value: 'Postgres' } });
+      expect(within(mapRegion).getByText('Internal-Postgres')).toBeInTheDocument();
+      expect(within(mapRegion).queryByText('Bastion-Alpha')).not.toBeInTheDocument();
+
+      // Clear search
+      fireEvent.change(searchInput, { target: { value: '' } });
+      expect(within(mapRegion).getByText('Bastion-Alpha')).toBeInTheDocument();
+
+      // 6. Test Layout Switcher (Hierarchical -> Subnet Clusters -> Grid)
+      const layoutSelect = within(mapRegion).getByRole('combobox', { name: 'Layout Mode' });
+      fireEvent.change(layoutSelect, { target: { value: 'subnets' } });
+      expect(layoutSelect).toHaveValue('subnets');
+      fireEvent.change(layoutSelect, { target: { value: 'grid' } });
+      expect(layoutSelect).toHaveValue('grid');
+
+      // 7. Verify Visual Legend is present at bottom
+      expect(within(mapRegion).getByText('Direct SSH Connection')).toBeInTheDocument();
+      expect(within(mapRegion).getByText('Multi-Hop Jump Chain')).toBeInTheDocument();
+      expect(within(mapRegion).getByText('Active Forward Tunnel')).toBeInTheDocument();
+
+      // 8. Test docking Network Map into a split pane via + Add to View
+      // Open New Connection split from View menu
+      const appNav = screen.getByRole('navigation', { name: 'Application Menu' });
+      const viewMenuBtn = within(appNav).getByRole('button', { name: /View/i });
+      fireEvent.click(viewMenuBtn);
+      const newSplitMenuItem = await screen.findByRole('menuitem', { name: /New Connection Split/i });
+      fireEvent.click(newSplitMenuItem);
+
+      const addToViewBtn = await screen.findByRole('button', { name: 'Add to View' });
+      fireEvent.click(addToViewBtn);
+
+      const dockMapBtn = await screen.findByRole('menuitem', { name: /Network Map/i });
+      expect(dockMapBtn).toBeInTheDocument();
+      fireEvent.click(dockMapBtn);
+
+      expect(await screen.findByLabelText(/Network Map Pane Network Topology Map/i)).toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
 });

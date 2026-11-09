@@ -35,6 +35,7 @@ import { SessionLogsModal } from './components/SessionLogsModal';
 import { BroadcastScope, BroadcastState } from './types/broadcast';
 import { WorkspaceState, ReconnectState, PersistedTabItem, PersistedWorkspaceNode } from './types/workspace';
 import { CyberIcon } from './components/CyberIcon';
+import { NetworkMapView } from './components/NetworkMapView';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -183,7 +184,14 @@ interface CommandPaletteResponse {
 
 export type SplitDirection = 'none' | 'horizontal' | 'vertical';
 
-export type DockablePaneType = 'terminal' | 'notes' | 'totp' | 'sftp' | 'snippets' | 'launcher';
+export type DockablePaneType =
+  | 'terminal'
+  | 'notes'
+  | 'totp'
+  | 'sftp'
+  | 'snippets'
+  | 'launcher'
+  | 'network-map';
 
 export type DropZonePosition = 'left' | 'right' | 'top' | 'bottom' | 'center';
 
@@ -200,7 +208,8 @@ export type WorkspaceDragPayload =
         | 'snippets'
         | 'local-powershell'
         | 'local-cmd'
-        | 'local-bash';
+        | 'local-bash'
+        | 'network-map';
       hostId?: string;
       title: string;
     };
@@ -243,7 +252,7 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map';
   sftpSessionId?: string;
   notesHostId?: string;
   notesInitialNoteId?: string | null;
@@ -1497,6 +1506,53 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     },
     []
   );
+
+  const openNetworkMapTab = useCallback((): void => {
+    setTabs((prev) => {
+      const existingTab = prev.find((t) => t.tabType === 'network-map');
+      if (existingTab) {
+        setActiveTabId(existingTab.id);
+        return prev;
+      }
+      tabCounterRef.current += 1;
+      const seq = tabCounterRef.current;
+      const tabId = `netmap-tab-${seq}`;
+      const paneId = `netmap-pane-${seq}-1`;
+      const newTab: TabItem = {
+        id: tabId,
+        title: 'Network Map 🌐',
+        color: '#2dd4bf',
+        tabType: 'network-map',
+        rootNode: {
+          type: 'pane',
+          id: paneId,
+          sessionId: `netmap-${seq}`,
+          title: 'Network Topology Map',
+          paneType: 'network-map',
+        },
+        activePaneId: paneId,
+      };
+      setActiveTabId(tabId);
+      return [...prev, newTab];
+    });
+  }, []);
+
+  const getActiveSessionHostIds = useCallback((): string[] => {
+    const ids = new Set<string>();
+    for (const t of tabs) {
+      const panes = collectPanes(t.rootNode);
+      for (const p of panes) {
+        if (
+          p.hostId &&
+          (!p.paneType || p.paneType === 'terminal') &&
+          !p.sessionId.startsWith('restored-')
+        ) {
+          ids.add(p.hostId);
+        }
+      }
+    }
+    return Array.from(ids);
+  }, [tabs]);
 
   const registerWriter = useCallback((id: string, writeFn: (chunk: string) => void) => {
     writersRef.current.set(id, writeFn);
@@ -3359,7 +3415,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       !activePane ||
       activeTab.tabType === 'notes' ||
       activeTab.tabType === 'settings' ||
-      activeTab.tabType === 'sftp'
+      activeTab.tabType === 'sftp' ||
+      activeTab.tabType === 'network-map'
     ) {
       tabCounterRef.current += 1;
       const seqFirst = tabCounterRef.current;
@@ -4028,7 +4085,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       !activePane ||
       activeTab.tabType === 'notes' ||
       activeTab.tabType === 'settings' ||
-      activeTab.tabType === 'sftp'
+      activeTab.tabType === 'sftp' ||
+      activeTab.tabType === 'network-map'
     ) {
       await handleConnectSavedHost(host);
       return;
@@ -4095,7 +4153,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       | 'snippets'
       | 'local-powershell'
       | 'local-cmd'
-      | 'local-bash',
+      | 'local-bash'
+      | 'network-map',
     zone: Exclude<DropZonePosition, 'center'> = 'right',
     targetPaneIdOverride?: string,
     explicitHostId?: string
@@ -4111,7 +4170,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         !activePane ||
         activeTab.tabType === 'notes' ||
         activeTab.tabType === 'settings' ||
-        activeTab.tabType === 'sftp'
+        activeTab.tabType === 'sftp' ||
+        activeTab.tabType === 'network-map'
       ) {
         await handleOpenLocalTerminal(shellType);
         return;
@@ -4199,6 +4259,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         paneType: 'snippets',
       };
       setShowSnippetsModal(false);
+    } else if (toolType === 'network-map') {
+      const newPaneId = `pane-netmap-${tabCounterRef.current}`;
+      newPane = {
+        type: 'pane',
+        id: newPaneId,
+        sessionId: `netmap-pane-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        title: 'Network Topology Map',
+        paneType: 'network-map',
+      };
     } else {
       const newPaneId = `pane-sftp-${tabCounterRef.current}`;
       const sftpSid =
@@ -4221,7 +4290,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       !activePane ||
       activeTab.tabType === 'notes' ||
       activeTab.tabType === 'settings' ||
-      activeTab.tabType === 'sftp'
+      activeTab.tabType === 'sftp' ||
+      activeTab.tabType === 'network-map'
     ) {
       tabCounterRef.current += 1;
       const newTabId = `tab-view-${tabCounterRef.current}`;
@@ -5192,6 +5262,108 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   onClose={() => void handleClosePane(tab.id, node.id)}
                 />
               )}
+            </div>
+            {renderPaneDropOverlay(tab, node)}
+          </div>
+        );
+      }
+
+      if (node.paneType === 'network-map') {
+        return (
+          <div
+            key={node.id}
+            className={`split-pane split-widget-pane split-netmap-pane ${isPaneActive ? 'active' : ''} ${isDragSource ? 'is-dragging-pane' : ''}`}
+            aria-label={`Network Map Pane ${node.title}`}
+            {...commonPaneDragEvents}
+            onClick={() => {
+              setTabs((prev) =>
+                prev.map((t) => (t.id === tab.id ? { ...t, activePaneId: node.id } : t))
+              );
+            }}
+          >
+            <div
+              className="split-pane-header"
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                startWorkspaceDrag({
+                  type: 'pane',
+                  tabId: tab.id,
+                  paneId: node.id,
+                  title: node.title,
+                });
+              }}
+              onDragEnd={() => startWorkspaceDrag(null)}
+              title="Drag header to rearrange or dock pane"
+            >
+              <div className="pane-header-left">
+                <span className="pane-drag-handle" aria-hidden="true">
+                  <CyberIcon name="grip" size={12} />
+                </span>
+                <span className="pane-widget-icon">
+                  <CyberIcon name="network" size={13} />
+                </span>
+                <span className="pane-title-text" title={node.title}>
+                  {node.title}
+                </span>
+              </div>
+              <div className="pane-header-actions">
+                {isPaneActive ? (
+                  <span className="pane-active-indicator">● ACTIVE</span>
+                ) : (
+                  <span className="pane-inactive-hint">FOCUS</span>
+                )}
+                {totalPanes > 1 && (
+                  <button
+                    type="button"
+                    className="pane-undock-btn"
+                    aria-label={`Undock Pane ${node.title}`}
+                    title="Undock pane into its own standalone tab"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUndockPaneToTab(tab.id, node.id);
+                    }}
+                  >
+                    <CyberIcon name="undock" size={12} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="pane-close-btn"
+                  aria-label={`Close Pane ${node.title}`}
+                  title="Close Docked Pane"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleClosePane(tab.id, node.id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="docked-widget-body" style={{ flex: 1, minHeight: 0 }}>
+              <NetworkMapView
+                hosts={vaultSummary.hosts}
+                groups={vaultSummary.groups}
+                notes={notes}
+                activeSessionHostIds={getActiveSessionHostIds()}
+                activeTunnels={activeTunnels}
+                onConnectHost={(hostId) => {
+                  const h = vaultSummary.hosts.find((x) => x.id === hostId);
+                  if (h) void handleConnectSavedHost(h);
+                }}
+                onSplitConnectHost={(hostId) => {
+                  const h = vaultSummary.hosts.find((x) => x.id === hostId);
+                  if (h) void handleConnectHostIntoSplit(h, 'right');
+                }}
+                onOpenSftp={(hostId) => {
+                  const h = vaultSummary.hosts.find((x) => x.id === hostId);
+                  if (h) void handleOpenHostSftp(h);
+                }}
+                onOpenNotes={(hostId) => openNotesTab(hostId)}
+                onClose={() => void handleClosePane(tab.id, node.id)}
+                isDocked={true}
+              />
             </div>
             {renderPaneDropOverlay(tab, node)}
           </div>
@@ -6587,6 +6759,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       type="button"
                       role="menuitem"
                       className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        openNetworkMapTab();
+                      }}
+                    >
+                      <span>Interactive Network Topology Map (F-37)</span>
+                      <span className="nav-dropdown-shortcut">🌐 Map</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
                       disabled={!sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')}
                       onClick={() => {
                         setActiveDropdownMenu(null);
@@ -6694,6 +6878,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   >
                     <span>New Connection Split</span>
                     <span className="nav-dropdown-shortcut">+ Split</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      openNetworkMapTab();
+                    }}
+                  >
+                    <span>Network Topology Map</span>
+                    <span className="nav-dropdown-shortcut">🌐 Map</span>
                   </button>
                   <button
                     type="button"
@@ -7440,7 +7636,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               </div>
             </div>
 
-            {activeTab.tabType !== 'notes' && activeTab.tabType !== 'settings' && activeTab.tabType !== 'sftp' && (
+            {activeTab.tabType !== 'notes' &&
+              activeTab.tabType !== 'settings' &&
+              activeTab.tabType !== 'sftp' &&
+              activeTab.tabType !== 'network-map' && (
               <div className="terminal-toolbar hud-command-strip">
                 <div className="hud-telemetry-readout" title={statusMessage}>
                   <span className="hud-telemetry-dot" />
@@ -7658,6 +7857,23 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                               type="button"
                               role="menuitem"
                               className="add-to-view-tool-btn"
+                              draggable
+                              onDragStart={() =>
+                                startWorkspaceDrag({
+                                  type: 'tool',
+                                  toolType: 'network-map',
+                                  title: 'Network Topology Map',
+                                })
+                              }
+                              onDragEnd={() => startWorkspaceDrag(null)}
+                              onClick={() => void handleDockToolIntoSplit('network-map', addToViewZone)}
+                            >
+                              <CyberIcon name="network" size={12} /> Network Map
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="add-to-view-tool-btn"
                               onClick={() =>
                                 void handleDockToolIntoSplit('local-powershell', addToViewZone)
                               }
@@ -7856,6 +8072,29 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         onSaveNote={handleSaveNote}
                         onDeleteNote={handleDeleteNote}
                         onClose={() => void handleCloseTab(tab.id)}
+                      />
+                    ) : tab.tabType === 'network-map' ? (
+                      <NetworkMapView
+                        hosts={vaultSummary.hosts}
+                        groups={vaultSummary.groups}
+                        notes={notes}
+                        activeSessionHostIds={getActiveSessionHostIds()}
+                        activeTunnels={activeTunnels}
+                        onConnectHost={(hostId) => {
+                          const h = vaultSummary.hosts.find((x) => x.id === hostId);
+                          if (h) void handleConnectSavedHost(h);
+                        }}
+                        onSplitConnectHost={(hostId) => {
+                          const h = vaultSummary.hosts.find((x) => x.id === hostId);
+                          if (h) void handleConnectHostIntoSplit(h, 'right');
+                        }}
+                        onOpenSftp={(hostId) => {
+                          const h = vaultSummary.hosts.find((x) => x.id === hostId);
+                          if (h) void handleOpenHostSftp(h);
+                        }}
+                        onOpenNotes={(hostId) => openNotesTab(hostId)}
+                        onClose={() => void handleCloseTab(tab.id)}
+                        isDocked={false}
                       />
                     ) : (
                       renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)
@@ -8123,6 +8362,36 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     </div>
                   );
                 })()}
+
+              {(() => {
+                const q = paletteQuery.trim().toLowerCase();
+                const showNetMap =
+                  !q ||
+                  'network topology map'.includes(q) ||
+                  'map'.includes(q) ||
+                  'topology'.includes(q) ||
+                  'netzwerkkarte'.includes(q);
+                if (!showNetMap) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      openNetworkMapTab();
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong>🌐 Network Topology Map (F-37)</strong>
+                      <span>Interactive network graph &amp; jump chain visualizer</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Open Map ↵</span>
+                    </div>
+                  </button>
+                );
+              })()}
             </div>
 
             <div className="modal-actions">

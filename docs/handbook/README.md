@@ -6,9 +6,37 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, & `F-27`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, & `F-37`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Interactive Network Topology Map / "Netzwerkkarte" (`F-37` / Spec Line 58, 90, 139, 271, 273)**:
+  - **Visual Topology & Interactive Graph**:
+    - Powered by `react-flow` (v11, MIT licensed) for smooth pan/zoom, interactive node drag-and-drop, and high-performance physics-based layouts.
+    - Graph visualizes your entire infrastructure:
+      - **Client Node**: Your DoubleAgent workstation node (`DoubleAgent Workstation`).
+      - **Host Cards**: Configured SSH hosts with real-time status badges (`Active` / `Idle`), IP addresses, ports, SSH usernames, group memberships, and assigned subnet tags.
+      - **Subnet Clusters**: Logical visual groupings based on host subnet configuration or group tags.
+    - **Dynamic Edge Visualization**:
+      - **Direct SSH Connections**: Solid cyan lines with active session pulsing animations.
+      - **Multi-hop Jump Chains / ProxyJump**: Dashed amber directional edges with numbered hop markers ($H_1, H_2$) and bastion badges indicating routing path.
+      - **Active Port Forwarding Tunnels**: Glowing magenta edges labeled with tunnel type (`-L`, `-R`, `-D`) and local/remote port mappings (`8080:localhost:80`).
+  - **Steuerpult HUD & Interactive Control Deck**:
+    - **Search Filter**: Instant real-time filtering of nodes and edges by host label, IP, username, group, or tags.
+    - **Filter Modes**: Toggle between **All Infrastructure**, **Active Sessions Only**, **Port Forwarding Tunnels Only**, and **Jump Chains Only**.
+    - **Layout Engines**: Switch on the fly between **Hierarchical Flow** (client &rarr; bastions &rarr; end hosts), **Subnet Clusters** (grouped by subnet/CIDR), and **Grid Layout**.
+    - **Live Telemetry Strip**: Displays live counters for total hosts, active SSH sessions, active tunnels, and multi-hop jump chains.
+    - **Fit View & Minimap**: Quick zoom-to-fit action button and interactive HUD minimap in the corner.
+  - **Side HUD Inspector Drawer**:
+    - Clicking any host node opens the Cyberpunk Inspector Drawer with deep operational telemetry:
+      - Host address, SSH port, user, group name, subnet CIDR, jump chain hops, active tunnels count, and notes count.
+      - **Instant Action Controls**:
+        - **Connect SSH**: Opens a direct SSH terminal session tab.
+        - **Split Connect**: Docks an SSH terminal into a new split pane next to the map.
+        - **SFTP Browser**: Opens a 2-column SFTP file manager to the selected host.
+        - **Host Notes**: Opens the persistent encrypted host notes drawer.
+  - **Flexible Workspace Integration**:
+    - Open as a dedicated full tab via **Tools ▾ &rarr; Interactive Network Topology Map (F-37)**, **View ▾ &rarr; Network Topology Map**, or **Ctrl+K &rarr; Network Topology Map**.
+    - Dock into any split workspace view alongside live terminals, notes, or tunnels via the **`+ View ▾`** HUD menu or toolbar buttons.
 - **Auto-Reconnect & Workspace Session Restore (`F-27` / Spec Line 136)**:
   - **Automatic Reconnection with Exponential Backoff**:
     - Automatically detects unexpected SSH socket drops (broken pipe, network drops, server timeouts, EOF) and initiates reconnection.

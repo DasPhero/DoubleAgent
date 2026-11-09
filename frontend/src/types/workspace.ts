@@ -43,7 +43,7 @@ export interface PersistedTabItem {
   panes?: PersistedPaneItem[];
   rootNode: PersistedWorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map';
   notesHostId?: string;
 }
 
@@ -58,3 +58,4 @@ export interface ReconnectState {
   status: 'reconnecting' | 'failed';
   reason?: string;
 }
+

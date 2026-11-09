@@ -1,6 +1,6 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-27` — Auto-Reconnect & Workspace Session Restore — COMPLETED!
+- **Current Milestone:** `F-37` — Interactive Network Topology Map ("Netzwerkkarte") with react-flow — COMPLETED!
 - **Next Milestone:** `F-28` (Remote File Edit — v1 Phase)
 - **Stage:** `2-flagship`
 
@@ -262,10 +262,35 @@
       - Frontend Vitest unit tests: 24 passed (`npm --prefix frontend run test -- --run`).
       - Standalone binary: verified and compiled via `wails build` into `build/bin/DoubleAgent.exe` in 25s.
 
+  - **`v1` Milestone (`F-37` — Interactive Network Topology Map ("Netzwerkkarte") with `react-flow`)**:
+    - **Interactive Graph Visualization (`reactflow` v11)**:
+      - Installed `reactflow` v11 (MIT license) without copyleft, fully compatible with React 18 and Vite.
+      - Visualizes all configured hosts, subnets, multi-hop jump chains, and active port forwarding tunnels as an interactive cyber-HUD node graph.
+      - Node types: Local Workstation (`clientNode`), Host cards (`hostNode`), and Subnet clusters.
+      - Edge types: Direct SSH connections (solid cyan, animated on active sessions), Multi-hop Jump Chains / ProxyJump (dashed amber with hop labels and directional arrows), and Active Port Forwarding Tunnels (`-L`, `-R`, `-D` glowing magenta with bidirectional port labels).
+    - **Steuerpult HUD Controls & Filtering**:
+      - Real-time search filter filtering hosts by label, IP/address, username, or tags.
+      - Filter mode buttons: `All`, `🟢 Active Only`, `⇄ Tunnels Only`, `⛓ Jump Chains Only`.
+      - Multi-layout generator: `Hierarchical` (Directed Left-to-Right: Client $\to$ Bastions $\to$ Targets), `Subnet Clusters` (automatic CIDR grouping), and `Grid Array`.
+      - Real-time telemetry counters: total configured hosts, distinct subnets, active sessions, and active tunnels.
+      - Minimap, zoom controls, and pan background with cyberpunk grid styling.
+    - **Side HUD Inspector Drawer**:
+      - Inspects selected nodes showing host address, effective credentials, group strip, subnet CIDR, jump chain hops, and active tunnels.
+      - One-click actions: **`Connect SSH`**, **`Split Connect`** (connects side-by-side in current view), **`SFTP Browser`**, and **`Host Notes`**.
+    - **Multi-Window & Workspace Split Integration**:
+      - Accessible as a dedicated full-tab view (`tabType: 'network-map'`) via top menus or Command Palette (`Ctrl+K`).
+      - Dockable into any split pane (`paneType: 'network-map'`) via the `+ View` HUD menu, supporting flexible multi-window workspace setups.
+      - Undockable from split panes back into dedicated standalone tabs with one click.
+    - **Testing & Verification**:
+      - Frontend unit tests: 25 passed in Vitest (`npm --prefix frontend run test -- --run`).
+      - Go backend tests: all packages green (`go test ./...`).
+      - Go vet: clean (`go vet ./...`).
+      - Frontend lint: 0 warnings, 0 errors (`eslint . --max-warnings 0`).
+      - Standalone binary: verified and compiled via `wails build` into `build/bin/DoubleAgent.exe`.
+
 ## In Progress
-- None (v1 Phase Milestone F-27 Complete).
+- None (v1 Phase Milestone F-37 Complete).
 
 ## Next (TODO List — v1 Phase)
 - **`F-28`: Remote File Edit**: Edit remote SFTP files in-place with automatic re-upload on save.
 - **`F-29`: Encrypted Vault Sync / Export**: Export/import encrypted vault bundles across machines.
-- **`F-37`: Interactive Network Map**: `react-flow` topology view of hosts, groups, jump chains, and active tunnels.

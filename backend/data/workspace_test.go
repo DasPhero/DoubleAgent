@@ -116,3 +116,4 @@ func TestWorkspaceStore_CorruptedFile_F27(t *testing.T) {
 		t.Fatalf("expected error loading corrupted file, got nil")
 	}
 }
+

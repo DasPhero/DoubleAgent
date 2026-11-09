@@ -34,7 +34,9 @@ export type CyberIconName =
   | 'lock'
   | 'unlock'
   | 'swap'
-  | 'next-pane';
+  | 'next-pane'
+  | 'network'
+  | 'map';
 
 export interface CyberIconProps {
   name: CyberIconName;
@@ -319,6 +321,26 @@ export const CyberIcon: React.FC<CyberIconProps> = ({
         <svg {...commonProps}>
           <polyline points="9 18 15 12 9 6" />
           <line x1="19" y1="5" x2="19" y2="19" />
+        </svg>
+      );
+    case 'network':
+      return (
+        <svg {...commonProps}>
+          <rect x="2" y="3" width="6" height="6" rx="1" />
+          <rect x="16" y="3" width="6" height="6" rx="1" />
+          <rect x="9" y="15" width="6" height="6" rx="1" />
+          <line x1="5" y1="9" x2="5" y2="12" />
+          <line x1="19" y1="9" x2="19" y2="12" />
+          <line x1="12" y1="12" x2="12" y2="15" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      );
+    case 'map':
+      return (
+        <svg {...commonProps}>
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+          <line x1="8" y1="2" x2="8" y2="18" />
+          <line x1="16" y1="6" x2="16" y2="22" />
         </svg>
       );
   }

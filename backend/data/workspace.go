@@ -104,3 +104,4 @@ func (s *fileWorkspaceStore) Clear() error {
 	}
 	return nil
 }
+
