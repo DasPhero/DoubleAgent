@@ -13,6 +13,8 @@ interface HostNotesDrawerProps {
   onPinSplit?: () => void;
   onOpenFullNotes?: () => void;
   isPinned?: boolean;
+  onHeaderDragStart?: (e: React.DragEvent) => void;
+  onHeaderDragEnd?: () => void;
 }
 
 export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
@@ -26,6 +28,8 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
   onPinSplit,
   onOpenFullNotes,
   isPinned = false,
+  onHeaderDragStart,
+  onHeaderDragEnd,
 }) => {
   const host = useMemo(() => hosts.find((h) => h.id === hostId), [hosts, hostId]);
   const hostNotes = useMemo(() => {
@@ -108,8 +112,20 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
       aria-label="Host Documentation Drawer"
     >
       {/* Drawer Header */}
-      <div className="drawer-header">
+      <div
+        className="drawer-header"
+        draggable={Boolean(onHeaderDragStart)}
+        onDragStart={onHeaderDragStart}
+        onDragEnd={onHeaderDragEnd}
+        title={isPinned ? 'Drag header to rearrange or dock notes pane' : 'Drag header onto any terminal pane to dock notes'}
+        style={{ cursor: onHeaderDragStart ? 'grab' : undefined }}
+      >
         <div className="drawer-title-box">
+          {onHeaderDragStart && (
+            <span className="pane-drag-handle" aria-hidden="true">
+              ⠿
+            </span>
+          )}
           <span className="drawer-icon">📝</span>
           <div className="drawer-titles">
             <span className="drawer-sub">{isPinned ? 'Pinned Notes' : 'Host Notes'}</span>

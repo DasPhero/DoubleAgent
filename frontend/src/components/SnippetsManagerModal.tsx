@@ -9,6 +9,8 @@ export interface SnippetsManagerModalProps {
   onClose: () => void;
   initialSelectedId?: string;
   initialPrefillBody?: string;
+  isDocked?: boolean;
+  onDockToView?: () => void;
 }
 
 export function SnippetsManagerModal({
@@ -19,6 +21,8 @@ export function SnippetsManagerModal({
   onClose,
   initialSelectedId,
   initialPrefillBody,
+  isDocked = false,
+  onDockToView,
 }: SnippetsManagerModalProps): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string>('all');
@@ -169,39 +173,48 @@ export function SnippetsManagerModal({
     }
   };
 
-  return (
-    <div
-      className="modal-backdrop"
-      role="dialog"
-      aria-label="Snippets Manager"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="modal-card snippets-manager-card">
+  const cardContent = (
+      <div
+        className={`modal-card snippets-manager-card ${isDocked ? 'is-docked-widget' : ''}`}
+        role={isDocked ? 'region' : undefined}
+        aria-label={isDocked ? 'Docked Command Snippets' : undefined}
+      >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>⚡</span>
-            <div>
-              <h2 style={{ margin: 0 }}>Command Snippets</h2>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Reusable commands with variable injection (<code>{'{{HOST}}'}</code>, <code>{'{{USER}}'}</code>, <code>{'{{PORT}}'}</code>, <code>{'{{CWD}}'}</code>, custom parameters).
-              </span>
+        {!isDocked && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1.2rem' }}>⚡</span>
+              <div>
+                <h2 style={{ margin: 0 }}>Command Snippets</h2>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Reusable commands with variable injection (<code>{'{{HOST}}'}</code>, <code>{'{{USER}}'}</code>, <code>{'{{PORT}}'}</code>, <code>{'{{CWD}}'}</code>, custom parameters).
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              {onDockToView && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={onDockToView}
+                  aria-label="Dock Snippets to View"
+                  title="Dock Command Snippets as a split panel inside the current workspace view"
+                >
+                  📌 Dock to View
+                </button>
+              )}
+              <button
+                type="button"
+                className="tab-close-btn"
+                onClick={onClose}
+                aria-label="Close"
+                style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}
+              >
+                ×
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            className="tab-close-btn"
-            onClick={onClose}
-            aria-label="Close"
-            style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}
-          >
-            ×
-          </button>
-        </div>
+        )}
 
         {error && <div className="error-banner">{error}</div>}
 
@@ -259,7 +272,9 @@ export function SnippetsManagerModal({
                           type="button"
                           className="btn-primary btn-sm"
                           onClick={() => {
-                            onClose();
+                            if (!isDocked) {
+                              onClose();
+                            }
                             onRunSnippet(s);
                           }}
                           title="Run in active terminal session"
@@ -441,6 +456,24 @@ export function SnippetsManagerModal({
           </form>
         )}
       </div>
+  );
+
+  if (isDocked) {
+    return cardContent;
+  }
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-label="Snippets Manager"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      {cardContent}
     </div>
   );
 }

@@ -4123,4 +4123,413 @@ body,
   text-align: center;
 }
 
+/* =========================================================================
+   Workspace Tiling, Split Resizing, Docked Widgets & Windows-Style Snap DnD
+   ========================================================================= */
+
+.split-child-slot > .split-pane,
+.split-child-slot > .split-container {
+  flex: 1 1 0%;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split-resizer-bar {
+  flex: 0 0 6px;
+  background: rgba(148, 163, 184, 0.08);
+  position: relative;
+  z-index: 25;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.split-resizer-horizontal {
+  cursor: col-resize;
+  width: 6px;
+  margin: 0 1px;
+  border-radius: 3px;
+}
+
+.split-resizer-vertical {
+  cursor: row-resize;
+  height: 6px;
+  margin: 1px 0;
+  border-radius: 3px;
+}
+
+.split-resizer-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.35);
+  transition: background 0.15s ease;
+}
+
+.split-resizer-horizontal::after {
+  width: 2px;
+  height: 32px;
+}
+
+.split-resizer-vertical::after {
+  width: 32px;
+  height: 2px;
+}
+
+.split-resizer-bar:hover,
+.split-resizer-bar.resizing {
+  background: rgba(20, 184, 166, 0.35);
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.45);
+}
+
+.split-resizer-bar:hover::after,
+.split-resizer-bar.resizing::after {
+  background: var(--accent);
+}
+
+.pane-drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  opacity: 0.65;
+  user-select: none;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.split-pane-header:hover .pane-drag-handle,
+.drawer-header:hover .pane-drag-handle {
+  opacity: 1;
+  color: var(--accent-glow);
+}
+
+.split-pane-header[draggable='true'] {
+  cursor: grab;
+}
+
+.split-pane-header[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.split-pane.is-dragging-pane {
+  opacity: 0.55;
+  border-style: dashed !important;
+  border-color: var(--accent) !important;
+}
+
+.pane-undock-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pane-undock-btn:hover {
+  background: rgba(20, 184, 166, 0.18);
+  border-color: var(--accent);
+  color: var(--text-bright);
+}
+
+/* Windows Snap-Assist Style Drop Overlay & Compass */
+.split-pane {
+  position: relative;
+}
+
+.pane-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pane-snap-highlight {
+  position: absolute;
+  background: rgba(20, 184, 166, 0.22);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: inset 0 0 24px rgba(20, 184, 166, 0.25), 0 0 18px rgba(20, 184, 166, 0.3);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease-out;
+  pointer-events: none;
+}
+
+.pane-snap-highlight.snap-left {
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc(50% - 9px);
+}
+
+.pane-snap-highlight.snap-right {
+  top: 6px;
+  bottom: 6px;
+  right: 6px;
+  width: calc(50% - 9px);
+}
+
+.pane-snap-highlight.snap-top {
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  height: calc(50% - 9px);
+}
+
+.pane-snap-highlight.snap-bottom {
+  bottom: 6px;
+  left: 6px;
+  right: 6px;
+  height: calc(50% - 9px);
+}
+
+.pane-snap-highlight.snap-center {
+  inset: 8px;
+  background: rgba(14, 165, 233, 0.2);
+  border-color: #38bdf8;
+}
+
+.pane-snap-badge {
+  background: #0c131f;
+  border: 1px solid var(--accent);
+  color: var(--text-bright);
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65);
+  letter-spacing: 0.03em;
+}
+
+.pane-snap-compass {
+  position: relative;
+  z-index: 65;
+  pointer-events: auto;
+  display: grid;
+  grid-template-areas:
+    '. top .'
+    'left center right'
+    '. bottom .';
+  grid-template-columns: repeat(3, auto);
+  gap: 0.35rem;
+  padding: 0.55rem;
+  background: rgba(12, 19, 31, 0.92);
+  border: 1px solid var(--border-accent);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
+}
+
+.snap-compass-btn {
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.snap-compass-btn:hover,
+.snap-compass-btn.active {
+  background: var(--accent);
+  border-color: var(--accent-glow);
+  color: #041311;
+  font-weight: 700;
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.55);
+}
+
+.snap-compass-btn.compass-top {
+  grid-area: top;
+}
+.snap-compass-btn.compass-left {
+  grid-area: left;
+}
+.snap-compass-btn.compass-center {
+  grid-area: center;
+}
+.snap-compass-btn.compass-right {
+  grid-area: right;
+}
+.snap-compass-btn.compass-bottom {
+  grid-area: bottom;
+}
+
+/* Docked Widgets inside Split Panes (TOTP, Snippets, SFTP) */
+.split-widget-pane {
+  background: #0f172a !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.docked-widget-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.totp-manager-modal.is-docked-widget,
+.snippets-manager-card.is-docked-widget {
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  max-height: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  background: transparent !important;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* + Add to View Popover Menu */
+.add-to-view-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 310px;
+  max-height: 460px;
+  overflow-y: auto;
+  background: #0c131f;
+  border: 1px solid var(--border-accent);
+  border-radius: 10px;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.85);
+  padding: 0.65rem;
+  z-index: 12000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.add-to-view-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-glow);
+  margin-top: 0.2rem;
+  padding: 0 0.25rem;
+}
+
+.add-to-view-zone-selector {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.3rem;
+}
+
+.zone-pill-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.28rem 0.2rem;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.zone-pill-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-bright);
+}
+
+.zone-pill-btn.active {
+  background: rgba(20, 184, 166, 0.22);
+  border-color: var(--accent);
+  color: var(--accent-glow);
+  font-weight: 700;
+}
+
+.add-to-view-hosts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.add-to-view-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  color: var(--text-main);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.add-to-view-item:hover {
+  background: rgba(20, 184, 166, 0.15);
+  border-color: var(--accent);
+  color: var(--text-bright);
+}
+
+.add-to-view-empty {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0.35rem 0.5rem;
+}
+
+.add-to-view-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem;
+}
+
+.add-to-view-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0.42rem 0.5rem;
+  color: var(--text-main);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.add-to-view-tool-btn:hover {
+  background: rgba(20, 184, 166, 0.16);
+  border-color: var(--accent);
+  color: var(--text-bright);
+}
+
+.host-card[draggable='true'] {
+  cursor: grab;
+}
+
+.host-card[draggable='true']:active {
+  cursor: grabbing;
+}
+
+
 

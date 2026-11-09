@@ -1809,4 +1809,64 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('status', { name: 'Broadcast Input Mode Active' })).not.toBeInTheDocument();
   });
+
+  it('supports multi-host side-by-side splits, snap drag-and-drop rearranging, resizable panes, and dockable widgets (F-08)', async () => {
+    render(<App initialLocked={false} />);
+
+    // 1. Create two different hosts: Node Alpha and Node Beta
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Node Alpha' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.20.0.1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Host' }));
+    expect(await screen.findByText('Node Alpha')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
+    fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Node Beta' } });
+    fireEvent.change(screen.getByLabelText('Host IP or Hostname'), { target: { value: '10.20.0.2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Host' }));
+    expect(await screen.findByText('Node Beta')).toBeInTheDocument();
+
+    // 2. Connect to Node Alpha first
+    const connectButtons = screen.getAllByRole('button', { name: 'Connect' });
+    fireEvent.click(connectButtons[0]);
+    expect(await screen.findByLabelText('Pane Node Alpha')).toBeInTheDocument();
+
+    // 3. Click "Split Connect Node Beta" (⬌) to open Node Beta side-by-side in the same view
+    fireEvent.click(screen.getByRole('button', { name: 'Split Connect Node Beta' }));
+    expect(await screen.findByLabelText('Pane Node Beta')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Node Alpha')).toBeInTheDocument();
+
+    // 4. Verify interactive split resizer bar exists and supports double-click equalize
+    const resizer = screen.getByRole('separator', { name: /Resize Split horizontal 1/i });
+    expect(resizer).toBeInTheDocument();
+    fireEvent.doubleClick(resizer);
+
+    // 5. Open "+ Add to View" menu and dock the 2FA / TOTP Authenticator into the split view
+    fireEvent.click(screen.getByRole('button', { name: 'Add to View' }));
+    expect(screen.getByRole('menu', { name: 'Add to Workspace View Menu' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: /2FA \/ TOTP/i }));
+    expect(await screen.findByLabelText('Pane 2FA / TOTP Authenticator')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Docked TOTP Authenticator' })).toBeInTheDocument();
+
+    // 6. Test drag-and-drop pane rearrangement via Snap Compass (Swap Node Beta with Node Alpha)
+    const betaPane = screen.getByLabelText('Pane Node Beta');
+    const betaHeader = betaPane.querySelector('.split-pane-header');
+    expect(betaHeader).not.toBeNull();
+    if (betaHeader) {
+      fireEvent.dragStart(betaHeader, {
+        dataTransfer: { setData: () => {}, effectAllowed: 'move' },
+      });
+    }
+
+    // While dragging, Snap Compass buttons appear on other panes
+    const swapBtn = await screen.findByRole('button', { name: 'Swap with Node Alpha' });
+    fireEvent.click(swapBtn);
+    expect(screen.getByLabelText('Pane Node Alpha')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pane Node Beta')).toBeInTheDocument();
+
+    // 7. Test Undock Pane to standalone Tab via 📤 button
+    fireEvent.click(screen.getByRole('button', { name: 'Undock Pane Node Beta' }));
+    // Node Beta is now its own tab and the active tab
+    expect(await screen.findByLabelText('Pane Node Beta')).toBeInTheDocument();
+  });
 });

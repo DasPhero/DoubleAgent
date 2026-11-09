@@ -5,3 +5,4 @@ export interface BroadcastState {
   scope: BroadcastScope;
   customSessionIds: string[];
 }
+

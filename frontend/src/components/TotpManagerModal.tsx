@@ -14,6 +14,8 @@ export interface TotpManagerModalProps {
   activeSessionId?: string | null;
   onInjectCode?: (totpId: string) => Promise<void>;
   onRefreshVault?: () => Promise<void>;
+  isDocked?: boolean;
+  onDockToView?: () => void;
 }
 
 // Access Wails runtime bindings safely
@@ -39,6 +41,8 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
   activeSessionId,
   onInjectCode,
   onRefreshVault,
+  isDocked = false,
+  onDockToView,
 }) => {
   const [totpList, setTotpList] = useState<TotpSummary[]>([]);
   const [codes, setCodes] = useState<Record<string, TotpCodeResponse>>({});
@@ -325,28 +329,42 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
     return null;
   }
 
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
+  const content = (
       <div
-        className="modal-container totp-manager-modal"
+        className={`modal-container totp-manager-modal ${isDocked ? 'is-docked-widget' : ''}`}
         onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="TOTP Authenticator Generator"
+        role={isDocked ? 'region' : 'dialog'}
+        aria-label={isDocked ? 'Docked TOTP Authenticator' : 'TOTP Authenticator Generator'}
       >
-        <div className="modal-header">
-          <div className="modal-title-with-badge">
-            <span className="modal-icon">🔐</span>
-            <h2>TOTP Authenticator Generator</h2>
+        {!isDocked && (
+          <div className="modal-header">
+            <div className="modal-title-with-badge">
+              <span className="modal-icon">🔐</span>
+              <h2>TOTP Authenticator Generator</h2>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              {onDockToView && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={onDockToView}
+                  aria-label="Dock TOTP to View"
+                  title="Dock TOTP Authenticator as a split panel inside the current workspace view"
+                >
+                  📌 Dock to View
+                </button>
+              )}
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={onClose}
+                aria-label="Close TOTP Authenticator"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            onClick={onClose}
-            aria-label="Close TOTP Authenticator"
-          >
-            ✕
-          </button>
-        </div>
+        )}
 
         {errorMessage && (
           <div className="modal-error-banner" role="alert">
@@ -732,15 +750,26 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
           )}
         </div>
 
-        <div className="modal-footer totp-modal-footer">
-          <div className="totp-footer-hint">
-            <span>🛡️ Threat Model: TOTP seeds remain encrypted inside the Go process; only ephemeral 30s codes leave the vault.</span>
+        {!isDocked && (
+          <div className="modal-footer totp-modal-footer">
+            <div className="totp-footer-hint">
+              <span>🛡️ Threat Model: TOTP seeds remain encrypted inside the Go process; only ephemeral 30s codes leave the vault.</span>
+            </div>
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Close
+            </button>
           </div>
-          <button type="button" className="btn-secondary" onClick={onClose}>
-            Close
-          </button>
-        </div>
+        )}
       </div>
+  );
+
+  if (isDocked) {
+    return content;
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      {content}
     </div>
   );
 };

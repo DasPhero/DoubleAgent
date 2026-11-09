@@ -189,6 +189,24 @@
     - Vitest end-to-end integration test `supports Broadcast / Multi-Execution Input across split panes with glowing visual indicators and disarm controls (F-26)` in `frontend/src/App.test.tsx` (passes cleanly).
     - Standalone binary verified with `wails build`.
 
+- **Workspace View Builder: Multi-Host Side-by-Side Tiling, Snap Drag-and-Drop, Resizable Splits & Dockable Widgets (`F-08`)**:
+  - **Multi-Session Side-by-Side Splits (Different Connections)**:
+    - Added `handleConnectHostIntoSplit` in `frontend/src/App.tsx` allowing any saved host or local shell (`PowerShell`, `CMD`, `Bash / WSL`) to be opened directly into a horizontal or vertical split (`left`, `right`, `top`, `bottom`) alongside existing connections in the current view.
+    - Added a **`⬌` (`Split Connect`)** button on every Host Card in the left sidebar and a **`🧩 + Add to View ▾`** popover menu in the terminal toolbar with a dock zone selector (`◨ Right`, `⬓ Bottom`, `◧ Left`, `⬒ Top`).
+  - **Interactive Drag-to-Resize Split Panes**:
+    - Extended `WorkspaceNode` split containers with `ratios?: number[]` and added interactive `.split-resizer-bar` dividers between every split child (`handleSplitResizeStart`).
+    - Supports smooth mouse-drag resizing with minimum size clamping, double-click on any divider to reset to 50/50 (`handleResetSplitRatios`), and `⊞ Equalize All Split Proportions` (`handleEqualizeAllSplits`).
+  - **Windows Snap-Assist Style Drag-and-Drop**:
+    - Dragging any **Split Pane Header** (`⠿`), **Top Tab Pill**, **Sidebar Host Card**, or **Toolbar Tool Pill** activates live 5-zone drop overlays (`.pane-drop-overlay`) on every pane in the workspace.
+    - Hovering near the Top, Bottom, Left, Right, or Center of a target pane highlights a translucent cyan snap preview (`.pane-snap-highlight`) and displays an interactive 5-way **Snap Compass** (`⬒ Top`, `◧ Left`, `⇄ Swap` / `⊕ Dock`, `◨ Right`, `⬓ Bottom`).
+    - Dropping a **Tab** merges all of its panes into the chosen split zone (`handleMergeTabIntoSplit`).
+    - Dropping a **Split Pane** onto another pane either swaps them (`center`) or moves and re-tiles the pane (`left`/`right`/`top`/`bottom`).
+    - Dropping a **Split Pane** onto the top `.tabs-bar` (or clicking `📤` `Undock Pane` in the pane header) detaches it into its own standalone tab (`handleUndockPaneToTab`).
+  - **Dockable Workspace Widgets (`Notes`, `2FA / TOTP`, `SFTP Browser`, `Command Snippets`)**:
+    - Extended `DockablePaneType` (`'terminal' | 'notes' | 'totp' | 'sftp' | 'snippets'`) so users can build custom multi-tool views.
+    - Added `isDocked` and `onDockToView` support to `TotpManagerModal.tsx` and `SnippetsManagerModal.tsx`, plus draggable headers on `HostNotesDrawer.tsx`.
+    - Verified in `frontend/src/App.test.tsx` (`supports multi-host side-by-side splits, snap drag-and-drop rearranging, resizable panes, and dockable widgets (F-08)`).
+
 ## In Progress
 - None (v1 Phase Milestone F-26 Complete).
 

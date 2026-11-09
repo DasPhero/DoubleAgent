@@ -268,14 +268,26 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
 - **Visual Security State (Dark Crimson Locked ↔ Theme Unlocked)**:
   - When the **Vault is Locked**, the entire application displays a **Dark Crimson / Red** theme so you can see at a glance that secrets are locked.
   - As soon as you unlock the Vault, the UI transitions to your selected theme (Teal by default).
-- **Multi-Session Tabs & Arbitrary Mixed Split Panes (`F-08`)**:
-  - Connecting to multiple hosts (or multiple times to the same host) opens each session in its own **Tab** in the top tab bar.
-  - **Preserved Terminal Logs Across Splits & Tab Switches**: Utilizing a persistent `TerminalPool`, all running session logs, command outputs, active screen buffers, and scrollback are 100% preserved when splitting panes horizontally/vertically or switching tabs.
+- **Multi-Session Tabs, Side-by-Side Multi-Host Splits, Resizable Panes & Snap Drag-and-Drop (`F-08`)**:
+  - Connecting to multiple hosts (or multiple times to the same host) opens each session in its own **Tab** in the top tab bar — or lets you combine different connections and tools side-by-side inside a single custom Workspace View.
+  - **Open Multiple Different Sessions Side-by-Side**:
+    - Click **`⬌`** (`Split Connect`) on any Host Card in the left sidebar to connect that host directly into a split alongside your currently active terminal.
+    - Or click **`🧩 + Add to View ▾`** in the terminal toolbar, pick a dock zone (**◨ Right**, **⬓ Bottom**, **◧ Left**, **⬒ Top**), and click any saved SSH host or local shell (**PowerShell**, **Bash / WSL**) to open it in the same view.
+  - **Interactive Drag-to-Resize Split Panes**:
+    - Drag any divider bar between split panes horizontally or vertically to resize panes to custom proportions.
+    - **Double-click** any divider bar (or select **⊞ Equalize All Split Proportions** in **🧩 + Add to View ▾**) to snap panes back to equal sizes.
+  - **Windows Snap-Assist Style Drag-and-Drop**:
+    - Drag any **Split Pane Header** (`⠿`), **Top Tab Pill**, **Sidebar Host Card**, or **Toolbar Tool Pill** (`📌 Notes Split`, `📌 2FA Split`) onto any open pane.
+    - Hover near the **Left**, **Right**, **Top**, **Bottom**, or **Center** of a pane (or click the 5-way **Snap Compass** buttons) to dock the item into a new split or **⇄ Swap** two panes in place.
+    - **Undock to Standalone Tab**: Click **`📤`** in any split pane header, or drag a split pane header up onto the **Top Tab Bar**, to detach it into its own standalone tab.
+  - **Dockable Workspace Widgets**:
+    - Dock **Host Notes Drawer**, **2FA / TOTP Authenticator**, **SFTP File Browser**, or **Command Snippets** directly into the split grid via **🧩 + Add to View ▾**, **`📌 2FA Split`**, or the **`📌 Dock to View`** button inside the TOTP and Snippets modals.
+  - **Preserved Terminal Logs Across Splits & Tab Switches**: Utilizing a persistent `TerminalPool`, all running session logs, command outputs, active screen buffers, and scrollback are 100% preserved when splitting, rearranging, undocking, or switching tabs.
   - **Isolated Terminal Scrolling**: Scrolling inside a terminal pane never bubbles up or causes the DoubleAgent window/workspace to scroll (`overscroll-behavior: contain` + overflow locking).
   - **Per-Pane Font Zoom Controls**:
     - Zoom terminal text in any pane via the **`+`** and **`-`** buttons in the pane header, or press **`Ctrl +`** / **`Ctrl -`** (or **`Ctrl + MouseWheel`**).
     - Press **`Ctrl + 0`** to quickly reset the pane's font size to the global default. Current font size is displayed dynamically in each pane header (e.g. `14px`).
-  - **Drag-and-Drop Reordering**: Drag any tab pill left or right to reorder your open sessions.
+  - **Drag-and-Drop Reordering**: Drag any tab pill left or right to reorder your open sessions, or drag it down into the terminal view to merge tabs side-by-side.
   - **Mixed Nested Splitting**:
     - Click **Split ⬌** (`Split Horizontal`) or **Split ⬍** (`Split Vertical`) to divide any active pane.
     - Supports arbitrary nested combinations (e.g. splitting horizontally and then splitting the left pane vertically creates two stacked panes on the left alongside a full-height pane on the right).

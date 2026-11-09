@@ -181,6 +181,28 @@ interface CommandPaletteResponse {
 
 export type SplitDirection = 'none' | 'horizontal' | 'vertical';
 
+export type DockablePaneType = 'terminal' | 'notes' | 'totp' | 'sftp' | 'snippets';
+
+export type DropZonePosition = 'left' | 'right' | 'top' | 'bottom' | 'center';
+
+export type WorkspaceDragPayload =
+  | { type: 'pane'; tabId: string; paneId: string; title: string }
+  | { type: 'tab'; tabId: string; title: string }
+  | { type: 'host'; hostId: string; label: string }
+  | {
+      type: 'tool';
+      toolType:
+        | 'notes'
+        | 'totp'
+        | 'sftp'
+        | 'snippets'
+        | 'local-powershell'
+        | 'local-cmd'
+        | 'local-bash';
+      hostId?: string;
+      title: string;
+    };
+
 export type WorkspaceNode =
   | {
       type: 'pane';
@@ -189,14 +211,16 @@ export type WorkspaceNode =
       hostId?: string;
       title: string;
       cwd?: string;
-      paneType?: 'terminal' | 'notes';
+      paneType?: DockablePaneType;
       notesHostId?: string;
+      sftpSessionId?: string;
     }
   | {
       type: 'split';
       id: string;
       direction: 'horizontal' | 'vertical';
       children: WorkspaceNode[];
+      ratios?: number[];
     };
 
 export interface PaneItem {
@@ -205,8 +229,9 @@ export interface PaneItem {
   hostId?: string;
   title: string;
   cwd?: string;
-  paneType?: 'terminal' | 'notes';
+  paneType?: DockablePaneType;
   notesHostId?: string;
+  sftpSessionId?: string;
 }
 
 export interface TabItem {
@@ -266,6 +291,7 @@ export function collectPanes(node: WorkspaceNode | null): PaneItem[] {
         cwd: node.cwd,
         paneType: node.paneType,
         notesHostId: node.notesHostId,
+        sftpSessionId: node.sftpSessionId,
       },
     ];
   }
@@ -288,6 +314,25 @@ export function findPane(node: WorkspaceNode | null, paneId: string): PaneItem |
   return null;
 }
 
+export function findPaneNode(
+  node: WorkspaceNode | null,
+  paneId: string
+): Extract<WorkspaceNode, { type: 'pane' }> | null {
+  if (!node) {
+    return null;
+  }
+  if (node.type === 'pane') {
+    return node.id === paneId ? node : null;
+  }
+  for (const child of node.children) {
+    const found = findPaneNode(child, paneId);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 export function splitPaneInTree(
   root: WorkspaceNode,
   targetPaneId: string,
@@ -301,6 +346,7 @@ export function splitPaneInTree(
         id: `split-${newPane.id}`,
         direction,
         children: [root, newPane],
+        ratios: [50, 50],
       };
     }
     return root;
@@ -317,13 +363,97 @@ export function splitPaneInTree(
           id: `split-${newPane.id}`,
           direction,
           children: [child, newPane],
+          ratios: [50, 50],
         });
       }
     } else {
       newChildren.push(splitPaneInTree(child, targetPaneId, newPane, direction));
     }
   }
-  return { ...root, children: newChildren };
+  const equalRatios = newChildren.map(() => 100 / newChildren.length);
+  return { ...root, children: newChildren, ratios: equalRatios };
+}
+
+export function dockNodeInTree(
+  root: WorkspaceNode,
+  targetPaneId: string,
+  nodeToInsert: WorkspaceNode,
+  zone: Exclude<DropZonePosition, 'center'>
+): WorkspaceNode {
+  const direction: 'horizontal' | 'vertical' =
+    zone === 'left' || zone === 'right' ? 'horizontal' : 'vertical';
+  const insertBefore = zone === 'left' || zone === 'top';
+
+  if (root.type === 'pane') {
+    if (root.id === targetPaneId) {
+      return {
+        type: 'split',
+        id: `split-${nodeToInsert.id}-${Date.now()}`,
+        direction,
+        children: insertBefore ? [nodeToInsert, root] : [root, nodeToInsert],
+        ratios: [50, 50],
+      };
+    }
+    return root;
+  }
+
+  const newChildren: WorkspaceNode[] = [];
+  let insertedDirectly = false;
+  for (const child of root.children) {
+    if (child.type === 'pane' && child.id === targetPaneId && root.direction === direction) {
+      if (insertBefore) {
+        newChildren.push(nodeToInsert, child);
+      } else {
+        newChildren.push(child, nodeToInsert);
+      }
+      insertedDirectly = true;
+    } else if (child.type === 'pane' && child.id === targetPaneId) {
+      newChildren.push({
+        type: 'split',
+        id: `split-${nodeToInsert.id}-${Date.now()}`,
+        direction,
+        children: insertBefore ? [nodeToInsert, child] : [child, nodeToInsert],
+        ratios: [50, 50],
+      });
+    } else {
+      newChildren.push(dockNodeInTree(child, targetPaneId, nodeToInsert, zone));
+    }
+  }
+
+  const equalRatios = newChildren.map(() => 100 / newChildren.length);
+  return {
+    ...root,
+    children: newChildren,
+    ratios: insertedDirectly
+      ? equalRatios
+      : root.ratios && root.ratios.length === newChildren.length
+        ? root.ratios
+        : equalRatios,
+  };
+}
+
+export function swapPanesInTree(
+  root: WorkspaceNode,
+  paneIdA: string,
+  paneIdB: string
+): WorkspaceNode {
+  if (paneIdA === paneIdB) return root;
+  const paneA = findPaneNode(root, paneIdA);
+  const paneB = findPaneNode(root, paneIdB);
+  if (!paneA || !paneB) return root;
+
+  const replaceRec = (node: WorkspaceNode): WorkspaceNode => {
+    if (node.type === 'pane') {
+      if (node.id === paneIdA) return { ...paneB };
+      if (node.id === paneIdB) return { ...paneA };
+      return node;
+    }
+    return {
+      ...node,
+      children: node.children.map(replaceRec),
+    };
+  };
+  return replaceRec(root);
 }
 
 export function removePaneFromTree(
@@ -346,7 +476,50 @@ export function removePaneFromTree(
   if (remaining.length === 1) {
     return remaining[0];
   }
-  return { ...root, children: remaining };
+  const equalRatios = remaining.map(() => 100 / remaining.length);
+  return { ...root, children: remaining, ratios: equalRatios };
+}
+
+export function movePaneInTree(
+  root: WorkspaceNode,
+  sourcePaneId: string,
+  targetPaneId: string,
+  zone: DropZonePosition
+): WorkspaceNode {
+  if (sourcePaneId === targetPaneId) return root;
+  if (zone === 'center') {
+    return swapPanesInTree(root, sourcePaneId, targetPaneId);
+  }
+  const sourceNode = findPaneNode(root, sourcePaneId);
+  if (!sourceNode) return root;
+  const withoutSource = removePaneFromTree(root, sourcePaneId);
+  if (!withoutSource) return root;
+  return dockNodeInTree(withoutSource, targetPaneId, sourceNode, zone);
+}
+
+export function updateSplitRatiosInTree(
+  root: WorkspaceNode,
+  splitId: string,
+  newRatios: number[]
+): WorkspaceNode {
+  if (root.type === 'pane') return root;
+  if (root.id === splitId) {
+    return { ...root, ratios: newRatios };
+  }
+  return {
+    ...root,
+    children: root.children.map((c) => updateSplitRatiosInTree(c, splitId, newRatios)),
+  };
+}
+
+export function equalizeAllSplitsInTree(root: WorkspaceNode): WorkspaceNode {
+  if (root.type === 'pane') return root;
+  const equalRatios = root.children.map(() => 100 / root.children.length);
+  return {
+    ...root,
+    ratios: equalRatios,
+    children: root.children.map(equalizeAllSplitsInTree),
+  };
 }
 
 function reorderTabsLocal(tabs: TabItem[], fromId: string, toId: string): TabItem[] {
@@ -918,6 +1091,33 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     scope: 'tab',
     customSessionIds: [],
   });
+
+  // Workspace Drag-and-Drop, Split Resizing & View Builder State
+  const [workspaceDragItem, setWorkspaceDragItem] = useState<WorkspaceDragPayload | null>(null);
+  const workspaceDragRef = useRef<WorkspaceDragPayload | null>(null);
+  const [dropTargetIndicator, setDropTargetIndicator] = useState<{
+    paneId: string;
+    zone: DropZonePosition;
+  } | null>(null);
+  const [activeSplitResize, setActiveSplitResize] = useState<{
+    tabId: string;
+    splitId: string;
+    direction: 'horizontal' | 'vertical';
+    index: number;
+    startPos: number;
+    containerSize: number;
+    initialRatios: number[];
+  } | null>(null);
+  const [showAddToViewMenu, setShowAddToViewMenu] = useState<boolean>(false);
+  const [addToViewZone, setAddToViewZone] = useState<Exclude<DropZonePosition, 'center'>>('right');
+
+  const startWorkspaceDrag = useCallback((payload: WorkspaceDragPayload | null): void => {
+    workspaceDragRef.current = payload;
+    setWorkspaceDragItem(payload);
+    if (!payload) {
+      setDropTargetIndicator(null);
+    }
+  }, []);
 
   // Terminal Search state (F-11)
   const [searchOpenPanes, setSearchOpenPanes] = useState<Set<string>>(new Set());
@@ -2369,7 +2569,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     if (broadcastState.scope === 'tab') {
       if (!activeTab) return [];
       const panes = collectPanes(activeTab.rootNode);
-      return panes.filter((p) => p.paneType !== 'notes').map((p) => p.sessionId);
+      return panes
+        .filter((p) => !p.paneType || p.paneType === 'terminal')
+        .map((p) => p.sessionId);
     }
     if (broadcastState.scope === 'all') {
       const allPanes: string[] = [];
@@ -2377,7 +2579,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         if (t.tabType === 'terminal' || !t.tabType) {
           const panes = collectPanes(t.rootNode);
           panes.forEach((p) => {
-            if (p.paneType !== 'notes') {
+            if (!p.paneType || p.paneType === 'terminal') {
               allPanes.push(p.sessionId);
             }
           });
@@ -3051,17 +3253,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     }
     const targetPane = findPane(targetTab.rootNode, paneId);
     if (targetPane) {
+      const isTerminalPane = !targetPane.paneType || targetPane.paneType === 'terminal';
       writersRef.current.delete(targetPane.sessionId);
       pendingDataBuffers.current.delete(targetPane.sessionId);
       focusersRef.current.delete(targetPane.sessionId);
-      disposeTerminal(targetPane.sessionId);
+      if (isTerminalPane) {
+        disposeTerminal(targetPane.sessionId);
+      }
       setPaneFontSizes((prev) => {
         const next = new Map(prev);
         next.delete(targetPane.sessionId);
         return next;
       });
       const api = getWailsBindings();
-      if (api) {
+      if (api && isTerminalPane) {
         void api.DisconnectSession(targetPane.sessionId);
       }
     }
@@ -3121,16 +3326,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     const targetPanes = collectPanes(target.rootNode);
     const api = getWailsBindings();
     for (const p of targetPanes) {
+      const isTerminalPane = !p.paneType || p.paneType === 'terminal';
       writersRef.current.delete(p.sessionId);
       pendingDataBuffers.current.delete(p.sessionId);
       focusersRef.current.delete(p.sessionId);
-      disposeTerminal(p.sessionId);
+      if (isTerminalPane) {
+        disposeTerminal(p.sessionId);
+      }
       setPaneFontSizes((prev) => {
         const next = new Map(prev);
         next.delete(p.sessionId);
         return next;
       });
-      if (api) {
+      if (api && isTerminalPane) {
         void api.DisconnectSession(p.sessionId);
       }
     }
@@ -3149,20 +3357,649 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     setStatusMessage('Disconnected.');
   };
 
+  const handleSplitResizeStart = (
+    e: React.MouseEvent,
+    tabId: string,
+    splitId: string,
+    direction: 'horizontal' | 'vertical',
+    index: number,
+    initialRatios: number[]
+  ): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    const parentEl = (e.currentTarget as HTMLElement).parentElement;
+    const rect = parentEl?.getBoundingClientRect();
+    const containerSize =
+      direction === 'horizontal'
+        ? rect && rect.width > 0
+          ? rect.width
+          : 800
+        : rect && rect.height > 0
+          ? rect.height
+          : 500;
+    const startPos = direction === 'horizontal' ? e.clientX : e.clientY;
+    setActiveSplitResize({
+      tabId,
+      splitId,
+      direction,
+      index,
+      startPos,
+      containerSize,
+      initialRatios,
+    });
+
+    const handleMouseMove = (moveEvent: MouseEvent): void => {
+      const currentPos = direction === 'horizontal' ? moveEvent.clientX : moveEvent.clientY;
+      const deltaPx = currentPos - startPos;
+      const deltaPct = (deltaPx / Math.max(containerSize, 100)) * 100;
+      const nextRatios = [...initialRatios];
+      const totalPair = nextRatios[index] + nextRatios[index + 1];
+      const minPct = Math.min(12, totalPair * 0.25);
+      const updatedA = Math.min(totalPair - minPct, Math.max(minPct, nextRatios[index] + deltaPct));
+      const updatedB = totalPair - updatedA;
+      nextRatios[index] = Number(updatedA.toFixed(2));
+      nextRatios[index + 1] = Number(updatedB.toFixed(2));
+
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? { ...t, rootNode: updateSplitRatiosInTree(t.rootNode, splitId, nextRatios) }
+            : t
+        )
+      );
+    };
+
+    const handleMouseUp = (): void => {
+      setActiveSplitResize(null);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleResetSplitRatios = (tabId: string, splitId: string, childCount: number): void => {
+    const equal = Array.from({ length: childCount }, () => 100 / childCount);
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === tabId
+          ? { ...t, rootNode: updateSplitRatiosInTree(t.rootNode, splitId, equal) }
+          : t
+      )
+    );
+    setStatusMessage('Reset split pane sizes to equal proportions.');
+    window.dispatchEvent(new Event('resize'));
+  };
+
+  const handleEqualizeAllSplits = (): void => {
+    if (!activeTab) return;
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTab.id ? { ...t, rootNode: equalizeAllSplitsInTree(t.rootNode) } : t
+      )
+    );
+    setShowAddToViewMenu(false);
+    setStatusMessage('Equalized all split pane sizes in current view.');
+    window.dispatchEvent(new Event('resize'));
+  };
+
+  const handleConnectHostIntoSplit = async (
+    host: HostSummary,
+    zone: Exclude<DropZonePosition, 'center'> = 'right',
+    targetPaneIdOverride?: string
+  ): Promise<void> => {
+    if (
+      !activeTab ||
+      !activePane ||
+      activeTab.tabType === 'notes' ||
+      activeTab.tabType === 'settings' ||
+      activeTab.tabType === 'sftp'
+    ) {
+      await handleConnectSavedHost(host);
+      return;
+    }
+
+    const targetPaneId = targetPaneIdOverride || activePane.id;
+    const api = getWailsBindings();
+    let sessionIdToUse = `sess-split-host-${host.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    if (api?.ConnectSavedHost) {
+      setStatusMessage(
+        `Connecting to ${host.label} (${host.effectiveUser}@${host.address}:${host.effectivePort}) into split view...`
+      );
+      try {
+        sessionIdToUse = await api.ConnectSavedHost(host.id, { cols: 100, rows: 34 });
+        if (host.sessionLogging) {
+          setActiveLogSessions((prev) => {
+            const next = new Set(prev);
+            next.add(sessionIdToUse);
+            return next;
+          });
+          void refreshSessionLogs();
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Split connection failed: ${msg}`);
+        return;
+      }
+    } else if (host.sessionLogging) {
+      void handleToggleSessionLog(sessionIdToUse, host.label, host.id);
+    }
+
+    tabCounterRef.current += 1;
+    const newPaneId = `pane-host-${tabCounterRef.current}`;
+    const newPane: WorkspaceNode = {
+      type: 'pane',
+      id: newPaneId,
+      sessionId: sessionIdToUse,
+      hostId: host.id,
+      title: host.label,
+      paneType: 'terminal',
+    };
+
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id !== activeTab.id) return t;
+        const updatedRoot = dockNodeInTree(t.rootNode, targetPaneId, newPane, zone);
+        return {
+          ...t,
+          rootNode: updatedRoot,
+          activePaneId: newPaneId,
+        };
+      })
+    );
+    setShowAddToViewMenu(false);
+    setStatusMessage(`Connected ${host.label} side-by-side (${zone}) in current view.`);
+    setTimeout(() => focusersRef.current.get(sessionIdToUse)?.(), 50);
+  };
+
+  const handleDockToolIntoSplit = async (
+    toolType:
+      | 'notes'
+      | 'totp'
+      | 'sftp'
+      | 'snippets'
+      | 'local-powershell'
+      | 'local-cmd'
+      | 'local-bash',
+    zone: Exclude<DropZonePosition, 'center'> = 'right',
+    targetPaneIdOverride?: string,
+    explicitHostId?: string
+  ): Promise<void> => {
+    if (
+      toolType === 'local-powershell' ||
+      toolType === 'local-cmd' ||
+      toolType === 'local-bash'
+    ) {
+      const shellType = toolType.replace('local-', '');
+      if (
+        !activeTab ||
+        !activePane ||
+        activeTab.tabType === 'notes' ||
+        activeTab.tabType === 'settings' ||
+        activeTab.tabType === 'sftp'
+      ) {
+        await handleOpenLocalTerminal(shellType);
+        return;
+      }
+      const api = getWailsBindings();
+      let sid = `local-${shellType}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      if (api?.OpenLocalTerminal) {
+        try {
+          sid = await api.OpenLocalTerminal(shellType, { cols: 100, rows: 30 });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStatusMessage(`Local terminal failed: ${msg}`);
+          return;
+        }
+      }
+      const labelMap: Record<string, string> = {
+        powershell: 'Local (PowerShell)',
+        cmd: 'Local (CMD)',
+        bash: 'Local (Bash)',
+      };
+      tabCounterRef.current += 1;
+      const newPaneId = `pane-local-${tabCounterRef.current}`;
+      const newPane: WorkspaceNode = {
+        type: 'pane',
+        id: newPaneId,
+        sessionId: sid,
+        title: labelMap[shellType] || `Local (${shellType})`,
+        paneType: 'terminal',
+      };
+      const targetId = targetPaneIdOverride || activePane.id;
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTab.id
+            ? {
+                ...t,
+                rootNode: dockNodeInTree(t.rootNode, targetId, newPane, zone),
+                activePaneId: newPaneId,
+              }
+            : t
+        )
+      );
+      setShowAddToViewMenu(false);
+      setStatusMessage(`Docked ${newPane.title} (${zone}) in current view.`);
+      setTimeout(() => focusersRef.current.get(sid)?.(), 50);
+      return;
+    }
+
+    const hostId = explicitHostId || activePane?.hostId || activeTab?.hostId;
+    const hostObj = vaultSummary.hosts.find((h) => h.id === hostId);
+    const hostLabel = hostObj?.label || hostObj?.address || (hostId ? 'Host' : 'Workspace');
+
+    tabCounterRef.current += 1;
+    let newPane: WorkspaceNode;
+    if (toolType === 'notes') {
+      const newPaneId = `pane-notes-${tabCounterRef.current}`;
+      newPane = {
+        type: 'pane',
+        id: newPaneId,
+        sessionId: `notes-sess-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        hostId,
+        title: `Notes: ${hostLabel}`,
+        paneType: 'notes',
+        notesHostId: hostId,
+      };
+      setOpenNotesDrawerHostId(null);
+    } else if (toolType === 'totp') {
+      const newPaneId = `pane-totp-${tabCounterRef.current}`;
+      newPane = {
+        type: 'pane',
+        id: newPaneId,
+        sessionId: `totp-sess-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        hostId,
+        title: '2FA / TOTP Authenticator',
+        paneType: 'totp',
+      };
+      setShowTotpModal(false);
+    } else if (toolType === 'snippets') {
+      const newPaneId = `pane-snippets-${tabCounterRef.current}`;
+      newPane = {
+        type: 'pane',
+        id: newPaneId,
+        sessionId: `snippets-sess-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        hostId,
+        title: 'Command Snippets',
+        paneType: 'snippets',
+      };
+      setShowSnippetsModal(false);
+    } else {
+      const newPaneId = `pane-sftp-${tabCounterRef.current}`;
+      const sftpSid =
+        activePane && (!activePane.paneType || activePane.paneType === 'terminal')
+          ? activePane.sessionId
+          : `sftp-preview-${Date.now()}`;
+      newPane = {
+        type: 'pane',
+        id: newPaneId,
+        sessionId: `sftp-pane-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        sftpSessionId: sftpSid,
+        hostId,
+        title: `SFTP: ${hostLabel}`,
+        paneType: 'sftp',
+      };
+    }
+
+    if (
+      !activeTab ||
+      !activePane ||
+      activeTab.tabType === 'notes' ||
+      activeTab.tabType === 'settings' ||
+      activeTab.tabType === 'sftp'
+    ) {
+      tabCounterRef.current += 1;
+      const newTabId = `tab-view-${tabCounterRef.current}`;
+      const newTab: TabItem = {
+        id: newTabId,
+        title: newPane.title,
+        hostId,
+        color: '#14b8a6',
+        rootNode: newPane,
+        activePaneId: newPane.id,
+        tabType: 'terminal',
+      };
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(newTabId);
+      setShowAddToViewMenu(false);
+      setStatusMessage(`Opened ${newPane.title} in workspace view.`);
+      return;
+    }
+
+    const targetId = targetPaneIdOverride || activePane.id;
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTab.id
+          ? {
+              ...t,
+              rootNode: dockNodeInTree(t.rootNode, targetId, newPane, zone),
+              activePaneId: newPane.id,
+            }
+          : t
+      )
+    );
+    setShowAddToViewMenu(false);
+    setStatusMessage(`Docked ${newPane.title} (${zone}) in current view.`);
+  };
+
+  const handleUndockPaneToTab = (tabId: string, paneId: string): void => {
+    const sourceTab = tabs.find((t) => t.id === tabId);
+    if (!sourceTab) return;
+    const panes = collectPanes(sourceTab.rootNode);
+    if (panes.length <= 1) return;
+    const paneNode = findPaneNode(sourceTab.rootNode, paneId);
+    if (!paneNode) return;
+
+    const updatedSourceRoot = removePaneFromTree(sourceTab.rootNode, paneId);
+    if (!updatedSourceRoot) return;
+
+    tabCounterRef.current += 1;
+    const newTabId = `tab-undock-${tabCounterRef.current}`;
+    const newTab: TabItem = {
+      id: newTabId,
+      title: paneNode.title,
+      hostId: paneNode.hostId,
+      color: getEffectiveHostColor(paneNode.hostId, undefined, paneNode.title),
+      rootNode: paneNode,
+      activePaneId: paneNode.id,
+      tabType: 'terminal',
+    };
+
+    setTabs((prev) => {
+      const next: TabItem[] = [];
+      for (const t of prev) {
+        if (t.id === tabId) {
+          const rem = collectPanes(updatedSourceRoot);
+          next.push({
+            ...t,
+            rootNode: updatedSourceRoot,
+            activePaneId: rem.some((p) => p.id === t.activePaneId)
+              ? t.activePaneId
+              : rem[0]?.id || '',
+          });
+        } else {
+          next.push(t);
+        }
+      }
+      next.push(newTab);
+      return next;
+    });
+    setActiveTabId(newTabId);
+    setStatusMessage(`Undocked "${paneNode.title}" into its own tab.`);
+  };
+
+  const handleMergeTabIntoSplit = (
+    sourceTabId: string,
+    targetTabId: string,
+    targetPaneId: string,
+    zone: Exclude<DropZonePosition, 'center'>
+  ): void => {
+    if (sourceTabId === targetTabId) return;
+    const sourceTab = tabs.find((t) => t.id === sourceTabId);
+    const targetTab = tabs.find((t) => t.id === targetTabId);
+    if (!sourceTab || !targetTab) return;
+
+    const sourcePanes = collectPanes(sourceTab.rootNode);
+    const firstSourcePaneId = sourcePanes[0]?.id || targetTab.activePaneId;
+
+    setTabs((prev) => {
+      const next: TabItem[] = [];
+      for (const t of prev) {
+        if (t.id === sourceTabId) {
+          continue;
+        }
+        if (t.id === targetTabId) {
+          const mergedRoot = dockNodeInTree(t.rootNode, targetPaneId, sourceTab.rootNode, zone);
+          next.push({
+            ...t,
+            rootNode: mergedRoot,
+            activePaneId: firstSourcePaneId,
+          });
+        } else {
+          next.push(t);
+        }
+      }
+      return next;
+    });
+    setActiveTabId(targetTabId);
+    setStatusMessage(`Merged tab "${sourceTab.title}" (${zone}) into "${targetTab.title}".`);
+  };
+
+  const getDropZoneFromEvent = (
+    e: React.DragEvent,
+    isSameTabPane: boolean
+  ): DropZonePosition => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      const relX = (e.clientX - rect.left) / rect.width;
+      const relY = (e.clientY - rect.top) / rect.height;
+      const distLeft = relX;
+      const distRight = 1 - relX;
+      const distTop = relY;
+      const distBottom = 1 - relY;
+      const minEdge = Math.min(distLeft, distRight, distTop, distBottom);
+      if (minEdge < 0.28) {
+        if (minEdge === distLeft) return 'left';
+        if (minEdge === distRight) return 'right';
+        if (minEdge === distTop) return 'top';
+        return 'bottom';
+      }
+      return isSameTabPane ? 'center' : 'right';
+    }
+    return isSameTabPane ? 'center' : 'right';
+  };
+
+  const handleExecuteDropOnPane = (
+    tab: TabItem,
+    targetPaneId: string,
+    explicitZone?: DropZonePosition
+  ): void => {
+    const dragPayload = workspaceDragRef.current || workspaceDragItem;
+    if (!dragPayload) return;
+
+    const isSameTabPane = dragPayload.type === 'pane' && dragPayload.tabId === tab.id;
+    const zone: DropZonePosition =
+      explicitZone ||
+      (dropTargetIndicator?.paneId === targetPaneId ? dropTargetIndicator.zone : undefined) ||
+      (isSameTabPane ? 'center' : 'right');
+
+    startWorkspaceDrag(null);
+
+    if (dragPayload.type === 'pane') {
+      if (dragPayload.tabId === tab.id) {
+        if (dragPayload.paneId === targetPaneId) return;
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === tab.id
+              ? {
+                  ...t,
+                  rootNode: movePaneInTree(t.rootNode, dragPayload.paneId, targetPaneId, zone),
+                  activePaneId: dragPayload.paneId,
+                }
+              : t
+          )
+        );
+        setStatusMessage(
+          zone === 'center'
+            ? `Swapped "${dragPayload.title}" with target pane.`
+            : `Moved "${dragPayload.title}" to ${zone} split.`
+        );
+      } else {
+        const sourceTab = tabs.find((t) => t.id === dragPayload.tabId);
+        const sourceNode = sourceTab ? findPaneNode(sourceTab.rootNode, dragPayload.paneId) : null;
+        if (!sourceTab || !sourceNode) return;
+        const effectiveZone: Exclude<DropZonePosition, 'center'> =
+          zone === 'center' ? 'right' : zone;
+        setTabs((prev) => {
+          const next: TabItem[] = [];
+          for (const t of prev) {
+            if (t.id === sourceTab.id) {
+              const remRoot = removePaneFromTree(t.rootNode, dragPayload.paneId);
+              if (remRoot) {
+                const remPanes = collectPanes(remRoot);
+                next.push({
+                  ...t,
+                  rootNode: remRoot,
+                  activePaneId: remPanes[0]?.id || '',
+                });
+              }
+            } else if (t.id === tab.id) {
+              next.push({
+                ...t,
+                rootNode: dockNodeInTree(t.rootNode, targetPaneId, sourceNode, effectiveZone),
+                activePaneId: sourceNode.id,
+              });
+            } else {
+              next.push(t);
+            }
+          }
+          return next;
+        });
+        setActiveTabId(tab.id);
+        setStatusMessage(`Docked "${dragPayload.title}" (${effectiveZone}) into current view.`);
+      }
+      return;
+    }
+
+    if (dragPayload.type === 'tab') {
+      const effectiveZone: Exclude<DropZonePosition, 'center'> =
+        zone === 'center' ? 'right' : zone;
+      handleMergeTabIntoSplit(dragPayload.tabId, tab.id, targetPaneId, effectiveZone);
+      return;
+    }
+
+    if (dragPayload.type === 'host') {
+      const hostObj = vaultSummary.hosts.find((h) => h.id === dragPayload.hostId);
+      if (hostObj) {
+        const effectiveZone: Exclude<DropZonePosition, 'center'> =
+          zone === 'center' ? 'right' : zone;
+        void handleConnectHostIntoSplit(hostObj, effectiveZone, targetPaneId);
+      }
+      return;
+    }
+
+    if (dragPayload.type === 'tool') {
+      const effectiveZone: Exclude<DropZonePosition, 'center'> =
+        zone === 'center' ? 'right' : zone;
+      void handleDockToolIntoSplit(
+        dragPayload.toolType,
+        effectiveZone,
+        targetPaneId,
+        dragPayload.hostId
+      );
+    }
+  };
+
+  const renderPaneDropOverlay = (
+    tab: TabItem,
+    node: Extract<WorkspaceNode, { type: 'pane' }>
+  ): React.JSX.Element | null => {
+    const activeDrag = workspaceDragItem || workspaceDragRef.current;
+    if (!activeDrag) return null;
+    if (activeDrag.type === 'pane' && activeDrag.paneId === node.id) return null;
+
+    const isSameTabPane = activeDrag.type === 'pane' && activeDrag.tabId === tab.id;
+    const activeZone =
+      dropTargetIndicator?.paneId === node.id ? dropTargetIndicator.zone : null;
+
+    const zoneButtons: { zone: DropZonePosition; label: string; icon: string }[] = [
+      { zone: 'top', label: `Dock Top on ${node.title}`, icon: '⬒ Top' },
+      { zone: 'left', label: `Dock Left on ${node.title}`, icon: '◧ Left' },
+      {
+        zone: 'center',
+        label: isSameTabPane ? `Swap with ${node.title}` : `Dock Center on ${node.title}`,
+        icon: isSameTabPane ? '⇄ Swap' : '⊕ Dock',
+      },
+      { zone: 'right', label: `Dock Right on ${node.title}`, icon: '◨ Right' },
+      { zone: 'bottom', label: `Dock Bottom on ${node.title}`, icon: '⬓ Bottom' },
+    ];
+
+    return (
+      <div className="pane-drop-overlay" aria-label={`Drop Zones for ${node.title}`}>
+        {activeZone && (
+          <div className={`pane-snap-highlight snap-${activeZone}`}>
+            <span className="pane-snap-badge">
+              {activeZone === 'center' && isSameTabPane
+                ? `⇄ Swap with ${node.title}`
+                : `Snap ${activeZone.toUpperCase()} — ${activeDrag.type === 'host' ? activeDrag.label : activeDrag.title}`}
+            </span>
+          </div>
+        )}
+        <div className="pane-snap-compass">
+          {zoneButtons.map((zb) => (
+            <button
+              key={zb.zone}
+              type="button"
+              className={`snap-compass-btn compass-${zb.zone} ${activeZone === zb.zone ? 'active' : ''}`}
+              aria-label={zb.label}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (dropTargetIndicator?.paneId !== node.id || dropTargetIndicator?.zone !== zb.zone) {
+                  setDropTargetIndicator({ paneId: node.id, zone: zb.zone });
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleExecuteDropOnPane(tab, node.id, zb.zone);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleExecuteDropOnPane(tab, node.id, zb.zone);
+              }}
+            >
+              {zb.icon}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderWorkspaceNode = (
     node: WorkspaceNode,
     tab: TabItem,
     totalPanes: number
   ): React.JSX.Element => {
     if (node.type === 'pane') {
+      const isPaneActive = node.id === tab.activePaneId;
+      const isDragSource =
+        workspaceDragItem?.type === 'pane' && workspaceDragItem.paneId === node.id;
+
+      const commonPaneDragEvents = {
+        onDragOver: (e: React.DragEvent) => {
+          const dragPayload = workspaceDragRef.current || workspaceDragItem;
+          if (!dragPayload) return;
+          if (dragPayload.type === 'pane' && dragPayload.paneId === node.id) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const isSameTab = dragPayload.type === 'pane' && dragPayload.tabId === tab.id;
+          const detectedZone = getDropZoneFromEvent(e, isSameTab);
+          if (
+            dropTargetIndicator?.paneId !== node.id ||
+            dropTargetIndicator?.zone !== detectedZone
+          ) {
+            setDropTargetIndicator({ paneId: node.id, zone: detectedZone });
+          }
+        },
+        onDrop: (e: React.DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleExecuteDropOnPane(tab, node.id);
+        },
+      };
+
       if (node.paneType === 'notes') {
-        const isPaneActive = node.id === tab.activePaneId;
         const targetHostId = node.notesHostId || node.hostId || '';
         return (
           <div
             key={node.id}
-            className={`split-pane split-notes-pane ${isPaneActive ? 'active' : ''}`}
+            className={`split-pane split-notes-pane ${isPaneActive ? 'active' : ''} ${isDragSource ? 'is-dragging-pane' : ''}`}
             aria-label={`Notes Pane ${node.title}`}
+            {...commonPaneDragEvents}
             onClick={() => {
               setTabs((prev) =>
                 prev.map((t) => (t.id === tab.id ? { ...t, activePaneId: node.id } : t))
@@ -3183,19 +4020,172 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               onDeleteNote={handleDeleteNote}
               onClose={() => void handleClosePane(tab.id, node.id)}
               onOpenFullNotes={() => openNotesTab(targetHostId || undefined)}
+              onHeaderDragStart={(e) => {
+                e.stopPropagation();
+                startWorkspaceDrag({
+                  type: 'pane',
+                  tabId: tab.id,
+                  paneId: node.id,
+                  title: node.title,
+                });
+              }}
+              onHeaderDragEnd={() => startWorkspaceDrag(null)}
             />
+            {renderPaneDropOverlay(tab, node)}
           </div>
         );
       }
 
-      const isPaneActive = node.id === tab.activePaneId;
+      if (node.paneType === 'totp' || node.paneType === 'snippets' || node.paneType === 'sftp') {
+        return (
+          <div
+            key={node.id}
+            className={`split-pane split-widget-pane ${isPaneActive ? 'active' : ''} ${isDragSource ? 'is-dragging-pane' : ''}`}
+            aria-label={`Pane ${node.title}`}
+            {...commonPaneDragEvents}
+            onClick={() => {
+              setTabs((prev) =>
+                prev.map((t) => (t.id === tab.id ? { ...t, activePaneId: node.id } : t))
+              );
+            }}
+          >
+            <div
+              className="split-pane-header"
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                startWorkspaceDrag({
+                  type: 'pane',
+                  tabId: tab.id,
+                  paneId: node.id,
+                  title: node.title,
+                });
+              }}
+              onDragEnd={() => startWorkspaceDrag(null)}
+              title="Drag header to rearrange or dock pane"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
+                <span className="pane-drag-handle" aria-hidden="true">
+                  ⠿
+                </span>
+                <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                  {node.paneType === 'totp'
+                    ? `🔐 ${node.title}`
+                    : node.paneType === 'snippets'
+                      ? `⚡ ${node.title}`
+                      : `📁 ${node.title}`}
+                </span>
+              </div>
+              <div className="pane-header-actions">
+                {isPaneActive ? (
+                  <span className="pane-active-indicator">● Active</span>
+                ) : (
+                  <span className="pane-inactive-hint">Click to focus</span>
+                )}
+                {totalPanes > 1 && (
+                  <button
+                    type="button"
+                    className="pane-undock-btn"
+                    aria-label={`Undock Pane ${node.title}`}
+                    title="Undock pane into its own standalone tab"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUndockPaneToTab(tab.id, node.id);
+                    }}
+                  >
+                    📤
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="pane-close-btn"
+                  aria-label={`Close Pane ${node.title}`}
+                  title="Close Docked Pane"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleClosePane(tab.id, node.id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="docked-widget-body">
+              {node.paneType === 'totp' ? (
+                <TotpManagerModal
+                  isOpen={true}
+                  isDocked={true}
+                  hosts={vaultSummary.hosts.map((h) => ({
+                    id: h.id,
+                    label: h.label,
+                    address: `${h.effectiveUser}@${h.address}:${h.effectivePort}`,
+                  }))}
+                  activeSessionId={sessionId}
+                  onInjectCode={handleInjectTotp}
+                  onRefreshVault={refreshVaultState}
+                  onClose={() => void handleClosePane(tab.id, node.id)}
+                />
+              ) : node.paneType === 'snippets' ? (
+                <SnippetsManagerModal
+                  isDocked={true}
+                  snippets={vaultSummary.snippets || []}
+                  onSaveSnippet={handleSaveSnippet}
+                  onDeleteSnippet={handleDeleteSnippet}
+                  onRunSnippet={(snip) => {
+                    const targetTermPane =
+                      collectPanes(tab.rootNode).find(
+                        (p) => !p.paneType || p.paneType === 'terminal'
+                      ) || activePane;
+                    void handleTriggerSnippet(snip, targetTermPane?.sessionId || '');
+                  }}
+                  onClose={() => void handleClosePane(tab.id, node.id)}
+                />
+              ) : (
+                <SftpBrowserView
+                  sessionId={
+                    node.sftpSessionId ||
+                    collectPanes(tab.rootNode).find(
+                      (p) => !p.paneType || p.paneType === 'terminal'
+                    )?.sessionId ||
+                    node.sessionId
+                  }
+                  hostLabel={node.title.replace('SFTP: ', '')}
+                  api={{
+                    listLocalDir: (p) =>
+                      getWailsBindings()?.ListLocalDir?.(p) ?? Promise.resolve([]),
+                    listRemoteDir: (sid, p) =>
+                      getWailsBindings()?.ListRemoteDir?.(sid, p) ?? Promise.resolve([]),
+                    startSftpUpload: (sid, l, r) =>
+                      getWailsBindings()?.StartSftpUpload?.(sid, l, r) ?? Promise.resolve(''),
+                    startSftpDownload: (sid, r, l) =>
+                      getWailsBindings()?.StartSftpDownload?.(sid, r, l) ?? Promise.resolve(''),
+                    createRemoteDir: (sid, p) =>
+                      getWailsBindings()?.CreateRemoteDir?.(sid, p) ?? Promise.resolve(),
+                    deleteRemoteItem: (sid, p) =>
+                      getWailsBindings()?.DeleteRemoteItem?.(sid, p) ?? Promise.resolve(),
+                    cancelTransfer: (tid) =>
+                      getWailsBindings()?.CancelTransfer?.(tid) ?? Promise.resolve(),
+                    getActiveTransfers: () =>
+                      getWailsBindings()?.GetActiveTransfers?.() ?? Promise.resolve([]),
+                  }}
+                  eventsOn={getWailsRuntime()?.EventsOn}
+                  onClose={() => void handleClosePane(tab.id, node.id)}
+                />
+              )}
+            </div>
+            {renderPaneDropOverlay(tab, node)}
+          </div>
+        );
+      }
+
       const currentSize = paneFontSizes.get(node.sessionId) || globalSettings.fontSize;
       const isBroadcastingThis = getBroadcastTargetSessionIds().includes(node.sessionId);
       return (
         <div
           key={node.id}
-          className={`split-pane ${isPaneActive ? 'active' : ''} ${isBroadcastingThis ? 'is-broadcasting' : ''}`}
+          className={`split-pane ${isPaneActive ? 'active' : ''} ${isBroadcastingThis ? 'is-broadcasting' : ''} ${isDragSource ? 'is-dragging-pane' : ''}`}
           aria-label={`Pane ${node.title}`}
+          {...commonPaneDragEvents}
           onClick={() => {
             setTabs((prev) =>
               prev.map((t) => (t.id === tab.id ? { ...t, activePaneId: node.id } : t))
@@ -3203,8 +4193,25 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             focusersRef.current.get(node.sessionId)?.();
           }}
         >
-          <div className="split-pane-header">
+          <div
+            className="split-pane-header"
+            draggable
+            onDragStart={(e) => {
+              e.stopPropagation();
+              startWorkspaceDrag({
+                type: 'pane',
+                tabId: tab.id,
+                paneId: node.id,
+                title: node.title,
+              });
+            }}
+            onDragEnd={() => startWorkspaceDrag(null)}
+            title="Drag header to rearrange, swap, or snap split panes"
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
+              <span className="pane-drag-handle" aria-hidden="true">
+                ⠿
+              </span>
               {isBroadcastingThis && (
                 <span className="pane-broadcast-badge" title="Broadcast Input ACTIVE on this pane">
                   🔴 BROADCAST
@@ -3413,18 +4420,32 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 <span className="pane-inactive-hint">Click to focus</span>
               )}
               {totalPanes > 1 && (
-                <button
-                  type="button"
-                  className="pane-close-btn"
-                  aria-label={`Close Pane ${node.title}`}
-                  title="Close Split Pane"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleClosePane(tab.id, node.id);
-                  }}
-                >
-                  ×
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="pane-undock-btn"
+                    aria-label={`Undock Pane ${node.title}`}
+                    title="Undock pane into its own standalone tab"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUndockPaneToTab(tab.id, node.id);
+                    }}
+                  >
+                    📤
+                  </button>
+                  <button
+                    type="button"
+                    className="pane-close-btn"
+                    aria-label={`Close Pane ${node.title}`}
+                    title="Close Split Pane"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleClosePane(tab.id, node.id);
+                    }}
+                  >
+                    ×
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -3601,17 +4622,60 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               }}
             />
           )}
+          {renderPaneDropOverlay(tab, node)}
         </div>
       );
     }
 
+    const childCount = node.children.length;
+    const ratios =
+      node.ratios && node.ratios.length === childCount
+        ? node.ratios
+        : node.children.map(() => 100 / childCount);
+
     return (
       <div
         key={node.id}
+        data-split-id={node.id}
         className={`split-container split-${node.direction}`}
         aria-label={`Split Container ${node.direction}`}
       >
-        {node.children.map((child) => renderWorkspaceNode(child, tab, totalPanes))}
+        {node.children.map((child, idx) => (
+          <React.Fragment key={child.id}>
+            <div
+              className="split-child-slot"
+              style={{
+                flex: `${ratios[idx]} 1 0%`,
+                minWidth: 0,
+                minHeight: 0,
+                display: 'flex',
+                overflow: 'hidden',
+              }}
+            >
+              {renderWorkspaceNode(child, tab, totalPanes)}
+            </div>
+            {idx < childCount - 1 && (
+              <div
+                className={`split-resizer-bar split-resizer-${node.direction} ${
+                  activeSplitResize?.splitId === node.id && activeSplitResize?.index === idx
+                    ? 'resizing'
+                    : ''
+                }`}
+                role="separator"
+                aria-orientation={node.direction === 'horizontal' ? 'vertical' : 'horizontal'}
+                aria-label={`Resize Split ${node.direction} ${idx + 1}`}
+                title="Drag to resize panes (Double-click to equalize)"
+                onMouseDown={(e) =>
+                  handleSplitResizeStart(e, tab.id, node.id, node.direction, idx, ratios)
+                }
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  handleResetSplitRatios(tab.id, node.id, childCount);
+                }}
+              />
+            )}
+          </React.Fragment>
+        ))}
       </div>
     );
   };
@@ -4696,8 +5760,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   <button
                     type="button"
                     className="sidebar-quick-btn"
-                    title="Host Notes & Documentation"
+                    title="Host Notes & Documentation (Click to open or drag onto terminal view to dock)"
                     aria-label="Host Notes & Documentation"
+                    draggable
+                    onDragStart={() =>
+                      startWorkspaceDrag({
+                        type: 'tool',
+                        toolType: 'notes',
+                        hostId: activePane?.hostId || activeTab?.hostId,
+                        title: 'Host Notes',
+                      })
+                    }
+                    onDragEnd={() => startWorkspaceDrag(null)}
                     onClick={() => openNotesTab()}
                   >
                     <span className="sidebar-quick-icon">📝</span>
@@ -4764,7 +5838,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         </small>
                       </div>
                       {groupHosts.map((h) => (
-                        <div key={h.id} className="host-card">
+                        <div
+                          key={h.id}
+                          className="host-card"
+                          draggable
+                          onDragStart={() =>
+                            startWorkspaceDrag({
+                              type: 'host',
+                              hostId: h.id,
+                              label: h.label,
+                            })
+                          }
+                          onDragEnd={() => startWorkspaceDrag(null)}
+                          title={`Drag ${h.label} onto any terminal pane to open side-by-side`}
+                        >
                           <div className="host-info">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                               <span
@@ -4804,6 +5891,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                             <button
                               type="button"
                               className="btn-secondary btn-sm"
+                              title={`Open ${h.label} side-by-side in current workspace view`}
+                              aria-label={`Split Connect ${h.label}`}
+                              onClick={() => void handleConnectHostIntoSplit(h, 'right')}
+                            >
+                              ⬌
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-sm"
                               title={`Open SFTP file browser for ${h.label}`}
                               onClick={() => void handleOpenHostSftp(h)}
                             >
@@ -4836,7 +5932,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 {filteredHosts
                   .filter((h) => !h.groupId)
                   .map((h) => (
-                    <div key={h.id} className="host-card">
+                    <div
+                      key={h.id}
+                      className="host-card"
+                      draggable
+                      onDragStart={() =>
+                        startWorkspaceDrag({
+                          type: 'host',
+                          hostId: h.id,
+                          label: h.label,
+                        })
+                      }
+                      onDragEnd={() => startWorkspaceDrag(null)}
+                      title={`Drag ${h.label} onto any terminal pane to open side-by-side`}
+                    >
                       <div className="host-info">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                           <span
@@ -4872,6 +5981,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                           onClick={() => void handleConnectSavedHost(h)}
                         >
                           Connect
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          title={`Open ${h.label} side-by-side in current workspace view`}
+                          aria-label={`Split Connect ${h.label}`}
+                          onClick={() => void handleConnectHostIntoSplit(h, 'right')}
+                        >
+                          ⬌
                         </button>
                         <button
                           type="button"
@@ -4921,7 +6039,24 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
         {tabs.length > 0 && activeTab && activePane ? (
           <section className="terminal-workspace" aria-label="Active Terminal Session">
-            <div className="tabs-bar" role="tablist" aria-label="Session Tabs">
+            <div
+              className="tabs-bar"
+              role="tablist"
+              aria-label="Session Tabs"
+              onDragOver={(e) => {
+                if (workspaceDragRef.current?.type === 'pane' || workspaceDragItem?.type === 'pane') {
+                  e.preventDefault();
+                }
+              }}
+              onDrop={(e) => {
+                const payload = workspaceDragRef.current || workspaceDragItem;
+                if (payload?.type === 'pane') {
+                  e.preventDefault();
+                  startWorkspaceDrag(null);
+                  handleUndockPaneToTab(payload.tabId, payload.paneId);
+                }
+              }}
+            >
               {groupTabsByHost
                 ? (() => {
                     const groupsMap = new Map<
@@ -4990,15 +6125,28 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                                     draggable
                                     className={`tab-pill ${isActive ? 'active' : ''}`}
                                     style={{ borderTop: `3px solid ${tabColor}` }}
-                                    onDragStart={() => setDraggedTabId(tab.id)}
+                                    onDragStart={() => {
+                                      setDraggedTabId(tab.id);
+                                      startWorkspaceDrag({
+                                        type: 'tab',
+                                        tabId: tab.id,
+                                        title: tab.title,
+                                      });
+                                    }}
+                                    onDragEnd={() => {
+                                      setDraggedTabId(null);
+                                      startWorkspaceDrag(null);
+                                    }}
                                     onDragOver={(e) => e.preventDefault()}
-                                    onDrop={() => {
+                                    onDrop={(e) => {
+                                      e.stopPropagation();
                                       if (draggedTabId && draggedTabId !== tab.id) {
                                         setTabs((prev) =>
                                           reorderTabsLocal(prev, draggedTabId, tab.id)
                                         );
                                       }
                                       setDraggedTabId(null);
+                                      startWorkspaceDrag(null);
                                     }}
                                     onClick={() => {
                                       setActiveTabId(tab.id);
@@ -5056,13 +6204,26 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                         draggable
                         className={`tab-pill ${isActive ? 'active' : ''}`}
                         style={{ borderTop: `3px solid ${tabColor}` }}
-                        onDragStart={() => setDraggedTabId(tab.id)}
+                        onDragStart={() => {
+                          setDraggedTabId(tab.id);
+                          startWorkspaceDrag({
+                            type: 'tab',
+                            tabId: tab.id,
+                            title: tab.title,
+                          });
+                        }}
+                        onDragEnd={() => {
+                          setDraggedTabId(null);
+                          startWorkspaceDrag(null);
+                        }}
                         onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => {
+                        onDrop={(e) => {
+                          e.stopPropagation();
                           if (draggedTabId && draggedTabId !== tab.id) {
                             setTabs((prev) => reorderTabsLocal(prev, draggedTabId, tab.id));
                           }
                           setDraggedTabId(null);
+                          startWorkspaceDrag(null);
                         }}
                         onClick={() => {
                           setActiveTabId(tab.id);
@@ -5135,18 +6296,233 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   >
                     Split ⬍
                   </button>
+
+                  {/* Workspace View Builder: Open Different Connections & Dockable Widgets Side-by-Side */}
+                  <div className="add-to-view-wrapper" style={{ position: 'relative', display: 'inline-flex' }}>
+                    <button
+                      type="button"
+                      className={`btn-sm ${showAddToViewMenu ? 'btn-primary' : 'btn-secondary'}`}
+                      aria-label="Add to View"
+                      aria-expanded={showAddToViewMenu}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setShowAddToViewMenu((prev) => !prev)}
+                      title="Open another host connection, local shell, Notes, TOTP, SFTP, or Snippets side-by-side in this view"
+                    >
+                      🧩 + Add to View ▾
+                    </button>
+                    {showAddToViewMenu && (
+                      <div
+                        className="add-to-view-popover"
+                        role="menu"
+                        aria-label="Add to Workspace View Menu"
+                      >
+                        <div className="add-to-view-section-title">Dock Position</div>
+                        <div className="add-to-view-zone-selector">
+                          {(
+                            [
+                              { zone: 'right', label: '◨ Right' },
+                              { zone: 'bottom', label: '⬓ Bottom' },
+                              { zone: 'left', label: '◧ Left' },
+                              { zone: 'top', label: '⬒ Top' },
+                            ] as const
+                          ).map((item) => (
+                            <button
+                              key={item.zone}
+                              type="button"
+                              className={`zone-pill-btn ${addToViewZone === item.zone ? 'active' : ''}`}
+                              onClick={() => setAddToViewZone(item.zone)}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="add-to-view-section-title">
+                          Connect Host into Split ({addToViewZone})
+                        </div>
+                        {vaultSummary.hosts.length === 0 ? (
+                          <div className="add-to-view-empty">No saved hosts in vault yet.</div>
+                        ) : (
+                          <div className="add-to-view-hosts-list">
+                            {vaultSummary.hosts.map((h) => (
+                              <button
+                                key={h.id}
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-item"
+                                onClick={() => void handleConnectHostIntoSplit(h, addToViewZone)}
+                              >
+                                <span
+                                  className="host-color-dot"
+                                  style={{
+                                    backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
+                                  }}
+                                />
+                                <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>
+                                  {h.label}
+                                </span>
+                                <small style={{ color: 'var(--text-muted)' }}>
+                                  {h.effectiveUser}@{h.address}
+                                </small>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="add-to-view-section-title">
+                          Dock Tools &amp; Widgets (Click or Drag)
+                        </div>
+                        <div className="add-to-view-tools-grid">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="add-to-view-tool-btn"
+                            draggable
+                            onDragStart={() =>
+                              startWorkspaceDrag({
+                                type: 'tool',
+                                toolType: 'notes',
+                                hostId: activePane?.hostId || activeTab?.hostId,
+                                title: 'Host Notes',
+                              })
+                            }
+                            onDragEnd={() => startWorkspaceDrag(null)}
+                            onClick={() => void handleDockToolIntoSplit('notes', addToViewZone)}
+                          >
+                            📝 Notes Drawer
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="add-to-view-tool-btn"
+                            draggable
+                            onDragStart={() =>
+                              startWorkspaceDrag({
+                                type: 'tool',
+                                toolType: 'totp',
+                                title: '2FA / TOTP',
+                              })
+                            }
+                            onDragEnd={() => startWorkspaceDrag(null)}
+                            onClick={() => void handleDockToolIntoSplit('totp', addToViewZone)}
+                          >
+                            🔐 2FA / TOTP
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="add-to-view-tool-btn"
+                            draggable
+                            onDragStart={() =>
+                              startWorkspaceDrag({
+                                type: 'tool',
+                                toolType: 'sftp',
+                                hostId: activePane?.hostId || activeTab?.hostId,
+                                title: 'SFTP Browser',
+                              })
+                            }
+                            onDragEnd={() => startWorkspaceDrag(null)}
+                            onClick={() => void handleDockToolIntoSplit('sftp', addToViewZone)}
+                          >
+                            📁 SFTP Browser
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="add-to-view-tool-btn"
+                            draggable
+                            onDragStart={() =>
+                              startWorkspaceDrag({
+                                type: 'tool',
+                                toolType: 'snippets',
+                                title: 'Command Snippets',
+                              })
+                            }
+                            onDragEnd={() => startWorkspaceDrag(null)}
+                            onClick={() => void handleDockToolIntoSplit('snippets', addToViewZone)}
+                          >
+                            ⚡ Snippets
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="add-to-view-tool-btn"
+                            onClick={() =>
+                              void handleDockToolIntoSplit('local-powershell', addToViewZone)
+                            }
+                          >
+                            💻 Local PowerShell
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="add-to-view-tool-btn"
+                            onClick={() =>
+                              void handleDockToolIntoSplit('local-bash', addToViewZone)
+                            }
+                          >
+                            🐧 Local Bash / WSL
+                          </button>
+                        </div>
+
+                        {activeTabPanes.length > 1 && (
+                          <>
+                            <div className="add-to-view-section-title">Workspace Layout</div>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="add-to-view-item"
+                              onClick={handleEqualizeAllSplits}
+                            >
+                              <span>⊞ Equalize All Split Proportions</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {activePane?.hostId && (
                     <button
                       type="button"
                       className="btn-secondary btn-sm"
                       aria-label="Pin Notes Split"
+                      draggable
+                      onDragStart={() =>
+                        startWorkspaceDrag({
+                          type: 'tool',
+                          toolType: 'notes',
+                          hostId: activePane.hostId,
+                          title: 'Host Notes',
+                        })
+                      }
+                      onDragEnd={() => startWorkspaceDrag(null)}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handlePinNotesSplit(activePane.hostId)}
-                      title="Pin host notes as horizontal split view alongside terminal"
+                      title="Pin host notes as horizontal split view alongside terminal (or drag onto any pane)"
                     >
                       📌 Notes Split
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    aria-label="Dock TOTP Split"
+                    draggable
+                    onDragStart={() =>
+                      startWorkspaceDrag({
+                        type: 'tool',
+                        toolType: 'totp',
+                        title: '2FA / TOTP Authenticator',
+                      })
+                    }
+                    onDragEnd={() => startWorkspaceDrag(null)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void handleDockToolIntoSplit('totp', 'right')}
+                    title="Dock 2FA / TOTP Authenticator into current workspace view (or drag onto any pane)"
+                  >
+                    📌 2FA Split
+                  </button>
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
@@ -5313,6 +6689,15 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     setOpenNotesDrawerHostId(null);
                     openNotesTab(hostIdToOpen || undefined);
                   }}
+                  onHeaderDragStart={() =>
+                    startWorkspaceDrag({
+                      type: 'tool',
+                      toolType: 'notes',
+                      hostId: openNotesDrawerHostId,
+                      title: 'Host Notes',
+                    })
+                  }
+                  onHeaderDragEnd={() => startWorkspaceDrag(null)}
                 />
               )}
             </div>
@@ -6713,6 +8098,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           onDeleteSnippet={handleDeleteSnippet}
           onRunSnippet={(snip) => void handleTriggerSnippet(snip, snippetActiveSessionId)}
           initialPrefillBody={snippetPrefillBody}
+          onDockToView={() => void handleDockToolIntoSplit('snippets', 'right')}
           onClose={() => {
             setShowSnippetsModal(false);
             setSnippetPrefillBody('');
@@ -6743,6 +8129,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           activeSessionId={sessionId}
           onInjectCode={handleInjectTotp}
           onRefreshVault={refreshVaultState}
+          onDockToView={() => void handleDockToolIntoSplit('totp', 'right')}
           onClose={() => setShowTotpModal(false)}
         />
       )}
