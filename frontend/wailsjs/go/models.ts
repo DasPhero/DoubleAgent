@@ -588,6 +588,32 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class PaneItem {
+	    id: string;
+	    sessionId: string;
+	    hostId?: string;
+	    title: string;
+	    cwd?: string;
+	    paneType?: string;
+	    notesHostId?: string;
+	    sftpSessionId?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PaneItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sessionId = source["sessionId"];
+	        this.hostId = source["hostId"];
+	        this.title = source["title"];
+	        this.cwd = source["cwd"];
+	        this.paneType = source["paneType"];
+	        this.notesHostId = source["notesHostId"];
+	        this.sftpSessionId = source["sftpSessionId"];
+	    }
+	}
 	export class ProxyProfile {
 	    id: string;
 	    name: string;
@@ -1001,6 +1027,106 @@ export namespace core {
 	        this.fingerprint = source["fingerprint"];
 	    }
 	}
+	export class WorkspaceNode {
+	    type: string;
+	    id: string;
+	    sessionId?: string;
+	    hostId?: string;
+	    title?: string;
+	    cwd?: string;
+	    paneType?: string;
+	    notesHostId?: string;
+	    sftpSessionId?: string;
+	    direction?: string;
+	    children?: WorkspaceNode[];
+	    ratios?: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.id = source["id"];
+	        this.sessionId = source["sessionId"];
+	        this.hostId = source["hostId"];
+	        this.title = source["title"];
+	        this.cwd = source["cwd"];
+	        this.paneType = source["paneType"];
+	        this.notesHostId = source["notesHostId"];
+	        this.sftpSessionId = source["sftpSessionId"];
+	        this.direction = source["direction"];
+	        this.children = this.convertValues(source["children"], WorkspaceNode);
+	        this.ratios = source["ratios"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TabItem {
+	    id: string;
+	    title: string;
+	    hostId?: string;
+	    color?: string;
+	    splitDir?: string;
+	    panes?: PaneItem[];
+	    rootNode?: WorkspaceNode;
+	    activePaneId: string;
+	    tabType?: string;
+	    notesHostId?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TabItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.hostId = source["hostId"];
+	        this.color = source["color"];
+	        this.splitDir = source["splitDir"];
+	        this.panes = this.convertValues(source["panes"], PaneItem);
+	        this.rootNode = this.convertValues(source["rootNode"], WorkspaceNode);
+	        this.activePaneId = source["activePaneId"];
+	        this.tabType = source["tabType"];
+	        this.notesHostId = source["notesHostId"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class TerminalSpawnOptions {
 	    mode: string;
@@ -1164,6 +1290,46 @@ export namespace core {
 	        this.snippets = this.convertValues(source["snippets"], Snippet);
 	        this.totpRecords = this.convertValues(source["totpRecords"], TotpSummary);
 	        this.notes = this.convertValues(source["notes"], NotePageSummary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class WorkspaceState {
+	    version: number;
+	    activeTabId: string;
+	    tabs: TabItem[];
+	    autoRestore: boolean;
+	    // Go type: time
+	    savedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.activeTabId = source["activeTabId"];
+	        this.tabs = this.convertValues(source["tabs"], TabItem);
+	        this.autoRestore = source["autoRestore"];
+	        this.savedAt = this.convertValues(source["savedAt"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

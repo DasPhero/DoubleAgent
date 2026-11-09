@@ -6,9 +6,29 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, & `F-26`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, & `F-27`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Auto-Reconnect & Workspace Session Restore (`F-27` / Spec Line 136)**:
+  - **Automatic Reconnection with Exponential Backoff**:
+    - Automatically detects unexpected SSH socket drops (broken pipe, network drops, server timeouts, EOF) and initiates reconnection.
+    - Uses an exponential backoff schedule ($2s \to 4s \to 8s \to 16s$, capped at $30s$) to prevent hammering unreachable or restarting servers.
+    - **Header Badge & Reconnect HUD Overlay**:
+      - Participating pane displays a pulsing amber `⚡ RECONNECTING (Ns)` header badge.
+      - Terminal displays a Glassmorphic Reconnect HUD card showing dropped connection reason, live countdown timer, and attempt count ($N/\text{Max}$).
+      - Immediate action controls: **`Reconnect Now`** (bypasses countdown to retry immediately), **`Cancel`** (stops the reconnection timer), and **`Close Pane`** (cleans up the pane).
+    - If maximum reconnect attempts are exceeded without success, the HUD transitions to **`Connection Terminated`** with a **`Retry Reconnect`** button.
+    - Intentional user actions (closing a pane, closing a tab, or clicking Disconnect) are tracked and never trigger auto-reconnect.
+  - **Workspace Session & Layout Restore (`workspace.json`)**:
+    - Automatically records tab layouts, nested split trees, split ratios, active tabs/panes, dockable notes splits, and launcher panes with debounced writes.
+    - Saves layout state to `workspace.json` in user config directory using thread-safe atomic file replacement.
+    - **Strict Security Boundary**: The persisted workspace file stores structural layout and host references only—zero plaintext passwords, keys, or credentials are saved.
+    - On application startup, the exact tab and split pane geometry is rehydrated. Restored panes display a **`Session Restored`** standby card with a one-click **`Connect Session`** button or seamlessly reconnect once the vault is unlocked.
+  - **Connection & Session Settings**:
+    - Configurable in **Global Settings (`Ctrl+,`) &rarr; Connection & Session Restore**:
+      - **Auto-Reconnect**: Toggle automatic reconnection on unexpected drops.
+      - **Max Reconnect Attempts**: Choose between 3, 5, or 10 retry attempts.
+      - **Workspace Session Restore**: Toggle saving and rehydrating workspace layout on startup.
 - **Broadcast / Multi-Execution Input (`F-26`)**:
   - **Simultaneous Keystroke Dispatch**:
     - Simultaneously sends typed keyboard input, shell commands, and control keys to multiple selected terminal sessions (split panes or tabs).

@@ -405,6 +405,55 @@ export function SettingsView({
             </div>
           </section>
 
+          <section className="settings-section">
+            <h3>Connection &amp; Session Restore</h3>
+            <div className="settings-field-row">
+              <label htmlFor="setting-auto-reconnect">Auto-Reconnect</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  id="setting-auto-reconnect"
+                  aria-label="Auto-Reconnect"
+                  type="checkbox"
+                  style={{ width: 'auto' }}
+                  checked={globalSettings.autoReconnect !== false}
+                  onChange={(e) => onUpdateSettings({ autoReconnect: e.target.checked })}
+                />
+                <span>Automatically reconnect lost SSH sessions with exponential backoff</span>
+              </label>
+            </div>
+
+            <div className="settings-field-row">
+              <label htmlFor="setting-max-reconnect">Max Reconnect Attempts</label>
+              <select
+                id="setting-max-reconnect"
+                aria-label="Max Reconnect Attempts"
+                value={globalSettings.maxReconnectAttempts || 5}
+                onChange={(e) =>
+                  onUpdateSettings({ maxReconnectAttempts: Number(e.target.value) || 5 })
+                }
+              >
+                <option value="3">3 Attempts</option>
+                <option value="5">5 Attempts (Default)</option>
+                <option value="10">10 Attempts</option>
+              </select>
+            </div>
+
+            <div className="settings-field-row">
+              <label htmlFor="setting-session-restore">Workspace Session Restore</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  id="setting-session-restore"
+                  aria-label="Workspace Session Restore"
+                  type="checkbox"
+                  style={{ width: 'auto' }}
+                  checked={globalSettings.sessionRestoreEnabled !== false}
+                  onChange={(e) => onUpdateSettings({ sessionRestoreEnabled: e.target.checked })}
+                />
+                <span>Restore open tabs, split panes, and layout on launch (workspace.json)</span>
+              </label>
+            </div>
+          </section>
+
           <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '0.5rem' }}>
             <button
               type="button"

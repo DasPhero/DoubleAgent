@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
@@ -1888,4 +1888,218 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(await screen.findByLabelText('Pane Local (PowerShell)')).toBeInTheDocument();
     expect(screen.queryByLabelText('Pane New Connection')).not.toBeInTheDocument();
   }, 15000);
+
+  it('handles unexpected session drop with Auto-Reconnect exponential backoff countdown and HUD controls (F-27)', async () => {
+    const runtimeListeners = new Map<string, (payload: unknown) => void>();
+    (window as unknown as { runtime?: { EventsOn: (ev: string, cb: (data: unknown) => void) => () => void } }).runtime = {
+      EventsOn: (ev: string, cb: (data: unknown) => void) => {
+        runtimeListeners.set(ev, cb);
+        return () => {
+          runtimeListeners.delete(ev);
+        };
+      },
+    };
+
+    let connectSavedHostCalledWith = '';
+    (window as unknown as { go?: unknown }).go = {
+      main: {
+        App: {
+          HealthCheck: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            milestone: 'M1-4',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: true,
+            quickUnlockReady: false,
+          }),
+          GetVaultSummary: async () => ({
+            groups: [],
+            hosts: [
+              {
+                id: 'host-gateway-1',
+                label: 'Gateway Core',
+                address: '172.16.0.1',
+                effectivePort: 22,
+                effectiveUser: 'root',
+                groupId: '',
+                identityId: '',
+                tags: [],
+                color: '',
+                favorite: false,
+              },
+            ],
+            identities: [],
+            keys: [],
+            proxyProfiles: [],
+          }),
+          ConnectSavedHost: async (hId: string) => {
+            connectSavedHostCalledWith = hId;
+            return 'sess-reconnected-42';
+          },
+          SaveHost: async () => {},
+        },
+      },
+    };
+
+    try {
+      render(<App initialLocked={false} />);
+
+      // 1. Connect to Gateway Core
+      expect(await screen.findByText('Gateway Core')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+      const pane = await screen.findByLabelText('Pane Gateway Core');
+      expect(pane).toBeInTheDocument();
+
+      // 2. Simulate unexpected session exit (e.g. connection reset by peer)
+      const exitCb = runtimeListeners.get('terminal:exit');
+      expect(exitCb).toBeDefined();
+      exitCb?.({
+        sessionId: 'sess-reconnected-42',
+        reason: 'connection reset by peer',
+      });
+
+      // 3. Verify reconnect badge in pane header and reconnect HUD overlay
+      const badge = await screen.findByTitle('Auto-reconnect active');
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent(/RECONNECTING/i);
+
+      const overlay = await screen.findByRole('alert', { name: /Reconnect overlay for Gateway Core/i });
+      expect(overlay).toBeInTheDocument();
+      expect(within(overlay).getByText(/Connection Dropped/i)).toBeInTheDocument();
+      expect(within(overlay).getByText(/connection reset by peer/i)).toBeInTheDocument();
+      expect(within(overlay).getByText(/Reconnecting to/i)).toBeInTheDocument();
+
+      // 4. Click "Reconnect Now" button
+      const reconnectNowBtn = within(overlay).getByRole('button', { name: 'Reconnect Now' });
+      fireEvent.click(reconnectNowBtn);
+
+      // Verify it called ConnectSavedHost and reconnected
+      expect(connectSavedHostCalledWith).toBe('host-gateway-1');
+      await waitFor(() => {
+        expect(screen.queryByRole('alert', { name: /Reconnect overlay for Gateway Core/i })).not.toBeInTheDocument();
+      });
+
+      // 5. Test manual Reconnect Cancellation via Cancel button
+      // Drop session again
+      exitCb?.({
+        sessionId: 'sess-reconnected-42',
+        reason: 'remote host closed connection',
+      });
+      const overlay2 = await screen.findByRole('alert', { name: /Reconnect overlay for Gateway Core/i });
+      expect(overlay2).toBeInTheDocument();
+
+      const cancelBtn = within(overlay2).getByRole('button', { name: 'Cancel' });
+      fireEvent.click(cancelBtn);
+
+      // Overlay is dismissed, timer is cancelled
+      await waitFor(() => {
+        expect(screen.queryByRole('alert', { name: /Reconnect overlay for Gateway Core/i })).not.toBeInTheDocument();
+      });
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+      delete (window as unknown as { runtime?: unknown }).runtime;
+    }
+  });
+
+  it('restores workspace tabs and split hierarchies from workspace.json and provides F-27 settings (F-27)', async () => {
+    (window as unknown as { go?: unknown }).go = {
+      main: {
+        App: {
+          HealthCheck: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            milestone: 'M1-4',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: true,
+            quickUnlockReady: false,
+          }),
+          GetVaultSummary: async () => ({
+            groups: [],
+            hosts: [
+              {
+                id: 'host-restored-id',
+                label: 'Restored Server',
+                address: '10.0.0.50',
+                effectivePort: 22,
+                effectiveUser: 'admin',
+                groupId: '',
+                identityId: '',
+                tags: [],
+                color: '#2dd4bf',
+                favorite: false,
+              },
+            ],
+            identities: [],
+            keys: [],
+            proxyProfiles: [],
+          }),
+          LoadWorkspace: async () => ({
+            version: 1,
+            activeTabId: 'restored-tab-1',
+            autoRestore: true,
+            tabs: [
+              {
+                id: 'restored-tab-1',
+                title: 'Restored Server',
+                hostId: 'host-restored-id',
+                color: '#2dd4bf',
+                tabType: 'terminal',
+                activePaneId: 'restored-pane-1',
+                rootNode: {
+                  type: 'pane',
+                  id: 'restored-pane-1',
+                  sessionId: 'restored-sess-1',
+                  hostId: 'host-restored-id',
+                  title: 'Restored Server',
+                },
+              },
+            ],
+          }),
+          SaveWorkspace: async () => {},
+          ConnectSavedHost: async () => 'sess-rehydrated-1',
+        },
+      },
+    };
+
+    try {
+      render(<App initialLocked={false} />);
+
+      // 1. Verify workspace layout restored from workspace.json
+      expect(await screen.findByRole('tab', { name: /Restored Server/i })).toBeInTheDocument();
+      const restoredPane = await screen.findByLabelText('Pane Restored Server');
+      expect(restoredPane).toBeInTheDocument();
+
+      // 2. Verify standby overlay for restored session
+      const standbyOverlay = await screen.findByRole('status', { name: /Restored session for Restored Server/i });
+      expect(standbyOverlay).toBeInTheDocument();
+      expect(within(standbyOverlay).getByText(/Session Restored/i)).toBeInTheDocument();
+
+      // 3. Click "Connect Session" to activate the restored pane
+      const connectSessionBtn = within(standbyOverlay).getByRole('button', { name: 'Connect Session' });
+      fireEvent.click(connectSessionBtn);
+      await waitFor(() => {
+        expect(screen.queryByRole('status', { name: /Restored session for Restored Server/i })).not.toBeInTheDocument();
+      });
+
+      // 4. Open Settings (Ctrl+,) and verify Connection & Session Restore options
+      fireEvent.keyDown(window, { key: ',', ctrlKey: true });
+      expect(await screen.findByRole('dialog', { name: 'Global Settings' })).toBeInTheDocument();
+
+      const autoReconnectCheck = screen.getByLabelText('Auto-Reconnect');
+      expect(autoReconnectCheck).toBeChecked();
+      const sessionRestoreCheck = screen.getByLabelText('Workspace Session Restore');
+      expect(sessionRestoreCheck).toBeChecked();
+      const maxAttemptsSelect = screen.getByLabelText('Max Reconnect Attempts');
+      expect(maxAttemptsSelect).toHaveValue('5');
+
+      // Toggle session restore and close settings
+      fireEvent.click(sessionRestoreCheck);
+      expect(sessionRestoreCheck).not.toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
 });

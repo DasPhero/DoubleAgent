@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-26` — Broadcast / Multi-Execution Input — COMPLETED!
-- **Next Milestone:** `F-27` (Auto-Reconnect & Session Restore — v1 Phase)
+- **Current Milestone:** `F-27` — Auto-Reconnect & Workspace Session Restore — COMPLETED!
+- **Next Milestone:** `F-28` (Remote File Edit — v1 Phase)
 - **Stage:** `2-flagship`
 
 ## What Works
@@ -232,11 +232,40 @@
       - Fixed Direct SSH argument scaling and input geometry: decoupled form from legacy `cyber-quick-connect` fixed widths; locked password, key selector, passphrase, and button heights to 38px (eliminating ballooned tall boxes); gave the Host/IP input `flex: 1 1 auto; min-width: 0;` so it scales smoothly to fill available width across any screen or split pane size.
       - Added Direct SSH Key and Agent authentication: supports toggling between `Password`, `SSH Key` (with Keychain key selection and passphrase), and `SSH Agent`, backed by secure Go `KeyID` resolution in `app.go`.
 
+  - **`v1` Milestone (`F-27` — Auto-Reconnect with Exponential Backoff & Workspace Session Restore)**:
+    - **Backend Core & Persistence (`backend/core/workspace.go`, `backend/data/workspace.go`, `app.go`)**:
+      - Defined `WorkspaceState` struct (`Version`, `ActiveTabID`, `Tabs []TabItem`, `AutoRestore`, `SavedAt time.Time`).
+      - Extended `WorkspaceNode`, `PaneItem`, and `TabItem` to preserve `PaneType`, `NotesHostID`, `SftpSessionID`, and split `Ratios []float64`.
+      - Created `backend/data/workspace.go` with thread-safe `WorkspaceStore` (`Save`, `Load`, `Clear`) using atomic temporary file renaming (`workspace.json.tmp` $\to$ `workspace.json`) preventing corrupted files on unexpected app shutdown.
+      - Bound Wails methods in `app.go`: `SaveWorkspace(state core.WorkspaceState) error`, `LoadWorkspace() (core.WorkspaceState, error)`, `ClearWorkspace() error`, `SetWorkspaceStore(ws data.WorkspaceStore)`.
+      - Unit tests in `backend/data/workspace_test.go` (`TestWorkspaceStore_SaveLoadRoundtrip_F27`, `TestWorkspaceStore_CorruptedFile_F27`) and `app_test.go` (`TestApp_WorkspacePersistence_F27`).
+    - **Frontend Auto-Reconnect Engine (`frontend/src/App.tsx`, `frontend/src/types/workspace.ts`)**:
+      - Created `ReconnectState` interface tracking `paneId`, `tabId`, `hostId`, `title`, `attempt`, `maxAttempts`, `countdown`, `status` (`'idle' | 'reconnecting' | 'failed'`), and `reason`.
+      - Implemented exponential backoff schedule ($2s \to 4s \to 8s \to 16s$, capped at $30s$).
+      - Added `intentionalDisconnectsRef` tracking intentional user closures (closing tab, closing pane, clicking Disconnect) to prevent spurious reconnection loops.
+      - Integrated unexpected disconnect detection in `terminal:exit` event handler.
+      - Added header badge (`.pane-reconnect-badge`) with live countdown and animated amber pulse.
+      - Added glassmorphic HUD Reconnect card (`.pane-reconnect-overlay`) with connection dropped reason, countdown timer, `Reconnect Now` (immediate retry), `Cancel` (cancels countdown without closing pane), and `Close Pane` buttons.
+      - Added failed state handling (`.reconnect-hud-card.is-failed`) with `Retry Reconnect` button when maximum attempts are exceeded.
+    - **Frontend Workspace Layout Restore (`workspace.json`)**:
+      - Added launch `useEffect` calling `LoadWorkspace()` on startup to rehydrate tabs, nested split container trees, split ratios, notes splits, and launcher panes.
+      - Restored terminal panes display a `Session Restored` standby HUD card with a one-click `Connect Session` button (or seamless auto-reconnect once vault is unlocked).
+      - Added debounced auto-save (600ms) persisting workspace state on tab, pane, split, or active selection changes.
+      - Zero sensitive secrets: persists layout structure, pane IDs, cwd, and host IDs only; passwords and private keys remain strictly inside the encrypted vault.
+    - **Global Settings Integration (`frontend/src/components/SettingsView.tsx`, `frontend/src/components/TerminalView.tsx`)**:
+      - Added `autoReconnect` (default: true), `maxReconnectAttempts` (default: 5), and `sessionRestoreEnabled` (default: true) to global settings and storage.
+      - Added "Connection & Session Restore" settings section in SettingsView with toggles and max attempt options (3, 5, 10).
+    - **Testing & Verification**:
+      - Go backend tests: all packages green (`go test ./...`).
+      - Go vet: clean (`go vet ./...`).
+      - Frontend lint: 0 warnings, 0 errors (`eslint . --max-warnings 0`).
+      - Frontend Vitest unit tests: 24 passed (`npm --prefix frontend run test -- --run`).
+      - Standalone binary: verified and compiled via `wails build` into `build/bin/DoubleAgent.exe` in 25s.
+
 ## In Progress
-- None (v1 Phase Milestone F-26 Complete).
+- None (v1 Phase Milestone F-27 Complete).
 
 ## Next (TODO List — v1 Phase)
-- **`F-27`: Auto-Reconnect & Session Restore**: Automatic backoff reconnect on dropped SSH sessions and workspace tab restoration.
 - **`F-28`: Remote File Edit**: Edit remote SFTP files in-place with automatic re-upload on save.
 - **`F-29`: Encrypted Vault Sync / Export**: Export/import encrypted vault bundles across machines.
 - **`F-37`: Interactive Network Map**: `react-flow` topology view of hosts, groups, jump chains, and active tunnels.

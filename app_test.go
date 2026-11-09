@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"doubleagent/backend/core"
+	"doubleagent/backend/data"
 	"doubleagent/backend/vault"
 )
 
@@ -1191,5 +1192,71 @@ func TestApp_BroadcastInput_F26(t *testing.T) {
 	// Verify broadcast command was delivered to stdin
 	if !strings.Contains(fake.stdinBuf.String(), cmd) {
 		t.Fatalf("expected broadcast command %q in stdin, got %q", cmd, fake.stdinBuf.String())
+	}
+}
+
+func TestApp_WorkspacePersistence_F27(t *testing.T) {
+	app := NewApp()
+	tmpDir := t.TempDir()
+	wsPath := filepath.Join(tmpDir, "test_ws.json")
+	app.SetWorkspaceStore(data.NewWorkspaceStore(wsPath))
+
+	// Initial load should be empty
+	initial, err := app.LoadWorkspace()
+	if err != nil {
+		t.Fatalf("LoadWorkspace on initial state failed: %v", err)
+	}
+	if !initial.AutoRestore {
+		t.Errorf("expected default AutoRestore true, got false")
+	}
+
+	// Save workspace
+	state := core.WorkspaceState{
+		Version:     1,
+		ActiveTabID: "tab-restore-1",
+		AutoRestore: true,
+		Tabs: []core.TabItem{
+			{
+				ID:           "tab-restore-1",
+				Title:        "Production DB",
+				HostID:       "host-db-prod",
+				ActivePaneID: "pane-restore-1",
+				RootNode: &core.WorkspaceNode{
+					Type:      core.NodeTypePane,
+					ID:        "pane-restore-1",
+					HostID:    "host-db-prod",
+					Title:     "Production DB",
+					PaneType:  "terminal",
+				},
+			},
+		},
+	}
+
+	if err := app.SaveWorkspace(state); err != nil {
+		t.Fatalf("SaveWorkspace failed: %v", err)
+	}
+
+	// Load and verify
+	loaded, err := app.LoadWorkspace()
+	if err != nil {
+		t.Fatalf("LoadWorkspace failed: %v", err)
+	}
+	if loaded.ActiveTabID != "tab-restore-1" {
+		t.Errorf("expected activeTabId tab-restore-1, got %s", loaded.ActiveTabID)
+	}
+	if len(loaded.Tabs) != 1 || loaded.Tabs[0].HostID != "host-db-prod" {
+		t.Errorf("unexpected loaded tabs: %+v", loaded.Tabs)
+	}
+
+	// Clear and verify
+	if err := app.ClearWorkspace(); err != nil {
+		t.Fatalf("ClearWorkspace failed: %v", err)
+	}
+	cleared, err := app.LoadWorkspace()
+	if err != nil {
+		t.Fatalf("LoadWorkspace after clear failed: %v", err)
+	}
+	if len(cleared.Tabs) != 0 {
+		t.Errorf("expected 0 tabs after clear, got %d", len(cleared.Tabs))
 	}
 }

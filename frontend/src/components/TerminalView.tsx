@@ -21,6 +21,10 @@ export interface AppGlobalSettings {
   leaderKey?: string;
   leaderTimeoutMs?: number;
   customShortcuts?: CustomShortcutItem[];
+  // Auto-Reconnect & Session Restore (F-27)
+  autoReconnect?: boolean;
+  maxReconnectAttempts?: number;
+  sessionRestoreEnabled?: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppGlobalSettings = {
@@ -36,6 +40,9 @@ export const DEFAULT_SETTINGS: AppGlobalSettings = {
   leaderKey: 'Ctrl+B',
   leaderTimeoutMs: 2000,
   customShortcuts: [],
+  autoReconnect: true,
+  maxReconnectAttempts: 5,
+  sessionRestoreEnabled: true,
 };
 
 export function getThemeColors(theme: string) {

@@ -18,6 +18,10 @@ export function ChangeVaultPassword(arg1, arg2) {
   return window['go']['main']['App']['ChangeVaultPassword'](arg1, arg2);
 }
 
+export function ClearWorkspace() {
+  return window['go']['main']['App']['ClearWorkspace']();
+}
+
 export function ConnectSSH(arg1) {
   return window['go']['main']['App']['ConnectSSH'](arg1);
 }
@@ -206,6 +210,10 @@ export function ListTotpRecords() {
   return window['go']['main']['App']['ListTotpRecords']();
 }
 
+export function LoadWorkspace() {
+  return window['go']['main']['App']['LoadWorkspace']();
+}
+
 export function LockVault() {
   return window['go']['main']['App']['LockVault']();
 }
@@ -278,6 +286,10 @@ export function SaveTotpRecord(arg1) {
   return window['go']['main']['App']['SaveTotpRecord'](arg1);
 }
 
+export function SaveWorkspace(arg1) {
+  return window['go']['main']['App']['SaveWorkspace'](arg1);
+}
+
 export function SearchCommandPalette(arg1) {
   return window['go']['main']['App']['SearchCommandPalette'](arg1);
 }
@@ -296,6 +308,10 @@ export function SetSerialDTR(arg1, arg2) {
 
 export function SetSerialRTS(arg1, arg2) {
   return window['go']['main']['App']['SetSerialRTS'](arg1, arg2);
+}
+
+export function SetWorkspaceStore(arg1) {
+  return window['go']['main']['App']['SetWorkspaceStore'](arg1);
 }
 
 export function StartForwardTunnel(arg1, arg2) {

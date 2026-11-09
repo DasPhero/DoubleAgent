@@ -33,6 +33,7 @@ import { HostNotesDrawer } from './components/HostNotesDrawer';
 import { SessionLogRecord, SessionLogStatus } from './types/sessionLog';
 import { SessionLogsModal } from './components/SessionLogsModal';
 import { BroadcastScope, BroadcastState } from './types/broadcast';
+import { WorkspaceState, ReconnectState, PersistedTabItem, PersistedWorkspaceNode } from './types/workspace';
 import { CyberIcon } from './components/CyberIcon';
 import {
   CustomShortcutItem,
@@ -798,6 +799,9 @@ interface WailsAppBindings {
   DeleteSessionLog?: (logId: string) => Promise<void>;
   ExportSessionLog?: (logId: string, targetPath: string) => Promise<void>;
   BroadcastInput?: (sessionIDs: string[], data: string) => Promise<void>;
+  SaveWorkspace?: (state: WorkspaceState) => Promise<void>;
+  LoadWorkspace?: () => Promise<WorkspaceState>;
+  ClearWorkspace?: () => Promise<void>;
 }
 
 export interface SerialAutoDetectResult {
@@ -847,6 +851,43 @@ function getWailsRuntime(): WailsRuntime | undefined {
     runtime?: WailsRuntime;
   };
   return win.runtime;
+}
+
+function sanitizeNodeForPersistence(n: WorkspaceNode): PersistedWorkspaceNode {
+  if (n.type === 'pane') {
+    return {
+      type: 'pane',
+      id: n.id,
+      sessionId: n.sessionId,
+      hostId: n.hostId,
+      title: n.title,
+      cwd: n.cwd,
+      paneType: n.paneType,
+      notesHostId: n.notesHostId,
+      sftpSessionId: n.sftpSessionId,
+    };
+  }
+  return {
+    type: 'split',
+    id: n.id,
+    direction: n.direction,
+    children: (n.children || []).map(sanitizeNodeForPersistence),
+    ratios: n.ratios,
+  };
+}
+
+function sanitizeTabForPersistence(t: TabItem): PersistedTabItem {
+  return {
+    id: t.id,
+    title: t.title,
+    hostId: t.hostId,
+    color: t.color,
+    splitDir: 'none',
+    activePaneId: t.activePaneId,
+    tabType: t.tabType,
+    notesHostId: t.notesHostId,
+    rootNode: sanitizeNodeForPersistence(t.rootNode),
+  };
 }
 
 export function App({ initialLocked = false }: { initialLocked?: boolean } = {}): React.JSX.Element {
@@ -1013,6 +1054,18 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [tabs, setTabs] = useState<TabItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+
+  // Auto-Reconnect with Exponential Backoff & Workspace Session Restore (F-27)
+  const tabsRef = useRef<TabItem[]>(tabs);
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+
+  const [reconnectStates, setReconnectStates] = useState<Map<string, ReconnectState>>(new Map());
+  const reconnectTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  const intentionalDisconnectsRef = useRef<Set<string>>(new Set());
+  const saveWorkspaceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startAutoReconnectRef = useRef<((pane: PaneItem, tabId: string, attempt?: number, reason?: string) => void) | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>(
     initialLocked
       ? 'Vault is locked (Dark Crimson Theme). Unlock your vault to switch to Teal and access saved hosts.'
@@ -1064,6 +1117,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const [globalSettings, setGlobalSettings] = useState<AppGlobalSettings>(() =>
     loadSettingsFromStorage()
   );
+  const globalSettingsRef = useRef<AppGlobalSettings>(globalSettings);
+  useEffect(() => {
+    globalSettingsRef.current = globalSettings;
+  }, [globalSettings]);
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
   const [settingsActiveTab, setSettingsActiveTab] = useState<'appearance' | 'security' | 'shortcuts' | 'about'>('appearance');
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
@@ -1569,11 +1626,13 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
     const offExit = rt.EventsOn('terminal:exit', (raw: unknown) => {
       let exitedId = '';
+      let exitReason = '';
       if (typeof raw === 'string') {
         exitedId = raw;
       } else if (raw && typeof raw === 'object') {
         const obj = raw as Record<string, unknown>;
         exitedId = (obj.sessionId || obj.sessionID || '') as string;
+        exitReason = (obj.reason || '') as string;
       }
       if (!exitedId) {
         return;
@@ -1587,6 +1646,58 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         next.delete(exitedId);
         return next;
       });
+
+      // Check if this was an intentional disconnect triggered by user action
+      if (intentionalDisconnectsRef.current.has(exitedId)) {
+        intentionalDisconnectsRef.current.delete(exitedId);
+        setTabs((prev) => {
+          const nextTabs: TabItem[] = [];
+          for (const t of prev) {
+            const panes = collectPanes(t.rootNode);
+            const matchingPane = panes.find((p) => p.sessionId === exitedId);
+            if (!matchingPane) {
+              nextTabs.push(t);
+              continue;
+            }
+            const newRoot = removePaneFromTree(t.rootNode, matchingPane.id);
+            if (newRoot) {
+              const remainingPanes = collectPanes(newRoot);
+              const nextActiveId = remainingPanes.some((p) => p.id === t.activePaneId)
+                ? t.activePaneId
+                : remainingPanes[0]?.id || '';
+              nextTabs.push({
+                ...t,
+                rootNode: newRoot,
+                activePaneId: nextActiveId,
+              });
+            }
+          }
+          return nextTabs;
+        });
+        setStatusMessage('SSH session disconnected.');
+        return;
+      }
+
+      // Unexpected disconnect: check if auto-reconnect is enabled (F-27)
+      if (globalSettingsRef.current.autoReconnect !== false) {
+        let foundPane: PaneItem | undefined;
+        let foundTabId = '';
+        for (const t of tabsRef.current) {
+          const panes = collectPanes(t.rootNode);
+          const p = panes.find((pane) => pane.sessionId === exitedId);
+          if (p) {
+            foundPane = p;
+            foundTabId = t.id;
+            break;
+          }
+        }
+        if (foundPane && (foundPane.hostId || foundPane.title)) {
+          startAutoReconnectRef.current?.(foundPane, foundTabId, 1, exitReason);
+          setStatusMessage(`Connection dropped (${exitReason || 'disconnected'}). Auto-reconnecting...`);
+          return;
+        }
+      }
+
       setTabs((prev) => {
         const nextTabs: TabItem[] = [];
         for (const t of prev) {
@@ -1649,6 +1760,100 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     document.addEventListener('click', handleDocumentClick);
     return () => document.removeEventListener('click', handleDocumentClick);
   }, []);
+
+  // Restore workspace layout from workspace.json on launch (F-27)
+  useEffect(() => {
+    let mounted = true;
+    const restoreWorkspace = async (): Promise<void> => {
+      const api = getWailsBindings();
+      if (!api || !api.LoadWorkspace) return;
+      try {
+        const state = await api.LoadWorkspace();
+        if (
+          mounted &&
+          state &&
+          state.autoRestore &&
+          Array.isArray(state.tabs) &&
+          state.tabs.length > 0
+        ) {
+          const restoredTabs: TabItem[] = state.tabs.map((pt) => {
+            const rehydrateNode = (pn: PersistedWorkspaceNode): WorkspaceNode => {
+              if (pn.type === 'pane') {
+                return {
+                  type: 'pane',
+                  id: pn.id,
+                  sessionId: pn.sessionId || `restored-${pn.id}`,
+                  hostId: pn.hostId,
+                  title: pn.title || 'Terminal',
+                  cwd: pn.cwd,
+                  paneType: (pn.paneType as DockablePaneType) || (pn.hostId ? 'terminal' : 'launcher'),
+                  notesHostId: pn.notesHostId,
+                  sftpSessionId: pn.sftpSessionId,
+                };
+              }
+              return {
+                type: 'split',
+                id: pn.id,
+                direction: pn.direction === 'vertical' ? 'vertical' : 'horizontal',
+                children: (pn.children || []).map(rehydrateNode),
+                ratios: pn.ratios,
+              };
+            };
+            return {
+              id: pt.id,
+              title: pt.title,
+              hostId: pt.hostId,
+              color: pt.color,
+              tabType: pt.tabType,
+              notesHostId: pt.notesHostId,
+              activePaneId: pt.activePaneId,
+              rootNode: rehydrateNode(pt.rootNode),
+            };
+          });
+
+          setTabs(restoredTabs);
+          if (state.activeTabId && restoredTabs.some((t) => t.id === state.activeTabId)) {
+            setActiveTabId(state.activeTabId);
+          }
+          setStatusMessage('Workspace layout restored from previous session (workspace.json).');
+        }
+      } catch (err) {
+        console.warn('Workspace restore error:', err);
+      }
+    };
+    void restoreWorkspace();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Automatically save workspace layout changes to workspace.json with debounce (F-27)
+  useEffect(() => {
+    if (globalSettings.sessionRestoreEnabled === false) return;
+    if (tabs.length === 0) return;
+
+    if (saveWorkspaceTimeoutRef.current) {
+      clearTimeout(saveWorkspaceTimeoutRef.current);
+    }
+
+    saveWorkspaceTimeoutRef.current = setTimeout(() => {
+      const api = getWailsBindings();
+      if (!api || !api.SaveWorkspace) return;
+      const state: WorkspaceState = {
+        version: 1,
+        activeTabId: activeTabId || '',
+        autoRestore: true,
+        tabs: tabs.map(sanitizeTabForPersistence),
+      };
+      void api.SaveWorkspace(state);
+    }, 600);
+
+    return () => {
+      if (saveWorkspaceTimeoutRef.current) {
+        clearTimeout(saveWorkspaceTimeoutRef.current);
+      }
+    };
+  }, [tabs, activeTabId, globalSettings.sessionRestoreEnabled]);
 
   useEffect(() => {
     if (!showCommandPalette) {
@@ -3448,8 +3653,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         next.delete(targetPane.sessionId);
         return next;
       });
+      const rcTimer = reconnectTimersRef.current.get(paneId);
+      if (rcTimer) {
+        clearInterval(rcTimer);
+        reconnectTimersRef.current.delete(paneId);
+      }
+      setReconnectStates((prev) => {
+        if (!prev.has(paneId)) return prev;
+        const next = new Map(prev);
+        next.delete(paneId);
+        return next;
+      });
       const api = getWailsBindings();
       if (api && isTerminalPane) {
+        intentionalDisconnectsRef.current.add(targetPane.sessionId);
         void api.DisconnectSession(targetPane.sessionId);
       }
     }
@@ -3521,7 +3738,19 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
         next.delete(p.sessionId);
         return next;
       });
+      const paneRcTimer = reconnectTimersRef.current.get(p.id);
+      if (paneRcTimer) {
+        clearInterval(paneRcTimer);
+        reconnectTimersRef.current.delete(p.id);
+      }
+      setReconnectStates((prev) => {
+        if (!prev.has(p.id)) return prev;
+        const next = new Map(prev);
+        next.delete(p.id);
+        return next;
+      });
       if (api && isTerminalPane) {
+        intentionalDisconnectsRef.current.add(p.sessionId);
         void api.DisconnectSession(p.sessionId);
       }
     }
@@ -3536,9 +3765,170 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
     if (!activeTab || !activePane) {
       return;
     }
+    intentionalDisconnectsRef.current.add(activePane.sessionId);
     await handleClosePane(activeTab.id, activePane.id);
     setStatusMessage('Disconnected.');
   };
+
+  const cancelReconnect = (paneId: string, shouldClosePane = false): void => {
+    const timer = reconnectTimersRef.current.get(paneId);
+    if (timer) {
+      clearInterval(timer);
+      reconnectTimersRef.current.delete(paneId);
+    }
+    const recState = reconnectStates.get(paneId);
+    setReconnectStates((prev) => {
+      const next = new Map(prev);
+      next.delete(paneId);
+      return next;
+    });
+    if (recState && shouldClosePane) {
+      void handleClosePane(recState.tabId, paneId);
+    }
+    setStatusMessage('Reconnection cancelled.');
+  };
+
+  const performReconnect = async (paneId: string): Promise<void> => {
+    const timer = reconnectTimersRef.current.get(paneId);
+    if (timer) {
+      clearInterval(timer);
+      reconnectTimersRef.current.delete(paneId);
+    }
+    const recState = reconnectStates.get(paneId);
+    if (!recState) return;
+
+    const currentAttempt = recState.status === 'failed' ? 1 : recState.attempt;
+    setReconnectStates((prev) => {
+      const next = new Map(prev);
+      next.set(paneId, { ...recState, attempt: currentAttempt, status: 'reconnecting', countdown: 0 });
+      return next;
+    });
+
+    setStatusMessage(`Attempting to reconnect ${recState.title} (Attempt ${currentAttempt}/${recState.maxAttempts})...`);
+    const api = getWailsBindings();
+    if (!api) return;
+
+    try {
+      let newSessionId = '';
+      if (recState.hostId) {
+        newSessionId = await api.ConnectSavedHost(recState.hostId, { cols: 120, rows: 34 });
+      } else {
+        throw new Error('Host ID not available for auto-reconnect');
+      }
+
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== recState.tabId) return t;
+          const replaceSessionInNode = (n: WorkspaceNode): WorkspaceNode => {
+            if (n.type === 'pane') {
+              if (n.id === paneId) {
+                return { ...n, sessionId: newSessionId };
+              }
+              return n;
+            }
+            return { ...n, children: n.children.map(replaceSessionInNode) };
+          };
+          return { ...t, rootNode: replaceSessionInNode(t.rootNode) };
+        })
+      );
+
+      setReconnectStates((prev) => {
+        const next = new Map(prev);
+        next.delete(paneId);
+        return next;
+      });
+
+      setStatusMessage(`Successfully reconnected to ${recState.title}!`);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const nextAttempt = currentAttempt + 1;
+      if (nextAttempt <= recState.maxAttempts) {
+        startAutoReconnect(
+          {
+            id: paneId,
+            sessionId: '',
+            hostId: recState.hostId,
+            title: recState.title,
+          },
+          recState.tabId,
+          nextAttempt,
+          errMsg
+        );
+      } else {
+        setReconnectStates((prev) => {
+          const next = new Map(prev);
+          next.set(paneId, {
+            ...recState,
+            attempt: currentAttempt,
+            status: 'failed',
+            countdown: 0,
+            reason: errMsg || 'Maximum reconnect attempts exceeded',
+          });
+          return next;
+        });
+        setStatusMessage(`Auto-reconnect to ${recState.title} failed after ${recState.maxAttempts} attempts.`);
+      }
+    }
+  };
+
+  const startAutoReconnect = (
+    pane: PaneItem,
+    tabId: string,
+    attempt = 1,
+    reason?: string
+  ): void => {
+    const existing = reconnectTimersRef.current.get(pane.id);
+    if (existing) {
+      clearInterval(existing);
+      reconnectTimersRef.current.delete(pane.id);
+    }
+
+    const maxAttempts = globalSettings.maxReconnectAttempts || 5;
+    const effectiveAttempt = Math.max(1, attempt);
+    const delaySec = attempt === 0 ? 0 : Math.min(Math.pow(2, effectiveAttempt), 30);
+
+    setReconnectStates((prev) => {
+      const next = new Map(prev);
+      next.set(pane.id, {
+        paneId: pane.id,
+        tabId,
+        hostId: pane.hostId,
+        title: pane.title,
+        attempt: effectiveAttempt,
+        maxAttempts,
+        countdown: delaySec,
+        status: 'reconnecting',
+        reason: reason || 'Connection dropped',
+      });
+      return next;
+    });
+
+    if (delaySec === 0) {
+      void performReconnect(pane.id);
+      return;
+    }
+
+    let remaining = delaySec;
+    const timer = setInterval(() => {
+      remaining -= 1;
+      if (remaining > 0) {
+        setReconnectStates((prev) => {
+          const cur = prev.get(pane.id);
+          if (!cur) return prev;
+          const next = new Map(prev);
+          next.set(pane.id, { ...cur, countdown: remaining });
+          return next;
+        });
+      } else {
+        clearInterval(timer);
+        reconnectTimersRef.current.delete(pane.id);
+        void performReconnect(pane.id);
+      }
+    }, 1000);
+
+    reconnectTimersRef.current.set(pane.id, timer);
+  };
+  startAutoReconnectRef.current = startAutoReconnect;
 
   const handleSplitResizeStart = (
     e: React.MouseEvent,
@@ -4851,6 +5241,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   🔴 BROADCAST
                 </span>
               )}
+              {reconnectStates.has(node.id) && (
+                <span className="pane-reconnect-badge" title="Auto-reconnect active">
+                  <CyberIcon name="bolt" size={10} /> RECONNECTING ({reconnectStates.get(node.id)?.countdown}s)
+                </span>
+              )}
               <span className="pane-title-text" title={node.title}>
                 {node.title}
               </span>
@@ -5262,6 +5657,149 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               }}
             />
           )}
+
+          {reconnectStates.has(node.id) && (() => {
+            const rc = reconnectStates.get(node.id);
+            if (!rc) return null;
+            const isFailed = rc.status === 'failed';
+            return (
+              <div
+                className="pane-reconnect-overlay"
+                role="alert"
+                aria-label={`Reconnect overlay for ${node.title}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={`reconnect-hud-card ${isFailed ? 'is-failed' : ''}`}>
+                  <div className="reconnect-header">
+                    <span className="reconnect-pulse-icon">
+                      <CyberIcon name={isFailed ? 'close' : 'bolt'} size={18} />
+                    </span>
+                    <h4>{isFailed ? 'Connection Terminated' : 'Connection Dropped'}</h4>
+                  </div>
+                  <p className="reconnect-subtext">
+                    {isFailed ? (
+                      `Auto-reconnect failed after ${rc.maxAttempts} attempts.`
+                    ) : (
+                      <>
+                        Reconnecting to <strong>{node.title}</strong> in{' '}
+                        <strong>{rc.countdown}s</strong> (Attempt {rc.attempt}/{rc.maxAttempts})
+                      </>
+                    )}
+                  </p>
+                  {rc.reason && (
+                    <span className="reconnect-reason-badge" title={rc.reason}>
+                      {rc.reason}
+                    </span>
+                  )}
+                  <div className="reconnect-actions">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void performReconnect(node.id);
+                      }}
+                    >
+                      {isFailed ? 'Retry Reconnect' : 'Reconnect Now'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cancelReconnect(node.id, false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cancelReconnect(node.id, true);
+                      }}
+                    >
+                      Close Pane
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {node.sessionId.startsWith('restored-') && !reconnectStates.has(node.id) && (
+            <div
+              className="pane-reconnect-overlay"
+              role="status"
+              aria-label={`Restored session for ${node.title}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="reconnect-hud-card">
+                <div className="reconnect-header">
+                  <span className="reconnect-pulse-icon">
+                    <CyberIcon name="terminal" size={18} />
+                  </span>
+                  <h4>Session Restored</h4>
+                </div>
+                <p className="reconnect-subtext">
+                  Layout restored from workspace state for <strong>{node.title}</strong>.
+                </p>
+                <div className="reconnect-actions">
+                  {node.hostId ? (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startAutoReconnect(node, tab.id, 0);
+                        void performReconnect(node.id);
+                      }}
+                    >
+                      Connect Session
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        targetLauncherRef.current = { tabId: tab.id, paneId: node.id };
+                        setTabs((prev) =>
+                          prev.map((t) => {
+                            if (t.id !== tab.id) return t;
+                            const markLauncher = (n: WorkspaceNode): WorkspaceNode => {
+                              if (n.type === 'pane' && n.id === node.id) {
+                                return { ...n, paneType: 'launcher', title: 'New Connection' };
+                              }
+                              if (n.type === 'split') {
+                                return { ...n, children: n.children.map(markLauncher) };
+                              }
+                              return n;
+                            };
+                            return { ...t, activePaneId: node.id, rootNode: markLauncher(t.rootNode) };
+                          })
+                        );
+                      }}
+                    >
+                      Launch Session
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleClosePane(tab.id, node.id);
+                    }}
+                  >
+                    Close Pane
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {renderPaneDropOverlay(tab, node)}
         </div>
       );

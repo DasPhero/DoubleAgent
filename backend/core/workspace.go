@@ -1,5 +1,7 @@
 package core
 
+import "time"
+
 // SplitDirection specifies how panes within a tab are arranged (F-08).
 type SplitDirection string
 
@@ -17,28 +19,35 @@ const (
 	NodeTypeSplit WorkspaceNodeType = "split"
 )
 
-// WorkspaceNode represents either a single leaf terminal pane or a nested split container (F-08).
+// WorkspaceNode represents either a single leaf terminal pane or a nested split container (F-08, F-27).
 type WorkspaceNode struct {
-	Type      WorkspaceNodeType `json:"type"`
-	ID        string            `json:"id"`
-	SessionID string            `json:"sessionId,omitempty"`
-	HostID    string            `json:"hostId,omitempty"`
-	Title     string            `json:"title,omitempty"`
-	Cwd       string            `json:"cwd,omitempty"`
-	Direction SplitDirection    `json:"direction,omitempty"`
-	Children  []*WorkspaceNode  `json:"children,omitempty"`
+	Type          WorkspaceNodeType `json:"type"`
+	ID            string            `json:"id"`
+	SessionID     string            `json:"sessionId,omitempty"`
+	HostID        string            `json:"hostId,omitempty"`
+	Title         string            `json:"title,omitempty"`
+	Cwd           string            `json:"cwd,omitempty"`
+	PaneType      string            `json:"paneType,omitempty"`
+	NotesHostID   string            `json:"notesHostId,omitempty"`
+	SftpSessionID string            `json:"sftpSessionId,omitempty"`
+	Direction     SplitDirection    `json:"direction,omitempty"`
+	Children      []*WorkspaceNode  `json:"children,omitempty"`
+	Ratios        []float64         `json:"ratios,omitempty"`
 }
 
-// PaneItem represents a single terminal pane inside a tab (F-08).
+// PaneItem represents a single terminal pane inside a tab (F-08, F-27).
 type PaneItem struct {
-	ID        string `json:"id"`
-	SessionID string `json:"sessionId"`
-	HostID    string `json:"hostId,omitempty"`
-	Title     string `json:"title"`
-	Cwd       string `json:"cwd,omitempty"`
+	ID            string `json:"id"`
+	SessionID     string `json:"sessionId"`
+	HostID        string `json:"hostId,omitempty"`
+	Title         string `json:"title"`
+	Cwd           string `json:"cwd,omitempty"`
+	PaneType      string `json:"paneType,omitempty"`
+	NotesHostID   string `json:"notesHostId,omitempty"`
+	SftpSessionID string `json:"sftpSessionId,omitempty"`
 }
 
-// TabItem represents an open terminal tab containing an arbitrary nested split tree of panes (F-08).
+// TabItem represents an open terminal tab containing an arbitrary nested split tree of panes (F-08, F-27).
 type TabItem struct {
 	ID           string         `json:"id"`
 	Title        string         `json:"title"`
@@ -48,6 +57,17 @@ type TabItem struct {
 	Panes        []PaneItem     `json:"panes,omitempty"`
 	RootNode     *WorkspaceNode `json:"rootNode,omitempty"`
 	ActivePaneID string         `json:"activePaneId"`
+	TabType      string         `json:"tabType,omitempty"`
+	NotesHostID  string         `json:"notesHostId,omitempty"`
+}
+
+// WorkspaceState represents the serialized workspace layout persisted in workspace.json (F-27).
+type WorkspaceState struct {
+	Version     int       `json:"version"`
+	ActiveTabID string    `json:"activeTabId"`
+	Tabs        []TabItem `json:"tabs"`
+	AutoRestore bool      `json:"autoRestore"`
+	SavedAt     time.Time `json:"savedAt"`
 }
 
 // SplitPaneInTree splits targetPaneID inside root by adding newPane in direction dir.
@@ -130,11 +150,14 @@ func CollectPanes(root *WorkspaceNode) []PaneItem {
 	}
 	if root.Type == NodeTypePane {
 		return []PaneItem{{
-			ID:        root.ID,
-			SessionID: root.SessionID,
-			HostID:    root.HostID,
-			Title:     root.Title,
-			Cwd:       root.Cwd,
+			ID:            root.ID,
+			SessionID:     root.SessionID,
+			HostID:        root.HostID,
+			Title:         root.Title,
+			Cwd:           root.Cwd,
+			PaneType:      root.PaneType,
+			NotesHostID:   root.NotesHostID,
+			SftpSessionID: root.SftpSessionID,
 		}}
 	}
 	var out []PaneItem
@@ -151,11 +174,14 @@ func FindPane(root *WorkspaceNode, paneID string) *PaneItem {
 	}
 	if root.Type == NodeTypePane && root.ID == paneID {
 		return &PaneItem{
-			ID:        root.ID,
-			SessionID: root.SessionID,
-			HostID:    root.HostID,
-			Title:     root.Title,
-			Cwd:       root.Cwd,
+			ID:            root.ID,
+			SessionID:     root.SessionID,
+			HostID:        root.HostID,
+			Title:         root.Title,
+			Cwd:           root.Cwd,
+			PaneType:      root.PaneType,
+			NotesHostID:   root.NotesHostID,
+			SftpSessionID: root.SftpSessionID,
 		}
 	}
 	for _, child := range root.Children {

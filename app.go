@@ -16,6 +16,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"doubleagent/backend/core"
+	"doubleagent/backend/data"
 	"doubleagent/backend/pty"
 	"doubleagent/backend/serial"
 	"doubleagent/backend/ssh"
@@ -46,6 +47,7 @@ type App struct {
 	transferTasks    map[string]*activeTransferTask
 	activeTunnels    map[string]core.ForwardTunnel
 	logMgr           *core.SessionLogManager
+	workspaceStore   data.WorkspaceStore
 }
 
 type activeTransferTask struct {
@@ -67,6 +69,14 @@ func defaultLogsDir() string {
 		return filepath.Join(os.TempDir(), "doubleagent-logs")
 	}
 	return filepath.Join(cfgDir, "DoubleAgent", "logs")
+}
+
+func defaultWorkspacePath() string {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil || cfgDir == "" {
+		return filepath.Join(os.TempDir(), "doubleagent-workspace.json")
+	}
+	return filepath.Join(cfgDir, "DoubleAgent", "workspace.json")
 }
 
 // NewApp creates a new App application struct with the default SSH transport and encrypted Vault store.
@@ -126,6 +136,7 @@ func NewAppWithDependencies(
 		})
 	}
 	app.vaultStore = vaultStore
+	app.workspaceStore = data.NewWorkspaceStore(defaultWorkspacePath())
 	return app
 }
 
@@ -2743,4 +2754,47 @@ func (a *App) ExportSessionLog(logID string, targetPath string) error {
 		return errors.New("session log manager not initialized")
 	}
 	return a.logMgr.ExportLog(logID, targetPath)
+}
+
+// SetWorkspaceStore injects a custom WorkspaceStore for testing (F-27).
+func (a *App) SetWorkspaceStore(ws data.WorkspaceStore) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.workspaceStore = ws
+}
+
+// SaveWorkspace persists the user's workspace layout, tabs, and split panes across app restarts (F-27).
+func (a *App) SaveWorkspace(state core.WorkspaceState) error {
+	a.mu.Lock()
+	if a.workspaceStore == nil {
+		a.workspaceStore = data.NewWorkspaceStore(defaultWorkspacePath())
+	}
+	ws := a.workspaceStore
+	a.mu.Unlock()
+
+	return ws.Save(state)
+}
+
+// LoadWorkspace retrieves the persisted workspace layout from workspace.json (F-27).
+func (a *App) LoadWorkspace() (core.WorkspaceState, error) {
+	a.mu.Lock()
+	if a.workspaceStore == nil {
+		a.workspaceStore = data.NewWorkspaceStore(defaultWorkspacePath())
+	}
+	ws := a.workspaceStore
+	a.mu.Unlock()
+
+	return ws.Load()
+}
+
+// ClearWorkspace removes the persisted workspace state (F-27).
+func (a *App) ClearWorkspace() error {
+	a.mu.Lock()
+	if a.workspaceStore == nil {
+		a.workspaceStore = data.NewWorkspaceStore(defaultWorkspacePath())
+	}
+	ws := a.workspaceStore
+	a.mu.Unlock()
+
+	return ws.Clear()
 }
