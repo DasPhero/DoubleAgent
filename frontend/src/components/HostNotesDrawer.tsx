@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { NotePage, NoteHostOption } from '../types/note';
 import { MarkdownRenderer, toggleMarkdownTaskAtIndex } from './MarkdownRenderer';
+import { CyberIcon } from './CyberIcon';
 
 interface HostNotesDrawerProps {
   isOpen: boolean;
@@ -123,10 +124,12 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
         <div className="drawer-title-box">
           {onHeaderDragStart && (
             <span className="pane-drag-handle" aria-hidden="true">
-              ⠿
+              <CyberIcon name="grip" size={12} />
             </span>
           )}
-          <span className="drawer-icon">📝</span>
+          <span className="drawer-icon" style={{ color: 'var(--accent-glow)', display: 'inline-flex' }}>
+            <CyberIcon name="note" size={14} />
+          </span>
           <div className="drawer-titles">
             <span className="drawer-sub">{isPinned ? 'Pinned Notes' : 'Host Notes'}</span>
             <span className="drawer-host-name">
@@ -143,7 +146,7 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
               title="Pin notes as a horizontal split view alongside terminal"
               aria-label="Pin Notes as Split View"
             >
-              📌 Pin Split
+              <CyberIcon name="pin" size={11} /> Pin Split
             </button>
           )}
           {onOpenFullNotes && (
@@ -154,7 +157,7 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
               title="Open full notes editor in workspace tab"
               aria-label="Open Full Notes"
             >
-              ⤢ Full View
+              <CyberIcon name="undock" size={11} /> Full View
             </button>
           )}
           <button
@@ -181,7 +184,7 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
               setIsEditing(false);
             }}
           >
-            {n.isFolder ? '📁' : '📄'} {n.title}
+            <CyberIcon name={n.isFolder ? 'folder' : 'note'} size={11} /> {n.title}
           </button>
         ))}
         <button type="button" className="drawer-tab-pill add-tab-btn" onClick={handleCreate} title="New Note">

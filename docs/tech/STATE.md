@@ -207,6 +207,23 @@
     - Added `isDocked` and `onDockToView` support to `TotpManagerModal.tsx` and `SnippetsManagerModal.tsx`, plus draggable headers on `HostNotesDrawer.tsx`.
     - Verified in `frontend/src/App.test.tsx` (`supports multi-host side-by-side splits, snap drag-and-drop rearranging, resizable panes, and dockable widgets (F-08)`).
 
+- **Cyberpunk / Tactical Sci-Fi HUD & Glassmorphism Overhaul**:
+  - **Monochrome Vector SVG Icon System (`frontend/src/components/CyberIcon.tsx`)**:
+    - Replaced OS color emojis across the sidebar, toolbar, pane headers, and drawers with crisp geometric stroke SVGs (`CyberIcon`) that inherit current theme/glow colors (`--accent-glow`).
+  - **Uncrushable 27px Tmux/i3wm Pane Status Headers (`frontend/src/App.tsx`, `frontend/src/styles.css`)**:
+    - Protected `.pane-header-left` (`min-width: 85px`, `flex: 1 1 95px`) with `.pane-drag-handle` (`<CyberIcon name="grip" />`), active status dot, and monospace title so the drag handle and host name **never** vanish when a pane is narrow.
+    - Replaced bulky text buttons on the right side of pane headers with compact 20px monochrome HUD icon buttons (`.pane-hud-btn`) for Search, SFTP, Snippets, Session Recording (`REC`), Broadcast (`CAST`), Notes, Undock, and Close.
+  - **Segmented HUD Command Strip & Sci-Fi Bottom Telemetry Footer**:
+    - Consolidated the 12-button `.terminal-toolbar` into 3 sleek segmented `.hud-btn-group` decks:
+      1. **Layout & View**: `Split H`, `Split V`, `+ View ▾`, and `Next Pane`.
+      2. **Shell Spawner**: `~ Dir` (Default Dir), `CWD` (Current Dir), and `Root`.
+      3. **Security Ops**: `Broadcast`, `Pass` (Inject Password), and `2FA` (Inject TOTP).
+    - Added a persistent 23px `.cyber-hud-statusbar` footer at the bottom of the application displaying `VAULT ARMED` / `VAULT LOCKED`, active `TARGET`, `GRID` pane count, active `BROADCAST` / `REC` / `TUNNELS` telemetry pills, and live status readout.
+  - **Rack-Blade Sidebar Host Cards (`.rack-blade-card`)**:
+    - Redesigned sidebar host cards into compact glassmorphic server-blade rows with a flexible primary `Connect` button and 23px icon-only action buttons (`Split Connect`, `SFTP`, `Notes`, `Delete`) plus double-click-to-connect, eliminating horizontal button overflow even when the sidebar is resized narrow.
+  - **Compact Inline Quick-Connect Bar (`.cyber-quick-connect`)**:
+    - Streamlined the 4-input top header form into a unified glassmorphic `SSH user@host:port` pill bar that also auto-parses pasted `user@host:port` strings inline.
+
 ## In Progress
 - None (v1 Phase Milestone F-26 Complete).
 

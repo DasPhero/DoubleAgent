@@ -33,6 +33,7 @@ import { HostNotesDrawer } from './components/HostNotesDrawer';
 import { SessionLogRecord, SessionLogStatus } from './types/sessionLog';
 import { SessionLogsModal } from './components/SessionLogsModal';
 import { BroadcastScope, BroadcastState } from './types/broadcast';
+import { CyberIcon } from './components/CyberIcon';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -1110,6 +1111,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   } | null>(null);
   const [showAddToViewMenu, setShowAddToViewMenu] = useState<boolean>(false);
   const [addToViewZone, setAddToViewZone] = useState<Exclude<DropZonePosition, 'center'>>('right');
+  const [quickConnectExpanded, setQuickConnectExpanded] = useState<boolean>(false);
 
   const startWorkspaceDrag = useCallback((payload: WorkspaceDragPayload | null): void => {
     workspaceDragRef.current = payload;
@@ -1575,6 +1577,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
       const target = e.target as HTMLElement | null;
       if (!target?.closest('.nav-menu-container')) {
         setActiveDropdownMenu(null);
+      }
+      if (!target?.closest('.add-to-view-wrapper')) {
+        setShowAddToViewMenu(false);
       }
     };
     document.addEventListener('click', handleDocumentClick);
@@ -4064,23 +4069,31 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               onDragEnd={() => startWorkspaceDrag(null)}
               title="Drag header to rearrange or dock pane"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
+              <div className="pane-header-left">
                 <span className="pane-drag-handle" aria-hidden="true">
-                  ⠿
+                  <CyberIcon name="grip" size={12} />
                 </span>
-                <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                  {node.paneType === 'totp'
-                    ? `🔐 ${node.title}`
-                    : node.paneType === 'snippets'
-                      ? `⚡ ${node.title}`
-                      : `📁 ${node.title}`}
+                <span className="pane-widget-icon">
+                  <CyberIcon
+                    name={
+                      node.paneType === 'totp'
+                        ? 'totp'
+                        : node.paneType === 'snippets'
+                          ? 'bolt'
+                          : 'folder'
+                    }
+                    size={13}
+                  />
+                </span>
+                <span className="pane-title-text" title={node.title}>
+                  {node.title}
                 </span>
               </div>
               <div className="pane-header-actions">
                 {isPaneActive ? (
-                  <span className="pane-active-indicator">● Active</span>
+                  <span className="pane-active-indicator">● ACTIVE</span>
                 ) : (
-                  <span className="pane-inactive-hint">Click to focus</span>
+                  <span className="pane-inactive-hint">FOCUS</span>
                 )}
                 {totalPanes > 1 && (
                   <button
@@ -4093,7 +4106,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       handleUndockPaneToTab(tab.id, node.id);
                     }}
                   >
-                    📤
+                    <CyberIcon name="undock" size={12} />
                   </button>
                 )}
                 <button
@@ -4208,16 +4221,20 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             onDragEnd={() => startWorkspaceDrag(null)}
             title="Drag header to rearrange, swap, or snap split panes"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, overflow: 'hidden' }}>
+            <div className="pane-header-left">
               <span className="pane-drag-handle" aria-hidden="true">
-                ⠿
+                <CyberIcon name="grip" size={12} />
               </span>
+              <span
+                className={`pane-focus-dot ${isPaneActive ? 'active' : ''}`}
+                title={isPaneActive ? 'Active Pane' : 'Click to focus'}
+              />
               {isBroadcastingThis && (
                 <span className="pane-broadcast-badge" title="Broadcast Input ACTIVE on this pane">
                   🔴 BROADCAST
                 </span>
               )}
-              <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <span className="pane-title-text" title={node.title}>
                 {node.title}
               </span>
               {(node.cwd || getSessionCwd(node.sessionId)) && (
@@ -4225,7 +4242,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   className="pane-cwd-pill"
                   title={`Current working directory: ${node.cwd || getSessionCwd(node.sessionId)}`}
                 >
-                  📂 {node.cwd || getSessionCwd(node.sessionId)}
+                  <CyberIcon name="folder" size={10} /> {node.cwd || getSessionCwd(node.sessionId)}
                 </span>
               )}
             </div>
@@ -4266,7 +4283,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       void handleSendSerialBreak(node.sessionId);
                     }}
                   >
-                    ⚡ Break
+                    <CyberIcon name="bolt" size={11} /> BRK
                   </button>
                   <button
                     type="button"
@@ -4286,7 +4303,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       });
                     }}
                   >
-                    📈 Logic Analyzer
+                    <CyberIcon name="wave" size={11} />
                   </button>
                 </div>
               )}
@@ -4323,7 +4340,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
               </div>
               <button
                 type="button"
-                className={`pane-search-btn ${searchOpenPanes.has(node.sessionId) ? 'active' : ''}`}
+                className={`pane-hud-btn ${searchOpenPanes.has(node.sessionId) ? 'active' : ''}`}
                 aria-label={`Find in ${node.title}`}
                 title="Find in terminal (Ctrl+F)"
                 onClick={(e) => {
@@ -4331,12 +4348,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   togglePaneSearch(node.sessionId);
                 }}
               >
-                🔍 Find
+                <CyberIcon name="search" size={12} />
               </button>
               {!node.sessionId.startsWith('local-') && !node.sessionId.startsWith('serial-') && (
                 <button
                   type="button"
-                  className="pane-sftp-btn"
+                  className="pane-hud-btn"
                   aria-label={`Open SFTP for ${node.title}`}
                   title="Open SFTP File Browser"
                   onClick={(e) => {
@@ -4344,12 +4361,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     openSftpTab(node.sessionId, node.title, node.hostId);
                   }}
                 >
-                  📁 SFTP
+                  <CyberIcon name="folder" size={12} />
                 </button>
               )}
               <button
                 type="button"
-                className="pane-snippets-btn"
+                className="pane-hud-btn"
                 aria-label={`Run Snippet in ${node.title}`}
                 title="Run command snippet in this terminal"
                 onClick={(e) => {
@@ -4358,11 +4375,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   setShowSnippetsModal(true);
                 }}
               >
-                ⚡ Snippets
+                <CyberIcon name="bolt" size={12} />
               </button>
               <button
                 type="button"
-                className={`pane-rec-btn ${activeLogSessions.has(node.sessionId) ? 'recording' : ''}`}
+                className={`pane-hud-btn pane-rec-btn ${activeLogSessions.has(node.sessionId) ? 'recording' : ''}`}
                 aria-label={`Toggle Session Logging for ${node.title}`}
                 title="Toggle Timestamped Session Logging"
                 onClick={(e) => {
@@ -4370,25 +4387,37 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   void handleToggleSessionLog(node.sessionId, node.title, node.hostId);
                 }}
               >
-                {activeLogSessions.has(node.sessionId) ? '⏺ REC' : '⚪ Log'}
+                <CyberIcon name="record" size={10} />
+                <span className="sr-only">
+                  {activeLogSessions.has(node.sessionId) ? '⏺ REC' : '⚪ Log'}
+                </span>
+                {activeLogSessions.has(node.sessionId) && (
+                  <span className="hud-micro-tag">REC</span>
+                )}
               </button>
               <button
                 type="button"
-                className={`pane-broadcast-btn ${isBroadcastingThis ? 'active' : ''}`}
+                className={`pane-hud-btn pane-broadcast-btn ${isBroadcastingThis ? 'active' : ''}`}
                 aria-label={`Toggle Broadcast for ${node.title}`}
-                title={isBroadcastingThis ? 'Terminal is receiving broadcast input. Click to toggle.' : 'Click to add terminal to broadcast group.'}
+                title={
+                  isBroadcastingThis
+                    ? 'Terminal is receiving broadcast input. Click to toggle.'
+                    : 'Click to add terminal to broadcast group.'
+                }
                 onClick={(e) => {
                   e.stopPropagation();
                   handleToggleSessionBroadcast(node.sessionId);
                 }}
               >
-                {isBroadcastingThis ? '📡 ACTIVE' : '📡 Cast'}
+                <CyberIcon name="broadcast" size={12} />
+                <span className="sr-only">{isBroadcastingThis ? '📡 ACTIVE' : '📡 Cast'}</span>
+                {isBroadcastingThis && <span className="hud-micro-tag">CAST</span>}
               </button>
               {node.hostId && (
-                <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                <div className="pane-notes-group">
                   <button
                     type="button"
-                    className={`pane-notes-btn ${openNotesDrawerHostId === node.hostId ? 'active' : ''}`}
+                    className={`pane-hud-btn ${openNotesDrawerHostId === node.hostId ? 'active' : ''}`}
                     aria-label={`Toggle Host Notes for ${node.title}`}
                     title="Toggle Host Notes Drawer"
                     onClick={(e) => {
@@ -4397,12 +4426,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       setOpenNotesDrawerHostId((prev) => (prev === hid ? null : hid));
                     }}
                   >
-                    📝 Notes
+                    <CyberIcon name="note" size={12} />
                   </button>
                   <button
                     type="button"
-                    className="pane-notes-btn"
-                    style={{ borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '4px', paddingRight: '4px' }}
+                    className="pane-hud-btn"
                     aria-label={`Pin Notes Split for ${node.title}`}
                     title="Pin notes as horizontal split view alongside terminal"
                     onClick={(e) => {
@@ -4410,14 +4438,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       handlePinNotesSplit(node.hostId);
                     }}
                   >
-                    📌
+                    <CyberIcon name="pin" size={11} />
                   </button>
                 </div>
-              )}
-              {isPaneActive ? (
-                <span className="pane-active-indicator">● Active</span>
-              ) : (
-                <span className="pane-inactive-hint">Click to focus</span>
               )}
               {totalPanes > 1 && (
                 <>
@@ -4431,7 +4454,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       handleUndockPaneToTab(tab.id, node.id);
                     }}
                   >
-                    📤
+                    <CyberIcon name="undock" size={12} />
                   </button>
                   <button
                     type="button"
@@ -5642,43 +5665,69 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           </nav>
         </div>
 
-        <form className="quick-connect-bar" onSubmit={(e) => void handleConnect(e)}>
+        <form
+          className={`quick-connect-bar cyber-quick-connect ${quickConnectExpanded ? 'is-expanded' : ''}`}
+          onSubmit={(e) => void handleConnect(e)}
+        >
+          <span className="quick-connect-prefix" title="Direct SSH Quick Connect">
+            <CyberIcon name="terminal" size={13} />
+            <span>SSH</span>
+          </span>
           <input
             ref={quickConnectInputRef}
-            aria-label="Host Address"
-            placeholder="Host / IP (e.g. 192.168.1.10)"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            className="qc-user-input"
+            aria-label="Username"
+            placeholder="user"
+            value={username}
+            onFocus={() => setQuickConnectExpanded(true)}
+            onChange={(e) => setUsername(e.target.value)}
             required
           />
+          <span className="qc-sep">@</span>
+          <input
+            className="qc-host-input"
+            aria-label="Host Address"
+            placeholder="host / IP (or user@host:port)"
+            value={address}
+            onFocus={() => setQuickConnectExpanded(true)}
+            onChange={(e) => {
+              const val = e.target.value;
+              const match = val.match(/^([^@\s]+)@([^:\s]+)(?::(\d+))?$/);
+              if (match) {
+                setUsername(match[1]);
+                setAddress(match[2]);
+                if (match[3]) setPort(match[3]);
+              } else {
+                setAddress(val);
+              }
+            }}
+            required
+          />
+          <span className="qc-sep">:</span>
           <input
             aria-label="Port"
-            className="port-input"
+            className="port-input qc-port-input"
             placeholder="22"
             value={port}
+            onFocus={() => setQuickConnectExpanded(true)}
             onChange={(e) => setPort(e.target.value)}
             required
           />
           <input
-            aria-label="Username"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-          <input
+            className="qc-pass-input"
             aria-label="Password"
             type="password"
-            placeholder="Password"
+            placeholder="Password (opt)"
             value={password}
+            onFocus={() => setQuickConnectExpanded(true)}
             onChange={(e) => setPassword(e.target.value)}
           />
           {sessionId ? (
-            <button type="button" className="btn-danger" onClick={() => void handleDisconnect()}>
+            <button type="button" className="btn-danger btn-sm qc-submit-btn" onClick={() => void handleDisconnect()}>
               Disconnect
             </button>
           ) : (
-            <button type="submit" className="btn-primary">
+            <button type="submit" className="btn-primary btn-sm qc-submit-btn">
               Connect SSH
             </button>
           )}
@@ -5709,7 +5758,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                 title="Expand Sidebar (Ctrl+B)"
                 aria-label="Expand Sidebar"
               >
-                <span>▶</span>
+                <CyberIcon name="chevron-right" size={14} />
                 <span className="sidebar-vertical-title">Hosts &amp; Groups</span>
               </button>
             </div>
@@ -5727,7 +5776,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       setShowKeychainModal(true);
                     }}
                   >
-                    <span className="sidebar-quick-icon">🔑</span>
+                    <span className="sidebar-quick-icon">
+                      <CyberIcon name="key" size={13} />
+                    </span>
                     <span className="sidebar-quick-text">Keys</span>
                   </button>
                   <button
@@ -5741,7 +5792,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       setShowSSHConfigModal(true);
                     }}
                   >
-                    <span className="sidebar-quick-icon">⚙️</span>
+                    <span className="sidebar-quick-icon">
+                      <CyberIcon name="gear" size={13} />
+                    </span>
                     <span className="sidebar-quick-text">Config</span>
                   </button>
                   <button
@@ -5754,7 +5807,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       openSettingsTab('security');
                     }}
                   >
-                    <span className="sidebar-quick-icon">🛡️</span>
+                    <span className="sidebar-quick-icon">
+                      <CyberIcon name="shield" size={13} />
+                    </span>
                     <span className="sidebar-quick-text">Vault</span>
                   </button>
                   <button
@@ -5774,7 +5829,9 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     onDragEnd={() => startWorkspaceDrag(null)}
                     onClick={() => openNotesTab()}
                   >
-                    <span className="sidebar-quick-icon">📝</span>
+                    <span className="sidebar-quick-icon">
+                      <CyberIcon name="note" size={13} />
+                    </span>
                     <span className="sidebar-quick-text">Notes</span>
                   </button>
                 </nav>
@@ -5789,59 +5846,154 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                     title="Collapse Sidebar (Ctrl+B)"
                     aria-label="Collapse Sidebar"
                   >
-                    ◀
+                    <CyberIcon name="chevron-left" size={13} />
                   </button>
                 </div>
                 {!vaultLocked && (
                   <div className="sidebar-actions">
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  onClick={() => setShowAddGroupModal(true)}
-                >
-                  + Group
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary btn-sm"
-                  onClick={() => setShowAddHostModal(true)}
-                >
-                  + Host
-                </button>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm"
+                      onClick={() => setShowAddGroupModal(true)}
+                    >
+                      + Group
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary btn-sm"
+                      onClick={() => setShowAddHostModal(true)}
+                    >
+                      + Host
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {vaultLocked ? (
-            <div className="sidebar-locked-notice">
-              <p>Vault is locked. Unlock to view encrypted hosts, groups, and credentials.</p>
-            </div>
-          ) : (
-            <>
-              <input
-                className="sidebar-search"
-                aria-label="Filter Hosts"
-                placeholder="Search hosts, IP, tags..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <div className="sidebar-list">
-                {vaultSummary.groups.map((grp) => {
-                  const groupHosts = filteredHosts.filter((h) => h.groupId === grp.id);
-                  return (
-                    <div key={grp.id} className="group-block">
-                      <div className="group-title">
-                        <span>📁 {grp.name}</span>
-                        <small>
-                          ({grp.defaultSettings.username || 'root'}:
-                          {grp.defaultSettings.port || 22})
-                        </small>
-                      </div>
-                      {groupHosts.map((h) => (
+              {vaultLocked ? (
+                <div className="sidebar-locked-notice">
+                  <p>Vault is locked. Unlock to view encrypted hosts, groups, and credentials.</p>
+                </div>
+              ) : (
+                <>
+                  <input
+                    className="sidebar-search"
+                    aria-label="Filter Hosts"
+                    placeholder="Search hosts, IP, tags..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <div className="sidebar-list">
+                    {vaultSummary.groups.map((grp) => {
+                      const groupHosts = filteredHosts.filter((h) => h.groupId === grp.id);
+                      return (
+                        <div key={grp.id} className="group-block">
+                          <div className="group-title">
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <CyberIcon name="folder" size={12} /> {grp.name}
+                            </span>
+                            <small>
+                              ({grp.defaultSettings.username || 'root'}:
+                              {grp.defaultSettings.port || 22})
+                            </small>
+                          </div>
+                          {groupHosts.map((h) => (
+                            <div
+                              key={h.id}
+                              className="host-card rack-blade-card"
+                              draggable
+                              onDoubleClick={() => void handleConnectSavedHost(h)}
+                              onDragStart={() =>
+                                startWorkspaceDrag({
+                                  type: 'host',
+                                  hostId: h.id,
+                                  label: h.label,
+                                })
+                              }
+                              onDragEnd={() => startWorkspaceDrag(null)}
+                              title={`Double-click to connect · Drag ${h.label} onto any terminal pane to split`}
+                            >
+                              <div className="host-info">
+                                <div className="host-title-row">
+                                  <span
+                                    className="host-color-dot"
+                                    style={{
+                                      backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
+                                    }}
+                                    title={`Host Color: ${getEffectiveHostColor(h.id, h.color, h.label)}`}
+                                  />
+                                  <strong>{h.label}</strong>
+                                </div>
+                                <span className="host-address-line">
+                                  {h.effectiveUser}@{h.address}:{h.effectivePort}
+                                </span>
+                                {h.initialDir && (
+                                  <span className="host-dir-line" title={`Default Directory: ${h.initialDir}`}>
+                                    <CyberIcon name="folder" size={10} /> {h.initialDir}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="host-card-actions rack-blade-actions">
+                                <button
+                                  type="button"
+                                  className="rack-action-btn rack-connect-btn"
+                                  title={`Connect to ${h.label}`}
+                                  onClick={() => void handleConnectSavedHost(h)}
+                                >
+                                  <CyberIcon name="play" size={10} />
+                                  <span className="rack-connect-label">Connect</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn"
+                                  title={`Open ${h.label} side-by-side in current workspace view`}
+                                  aria-label={`Split Connect ${h.label}`}
+                                  onClick={() => void handleConnectHostIntoSplit(h, 'right')}
+                                >
+                                  <CyberIcon name="split-h" size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn"
+                                  title={`Open SFTP file browser for ${h.label}`}
+                                  aria-label={`SFTP for ${h.label}`}
+                                  onClick={() => void handleOpenHostSftp(h)}
+                                >
+                                  <CyberIcon name="folder" size={12} />
+                                  <span className="sr-only">SFTP</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn"
+                                  title={`Open Notes & Docs for ${h.label}`}
+                                  aria-label={`Notes for ${h.label}`}
+                                  onClick={() => openNotesTab(h.id)}
+                                >
+                                  <CyberIcon name="note" size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn rack-delete-btn"
+                                  onClick={() => void handleDeleteHost(h.id)}
+                                  aria-label={`Delete ${h.label}`}
+                                  title={`Delete ${h.label}`}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+
+                    {filteredHosts
+                      .filter((h) => !h.groupId)
+                      .map((h) => (
                         <div
                           key={h.id}
-                          className="host-card"
+                          className="host-card rack-blade-card"
                           draggable
+                          onDoubleClick={() => void handleConnectSavedHost(h)}
                           onDragStart={() =>
                             startWorkspaceDrag({
                               type: 'host',
@@ -5850,10 +6002,10 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                             })
                           }
                           onDragEnd={() => startWorkspaceDrag(null)}
-                          title={`Drag ${h.label} onto any terminal pane to open side-by-side`}
+                          title={`Double-click to connect · Drag ${h.label} onto any terminal pane to split`}
                         >
                           <div className="host-info">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <div className="host-title-row">
                               <span
                                 className="host-color-dot"
                                 style={{
@@ -5863,168 +6015,71 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                               />
                               <strong>{h.label}</strong>
                             </div>
-                            <span>
+                            <span className="host-address-line">
                               {h.effectiveUser}@{h.address}:{h.effectivePort}
                             </span>
                             {h.initialDir && (
-                              <span
-                                style={{
-                                  fontSize: '0.68rem',
-                                  color: 'var(--accent-glow)',
-                                  marginTop: '0.1rem',
-                                  display: 'block',
-                                }}
-                                title={`Default Directory: ${h.initialDir}`}
-                              >
-                                📂 {h.initialDir}
+                              <span className="host-dir-line" title={`Default Directory: ${h.initialDir}`}>
+                                <CyberIcon name="folder" size={10} /> {h.initialDir}
                               </span>
                             )}
                           </div>
-                          <div className="host-card-actions">
+                          <div className="host-card-actions rack-blade-actions">
                             <button
                               type="button"
-                              className="btn-primary btn-sm"
+                              className="rack-action-btn rack-connect-btn"
+                              title={`Connect to ${h.label}`}
                               onClick={() => void handleConnectSavedHost(h)}
                             >
-                              Connect
+                              <CyberIcon name="play" size={10} />
+                              <span className="rack-connect-label">Connect</span>
                             </button>
                             <button
                               type="button"
-                              className="btn-secondary btn-sm"
+                              className="rack-action-btn"
                               title={`Open ${h.label} side-by-side in current workspace view`}
                               aria-label={`Split Connect ${h.label}`}
                               onClick={() => void handleConnectHostIntoSplit(h, 'right')}
                             >
-                              ⬌
+                              <CyberIcon name="split-h" size={12} />
                             </button>
                             <button
                               type="button"
-                              className="btn-secondary btn-sm"
+                              className="rack-action-btn"
                               title={`Open SFTP file browser for ${h.label}`}
+                              aria-label={`SFTP for ${h.label}`}
                               onClick={() => void handleOpenHostSftp(h)}
                             >
-                              SFTP
+                              <CyberIcon name="folder" size={12} />
+                              <span className="sr-only">SFTP</span>
                             </button>
                             <button
                               type="button"
-                              className="btn-secondary btn-sm"
+                              className="rack-action-btn"
                               title={`Open Notes & Docs for ${h.label}`}
                               aria-label={`Notes for ${h.label}`}
                               onClick={() => openNotesTab(h.id)}
                             >
-                              📝
+                              <CyberIcon name="note" size={12} />
                             </button>
                             <button
                               type="button"
-                              className="btn-danger btn-sm"
+                              className="rack-action-btn rack-delete-btn"
                               onClick={() => void handleDeleteHost(h.id)}
                               aria-label={`Delete ${h.label}`}
+                              title={`Delete ${h.label}`}
                             >
                               ×
                             </button>
                           </div>
                         </div>
                       ))}
-                    </div>
-                  );
-                })}
-
-                {filteredHosts
-                  .filter((h) => !h.groupId)
-                  .map((h) => (
-                    <div
-                      key={h.id}
-                      className="host-card"
-                      draggable
-                      onDragStart={() =>
-                        startWorkspaceDrag({
-                          type: 'host',
-                          hostId: h.id,
-                          label: h.label,
-                        })
-                      }
-                      onDragEnd={() => startWorkspaceDrag(null)}
-                      title={`Drag ${h.label} onto any terminal pane to open side-by-side`}
-                    >
-                      <div className="host-info">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span
-                            className="host-color-dot"
-                            style={{
-                              backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
-                            }}
-                            title={`Host Color: ${getEffectiveHostColor(h.id, h.color, h.label)}`}
-                          />
-                          <strong>{h.label}</strong>
-                        </div>
-                        <span>
-                          {h.effectiveUser}@{h.address}:{h.effectivePort}
-                        </span>
-                        {h.initialDir && (
-                          <span
-                            style={{
-                              fontSize: '0.68rem',
-                              color: 'var(--accent-glow)',
-                              marginTop: '0.1rem',
-                              display: 'block',
-                            }}
-                            title={`Default Directory: ${h.initialDir}`}
-                          >
-                            📂 {h.initialDir}
-                          </span>
-                        )}
-                      </div>
-                      <div className="host-card-actions">
-                        <button
-                          type="button"
-                          className="btn-primary btn-sm"
-                          onClick={() => void handleConnectSavedHost(h)}
-                        >
-                          Connect
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-sm"
-                          title={`Open ${h.label} side-by-side in current workspace view`}
-                          aria-label={`Split Connect ${h.label}`}
-                          onClick={() => void handleConnectHostIntoSplit(h, 'right')}
-                        >
-                          ⬌
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-sm"
-                          title={`Open SFTP file browser for ${h.label}`}
-                          onClick={() => void handleOpenHostSftp(h)}
-                        >
-                          SFTP
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary btn-sm"
-                          title={`Open Notes & Docs for ${h.label}`}
-                          aria-label={`Notes for ${h.label}`}
-                          onClick={() => openNotesTab(h.id)}
-                        >
-                          📝
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-danger btn-sm"
-                          onClick={() => void handleDeleteHost(h.id)}
-                          aria-label={`Delete ${h.label}`}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+                  </div>
+                </>
+              )}
             </>
           )}
-        </>
-      )}
-    </aside>
+        </aside>
 
     {!sidebarCollapsed && (
       <div
@@ -6271,331 +6326,324 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
             </div>
 
             {activeTab.tabType !== 'notes' && activeTab.tabType !== 'settings' && activeTab.tabType !== 'sftp' && (
-              <div className="terminal-toolbar">
-                <span>
-                  Active Session: <strong>{statusMessage}</strong>
-                </span>
-                <div className="terminal-toolbar-actions">
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    aria-label="Split Horizontal"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => void handleSplitPane('horizontal')}
-                    title="Split active pane horizontally (side-by-side)"
-                  >
-                    Split ⬌
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    aria-label="Split Vertical"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => void handleSplitPane('vertical')}
-                    title="Split active pane vertically (stacked)"
-                  >
-                    Split ⬍
-                  </button>
+              <div className="terminal-toolbar hud-command-strip">
+                <div className="hud-telemetry-readout" title={statusMessage}>
+                  <span className="hud-telemetry-dot" />
+                  <span className="hud-telemetry-label">HUD</span>
+                  <strong className="hud-telemetry-msg">
+                    {activePane.title}
+                    {activeTabPanes.length > 1 ? ` · ${activeTabPanes.length} PANES` : ''}
+                  </strong>
+                </div>
 
-                  {/* Workspace View Builder: Open Different Connections & Dockable Widgets Side-by-Side */}
-                  <div className="add-to-view-wrapper" style={{ position: 'relative', display: 'inline-flex' }}>
+                <div className="terminal-toolbar-actions hud-segmented-deck">
+                  {/* GROUP 1: Split & Workspace View Builder */}
+                  <div className="hud-btn-group">
                     <button
                       type="button"
-                      className={`btn-sm ${showAddToViewMenu ? 'btn-primary' : 'btn-secondary'}`}
-                      aria-label="Add to View"
-                      aria-expanded={showAddToViewMenu}
+                      className="hud-seg-btn"
+                      aria-label="Split Horizontal"
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setShowAddToViewMenu((prev) => !prev)}
-                      title="Open another host connection, local shell, Notes, TOTP, SFTP, or Snippets side-by-side in this view"
+                      onClick={() => void handleSplitPane('horizontal')}
+                      title="Split active pane horizontally (side-by-side)"
                     >
-                      🧩 + Add to View ▾
+                      <CyberIcon name="split-h" size={13} />
+                      <span>Split H</span>
                     </button>
-                    {showAddToViewMenu && (
-                      <div
-                        className="add-to-view-popover"
-                        role="menu"
-                        aria-label="Add to Workspace View Menu"
-                      >
-                        <div className="add-to-view-section-title">Dock Position</div>
-                        <div className="add-to-view-zone-selector">
-                          {(
-                            [
-                              { zone: 'right', label: '◨ Right' },
-                              { zone: 'bottom', label: '⬓ Bottom' },
-                              { zone: 'left', label: '◧ Left' },
-                              { zone: 'top', label: '⬒ Top' },
-                            ] as const
-                          ).map((item) => (
-                            <button
-                              key={item.zone}
-                              type="button"
-                              className={`zone-pill-btn ${addToViewZone === item.zone ? 'active' : ''}`}
-                              onClick={() => setAddToViewZone(item.zone)}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
+                    <button
+                      type="button"
+                      className="hud-seg-btn"
+                      aria-label="Split Vertical"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => void handleSplitPane('vertical')}
+                      title="Split active pane vertically (stacked)"
+                    >
+                      <CyberIcon name="split-v" size={13} />
+                      <span>Split V</span>
+                    </button>
 
-                        <div className="add-to-view-section-title">
-                          Connect Host into Split ({addToViewZone})
-                        </div>
-                        {vaultSummary.hosts.length === 0 ? (
-                          <div className="add-to-view-empty">No saved hosts in vault yet.</div>
-                        ) : (
-                          <div className="add-to-view-hosts-list">
-                            {vaultSummary.hosts.map((h) => (
+                    <div className="add-to-view-wrapper" style={{ position: 'relative', display: 'inline-flex' }}>
+                      <button
+                        type="button"
+                        className={`hud-seg-btn ${showAddToViewMenu ? 'active' : ''}`}
+                        aria-label="Add to View"
+                        aria-expanded={showAddToViewMenu}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setShowAddToViewMenu((prev) => !prev)}
+                        title="Open another host connection, local shell, Notes, TOTP, SFTP, or Snippets side-by-side in this view"
+                      >
+                        <CyberIcon name="grid" size={13} />
+                        <span>+ View</span>
+                        <CyberIcon name="chevron-down" size={11} />
+                      </button>
+                      {showAddToViewMenu && (
+                        <div
+                          className="add-to-view-popover cyber-glass-popover"
+                          role="menu"
+                          aria-label="Add to Workspace View Menu"
+                        >
+                          <div className="add-to-view-section-title">Dock Position</div>
+                          <div className="add-to-view-zone-selector">
+                            {(
+                              [
+                                { zone: 'right', label: '◨ Right' },
+                                { zone: 'bottom', label: '⬓ Bottom' },
+                                { zone: 'left', label: '◧ Left' },
+                                { zone: 'top', label: '⬒ Top' },
+                              ] as const
+                            ).map((item) => (
                               <button
-                                key={h.id}
+                                key={item.zone}
                                 type="button"
-                                role="menuitem"
-                                className="add-to-view-item"
-                                onClick={() => void handleConnectHostIntoSplit(h, addToViewZone)}
+                                className={`zone-pill-btn ${addToViewZone === item.zone ? 'active' : ''}`}
+                                onClick={() => setAddToViewZone(item.zone)}
                               >
-                                <span
-                                  className="host-color-dot"
-                                  style={{
-                                    backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
-                                  }}
-                                />
-                                <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>
-                                  {h.label}
-                                </span>
-                                <small style={{ color: 'var(--text-muted)' }}>
-                                  {h.effectiveUser}@{h.address}
-                                </small>
+                                {item.label}
                               </button>
                             ))}
                           </div>
-                        )}
 
-                        <div className="add-to-view-section-title">
-                          Dock Tools &amp; Widgets (Click or Drag)
-                        </div>
-                        <div className="add-to-view-tools-grid">
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="add-to-view-tool-btn"
-                            draggable
-                            onDragStart={() =>
-                              startWorkspaceDrag({
-                                type: 'tool',
-                                toolType: 'notes',
-                                hostId: activePane?.hostId || activeTab?.hostId,
-                                title: 'Host Notes',
-                              })
-                            }
-                            onDragEnd={() => startWorkspaceDrag(null)}
-                            onClick={() => void handleDockToolIntoSplit('notes', addToViewZone)}
-                          >
-                            📝 Notes Drawer
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="add-to-view-tool-btn"
-                            draggable
-                            onDragStart={() =>
-                              startWorkspaceDrag({
-                                type: 'tool',
-                                toolType: 'totp',
-                                title: '2FA / TOTP',
-                              })
-                            }
-                            onDragEnd={() => startWorkspaceDrag(null)}
-                            onClick={() => void handleDockToolIntoSplit('totp', addToViewZone)}
-                          >
-                            🔐 2FA / TOTP
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="add-to-view-tool-btn"
-                            draggable
-                            onDragStart={() =>
-                              startWorkspaceDrag({
-                                type: 'tool',
-                                toolType: 'sftp',
-                                hostId: activePane?.hostId || activeTab?.hostId,
-                                title: 'SFTP Browser',
-                              })
-                            }
-                            onDragEnd={() => startWorkspaceDrag(null)}
-                            onClick={() => void handleDockToolIntoSplit('sftp', addToViewZone)}
-                          >
-                            📁 SFTP Browser
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="add-to-view-tool-btn"
-                            draggable
-                            onDragStart={() =>
-                              startWorkspaceDrag({
-                                type: 'tool',
-                                toolType: 'snippets',
-                                title: 'Command Snippets',
-                              })
-                            }
-                            onDragEnd={() => startWorkspaceDrag(null)}
-                            onClick={() => void handleDockToolIntoSplit('snippets', addToViewZone)}
-                          >
-                            ⚡ Snippets
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="add-to-view-tool-btn"
-                            onClick={() =>
-                              void handleDockToolIntoSplit('local-powershell', addToViewZone)
-                            }
-                          >
-                            💻 Local PowerShell
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="add-to-view-tool-btn"
-                            onClick={() =>
-                              void handleDockToolIntoSplit('local-bash', addToViewZone)
-                            }
-                          >
-                            🐧 Local Bash / WSL
-                          </button>
-                        </div>
+                          <div className="add-to-view-section-title">
+                            Connect Host into Split ({addToViewZone})
+                          </div>
+                          {vaultSummary.hosts.length === 0 ? (
+                            <div className="add-to-view-empty">No saved hosts in vault yet.</div>
+                          ) : (
+                            <div className="add-to-view-hosts-list">
+                              {vaultSummary.hosts.map((h) => (
+                                <button
+                                  key={h.id}
+                                  type="button"
+                                  role="menuitem"
+                                  className="add-to-view-item"
+                                  onClick={() => void handleConnectHostIntoSplit(h, addToViewZone)}
+                                >
+                                  <span
+                                    className="host-color-dot"
+                                    style={{
+                                      backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
+                                    }}
+                                  />
+                                  <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>
+                                    {h.label}
+                                  </span>
+                                  <small style={{ color: 'var(--text-muted)' }}>
+                                    {h.effectiveUser}@{h.address}
+                                  </small>
+                                </button>
+                              ))}
+                            </div>
+                          )}
 
-                        {activeTabPanes.length > 1 && (
-                          <>
-                            <div className="add-to-view-section-title">Workspace Layout</div>
+                          <div className="add-to-view-section-title">
+                            Dock Tools &amp; Widgets (Click or Drag)
+                          </div>
+                          <div className="add-to-view-tools-grid">
                             <button
                               type="button"
                               role="menuitem"
-                              className="add-to-view-item"
-                              onClick={handleEqualizeAllSplits}
+                              className="add-to-view-tool-btn"
+                              draggable
+                              onDragStart={() =>
+                                startWorkspaceDrag({
+                                  type: 'tool',
+                                  toolType: 'notes',
+                                  hostId: activePane?.hostId || activeTab?.hostId,
+                                  title: 'Host Notes',
+                                })
+                              }
+                              onDragEnd={() => startWorkspaceDrag(null)}
+                              onClick={() => void handleDockToolIntoSplit('notes', addToViewZone)}
                             >
-                              <span>⊞ Equalize All Split Proportions</span>
+                              <CyberIcon name="note" size={12} /> Notes Drawer
                             </button>
-                          </>
-                        )}
-                      </div>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="add-to-view-tool-btn"
+                              draggable
+                              onDragStart={() =>
+                                startWorkspaceDrag({
+                                  type: 'tool',
+                                  toolType: 'totp',
+                                  title: '2FA / TOTP',
+                                })
+                              }
+                              onDragEnd={() => startWorkspaceDrag(null)}
+                              onClick={() => void handleDockToolIntoSplit('totp', addToViewZone)}
+                            >
+                              <CyberIcon name="totp" size={12} /> 2FA / TOTP
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="add-to-view-tool-btn"
+                              draggable
+                              onDragStart={() =>
+                                startWorkspaceDrag({
+                                  type: 'tool',
+                                  toolType: 'sftp',
+                                  hostId: activePane?.hostId || activeTab?.hostId,
+                                  title: 'SFTP Browser',
+                                })
+                              }
+                              onDragEnd={() => startWorkspaceDrag(null)}
+                              onClick={() => void handleDockToolIntoSplit('sftp', addToViewZone)}
+                            >
+                              <CyberIcon name="folder" size={12} /> SFTP Browser
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="add-to-view-tool-btn"
+                              draggable
+                              onDragStart={() =>
+                                startWorkspaceDrag({
+                                  type: 'tool',
+                                  toolType: 'snippets',
+                                  title: 'Command Snippets',
+                                })
+                              }
+                              onDragEnd={() => startWorkspaceDrag(null)}
+                              onClick={() => void handleDockToolIntoSplit('snippets', addToViewZone)}
+                            >
+                              <CyberIcon name="bolt" size={12} /> Snippets
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="add-to-view-tool-btn"
+                              onClick={() =>
+                                void handleDockToolIntoSplit('local-powershell', addToViewZone)
+                              }
+                            >
+                              <CyberIcon name="terminal" size={12} /> Local PowerShell
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="add-to-view-tool-btn"
+                              onClick={() =>
+                                void handleDockToolIntoSplit('local-bash', addToViewZone)
+                              }
+                            >
+                              <CyberIcon name="terminal" size={12} /> Local Bash / WSL
+                            </button>
+                          </div>
+
+                          {activeTabPanes.length > 1 && (
+                            <>
+                              <div className="add-to-view-section-title">Workspace Layout</div>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-item"
+                                onClick={handleEqualizeAllSplits}
+                              >
+                                <CyberIcon name="grid" size={12} />
+                                <span>Equalize All Split Proportions</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {activeTabPanes.length > 1 && (
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="Next Pane"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={handleCyclePaneFocus}
+                        title="Cycle keyboard focus to the next split pane (Alt+ArrowDown)"
+                      >
+                        <CyberIcon name="next-pane" size={13} />
+                      </button>
                     )}
                   </div>
 
-                  {activePane?.hostId && (
+                  {/* GROUP 2: Directory & Root Shell Spawner */}
+                  <div className="hud-btn-group">
                     <button
                       type="button"
-                      className="btn-secondary btn-sm"
-                      aria-label="Pin Notes Split"
-                      draggable
-                      onDragStart={() =>
-                        startWorkspaceDrag({
-                          type: 'tool',
-                          toolType: 'notes',
-                          hostId: activePane.hostId,
-                          title: 'Host Notes',
-                        })
-                      }
-                      onDragEnd={() => startWorkspaceDrag(null)}
+                      className="hud-seg-btn"
+                      aria-label="New Terminal Default Directory"
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handlePinNotesSplit(activePane.hostId)}
-                      title="Pin host notes as horizontal split view alongside terminal (or drag onto any pane)"
+                      onClick={() => void handleOpenTerminalDirectory('default')}
+                      title="Open new terminal in default working directory"
                     >
-                      📌 Notes Split
+                      <CyberIcon name="home" size={12} />
+                      <span>~ Dir</span>
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    aria-label="Dock TOTP Split"
-                    draggable
-                    onDragStart={() =>
-                      startWorkspaceDrag({
-                        type: 'tool',
-                        toolType: 'totp',
-                        title: '2FA / TOTP Authenticator',
-                      })
-                    }
-                    onDragEnd={() => startWorkspaceDrag(null)}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => void handleDockToolIntoSplit('totp', 'right')}
-                    title="Dock 2FA / TOTP Authenticator into current workspace view (or drag onto any pane)"
-                  >
-                    📌 2FA Split
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    aria-label="New Terminal Default Directory"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => void handleOpenTerminalDirectory('default')}
-                    title="Open new terminal in default working directory"
-                  >
-                    🏠 Default Dir
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    aria-label="New Terminal Current Directory"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => void handleOpenTerminalDirectory('current')}
-                    title="Open new terminal in current working directory"
-                  >
-                    📂 Current Dir
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    aria-label="New Terminal Root in Current Directory"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => void handleOpenTerminalDirectory('root')}
-                    title="Open new root / elevated terminal in current working directory"
-                  >
-                    ⚡ Root in Dir
-                  </button>
-                  {activeTabPanes.length > 1 && (
                     <button
                       type="button"
-                      className="btn-secondary btn-sm"
-                      aria-label="Next Pane"
+                      className="hud-seg-btn"
+                      aria-label="New Terminal Current Directory"
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={handleCyclePaneFocus}
-                      title="Cycle keyboard focus to the next split pane (Alt+ArrowDown)"
+                      onClick={() => void handleOpenTerminalDirectory('current')}
+                      title="Open new terminal in current working directory (CWD)"
                     >
-                      Next Pane ⇥
+                      <CyberIcon name="folder" size={12} />
+                      <span>CWD</span>
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      className="hud-seg-btn"
+                      aria-label="New Terminal Root in Current Directory"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => void handleOpenTerminalDirectory('root')}
+                      title="Open new root / elevated terminal in current working directory"
+                    >
+                      <CyberIcon name="bolt" size={12} />
+                      <span>Root</span>
+                    </button>
+                  </div>
+
+                  {/* GROUP 3: Security Ops, Injection & Broadcast */}
+                  <div className="hud-btn-group">
+                    <button
+                      type="button"
+                      className={`hud-seg-btn ${broadcastState.enabled ? 'is-danger-active' : ''}`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleToggleBroadcast(broadcastState.enabled ? undefined : 'tab')}
+                      title="Toggle Broadcast Input (Alt+B). Simultaneously sends typed keystrokes to multiple terminals."
+                      aria-label="Toggle Broadcast Input"
+                    >
+                      <CyberIcon name="broadcast" size={12} />
+                      <span>
+                        {broadcastState.enabled
+                          ? `CAST (${getBroadcastTargetSessionIds().length})`
+                          : 'Broadcast'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="hud-seg-btn"
+                      aria-label="Inject Password"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => void handleInjectPassword()}
+                      title="Injects the stored password directly from the Go Vault into the terminal without pressing Enter"
+                    >
+                      <CyberIcon name="key" size={12} />
+                      <span>Pass</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="hud-seg-btn"
+                      aria-label="🔐 2FA / TOTP"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => void handleInjectTotp()}
+                      title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt"
+                    >
+                      <CyberIcon name="totp" size={12} />
+                      <span>2FA</span>
+                    </button>
+                  </div>
+
                   <button
                     type="button"
-                    className={`btn-sm ${broadcastState.enabled ? 'btn-danger' : 'btn-secondary'}`}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleToggleBroadcast(broadcastState.enabled ? undefined : 'tab')}
-                    title="Toggle Broadcast Input (Alt+B). Simultaneously sends typed keystrokes to multiple terminals."
-                    aria-label="Toggle Broadcast Input"
-                  >
-                    📡 {broadcastState.enabled ? `Broadcasting (${getBroadcastTargetSessionIds().length})` : 'Broadcast'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => void handleInjectPassword()}
-                    title="Injects the stored password directly from the Go Vault into the terminal without pressing Enter"
-                  >
-                    Inject Password
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-sm"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => void handleInjectTotp()}
-                    title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt"
-                  >
-                    🔐 2FA / TOTP
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-danger btn-sm"
+                    className="btn-danger btn-sm hud-disconnect-btn"
                     onClick={() => void handleDisconnect()}
                   >
                     Disconnect
@@ -6713,34 +6761,41 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
               <div className="empty-state-grid">
                 <div className="empty-state-section">
-                  <h3>⚡ Local Shells</h3>
+                  <h3>
+                    <CyberIcon name="terminal" size={14} /> Local Shells
+                  </h3>
                   <div className="empty-state-actions">
                     <button
                       type="button"
                       className="btn-primary"
                       onClick={() => void handleOpenLocalTerminal('powershell')}
                     >
-                      <span>⚡ PowerShell</span>
+                      <CyberIcon name="bolt" size={13} />
+                      <span>PowerShell</span>
                     </button>
                     <button
                       type="button"
                       className="btn-secondary"
                       onClick={() => void handleOpenLocalTerminal('cmd')}
                     >
-                      <span>💻 Command Prompt</span>
+                      <CyberIcon name="terminal" size={13} />
+                      <span>Command Prompt</span>
                     </button>
                     <button
                       type="button"
                       className="btn-secondary"
                       onClick={() => void handleOpenLocalTerminal('wsl')}
                     >
-                      <span>🐧 WSL Linux</span>
+                      <CyberIcon name="terminal" size={13} />
+                      <span>WSL Linux</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="empty-state-section">
-                  <h3>📂 Terminal Directory Spawning</h3>
+                  <h3>
+                    <CyberIcon name="folder" size={14} /> Terminal Directory Spawning
+                  </h3>
                   <div className="empty-state-actions">
                     <button
                       type="button"
@@ -6748,7 +6803,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       onClick={() => void handleOpenTerminalDirectory('default')}
                       title="Open local terminal in default working directory"
                     >
-                      <span>🏠 Default Directory</span>
+                      <CyberIcon name="home" size={13} />
+                      <span>Default Directory</span>
                     </button>
                     <button
                       type="button"
@@ -6756,7 +6812,8 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       onClick={() => void handleOpenTerminalDirectory('current')}
                       title="Open terminal in chosen folder"
                     >
-                      <span>📂 Choose Folder...</span>
+                      <CyberIcon name="folder" size={13} />
+                      <span>Choose Folder...</span>
                     </button>
                     <button
                       type="button"
@@ -6764,34 +6821,40 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                       onClick={() => void handleOpenTerminalDirectory('root')}
                       title="Open elevated root / admin shell"
                     >
-                      <span>⚡ Root / Admin</span>
+                      <CyberIcon name="bolt" size={13} />
+                      <span>Root / Admin</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="empty-state-section">
-                  <h3>🔌 Remote &amp; Serial</h3>
+                  <h3>
+                    <CyberIcon name="serial" size={14} /> Remote &amp; Serial
+                  </h3>
                   <div className="empty-state-actions">
                     <button
                       type="button"
                       className="btn-secondary"
                       onClick={() => setShowCommandPalette(true)}
                     >
-                      <span>🔍 Quick Connect / Hosts (Ctrl+P)</span>
+                      <CyberIcon name="search" size={13} />
+                      <span>Quick Connect / Hosts (Ctrl+K)</span>
                     </button>
                     <button
                       type="button"
                       className="btn-secondary"
                       onClick={() => void handleOpenSerialModal()}
                     >
-                      <span>🔌 Hardware Serial / COM</span>
+                      <CyberIcon name="serial" size={13} />
+                      <span>Hardware Serial / COM</span>
                     </button>
                     <button
                       type="button"
                       className="btn-secondary"
                       onClick={() => setShowAddHostModal(true)}
                     >
-                      <span>➕ New SSH Host</span>
+                      <CyberIcon name="plus" size={13} />
+                      <span>New SSH Host</span>
                     </button>
                   </div>
                 </div>
@@ -6800,6 +6863,55 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           </section>
         )}
       </div>
+
+      {/* Sci-Fi HUD Bottom Telemetry Bar */}
+      <footer className="cyber-hud-statusbar" aria-label="System Telemetry Footer">
+        <div className="hud-status-left">
+          <span className={`hud-status-pill ${vaultLocked ? 'locked' : 'unlocked'}`}>
+            <CyberIcon name={vaultLocked ? 'lock' : 'unlock'} size={11} />
+            <span>{vaultLocked ? 'VAULT LOCKED' : 'VAULT ARMED'}</span>
+          </span>
+          {activePane ? (
+            <span className="hud-status-segment">
+              <span className="hud-status-key">TARGET:</span>
+              <strong className="hud-status-val">{activePane.title}</strong>
+            </span>
+          ) : (
+            <span className="hud-status-segment">
+              <span className="hud-status-key">MODE:</span>
+              <span className="hud-status-val">STANDBY</span>
+            </span>
+          )}
+          {activeTabPanes.length > 1 && (
+            <span className="hud-status-segment">
+              <span className="hud-status-key">GRID:</span>
+              <span className="hud-status-val">{activeTabPanes.length} PANES</span>
+            </span>
+          )}
+          {broadcastState.enabled && (
+            <span className="hud-status-pill danger">
+              <CyberIcon name="broadcast" size={11} />
+              <span>BROADCAST ({getBroadcastTargetSessionIds().length})</span>
+            </span>
+          )}
+          {activeLogSessions.size > 0 && (
+            <span className="hud-status-pill rec">
+              <CyberIcon name="record" size={10} />
+              <span>REC ({activeLogSessions.size})</span>
+            </span>
+          )}
+          {activeTunnels.length > 0 && (
+            <span className="hud-status-pill ok">
+              <CyberIcon name="tunnel" size={11} />
+              <span>TUNNELS ({activeTunnels.length})</span>
+            </span>
+          )}
+        </div>
+        <div className="hud-status-right">
+          <span className="hud-status-msg-inline">{statusMessage}</span>
+          <span className="hud-status-shortcut">Ctrl+K Palette</span>
+        </div>
+      </footer>
 
       {showCommandPalette && (
         <div
