@@ -321,11 +321,13 @@
     - Added `position: relative; z-index: 1000` to `.terminal-toolbar` and `.hud-command-strip`, `z-index: 1001` to `.add-to-view-wrapper`, and increased `.add-to-view-popover` to `z-index: 15000` with enhanced shadow and teal glow. Resolves stacking context clipping beneath split panes (`Ares [CWD]`).
   - **Connect Button Mouseover Contrast (`frontend/src/styles.css`)**:
     - Overhauled `.rack-connect-btn:hover` with a bright cyber teal gradient (`linear-gradient(135deg, var(--accent-bright), var(--accent-primary))`), high-contrast white text (`#ffffff`), and luminous outer glow (`0 0 14px rgba(20, 184, 166, 0.55)`), removing the pitch-black unreadable hover state.
-  - **Network Topology Map Tunnel Visualization (`F-37` / `F-13`) (`app.go`, `NetworkMapView.tsx`, `App.tsx`)**:
+  - **Network Topology Map Tunnel Visualization & Offline Start (`F-37` / `F-13`) (`app.go`, `NetworkMapView.tsx`, `App.tsx`, `styles.css`)**:
     - Backend: In `GetActiveTunnels()`, resolved and enriched empty `HostID` on active tunnels using `sessionHostID[st.SessionID]` and vault `ForwardRules[st.RuleID]`.
-    - Frontend: Extended `NetworkMapViewProps` with `forwardRules` and enhanced `isTunnelMatchingHost` to cross-reference `tun.hostId`, `tun.ruleId` from `forwardRules`, and target address.
-    - Added Configured Forward Rules listing in the host inspector panel alongside active tunnels.
-    - Wired `forwardRules` to both docked and full-tab `<NetworkMapView />` instances in `App.tsx`.
+    - Auto-Connect on Tunnel Start: Enhanced `handleStartTunnelWithHost` to check for an existing live SSH session on the target host; if none exists, it connects to the saved host in the background via `ConnectSavedHost` first, opens the session tab, and immediately establishes the port forwarding tunnel.
+    - Explicit Port & Host Mapping: Replaced cryptic `-L 8080⇄80` edge labels with explicit directional routing: `Client:8080 ──▶ Ares:80 (-L Local)` on active edges and `Client:8080 ⇢ Ares:80 [STANDBY]` on configured standby edges.
+    - Host Card HUD Telemetry: Embedded a Cyberpunk HUD tunnel box directly onto the host node card with `/// ACTIVE TUNNELS` chips and a one-click `▶ START` button for offline standby rules.
+    - Inspector Tunnel Routing Matrix: Built an interactive Cyberpunk Sci-Fi HUD Routing Matrix in the host inspector panel featuring dual-box endpoints (Source Listener vs Destination Target), mode indicators, live byte counters, `[ ▶ START TUNNEL ]` (with auto-connect subtext), `[ ■ STOP TUNNEL ]`, and `[ + NEW TUNNEL ]`.
+    - Pre-Selected Host in Port Forwarding Modal: Extended `PortForwardingView` with `initialHostId` so opening the manager from the network map pre-populates the host.
 
 ## In Progress
 - None (v1 Phase Milestone F-28 Complete & Polish Verified).

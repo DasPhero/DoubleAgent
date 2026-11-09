@@ -26,6 +26,7 @@ export interface PortForwardingViewProps {
   onStopTunnel: (tunnelId: string) => Promise<void>;
   onOpenProxychainsExport?: () => void;
   onClose: () => void;
+  initialHostId?: string;
 }
 
 export function PortForwardingView({
@@ -40,12 +41,13 @@ export function PortForwardingView({
   onStopTunnel,
   onOpenProxychainsExport,
   onClose,
+  initialHostId,
 }: PortForwardingViewProps): React.JSX.Element {
-  const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [showAddForm, setShowAddForm] = useState<boolean>(Boolean(initialHostId));
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [ruleType, setRuleType] = useState<ForwardRuleType>('L');
   const [label, setLabel] = useState<string>('');
-  const [hostId, setHostId] = useState<string>('');
+  const [hostId, setHostId] = useState<string>(initialHostId || '');
   const [bindAddress, setBindAddress] = useState<string>('127.0.0.1');
   const [bindPort, setBindPort] = useState<string>('8080');
   const [targetHost, setTargetHost] = useState<string>('127.0.0.1');

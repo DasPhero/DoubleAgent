@@ -1,3 +1,5 @@
+import { ForwardTunnelStatus, ForwardRule } from './forward';
+
 export type TopologyNodeType = 'client' | 'host' | 'subnet';
 export type TopologyNodeStatus = 'active' | 'tunnel' | 'configured';
 export type TopologyEdgeType = 'direct' | 'jump' | 'tunnel';
@@ -19,12 +21,16 @@ export interface TopologyNodeData {
   status: TopologyNodeStatus;
   activeSessionsCount?: number;
   activeTunnelsCount?: number;
+  hostTunnels?: ForwardTunnelStatus[];
+  hostRules?: ForwardRule[];
   jumpHops?: string[];
   notesCount?: number;
   onConnect?: (hostId: string) => void;
   onSplitConnect?: (hostId: string) => void;
   onOpenSftp?: (hostId: string, label: string) => void;
   onOpenNotes?: (hostId: string) => void;
+  onStartTunnel?: (hostId: string, ruleId: string) => void;
+  onStopTunnel?: (tunnelId: string) => void;
 }
 
 export interface TopologyEdgeData {

@@ -42,6 +42,36 @@ function isTunnelMatchingHost(
 }
 
 // ---------------------------------------------------------
+// Helper: Format Bytes and Route Descriptions
+// ---------------------------------------------------------
+export function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+}
+
+export function formatTunnelRoute(tun: ForwardTunnelStatus, hostLabel: string): string {
+  if (tun.type === 'L') {
+    return `Client:${tun.bindPort} ──▶ ${hostLabel}:${tun.targetPort || 'dyn'} (-L Local)`;
+  }
+  if (tun.type === 'R') {
+    return `${hostLabel}:${tun.bindPort} ──▶ Client:${tun.targetPort || 'dyn'} (-R Remote)`;
+  }
+  return `Client:${tun.bindPort} ──▶ ${hostLabel} (-D SOCKS5)`;
+}
+
+export function formatRuleRoute(rule: ForwardRule, hostLabel: string): string {
+  if (rule.type === 'L') {
+    return `Client:${rule.bindPort} ⇢ ${hostLabel}:${rule.targetPort || 'dyn'} (-L)`;
+  }
+  if (rule.type === 'R') {
+    return `${hostLabel}:${rule.bindPort} ⇢ Client:${rule.targetPort || 'dyn'} (-R)`;
+  }
+  return `Client:${rule.bindPort} ⇢ ${hostLabel} (-D SOCKS5)`;
+}
+
+// ---------------------------------------------------------
 // Custom React Flow Node: Host Node Card
 // ---------------------------------------------------------
 export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
@@ -128,6 +158,58 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
               <span key={tag} className="topo-tag-chip">
                 #{tag}
               </span>
+            ))}
+          </div>
+        )}
+
+        {/* Cyberpunk HUD Tunnel Strip directly on Host Card */}
+        {data.hostTunnels && data.hostTunnels.length > 0 && (
+          <div className="topo-node-tunnels-box active">
+            <div className="topo-tunnels-box-header">
+              <span className="topo-corner-bracket">///</span>
+              <span className="topo-tunnels-box-title">ACTIVE TUNNELS ({data.hostTunnels.length})</span>
+            </div>
+            {data.hostTunnels.slice(0, 3).map((tun) => (
+              <div key={tun.id} className="topo-tunnel-route-chip active">
+                <span className="chip-mode">-{tun.type}</span>
+                <div className="chip-endpoints">
+                  <span className="ep-local">Client:{tun.bindPort}</span>
+                  <span className="ep-arrow">▶</span>
+                  <span className="ep-remote">{data.label}:{tun.targetPort || 'dyn'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {data.hostRules && data.hostRules.length > 0 && (!data.hostTunnels || data.hostTunnels.length === 0) && (
+          <div className="topo-node-tunnels-box standby">
+            <div className="topo-tunnels-box-header">
+              <span className="topo-corner-bracket">///</span>
+              <span className="topo-tunnels-box-title">CONFIGURED ({data.hostRules.length})</span>
+            </div>
+            {data.hostRules.slice(0, 2).map((rule) => (
+              <div key={rule.id} className="topo-tunnel-route-chip standby">
+                <span className="chip-mode standby">-{rule.type}</span>
+                <div className="chip-endpoints">
+                  <span className="ep-local">{rule.type === 'R' ? data.label : 'Client'}:{rule.bindPort}</span>
+                  <span className="ep-arrow">⇢</span>
+                  <span className="ep-remote">{rule.type === 'R' ? 'Client' : data.label}:{rule.targetPort || 'dyn'}</span>
+                </div>
+                {hostId && data.onStartTunnel && (
+                  <button
+                    type="button"
+                    className="topo-tunnel-start-btn"
+                    title="Start tunnel (connects automatically if offline)"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      data.onStartTunnel?.(hostId, rule.id);
+                    }}
+                  >
+                    ▶ START
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -253,6 +335,9 @@ export interface NetworkMapViewProps {
   onSplitConnectHost?: (hostId: string) => void;
   onOpenSftp?: (hostId: string, hostLabel: string) => void;
   onOpenNotes?: (hostId: string) => void;
+  onStartTunnel?: (hostId: string, ruleId: string) => void;
+  onStopTunnel?: (tunnelId: string) => void;
+  onOpenForwardingManager?: (preselectedHostId?: string) => void;
   onClose?: () => void;
   isDocked?: boolean;
 }
@@ -268,6 +353,9 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
   onSplitConnectHost,
   onOpenSftp,
   onOpenNotes,
+  onStartTunnel,
+  onStopTunnel,
+  onOpenForwardingManager,
   onClose,
   isDocked = false,
 }) => {
@@ -374,9 +462,11 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
       for (const h of bastions) {
         const group = groups.find((g) => g.id === h.groupId);
         const isSessionActive = activeSessionHostIds.includes(h.id);
-        const isTunnelActive = activeTunnels.some((t) =>
+        const matchingHostTunnels = activeTunnels.filter((t) =>
           isTunnelMatchingHost(t, h.id, h.address, forwardRules)
         );
+        const matchingHostRules = (forwardRules || []).filter((r) => r.hostId === h.id);
+        const isTunnelActive = matchingHostTunnels.length > 0;
 
         nodes.push({
           id: h.id,
@@ -396,15 +486,17 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             tags: h.tags,
             status: isSessionActive ? 'active' : isTunnelActive ? 'tunnel' : 'configured',
             activeSessionsCount: isSessionActive ? 1 : 0,
-            activeTunnelsCount: activeTunnels.filter((t) =>
-              isTunnelMatchingHost(t, h.id, h.address, forwardRules)
-            ).length,
+            activeTunnelsCount: matchingHostTunnels.length,
+            hostTunnels: matchingHostTunnels,
+            hostRules: matchingHostRules,
             jumpHops: h.jumpChain,
             notesCount: notes.filter((n) => n.hostId === h.id).length,
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
             onOpenSftp,
             onOpenNotes,
+            onStartTunnel,
+            onStopTunnel,
           },
         });
         bastionY += 190;
@@ -415,9 +507,11 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
       for (const h of targets) {
         const group = groups.find((g) => g.id === h.groupId);
         const isSessionActive = activeSessionHostIds.includes(h.id);
-        const isTunnelActive = activeTunnels.some((t) =>
+        const matchingHostTunnels = activeTunnels.filter((t) =>
           isTunnelMatchingHost(t, h.id, h.address, forwardRules)
         );
+        const matchingHostRules = (forwardRules || []).filter((r) => r.hostId === h.id);
+        const isTunnelActive = matchingHostTunnels.length > 0;
 
         nodes.push({
           id: h.id,
@@ -437,15 +531,17 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             tags: h.tags,
             status: isSessionActive ? 'active' : isTunnelActive ? 'tunnel' : 'configured',
             activeSessionsCount: isSessionActive ? 1 : 0,
-            activeTunnelsCount: activeTunnels.filter((t) =>
-              isTunnelMatchingHost(t, h.id, h.address, forwardRules)
-            ).length,
+            activeTunnelsCount: matchingHostTunnels.length,
+            hostTunnels: matchingHostTunnels,
+            hostRules: matchingHostRules,
             jumpHops: h.jumpChain,
             notesCount: notes.filter((n) => n.hostId === h.id).length,
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
             onOpenSftp,
             onOpenNotes,
+            onStartTunnel,
+            onStopTunnel,
           },
         });
         targetY += 190;
@@ -458,9 +554,11 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
         for (const h of clusterHosts) {
           const group = groups.find((g) => g.id === h.groupId);
           const isSessionActive = activeSessionHostIds.includes(h.id);
-          const isTunnelActive = activeTunnels.some((t) =>
+          const matchingHostTunnels = activeTunnels.filter((t) =>
             isTunnelMatchingHost(t, h.id, h.address, forwardRules)
           );
+          const matchingHostRules = (forwardRules || []).filter((r) => r.hostId === h.id);
+          const isTunnelActive = matchingHostTunnels.length > 0;
 
           nodes.push({
             id: h.id,
@@ -480,15 +578,17 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
               tags: h.tags,
               status: isSessionActive ? 'active' : isTunnelActive ? 'tunnel' : 'configured',
               activeSessionsCount: isSessionActive ? 1 : 0,
-              activeTunnelsCount: activeTunnels.filter((t) =>
-                isTunnelMatchingHost(t, h.id, h.address, forwardRules)
-              ).length,
+              activeTunnelsCount: matchingHostTunnels.length,
+              hostTunnels: matchingHostTunnels,
+              hostRules: matchingHostRules,
               jumpHops: h.jumpChain,
               notesCount: notes.filter((n) => n.hostId === h.id).length,
               onConnect: onConnectHost,
               onSplitConnect: onSplitConnectHost,
               onOpenSftp,
               onOpenNotes,
+              onStartTunnel,
+              onStopTunnel,
             },
           });
           nodeY += 190;
@@ -503,9 +603,11 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
         const row = Math.floor(idx / cols);
         const group = groups.find((g) => g.id === h.groupId);
         const isSessionActive = activeSessionHostIds.includes(h.id);
-        const isTunnelActive = activeTunnels.some((t) =>
+        const matchingHostTunnels = activeTunnels.filter((t) =>
           isTunnelMatchingHost(t, h.id, h.address, forwardRules)
         );
+        const matchingHostRules = (forwardRules || []).filter((r) => r.hostId === h.id);
+        const isTunnelActive = matchingHostTunnels.length > 0;
 
         nodes.push({
           id: h.id,
@@ -525,15 +627,17 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             tags: h.tags,
             status: isSessionActive ? 'active' : isTunnelActive ? 'tunnel' : 'configured',
             activeSessionsCount: isSessionActive ? 1 : 0,
-            activeTunnelsCount: activeTunnels.filter((t) =>
-              isTunnelMatchingHost(t, h.id, h.address, forwardRules)
-            ).length,
+            activeTunnelsCount: matchingHostTunnels.length,
+            hostTunnels: matchingHostTunnels,
+            hostRules: matchingHostRules,
             jumpHops: h.jumpChain,
             notesCount: notes.filter((n) => n.hostId === h.id).length,
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
             onOpenSftp,
             onOpenNotes,
+            onStartTunnel,
+            onStopTunnel,
           },
         });
       });
@@ -597,9 +701,55 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
           source: 'client-node',
           target: h.id,
           animated: true,
-          label: `-${tun.type} ${tun.bindPort}⇄${tun.targetPort || 'dyn'}`,
+          label: formatTunnelRoute(tun, h.label),
+          labelStyle: {
+            fill: '#ffffff',
+            fontWeight: 700,
+            fontFamily: "'JetBrains Mono', Consolas, monospace",
+            fontSize: '11px',
+            letterSpacing: '0.03em',
+          },
+          labelBgStyle: {
+            fill: '#080d1a',
+            fillOpacity: 0.96,
+            stroke: '#ec4899',
+            strokeWidth: 1.5,
+          },
+          labelBgPadding: [10, 6],
+          labelBgBorderRadius: 6,
           style: { stroke: '#ec4899', strokeWidth: 2.5, strokeDasharray: '4,4' },
           markerEnd: { type: MarkerType.ArrowClosed, color: '#ec4899' },
+        });
+      });
+
+      // Check for Configured Standby Forward Rules
+      const standbyRules = (forwardRules || []).filter(
+        (r) => r.hostId === h.id && !activeTunnels.some((t) => t.ruleId === r.id)
+      );
+      standbyRules.forEach((rule) => {
+        edges.push({
+          id: `standby-edge-${h.id}-${rule.id}`,
+          source: 'client-node',
+          target: h.id,
+          animated: false,
+          label: `${formatRuleRoute(rule, h.label)} [STANDBY]`,
+          labelStyle: {
+            fill: '#5eead4',
+            fontWeight: 600,
+            fontFamily: "'JetBrains Mono', Consolas, monospace",
+            fontSize: '10px',
+            letterSpacing: '0.03em',
+          },
+          labelBgStyle: {
+            fill: '#051119',
+            fillOpacity: 0.92,
+            stroke: 'rgba(20, 184, 166, 0.45)',
+            strokeWidth: 1,
+          },
+          labelBgPadding: [8, 4],
+          labelBgBorderRadius: 5,
+          style: { stroke: 'rgba(20, 184, 166, 0.35)', strokeWidth: 1.5, strokeDasharray: '4,6' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(20, 184, 166, 0.5)' },
         });
       });
     }
@@ -618,6 +768,8 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     onSplitConnectHost,
     onOpenSftp,
     onOpenNotes,
+    onStartTunnel,
+    onStopTunnel,
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(generatedNodes);
@@ -864,37 +1016,163 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                 </div>
               )}
 
-              {selectedHostTunnels.length > 0 && (
-                <div className="inspector-field">
-                  <span className="inspector-label">Active Port Tunnels</span>
-                  <div className="inspector-tunnels-list">
-                    {selectedHostTunnels.map((t) => (
-                      <div key={t.id} className="inspector-tunnel-row">
-                        <span className="tunnel-mode-pill">-{t.type}</span>
-                        <span>
-                          {t.bindAddress}:{t.bindPort} &rarr; {t.targetHost || 'localhost'}:{t.targetPort || 'dyn'}
-                        </span>
-                      </div>
-                    ))}
+              {/* Cyberpunk HUD Tunnel Routing Matrix */}
+              <div className="inspector-field inspector-tunnel-matrix-field">
+                <div className="inspector-matrix-header">
+                  <div className="matrix-header-title">
+                    <span className="hud-corner-bracket">///</span>
+                    <span className="inspector-label">TUNNEL ROUTING MATRIX</span>
                   </div>
+                  {onOpenForwardingManager && (
+                    <button
+                      type="button"
+                      className="inspector-new-tunnel-link"
+                      title="Configure new port forwarding rule for this host"
+                      onClick={() => onOpenForwardingManager(selectedHost.id)}
+                    >
+                      + NEW TUNNEL
+                    </button>
+                  )}
                 </div>
-              )}
 
-              {selectedHostRules.length > 0 && (
-                <div className="inspector-field">
-                  <span className="inspector-label">Configured Forward Rules ({selectedHostRules.length})</span>
-                  <div className="inspector-tunnels-list">
-                    {selectedHostRules.map((r) => (
-                      <div key={r.id} className="inspector-tunnel-row">
-                        <span className="tunnel-mode-pill">-{r.type}</span>
-                        <span>
-                          {r.label ? `${r.label}: ` : ''}{r.bindAddress || '127.0.0.1'}:{r.bindPort} &rarr; {r.targetHost || 'localhost'}:{r.targetPort || 'dyn'}
-                        </span>
+                {/* 1. Active Tunnels */}
+                {selectedHostTunnels.length > 0 && (
+                  <div className="inspector-tunnels-group">
+                    <div className="inspector-group-title">
+                      <span className="hud-dot live" /> ACTIVE TUNNELS ({selectedHostTunnels.length})
+                    </div>
+                    {selectedHostTunnels.map((t) => (
+                      <div key={t.id} className="inspector-tunnel-card active">
+                        <div className="tunnel-card-header">
+                          <span className="tunnel-card-badge active">
+                            -{t.type} {t.type === 'L' ? 'LOCAL FORWARD' : t.type === 'R' ? 'REMOTE FORWARD' : 'DYNAMIC SOCKS5'}
+                          </span>
+                          <span className="tunnel-live-indicator">● LIVE</span>
+                        </div>
+
+                        {/* Explicit Routing Diagram */}
+                        <div className="tunnel-routing-diagram">
+                          <div className="diagram-endpoint source">
+                            <span className="endpoint-title">{t.type === 'R' ? 'REMOTE LISTENER' : 'LOCAL LISTENER'}</span>
+                            <strong className="endpoint-host">{t.type === 'R' ? selectedHost.label : 'Client (Localhost)'}</strong>
+                            <code className="endpoint-addr">
+                              {t.type === 'R' ? selectedHost.address : (t.bindAddress || '127.0.0.1')}:{t.bindPort}
+                            </code>
+                          </div>
+
+                          <div className="diagram-flow">
+                            <span className="flow-arrow">──────▶</span>
+                            <span className="flow-mode">SSH TUNNEL</span>
+                          </div>
+
+                          <div className="diagram-endpoint target">
+                            <span className="endpoint-title">{t.type === 'R' ? 'LOCAL TARGET' : 'REMOTE TARGET'}</span>
+                            <strong className="endpoint-host">{t.type === 'R' ? 'Client Workstation' : selectedHost.label}</strong>
+                            <code className="endpoint-addr">
+                              {t.type === 'R' ? (t.targetHost || 'localhost') : (t.targetHost || selectedHost.address)}:{t.targetPort || 'dyn'}
+                            </code>
+                          </div>
+                        </div>
+
+                        {/* Telemetry bar */}
+                        <div className="tunnel-telemetry-bar">
+                          <span className="telemetry-item">Conns: <strong>{t.activeConns}</strong></span>
+                          <span className="telemetry-item">In: <strong>{formatBytes(t.bytesIn)}</strong></span>
+                          <span className="telemetry-item">Out: <strong>{formatBytes(t.bytesOut)}</strong></span>
+                        </div>
+
+                        {/* Action button */}
+                        {onStopTunnel && (
+                          <div className="tunnel-card-actions">
+                            <button
+                              type="button"
+                              className="hud-btn-danger"
+                              onClick={() => onStopTunnel(t.id)}
+                            >
+                              ■ STOP TUNNEL
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* 2. Configured Forward Rules (Available to Start) */}
+                {selectedHostRules.length > 0 && (
+                  <div className="inspector-tunnels-group">
+                    <div className="inspector-group-title">
+                      <span className="hud-dot standby" /> CONFIGURED RULES ({selectedHostRules.length})
+                    </div>
+                    {selectedHostRules.map((r) => {
+                      const isActive = selectedHostTunnels.some((t) => t.ruleId === r.id);
+                      if (isActive) return null; // already shown in active section
+                      return (
+                        <div key={r.id} className="inspector-tunnel-card standby">
+                          <div className="tunnel-card-header">
+                            <span className="tunnel-card-badge standby">
+                              -{r.type} {r.label || (r.type === 'L' ? 'Local Forward' : r.type === 'R' ? 'Remote Forward' : 'Dynamic SOCKS5')}
+                            </span>
+                            <span className="tunnel-standby-indicator">○ STANDBY</span>
+                          </div>
+
+                          {/* Explicit Routing Diagram */}
+                          <div className="tunnel-routing-diagram standby">
+                            <div className="diagram-endpoint source">
+                              <span className="endpoint-title">{r.type === 'R' ? 'REMOTE LISTENER' : 'LOCAL LISTENER'}</span>
+                              <strong className="endpoint-host">{r.type === 'R' ? selectedHost.label : 'Client (Localhost)'}</strong>
+                              <code className="endpoint-addr">
+                                {r.type === 'R' ? selectedHost.address : (r.bindAddress || '127.0.0.1')}:{r.bindPort}
+                              </code>
+                            </div>
+
+                            <div className="diagram-flow">
+                              <span className="flow-arrow">⇢ ⇢ ⇢</span>
+                              <span className="flow-mode">STANDBY</span>
+                            </div>
+
+                            <div className="diagram-endpoint target">
+                              <span className="endpoint-title">{r.type === 'R' ? 'LOCAL TARGET' : 'REMOTE TARGET'}</span>
+                              <strong className="endpoint-host">{r.type === 'R' ? 'Client Workstation' : selectedHost.label}</strong>
+                              <code className="endpoint-addr">
+                                {r.type === 'R' ? (r.targetHost || 'localhost') : (r.targetHost || selectedHost.address)}:{r.targetPort || 'dyn'}
+                              </code>
+                            </div>
+                          </div>
+
+                          {/* Action button */}
+                          <div className="tunnel-card-actions">
+                            <button
+                              type="button"
+                              className="hud-btn-primary"
+                              title="Start tunnel (connects automatically if offline)"
+                              onClick={() => onStartTunnel?.(selectedHost.id, r.id)}
+                            >
+                              ▶ START TUNNEL
+                            </button>
+                            <span className="action-hint">Auto-connects to {selectedHost.label} if offline</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {selectedHostTunnels.length === 0 && selectedHostRules.length === 0 && (
+                  <div className="inspector-empty-tunnels">
+                    <p>No port tunnels configured for {selectedHost.label}.</p>
+                    {onOpenForwardingManager && (
+                      <button
+                        type="button"
+                        className="hud-btn-outline"
+                        onClick={() => onOpenForwardingManager(selectedHost.id)}
+                      >
+                        + Create Port Forwarding Rule
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {selectedHostNotes.length > 0 && (
                 <div className="inspector-field">

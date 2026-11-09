@@ -6271,7 +6271,8 @@ button:hover .cyber-svg-icon {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 320px;
+  width: 380px;
+  max-width: calc(100% - 20px);
   max-height: calc(100% - 20px);
   background: rgba(10, 16, 28, 0.96);
   border: 1px solid rgba(45, 212, 191, 0.4);
@@ -6328,7 +6329,8 @@ button:hover .cyber-svg-icon {
   flex-direction: column;
   gap: 0.65rem;
   overflow-y: auto;
-  max-height: 400px;
+  flex: 1;
+  min-height: 0;
 }
 
 .inspector-field {
@@ -6836,6 +6838,476 @@ button:hover .cyber-svg-icon {
   font-size: 0.82rem;
   font-weight: 600;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   CYBERPUNK SCI-FI HUD: TUNNEL ROUTING MATRIX & HOST CHIPS
+   ───────────────────────────────────────────────────────────── */
+
+/* 1. Host Node Card Tunnel Chips */
+.topo-node-tunnels-box {
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.45rem;
+  background: rgba(6, 11, 20, 0.92);
+  border: 1px solid rgba(236, 72, 153, 0.45);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  box-shadow: 0 0 10px rgba(236, 72, 153, 0.15);
+}
+
+.topo-node-tunnels-box.standby {
+  border-color: rgba(20, 184, 166, 0.35);
+  box-shadow: 0 0 8px rgba(20, 184, 166, 0.12);
+}
+
+.topo-tunnels-box-header {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f472b6;
+  text-transform: uppercase;
+}
+
+.topo-node-tunnels-box.standby .topo-tunnels-box-header {
+  color: var(--accent-glow);
+}
+
+.topo-corner-bracket {
+  color: #ec4899;
+  font-weight: 800;
+  font-size: 0.65rem;
+}
+
+.topo-node-tunnels-box.standby .topo-corner-bracket {
+  color: var(--accent-bright);
+}
+
+.topo-tunnel-route-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.68rem;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid rgba(236, 72, 153, 0.25);
+}
+
+.topo-tunnel-route-chip.standby {
+  border-color: rgba(20, 184, 166, 0.22);
+}
+
+.chip-mode {
+  font-weight: 800;
+  font-size: 0.62rem;
+  padding: 0.05rem 0.25rem;
+  border-radius: 2px;
+  background: rgba(236, 72, 153, 0.25);
+  color: #f472b6;
+}
+
+.chip-mode.standby {
+  background: rgba(20, 184, 166, 0.2);
+  color: var(--accent-glow);
+}
+
+.chip-endpoints {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ep-local {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.ep-remote {
+  color: #a7f3d0;
+  font-weight: 600;
+}
+
+.ep-arrow {
+  color: #ec4899;
+  font-weight: 800;
+}
+
+.topo-tunnel-route-chip.standby .ep-arrow {
+  color: var(--accent-bright);
+}
+
+.topo-tunnel-start-btn {
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-primary));
+  color: #ffffff;
+  border: 1px solid var(--accent-bright);
+  border-radius: 3px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(20, 184, 166, 0.4);
+  transition: all 0.15s ease;
+}
+
+.topo-tunnel-start-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.7);
+}
+
+/* 2. Inspector Tunnel Routing Matrix */
+.inspector-tunnel-matrix-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.inspector-matrix-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(45, 212, 191, 0.25);
+  padding-bottom: 0.35rem;
+}
+
+.matrix-header-title {
+  display: flex;
+  align-items: center;
+}
+
+.hud-corner-bracket {
+  color: var(--accent-glow);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-weight: 800;
+  font-size: 0.75rem;
+  margin-right: 0.3rem;
+}
+
+.inspector-new-tunnel-link {
+  background: transparent;
+  border: 1px solid rgba(20, 184, 166, 0.4);
+  border-radius: 3px;
+  color: var(--accent-glow);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.inspector-new-tunnel-link:hover {
+  background: rgba(20, 184, 166, 0.18);
+  border-color: var(--accent-bright);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(20, 184, 166, 0.35);
+}
+
+.inspector-tunnels-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.inspector-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.hud-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.hud-dot.live {
+  background: #ec4899;
+  box-shadow: 0 0 8px #ec4899;
+}
+
+.hud-dot.standby {
+  background: #2dd4bf;
+  box-shadow: 0 0 6px #2dd4bf;
+}
+
+.inspector-tunnel-card {
+  background: rgba(9, 14, 25, 0.94);
+  border: 1px solid rgba(236, 72, 153, 0.45);
+  border-radius: 6px;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 10px rgba(236, 72, 153, 0.15);
+  backdrop-filter: blur(8px);
+}
+
+.inspector-tunnel-card.standby {
+  border-color: rgba(20, 184, 166, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 8px rgba(20, 184, 166, 0.1);
+}
+
+.tunnel-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tunnel-card-badge {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.tunnel-card-badge.active {
+  background: rgba(236, 72, 153, 0.2);
+  border: 1px solid rgba(236, 72, 153, 0.45);
+  color: #f472b6;
+}
+
+.tunnel-card-badge.standby {
+  background: rgba(20, 184, 166, 0.18);
+  border: 1px solid rgba(20, 184, 166, 0.4);
+  color: var(--accent-glow);
+}
+
+.tunnel-live-indicator {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #ec4899;
+  letter-spacing: 0.05em;
+  animation: pulseNeon 1.5s infinite;
+}
+
+.tunnel-standby-indicator {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+@keyframes pulseNeon {
+  0%, 100% { opacity: 1; text-shadow: 0 0 8px #ec4899; }
+  50% { opacity: 0.5; text-shadow: none; }
+}
+
+/* Explicit Routing Diagram */
+.tunnel-routing-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  background: rgba(4, 8, 16, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  padding: 0.5rem 0.45rem;
+}
+
+.diagram-endpoint {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.diagram-endpoint.source {
+  text-align: left;
+}
+
+.diagram-endpoint.target {
+  text-align: right;
+}
+
+.endpoint-title {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.endpoint-host {
+  font-size: 0.76rem;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endpoint-addr {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.72rem;
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.diagram-endpoint.target .endpoint-addr {
+  color: #a7f3d0;
+}
+
+.diagram-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  flex-shrink: 0;
+}
+
+.flow-arrow {
+  color: #ec4899;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+}
+
+.tunnel-routing-diagram.standby .flow-arrow {
+  color: var(--accent-glow);
+}
+
+.flow-mode {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.52rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+/* Telemetry Bar */
+.tunnel-telemetry-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.25rem 0.45rem;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tunnel-telemetry-bar strong {
+  color: var(--text-bright);
+}
+
+/* Card Actions */
+.tunnel-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.15rem;
+}
+
+.hud-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-primary));
+  color: #ffffff;
+  border: 1px solid var(--accent-bright);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.35);
+  transition: all 0.15s ease;
+}
+
+.hud-btn-primary:hover {
+  box-shadow: 0 0 14px rgba(20, 184, 166, 0.65);
+  transform: translateY(-1px);
+}
+
+.hud-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hud-btn-danger:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.55);
+}
+
+.hud-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--accent-glow);
+  border: 1px dashed rgba(20, 184, 166, 0.4);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hud-btn-outline:hover {
+  background: rgba(20, 184, 166, 0.12);
+  border-color: var(--accent-bright);
+  color: #ffffff;
+}
+
+.action-hint {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.inspector-empty-tunnels {
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
 
 
 

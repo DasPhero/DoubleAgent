@@ -1162,6 +1162,7 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
 
   // Port Forwarding & Tunnels State (F-13)
   const [showPortForwardingModal, setShowPortForwardingModal] = useState<boolean>(false);
+  const [forwardingModalHostId, setForwardingModalHostId] = useState<string | undefined>(undefined);
   const [forwardRules, setForwardRules] = useState<ForwardRule[]>([]);
   const [activeTunnels, setActiveTunnels] = useState<ForwardTunnelStatus[]>([]);
 
@@ -2620,22 +2621,58 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
   const handleStartTunnelWithHost = async (hostId: string, ruleId: string): Promise<void> => {
     const host = vaultSummary.hosts.find((h) => h.id === hostId);
     const api = getWailsBindings();
-    if (!api?.ConnectSavedHost || !api?.StartForwardTunnel) {
-      setStatusMessage('Wails backend not available to connect and start tunnel.');
+    if (!api?.StartForwardTunnel) {
+      setStatusMessage('Wails backend not available to start tunnel.');
       return;
     }
-    setStatusMessage(`Connecting to ${host ? host.label : hostId} in background...`);
-    try {
-      const sessionId = await api.ConnectSavedHost(hostId, { cols: 80, rows: 24 });
-      if (host) {
-        openSessionTab(sessionId, host.label, host.id, host.color);
+
+    // 1. Check if there is already an active session for this host
+    let targetSessionId = '';
+    for (const t of tabs) {
+      const panes = collectPanes(t.rootNode);
+      for (const p of panes) {
+        if (
+          p.hostId === hostId &&
+          (!p.paneType || p.paneType === 'terminal') &&
+          p.sessionId &&
+          !p.sessionId.startsWith('restored-') &&
+          !p.sessionId.startsWith('local-') &&
+          !p.sessionId.startsWith('serial-')
+        ) {
+          targetSessionId = p.sessionId;
+          break;
+        }
       }
-      await api.StartForwardTunnel(sessionId, ruleId);
+      if (targetSessionId) break;
+    }
+
+    // 2. If no active session, connect in background first
+    if (!targetSessionId) {
+      if (!api.ConnectSavedHost) {
+        setStatusMessage('Wails backend ConnectSavedHost not available.');
+        return;
+      }
+      setStatusMessage(`Connecting to ${host ? host.label : hostId} in background...`);
+      try {
+        targetSessionId = await api.ConnectSavedHost(hostId, { cols: 80, rows: 24 });
+        if (host) {
+          openSessionTab(targetSessionId, host.label, host.id, host.color);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Failed to connect & start tunnel: ${msg}`);
+        throw err;
+      }
+    }
+
+    // 3. Start tunnel
+    try {
+      await api.StartForwardTunnel(targetSessionId, ruleId);
       await refreshForwardState();
-      setStatusMessage(`Started tunnel on ${host ? host.label : hostId} (connected in background).`);
+      setStatusMessage(`Started tunnel on ${host ? host.label : hostId}.`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage(`Failed to connect & start tunnel: ${msg}`);
+      setStatusMessage(`Start tunnel failed: ${msg}`);
       throw err;
     }
   };
@@ -5438,6 +5475,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                   if (h) void handleOpenHostSftp(h);
                 }}
                 onOpenNotes={(hostId) => openNotesTab(hostId)}
+                onStartTunnel={handleStartTunnelWithHost}
+                onStopTunnel={handleStopForwardTunnel}
+                onOpenForwardingManager={(hostId) => {
+                  setForwardingModalHostId(hostId);
+                  setShowPortForwardingModal(true);
+                }}
                 onClose={() => void handleClosePane(tab.id, node.id)}
                 isDocked={true}
               />
@@ -8291,6 +8334,12 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
                           if (h) void handleOpenHostSftp(h);
                         }}
                         onOpenNotes={(hostId) => openNotesTab(hostId)}
+                        onStartTunnel={handleStartTunnelWithHost}
+                        onStopTunnel={handleStopForwardTunnel}
+                        onOpenForwardingManager={(hostId) => {
+                          setForwardingModalHostId(hostId);
+                          setShowPortForwardingModal(true);
+                        }}
                         onClose={() => void handleCloseTab(tab.id)}
                         isDocked={false}
                       />
@@ -9718,7 +9767,11 @@ export function App({ initialLocked = false }: { initialLocked?: boolean } = {})
           onStartTunnelWithHost={handleStartTunnelWithHost}
           onStopTunnel={handleStopForwardTunnel}
           onOpenProxychainsExport={handleOpenProxychainsExport}
-          onClose={() => setShowPortForwardingModal(false)}
+          initialHostId={forwardingModalHostId}
+          onClose={() => {
+            setForwardingModalHostId(undefined);
+            setShowPortForwardingModal(false);
+          }}
         />
       )}
 
