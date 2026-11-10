@@ -3911,3 +3911,182 @@ func (a *App) ExportSprayList(opts core.SprayExportOptions) (core.SprayExportRes
 
 	return core.GenerateSprayList(targetCreds, policy, opts)
 }
+
+// ListEvidence returns evidence items filtered by engagement ID and/or host ID (F-18).
+func (a *App) ListEvidence(engagementID string, hostID string) ([]core.EvidenceItem, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	var res []core.EvidenceItem
+	for _, e := range payload.Evidence {
+		if engagementID != "" && e.EngagementID != engagementID {
+			continue
+		}
+		if hostID != "" && e.HostID != hostID {
+			continue
+		}
+		res = append(res, e)
+	}
+	return res, nil
+}
+
+// GetEvidence returns a single evidence item by ID (F-18).
+func (a *App) GetEvidence(id string) (*core.EvidenceItem, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range payload.Evidence {
+		if e.ID == id {
+			res := e
+			return &res, nil
+		}
+	}
+	return nil, fmt.Errorf("evidence item %q not found", id)
+}
+
+// SaveEvidence stores or updates an evidence item in the vault (F-18).
+func (a *App) SaveEvidence(item core.EvidenceItem) error {
+	if err := core.ValidateEvidenceItem(item); err != nil {
+		return err
+	}
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	if item.CapturedAt.IsZero() {
+		item.CapturedAt = time.Now()
+	}
+
+	idx := -1
+	for i, existing := range payload.Evidence {
+		if existing.ID == item.ID {
+			idx = i
+			break
+		}
+	}
+	if idx >= 0 {
+		payload.Evidence[idx] = item
+	} else {
+		payload.Evidence = append(payload.Evidence, item)
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DeleteEvidence removes an evidence item from the vault (F-18).
+func (a *App) DeleteEvidence(id string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.EvidenceItem, 0, len(payload.Evidence))
+	for _, e := range payload.Evidence {
+		if e.ID != id {
+			filtered = append(filtered, e)
+		}
+	}
+	payload.Evidence = filtered
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// GetEvidenceCategories returns default and engagement-custom evidence categories (F-18).
+func (a *App) GetEvidenceCategories(engagementID string) ([]string, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]struct{})
+	var categories []string
+
+	for _, def := range core.DefaultEvidenceCategories() {
+		if _, ok := seen[def]; !ok {
+			seen[def] = struct{}{}
+			categories = append(categories, def)
+		}
+	}
+
+	if engagementID != "" {
+		for _, eng := range payload.Engagements {
+			if eng.ID == engagementID {
+				for _, cust := range eng.CustomCategories {
+					if _, ok := seen[cust]; !ok && cust != "" {
+						seen[cust] = struct{}{}
+						categories = append(categories, cust)
+					}
+				}
+				break
+			}
+		}
+	}
+
+	for _, e := range payload.Evidence {
+		if (engagementID == "" || e.EngagementID == engagementID) && e.Category != "" {
+			if _, ok := seen[e.Category]; !ok {
+				seen[e.Category] = struct{}{}
+				categories = append(categories, e.Category)
+			}
+		}
+	}
+
+	return categories, nil
+}
+
+// AddEvidenceCategory registers a new custom category under an engagement (F-18).
+func (a *App) AddEvidenceCategory(engagementID, category string) error {
+	trimmed := strings.TrimSpace(category)
+	if trimmed == "" {
+		return errors.New("category name must not be empty")
+	}
+
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	if engagementID != "" {
+		found := false
+		for i := range payload.Engagements {
+			if payload.Engagements[i].ID == engagementID {
+				for _, c := range payload.Engagements[i].CustomCategories {
+					if strings.EqualFold(c, trimmed) {
+						return nil // already exists
+					}
+				}
+				payload.Engagements[i].CustomCategories = append(payload.Engagements[i].CustomCategories, trimmed)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("engagement %q not found", engagementID)
+		}
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// GetEvidenceTemplates returns pre-filled finding templates (F-18).
+func (a *App) GetEvidenceTemplates() []core.EvidenceItem {
+	return core.DefaultEvidenceTemplates()
+}

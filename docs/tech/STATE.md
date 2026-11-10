@@ -1,10 +1,43 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-36` & `F-40` — Engagement Credential Store, Spray Lists & Lockout Guard — COMPLETED!
-- **Next Milestone:** Wave 1 MVP+ — Evidence Vault (`F-18`) & Save Selection Context Menu (`F-19`)
+- **Current Milestone:** `F-18` — Evidence Vault & Findings Store — COMPLETED!
+- **Next Milestone:** Wave 1 MVP+ — Save Selection Context Menu (`F-19`) & Snippet Chains (`F-16`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Evidence Vault & Structured Findings Store (`F-18` / Pentest Spec Line 26, 49, 56)**:
+  - **Evidence Data Model & Serialization (`backend/core/pentest.go`)**:
+    - `EvidenceItem`: ID, `EngagementID`, `Category`, `Title`, `Type` (`text` / `table` / `file` / `credential`), `Content` (Markdown or JSON table), `HostID` (optional host association), `Severity` (`critical`, `high`, `medium`, `low`, `info`), `CapturedAt`, `Source` (`manual`, `terminal_selection`, `nmap`, `linpeas`, `bloodhound`, `mimikatz`), `Tags`.
+    - `TableEvidenceContent`: Structured columns and row data (`Headers []string`, `Rows [][]string`) for organized recon/finding tables.
+    - **8 Pre-filled Default Categories (Spec Line 56)**: Credentials, Open Ports/Services, Vulnerabilities, Privilege Escalation, Lateral Movement, Sensitive Data, Web, Active Directory.
+    - **Dynamic Custom Category Management**: Engagements store `CustomCategories []string` so operators can create bespoke categories (e.g. `Cloud Infrastructure`, `Wireless`, `Physical Security`).
+    - **Pre-filled Starter Finding Templates**: Out-of-the-box templates for common findings:
+      - *Unquoted Service Path* (PrivEsc / Windows / High)
+      - *Sudo NOPASSWD Misconfiguration* (PrivEsc / Linux / Critical)
+      - *Discovered Open Ports & Services Matrix* (Recon / Table / Info)
+      - *Anonymous / Writable SMB Share* (Lateral Movement / Medium)
+      - *AS-REP Roasting Vulnerable Account* (Active Directory / High)
+      - *Exposed Secret in Configuration / .env File* (Sensitive Data / Critical)
+  - **Vault Storage & 3-Way Merge Synchronization (`backend/vault/pentest.go`, `backend/vault/merge.go`)**:
+    - Stored under encrypted `VaultPayload.Evidence` (Argon2id + XChaCha20-Poly1305).
+    - Multi-machine sync (F-29): automatically merges non-conflicting findings; conflicts surface in `VaultConflictModal` with Local vs Remote summary.
+    - Store methods: `ListEvidence`, `GetEvidence`, `SaveEvidence`, `DeleteEvidence`, `GetEvidenceCategories`, `AddEvidenceCategory`, `GetEvidenceTemplates`.
+  - **Wails API Bindings (`app.go`)**:
+    - Clean bound methods with touch/auto-lock resets and `vault:updated` event emissions.
+  - **Cyberpunk HUD Evidence Vault Modal (`EvidenceVaultModal.tsx`)**:
+    - Category pills bar with live finding count badges and 1-click `+ Add Category` inline form.
+    - Real-time search query matching title, content, tags, host, and source.
+    - Severity and Host filter dropdowns.
+    - Dual Format Finding Editor:
+      - **Free Text (Markdown / PoC)**: Monospace editor with zero-innerHTML `MarkdownRenderer` AST preview.
+      - **Structured Table**: Interactive tabular builder with dynamic Add/Delete Column, Add/Delete Row, and inline cell editing.
+    - Template Quick-Picker: 1-click loading of common pentest finding templates.
+    - **Evidence Report Export (`.md`)**: Generates and downloads a clean, client-ready Markdown pentest report with executive summary severity breakdown, category groupings, and formatted tables.
+  - **Full Test Coverage**:
+    - Core: `backend/core/pentest_test.go` (`TestEvidence_F18`).
+    - Vault: `backend/vault/pentest_test.go` (`TestVault_Evidence_F18`).
+    - App: `app_test.go` (`TestApp_PentestEvidence_F18`).
+    - Frontend: `frontend/src/App.test.tsx` (`supports Pentest Evidence Vault, Findings, Categories, and Report Export (F-18)`).
 - **Engagement Credential Store, Spray Lists & Lockout Guard (`F-36`, `F-40` / Pentest Spec Section 2, 3)**:
   - **Engagement Data Model & Lockout Policy (`backend/core/pentest.go`)**:
     - `Engagement`: ID, Name, Scope, Timeframe, `LockoutPolicy`, and `IsActive` state.

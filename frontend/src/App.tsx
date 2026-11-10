@@ -45,6 +45,7 @@ import { ImportModal } from './components/ImportModal';
 import { RawTcpConfig, RawTcpListenerConfig, RawTcpListenerInfo, RawTcpSessionStats, RawTcpIncomingEvent } from './types/rawTcp';
 import { RawTcpModal } from './components/RawTcpModal';
 import { CredentialStoreModal } from './components/CredentialStoreModal';
+import { EvidenceVaultModal } from './components/EvidenceVaultModal';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -1097,6 +1098,8 @@ export function App({
 
   // Pentest Credential Pool & Spray Generator state (F-36, F-40)
   const [showCredStoreModal, setShowCredStoreModal] = useState<boolean>(false);
+  // Pentest Evidence Vault state (F-18)
+  const [showEvidenceModal, setShowEvidenceModal] = useState<boolean>(false);
 
   // Add Group form state
   const [grpName, setGrpName] = useState<string>('');
@@ -7195,6 +7198,14 @@ export function App({
         setShowCredStoreModal(true);
       },
     },
+    'evidence-vault': {
+      label: 'Evidence Vault & Findings (F-18)',
+      shortLabel: 'Evidence',
+      icon: 'shield',
+      action: () => {
+        setShowEvidenceModal(true);
+      },
+    },
     proxychains: {
       label: 'Export proxychains.conf',
       shortLabel: 'Proxychains',
@@ -7647,6 +7658,7 @@ export function App({
                     )}
                     {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
                     {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists (F-36)', '⚔️ Credentials', () => setShowCredStoreModal(true))}
+                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence Vault', () => setShowEvidenceModal(true))}
 
                     <div className="tools-sub-header">Config Import &amp; Export</div>
                     {renderDropdownRow('ssh-config', 'Import ssh_config', '⚙️', () => {
@@ -10601,6 +10613,19 @@ export function App({
         <CredentialStoreModal
           isOpen={showCredStoreModal}
           onClose={() => setShowCredStoreModal(false)}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+          }))}
+          activeHostId={activeTab?.hostId}
+        />
+      )}
+
+      {showEvidenceModal && (
+        <EvidenceVaultModal
+          isOpen={showEvidenceModal}
+          onClose={() => setShowEvidenceModal(false)}
           hosts={vaultSummary.hosts.map((h) => ({
             id: h.id,
             label: h.label,

@@ -9,6 +9,22 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
 ## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-36`, `F-37`, & `F-40`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Evidence Vault & Structured Findings Store (`F-18` / Pentest Module Wave 1)**:
+  - **Engagement-Scoped Evidence Vault**:
+    - Centralized repository for penetration testing findings, proof-of-concept exploits, discovered vulnerability details, reconnaissance artifacts, and session notes.
+    - Open **Tools ▾ &rarr; 🛡️ Evidence Vault (F-18)** or type `evidence` in the Command Palette (`Ctrl+K`).
+    - Finding entries are automatically associated with the active engagement and optionally mapped to a specific target host from your inventory.
+  - **Pre-filled Default Categories & Custom Categories (Spec Line 56)**:
+    - Pre-populated with the 8 standard pentest categories: *Credentials, Open Ports/Services, Vulnerabilities, Privilege Escalation, Lateral Movement, Sensitive Data, Web, and Active Directory*.
+    - Operators can create custom categories on-the-fly (`+ Add Category`) to match specific compliance frameworks or custom engagement scopes (e.g. `Cloud Infrastructure`, `Wireless Security`).
+  - **Dual-Format Findings: Free Text (Markdown) vs Structured Tables**:
+    - **Free Text / Markdown / PoC**: Rich monospace editor with zero-innerHTML Markdown rendering for command outputs, PoC reproduction steps, and remediation guidance.
+    - **Structured Table Builder**: Interactive table editor allowing operators to define column headers, add/delete rows, and edit cells directly for structured findings like port scans, discovered services, users/hashes, and endpoint matrices.
+  - **Pre-filled Starter Finding Templates**:
+    - Instant 1-click loading of common pentest finding templates: *Unquoted Service Path, Sudo NOPASSWD, Discovered Open Ports Matrix, Anonymous SMB Share, AS-REP Roasting, and Exposed .env Secrets*.
+  - **Client-Ready Report Export (`.md`)**:
+    - 1-click generation and download of formatted Markdown pentest report (`.md`).
+    - Includes executive summary severity breakdown (Critical, High, Medium, Low, Info), engagement scope, timeframe, and all findings grouped with structured tables and Markdown PoCs.
 - **Engagement Credential Pool, Spray List Generator & Lockout Guard (`F-36`, `F-40` / Pentest Module Wave 1)**:
   - **Engagement-Scoped Credential Pool (`F-36`)**:
     - Manage engagements (assessments, penetration tests, red team operations) with defined scope, timeframes, and active lockout policies.

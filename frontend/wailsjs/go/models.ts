@@ -295,6 +295,7 @@ export namespace core {
 	    scope: string;
 	    timeframe: string;
 	    lockoutPolicy: LockoutPolicy;
+	    customCategories?: string[];
 	    isActive: boolean;
 	    // Go type: time
 	    createdAt: any;
@@ -312,9 +313,61 @@ export namespace core {
 	        this.scope = source["scope"];
 	        this.timeframe = source["timeframe"];
 	        this.lockoutPolicy = this.convertValues(source["lockoutPolicy"], LockoutPolicy);
+	        this.customCategories = source["customCategories"];
 	        this.isActive = source["isActive"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class EvidenceItem {
+	    id: string;
+	    engagementId: string;
+	    category: string;
+	    title: string;
+	    type: string;
+	    content: string;
+	    hostId?: string;
+	    severity?: string;
+	    // Go type: time
+	    capturedAt: any;
+	    source?: string;
+	    tags?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new EvidenceItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.engagementId = source["engagementId"];
+	        this.category = source["category"];
+	        this.title = source["title"];
+	        this.type = source["type"];
+	        this.content = source["content"];
+	        this.hostId = source["hostId"];
+	        this.severity = source["severity"];
+	        this.capturedAt = this.convertValues(source["capturedAt"], null);
+	        this.source = source["source"];
+	        this.tags = source["tags"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

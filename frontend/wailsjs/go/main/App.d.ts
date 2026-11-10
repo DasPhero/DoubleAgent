@@ -3,6 +3,8 @@
 import {core} from '../models';
 import {data} from '../models';
 
+export function AddEvidenceCategory(arg1:string,arg2:string):Promise<void>;
+
 export function AutoDetectSerial(arg1:string):Promise<core.SerialAutoDetectResult>;
 
 export function BroadcastInput(arg1:Array<string>,arg2:string):Promise<void>;
@@ -34,6 +36,8 @@ export function CreateRemoteDir(arg1:string,arg2:string):Promise<void>;
 export function DeleteCredential(arg1:string):Promise<void>;
 
 export function DeleteEngagement(arg1:string):Promise<void>;
+
+export function DeleteEvidence(arg1:string):Promise<void>;
 
 export function DeleteForwardRule(arg1:string):Promise<void>;
 
@@ -87,6 +91,12 @@ export function GetAllTotpCodes():Promise<Array<core.TotpCodeResponse>>;
 
 export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOptions>;
 
+export function GetEvidence(arg1:string):Promise<core.EvidenceItem>;
+
+export function GetEvidenceCategories(arg1:string):Promise<Array<string>>;
+
+export function GetEvidenceTemplates():Promise<Array<core.EvidenceItem>>;
+
 export function GetLiveSessionIDs():Promise<Array<string>>;
 
 export function GetNote(arg1:string):Promise<core.NotePage>;
@@ -126,6 +136,8 @@ export function ListActiveRemoteEdits():Promise<Array<core.RemoteEditSession>>;
 export function ListCredentials(arg1:string,arg2:string):Promise<Array<core.CredentialEntry>>;
 
 export function ListEngagements():Promise<Array<core.Engagement>>;
+
+export function ListEvidence(arg1:string,arg2:string):Promise<Array<core.EvidenceItem>>;
 
 export function ListForwardRules():Promise<Array<core.ForwardRule>>;
 
@@ -182,6 +194,8 @@ export function ResolveVaultConflicts(arg1:Record<string, string>,arg2:boolean):
 export function SaveCredential(arg1:core.CredentialEntry):Promise<void>;
 
 export function SaveEngagement(arg1:core.Engagement):Promise<void>;
+
+export function SaveEvidence(arg1:core.EvidenceItem):Promise<void>;
 
 export function SaveForwardRule(arg1:core.ForwardRule):Promise<void>;
 

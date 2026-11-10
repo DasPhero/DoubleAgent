@@ -1883,3 +1883,115 @@ func TestApp_PentestEngagementsAndCredentials_F36_F40(t *testing.T) {
 		t.Fatalf("expected 1 credential after delete, got %d", len(afterCreds))
 	}
 }
+
+func TestApp_PentestEvidence_F18(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_pentest_evidence_app.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), "VaultPass456!"); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, _ string, _ ...interface{}) {})
+
+	// 1. Create Engagement
+	eng := core.Engagement{
+		ID:        "eng-evi-app",
+		Name:      "PCI-DSS Pentest",
+		Scope:     "172.16.0.0/16",
+		Timeframe: "Q4 2026",
+		IsActive:  true,
+	}
+	if err := app.SaveEngagement(eng); err != nil {
+		t.Fatalf("SaveEngagement failed: %v", err)
+	}
+
+	// 2. Save Evidence (Free text)
+	eviText := core.EvidenceItem{
+		ID:           "evi-text-app",
+		EngagementID: "eng-evi-app",
+		Category:     "Vulnerabilities",
+		Title:        "Apache Log4j RCE (CVE-2021-44228)",
+		Type:         core.EvidenceTypeText,
+		Content:      "Identified unpatched Log4j in payment gateway headers",
+		HostID:       "host-gw-01",
+		Severity:     "critical",
+		Source:       "manual",
+		CapturedAt:   time.Now(),
+		Tags:         []string{"cve-2021-44228", "rce"},
+	}
+	if err := app.SaveEvidence(eviText); err != nil {
+		t.Fatalf("SaveEvidence text failed: %v", err)
+	}
+
+	// 3. Save Evidence (Table)
+	eviTable := core.EvidenceItem{
+		ID:           "evi-table-app",
+		EngagementID: "eng-evi-app",
+		Category:     "Open Ports/Services",
+		Title:        "Payment Gateway Open Ports",
+		Type:         core.EvidenceTypeTable,
+		Content:      `{"headers":["Port","Proto","Service"],"rows":[["443","tcp","https"],["8080","tcp","http-proxy"]]}`,
+		HostID:       "host-gw-01",
+		Severity:     "info",
+		Source:       "nmap",
+		CapturedAt:   time.Now(),
+	}
+	if err := app.SaveEvidence(eviTable); err != nil {
+		t.Fatalf("SaveEvidence table failed: %v", err)
+	}
+
+	// 4. Query Evidence
+	allEvi, err := app.ListEvidence("eng-evi-app", "")
+	if err != nil || len(allEvi) != 2 {
+		t.Fatalf("expected 2 evidence items, got %d (err: %v)", len(allEvi), err)
+	}
+
+	hostEvi, err := app.ListEvidence("", "host-gw-01")
+	if err != nil || len(hostEvi) != 2 {
+		t.Fatalf("expected 2 host evidence items, got %d", len(hostEvi))
+	}
+
+	single, err := app.GetEvidence("evi-text-app")
+	if err != nil || single == nil || single.Title != "Apache Log4j RCE (CVE-2021-44228)" {
+		t.Fatalf("expected single evidence 'evi-text-app', got %+v", single)
+	}
+
+	// 5. Categories & Custom Category
+	cats, err := app.GetEvidenceCategories("eng-evi-app")
+	if err != nil || len(cats) < 8 {
+		t.Fatalf("expected at least 8 categories, got %d", len(cats))
+	}
+
+	if err := app.AddEvidenceCategory("eng-evi-app", "Cloud Container Security"); err != nil {
+		t.Fatalf("AddEvidenceCategory failed: %v", err)
+	}
+	catsAfter, err := app.GetEvidenceCategories("eng-evi-app")
+	if err != nil {
+		t.Fatalf("GetEvidenceCategories after failed: %v", err)
+	}
+	foundCustom := false
+	for _, c := range catsAfter {
+		if c == "Cloud Container Security" {
+			foundCustom = true
+			break
+		}
+	}
+	if !foundCustom {
+		t.Fatalf("expected 'Cloud Container Security' in categories, got %+v", catsAfter)
+	}
+
+	// 6. Templates
+	templates := app.GetEvidenceTemplates()
+	if len(templates) == 0 {
+		t.Fatalf("expected non-empty templates")
+	}
+
+	// 7. Delete Evidence
+	if err := app.DeleteEvidence("evi-text-app"); err != nil {
+		t.Fatalf("DeleteEvidence failed: %v", err)
+	}
+	remaining, err := app.ListEvidence("eng-evi-app", "")
+	if err != nil || len(remaining) != 1 || remaining[0].ID != "evi-table-app" {
+		t.Fatalf("expected 1 remaining evidence item, got %+v", remaining)
+	}
+}

@@ -2940,4 +2940,105 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       delete (window as unknown as { go?: unknown }).go;
     }
   });
+
+  it('supports Pentest Evidence Vault, Findings, Categories, and Report Export (F-18)', async () => {
+    const mockEngagement = {
+      id: 'eng-evi-1',
+      name: 'Corpo Red Team 2026',
+      scope: '10.20.0.0/16',
+      timeframe: 'Nov 2026',
+      lockoutPolicy: {
+        maxAttemptsPerUser: 3,
+        lockoutWindowMinutes: 30,
+        enforceDelaySeconds: 600,
+        warningThresholdPercent: 66,
+      },
+      isActive: true,
+      createdAt: '2026-11-10T12:00:00Z',
+      updatedAt: '2026-11-10T12:00:00Z',
+    };
+
+    const mockEvidence = [
+      {
+        id: 'evi-1',
+        engagementId: 'eng-evi-1',
+        category: 'Privilege Escalation',
+        title: 'Sudo NOPASSWD find binary',
+        type: 'text' as const,
+        content: 'sudo find . -exec /bin/sh \\; -quit',
+        severity: 'critical' as const,
+        source: 'manual',
+        tags: ['privesc', 'sudo'],
+        capturedAt: '2026-11-10T12:30:00Z',
+      },
+      {
+        id: 'evi-2',
+        engagementId: 'eng-evi-1',
+        category: 'Open Ports/Services',
+        title: 'Discovered HTTP & SSH Ports',
+        type: 'table' as const,
+        content: JSON.stringify({
+          headers: ['Port', 'Service', 'State'],
+          rows: [['22', 'ssh', 'open'], ['80', 'http', 'open']],
+        }),
+        severity: 'info' as const,
+        source: 'nmap',
+        tags: ['recon'],
+        capturedAt: '2026-11-10T12:35:00Z',
+      },
+    ];
+
+    const mockCategories = [
+      'Credentials',
+      'Open Ports/Services',
+      'Vulnerabilities',
+      'Privilege Escalation',
+      'Lateral Movement',
+      'Sensitive Data',
+      'Web',
+      'Active Directory',
+    ];
+
+    (window as unknown as { go: unknown }).go = {
+      main: {
+        App: {
+          GetActiveEngagement: vi.fn().mockResolvedValue(mockEngagement),
+          ListEvidence: vi.fn().mockResolvedValue(mockEvidence),
+          GetEvidenceCategories: vi.fn().mockResolvedValue(mockCategories),
+          SaveEvidence: vi.fn().mockResolvedValue(undefined),
+          DeleteEvidence: vi.fn().mockResolvedValue(undefined),
+          AddEvidenceCategory: vi.fn().mockResolvedValue(undefined),
+          GetEvidenceTemplates: vi.fn().mockResolvedValue([]),
+        },
+      },
+    };
+
+    try {
+      render(<App />);
+
+      // 1. Open Tools menu -> Evidence Vault
+      const toolsMenuBtn = screen.getByRole('button', { name: /^Tools/i });
+      fireEvent.click(toolsMenuBtn);
+      const eviToolBtn = screen.getByText(/Evidence Vault & Findings \(F-18\)/i);
+      fireEvent.click(eviToolBtn);
+
+      // 2. Verify modal opened
+      expect(await screen.findByText(/Evidence Vault & Findings \(F-18\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Corpo Red Team 2026/i)).toBeInTheDocument();
+
+      // 3. Verify evidence items rendered
+      expect(await screen.findByText('Sudo NOPASSWD find binary')).toBeInTheDocument();
+      expect(screen.getByText('Discovered HTTP & SSH Ports')).toBeInTheDocument();
+
+      // 4. Verify category filtering and tags
+      expect(screen.getByText('#privesc')).toBeInTheDocument();
+      expect(screen.getByText('CRITICAL')).toBeInTheDocument();
+
+      // 5. Close modal
+      const closeBtn = screen.getByRole('button', { name: /Close dialog/i });
+      fireEvent.click(closeBtn);
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
 });

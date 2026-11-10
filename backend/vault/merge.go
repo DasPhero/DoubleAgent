@@ -468,6 +468,42 @@ func MergeVaultPayloads(local, remote core.VaultPayload) (core.VaultPayload, cor
 		}
 	}
 
+	// 12. Evidence (F-18)
+	localEvidence := make(map[string]core.EvidenceItem, len(local.Evidence))
+	for _, e := range local.Evidence {
+		localEvidence[e.ID] = e
+	}
+	remoteEvidence := make(map[string]core.EvidenceItem, len(remote.Evidence))
+	for _, e := range remote.Evidence {
+		remoteEvidence[e.ID] = e
+	}
+
+	for _, le := range local.Evidence {
+		if re, exists := remoteEvidence[le.ID]; exists {
+			if jsonEqual(le, re) {
+				merged.Evidence = append(merged.Evidence, le)
+			} else {
+				report.HasConflicts = true
+				report.Conflicts = append(report.Conflicts, core.VaultConflictItem{
+					ID:            le.ID,
+					Type:          "evidence",
+					Label:         le.Title,
+					LocalSummary:  fmt.Sprintf("[%s] %s (%s)", le.Category, le.Title, le.Severity),
+					RemoteSummary: fmt.Sprintf("[%s] %s (%s)", re.Category, re.Title, re.Severity),
+				})
+				merged.Evidence = append(merged.Evidence, le)
+			}
+		} else {
+			merged.Evidence = append(merged.Evidence, le)
+		}
+	}
+	for _, re := range remote.Evidence {
+		if _, exists := localEvidence[re.ID]; !exists {
+			merged.Evidence = append(merged.Evidence, re)
+			report.AutoMerged++
+		}
+	}
+
 	return ensureNonNilSlices(merged), report
 }
 
@@ -728,6 +764,39 @@ func ResolveVaultConflicts(local, remote core.VaultPayload, resolutions map[stri
 		}
 	}
 	resolved.Credentials = finalCreds
+
+	// 8. Evidence (F-18)
+	remoteEvidence := make(map[string]core.EvidenceItem, len(remote.Evidence))
+	for _, e := range remote.Evidence {
+		remoteEvidence[e.ID] = e
+	}
+	var finalEvidence []core.EvidenceItem
+	for _, e := range resolved.Evidence {
+		res, hasRes := resolutions[e.ID]
+		if !hasRes {
+			finalEvidence = append(finalEvidence, e)
+			continue
+		}
+		switch res {
+		case core.ResolutionKeepRemote:
+			if re, ok := remoteEvidence[e.ID]; ok {
+				finalEvidence = append(finalEvidence, re)
+			} else {
+				finalEvidence = append(finalEvidence, e)
+			}
+		case core.ResolutionKeepBoth:
+			finalEvidence = append(finalEvidence, e)
+			if re, ok := remoteEvidence[e.ID]; ok {
+				cloned := re
+				cloned.ID = fmt.Sprintf("%s-synced", re.ID)
+				cloned.Title = fmt.Sprintf("%s (Synced)", re.Title)
+				finalEvidence = append(finalEvidence, cloned)
+			}
+		default:
+			finalEvidence = append(finalEvidence, e)
+		}
+	}
+	resolved.Evidence = finalEvidence
 
 	return ensureNonNilSlices(resolved)
 }
