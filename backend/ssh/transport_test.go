@@ -11,6 +11,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -357,6 +358,66 @@ func TestS2_ChangedHostKeyHardBlocksConnection_F06(t *testing.T) {
 	}
 	if tofuCalled {
 		t.Fatal("OnFirstSeenKey must never be called when a known host key changes (F-06 hard block)")
+	}
+}
+
+func TestKnownHostsStore_Persistence_F06(t *testing.T) {
+	tempDir := t.TempDir()
+	khPath := filepath.Join(tempDir, "known_hosts.json")
+
+	srv := startEmbeddedSSHServer(t, 2226, nil)
+
+	// Instance 1: connects, trusts key, writes to disk
+	store1 := dassh.NewKnownHostsStoreWithPath(khPath)
+	transport1 := dassh.NewTransportWithDialer(store1, srv.dial)
+
+	tofuCount := 0
+	sess1, err := transport1.Connect(context.Background(), core.SshSessionConfig{
+		Address:  srv.addr,
+		Port:     srv.port,
+		Username: "alice",
+		Auth: core.SshAuthConfig{
+			Method:   core.AuthPassword,
+			Password: "correct-horse-battery-staple",
+		},
+		OnFirstSeenKey: func(_ core.HostKeyInfo) (bool, error) {
+			tofuCount++
+			return true, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("first connect failed: %v", err)
+	}
+	_ = transport1.Disconnect(context.Background(), sess1)
+
+	if tofuCount != 1 {
+		t.Fatalf("expected 1 TOFU prompt on first connect, got %d", tofuCount)
+	}
+
+	// Instance 2: new store reloaded from same file path. Should NOT prompt TOFU!
+	store2 := dassh.NewKnownHostsStoreWithPath(khPath)
+	transport2 := dassh.NewTransportWithDialer(store2, srv.dial)
+
+	sess2, err := transport2.Connect(context.Background(), core.SshSessionConfig{
+		Address:  srv.addr,
+		Port:     srv.port,
+		Username: "alice",
+		Auth: core.SshAuthConfig{
+			Method:   core.AuthPassword,
+			Password: "correct-horse-battery-staple",
+		},
+		OnFirstSeenKey: func(_ core.HostKeyInfo) (bool, error) {
+			tofuCount++
+			return true, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("second connect with reloaded store failed: %v", err)
+	}
+	_ = transport2.Disconnect(context.Background(), sess2)
+
+	if tofuCount != 1 {
+		t.Fatalf("expected host key to be recognized from disk (no TOFU prompt), but tofuCount became %d", tofuCount)
 	}
 }
 

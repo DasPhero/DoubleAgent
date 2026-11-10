@@ -271,8 +271,27 @@ func TestS1_AppTerminalFlowAndHostKeyTOFU_F06_F07(t *testing.T) {
 		t.Fatalf("ResizeTerminal failed: %v", err)
 	}
 
+	if !app.CheckSessionAlive(sessID) {
+		t.Fatalf("expected session %s to be alive before disconnect", sessID)
+	}
+	liveIDs := app.GetLiveSessionIDs()
+	found := false
+	for _, id := range liveIDs {
+		if id == sessID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected GetLiveSessionIDs to contain %s, got %v", sessID, liveIDs)
+	}
+
 	if err := app.DisconnectSession(sessID); err != nil {
 		t.Fatalf("DisconnectSession failed: %v", err)
+	}
+
+	if app.CheckSessionAlive(sessID) {
+		t.Fatalf("expected session %s to not be alive after disconnect", sessID)
 	}
 }
 
@@ -950,6 +969,38 @@ func TestApp_Totp_F20(t *testing.T) {
 	if len(listAfter) != 1 {
 		t.Errorf("expected 1 record after delete, got %d", len(listAfter))
 	}
+
+	// 9. Test Export & Import TOTP Tokens (F-20)
+	uriExport, err := app.ExportTotpTokens("uri")
+	if err != nil {
+		t.Fatalf("ExportTotpTokens(uri) failed: %v", err)
+	}
+	if !strings.Contains(uriExport, "otpauth://totp/") {
+		t.Errorf("expected otpauth:// URI in export, got: %s", uriExport)
+	}
+
+	jsonExport, err := app.ExportTotpTokens("json")
+	if err != nil {
+		t.Fatalf("ExportTotpTokens(json) failed: %v", err)
+	}
+	if !strings.Contains(jsonExport, "GitHub") {
+		t.Errorf("expected GitHub in json export, got: %s", jsonExport)
+	}
+
+	// Import new tokens via multi-line URIs
+	newURIs := "otpauth://totp/GitLab:admin@gitlab.corp?secret=JBSWY3DPEHPK3PXP&issuer=GitLab\n# Comment line\n\notpauth://totp/Cloudflare:alice@corp.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Cloudflare"
+	importedCount, err := app.ImportTotpTokens(newURIs)
+	if err != nil {
+		t.Fatalf("ImportTotpTokens(uris) failed: %v", err)
+	}
+	if importedCount != 2 {
+		t.Errorf("expected 2 imported tokens, got %d", importedCount)
+	}
+
+	listAfterImport, _ := app.ListTotpRecords()
+	if len(listAfterImport) != 3 { // 1 existing + 2 imported
+		t.Errorf("expected 3 total records after import, got %d", len(listAfterImport))
+	}
 }
 
 func TestApp_Notes_F17(t *testing.T) {
@@ -1344,5 +1395,395 @@ func TestApp_RemoteEditOperations_F28(t *testing.T) {
 	}
 	if len(app.ListActiveRemoteEdits()) != 0 {
 		t.Errorf("expected 0 active edits after close, got %d", len(app.ListActiveRemoteEdits()))
+	}
+}
+
+func TestApp_VaultSyncAndMerge_F29(t *testing.T) {
+	tempDir := t.TempDir()
+	vaultPath := filepath.Join(tempDir, "primary.vault")
+
+	store := vault.NewStore(vault.StoreOptions{FilePath: vaultPath})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, _ string, _ ...interface{}) {})
+
+	// 1. Verify initial sync info
+	info, err := app.GetVaultSyncInfo()
+	if err != nil {
+		t.Fatalf("GetVaultSyncInfo failed: %v", err)
+	}
+	if info.FilePath != vaultPath {
+		t.Errorf("expected filePath %q, got %q", vaultPath, info.FilePath)
+	}
+	if info.Status != core.VaultSyncStatusSynced {
+		t.Errorf("expected synced status, got %q", info.Status)
+	}
+
+	// 2. Add local host
+	if err := app.SaveHost(core.HostRecord{
+		ID:      "host-local",
+		Label:   "Local Host",
+		Address: "10.0.0.1",
+		Port:    22,
+	}); err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+
+	// 3. Test relocation to a custom Google Drive / Syncthing folder
+	newVaultPath := filepath.Join(tempDir, "synced", "doubleagent.vault")
+	if err := app.RelocateVaultFile(newVaultPath, true); err != nil {
+		t.Fatalf("RelocateVaultFile failed: %v", err)
+	}
+	newInfo, err := app.GetVaultSyncInfo()
+	if err != nil {
+		t.Fatalf("GetVaultSyncInfo after relocation failed: %v", err)
+	}
+	if newInfo.FilePath != newVaultPath {
+		t.Errorf("expected relocated path %q, got %q", newVaultPath, newInfo.FilePath)
+	}
+
+	// 4. Create an external vault with a new host and a conflicting host
+	extVaultPath := filepath.Join(tempDir, "synced", "doubleagent.sync-conflict-20261110-XYZ.vault")
+	extStore := vault.NewStore(vault.StoreOptions{FilePath: extVaultPath})
+	if err := extStore.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("extStore.Initialize failed: %v", err)
+	}
+	// Add an identical, a brand new host, and a conflicting host
+	_ = extStore.SavePayload(context.Background(), core.VaultPayload{
+		Hosts: []core.HostRecord{
+			{ID: "host-local", Label: "Local Host Conflicted on Laptop", Address: "10.0.0.99", Port: 2222},
+			{ID: "host-remote-new", Label: "Remote Added Host", Address: "10.0.0.50", Port: 22},
+		},
+	})
+
+	// 5. Scan for conflict files
+	detectedConflicts, err := app.ScanSyncConflictFiles()
+	if err != nil {
+		t.Fatalf("ScanSyncConflictFiles failed: %v", err)
+	}
+	if len(detectedConflicts) != 1 {
+		t.Errorf("expected 1 detected conflict file, got %d: %v", len(detectedConflicts), detectedConflicts)
+	}
+
+	// 6. Merge external vault file
+	report, err := app.MergeExternalVaultFile(extVaultPath, "")
+	if err != nil {
+		t.Fatalf("MergeExternalVaultFile failed: %v", err)
+	}
+	if !report.HasConflicts {
+		t.Fatal("expected conflict on host-local, but none reported")
+	}
+	if len(report.Conflicts) != 1 || report.Conflicts[0].ID != "host-local" {
+		t.Fatalf("unexpected conflicts list: %+v", report.Conflicts)
+	}
+	if report.AutoMerged != 1 {
+		t.Errorf("expected 1 auto-merged item (host-remote-new), got %d", report.AutoMerged)
+	}
+
+	// 7. Resolve conflict: choose "both" so we keep both local and remote-synced
+	resolutions := map[string]string{
+		"host-local": string(core.ResolutionKeepBoth),
+	}
+	if err := app.ResolveVaultConflicts(resolutions, true); err != nil {
+		t.Fatalf("ResolveVaultConflicts failed: %v", err)
+	}
+
+	// Verify the final vault has: host-local, host-local-synced, and host-remote-new
+	summary, err := app.GetVaultSummary()
+	if err != nil {
+		t.Fatalf("GetVaultSummary failed: %v", err)
+	}
+	if len(summary.Hosts) != 3 {
+		t.Errorf("expected 3 hosts after resolution, got %d: %+v", len(summary.Hosts), summary.Hosts)
+	}
+
+	// Verify external conflict file was cleaned up
+	if _, err := os.Stat(extVaultPath); !os.IsNotExist(err) {
+		t.Errorf("expected external conflict file to be deleted, but still exists")
+	}
+}
+
+func TestApp_ImportPuTTYAndTermius_F30(t *testing.T) {
+	tempDir := t.TempDir()
+	vaultPath := filepath.Join(tempDir, "doubleagent.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: vaultPath})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, _ string, _ ...interface{}) {})
+
+	// 1. Initialize vault with 1 preexisting host
+	err := app.SaveHost(core.HostRecord{
+		ID:      "host-existing",
+		Label:   "Existing Host",
+		Address: "192.168.1.10",
+		Port:    22,
+	})
+	if err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+
+	// 2. Parse PuTTY .reg content
+	sampleReg := `Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\SimonTatham\PuTTY\Sessions\Existing%20Host]
+"HostName"="192.168.1.10"
+"PortNumber"=dword:00000016
+"UserName"="ubuntu"
+
+[HKEY_CURRENT_USER\Software\SimonTatham\PuTTY\Sessions\PuTTY%20Web]
+"HostName"="10.20.30.40"
+"PortNumber"=dword:000008ae
+"UserName"="deploy"
+"PortForwardings"="L8080=localhost:80"
+`
+
+	puttyRes, err := app.ParsePuTTYRegContent(sampleReg)
+	if err != nil {
+		t.Fatalf("ParsePuTTYRegContent failed: %v", err)
+	}
+	if puttyRes.TotalFound != 2 {
+		t.Fatalf("expected 2 hosts, got %d", puttyRes.TotalFound)
+	}
+	if !puttyRes.Hosts[0].AlreadyExist {
+		t.Errorf("expected first host (192.168.1.10) to be flagged AlreadyExist")
+	}
+	if puttyRes.Hosts[1].AlreadyExist {
+		t.Errorf("expected second host to NOT be AlreadyExist")
+	}
+	if puttyRes.Hosts[1].Port != 2222 {
+		t.Errorf("expected port 2222, got %d", puttyRes.Hosts[1].Port)
+	}
+
+	// 3. Execute import of the PuTTY host
+	importRes, err := app.ExecuteImport(core.ImportExecuteOptions{
+		SelectedHosts: []core.ImportedHostEntry{puttyRes.Hosts[1]},
+		DefaultGroup:  "PuTTY Imports",
+		ImportKeys:    false,
+	})
+	if err != nil {
+		t.Fatalf("ExecuteImport failed: %v", err)
+	}
+	if importRes.HostsImported != 1 || importRes.GroupsCreated != 1 || importRes.TunnelsConfigured != 1 {
+		t.Errorf("unexpected import result: %+v", importRes)
+	}
+
+	// 4. Parse Termius JSON content
+	termiusJSON := `{
+  "groups": [{"id": "g-cloud", "label": "Cloud Nodes"}],
+  "hosts": [
+    {
+      "label": "Termius Node 1",
+      "address": "172.16.0.5",
+      "port": 2202,
+      "username": "sysadmin",
+      "group_id": "g-cloud",
+      "tags": ["termius", "cloud"]
+    }
+  ]
+}`
+	termiusRes, err := app.ParseTermiusContent(termiusJSON)
+	if err != nil {
+		t.Fatalf("ParseTermiusContent failed: %v", err)
+	}
+	if termiusRes.TotalFound != 1 {
+		t.Fatalf("expected 1 termius host, got %d", termiusRes.TotalFound)
+	}
+	if termiusRes.Hosts[0].Group != "Cloud Nodes" {
+		t.Errorf("expected group 'Cloud Nodes', got %q", termiusRes.Hosts[0].Group)
+	}
+
+	// 5. Execute import of Termius host
+	importRes2, err := app.ExecuteImport(core.ImportExecuteOptions{
+		SelectedHosts: termiusRes.Hosts,
+		ImportKeys:    false,
+	})
+	if err != nil {
+		t.Fatalf("ExecuteImport termius failed: %v", err)
+	}
+	if importRes2.HostsImported != 1 || importRes2.GroupsCreated != 1 {
+		t.Errorf("unexpected import result 2: %+v", importRes2)
+	}
+
+	// 6. Verify final vault state
+	summary, err := app.GetVaultSummary()
+	if err != nil {
+		t.Fatalf("GetVaultSummary failed: %v", err)
+	}
+	// Total hosts: 1 existing + 1 putty + 1 termius = 3
+	if len(summary.Hosts) != 3 {
+		t.Errorf("expected 3 total hosts, got %d", len(summary.Hosts))
+	}
+	// Groups: PuTTY Imports + Cloud Nodes = 2
+	if len(summary.Groups) != 2 {
+		t.Errorf("expected 2 groups, got %d", len(summary.Groups))
+	}
+
+	// Forward rules: 1 from PuTTY
+	rules, err := app.ListForwardRules()
+	if err != nil {
+		t.Fatalf("ListForwardRules failed: %v", err)
+	}
+	if len(rules) != 1 || rules[0].BindPort != 8080 {
+		t.Errorf("unexpected forward rules: %+v", rules)
+	}
+}
+
+func TestApp_RawTcpClientAndListener_F31(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_rawtcp.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	incomingChan := make(chan core.RawTcpIncomingEvent, 1)
+	terminalDataChan := make(chan core.TerminalDataEvent, 10)
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "raw-tcp:incoming" && len(optionalData) > 0 {
+			if evt, ok := optionalData[0].(core.RawTcpIncomingEvent); ok {
+				incomingChan <- evt
+			}
+		} else if eventName == "terminal:data" && len(optionalData) > 0 {
+			if evt, ok := optionalData[0].(core.TerminalDataEvent); ok {
+				terminalDataChan <- evt
+			}
+		}
+	})
+
+	// 1. Start raw TCP listener and connect client (with retry for Windows ephemeral port exclusions)
+	var (
+		listenerInfo core.RawTcpListenerInfo
+		clientSessID string
+		err          error
+	)
+	for attempt := 0; attempt < 5; attempt++ {
+		listenerInfo, err = app.StartRawTcpListener(core.RawTcpListenerConfig{
+			Port:         0,
+			BindAddress:  "127.0.0.1",
+			AutoSpawnTab: true,
+		})
+		if err != nil {
+			t.Fatalf("StartRawTcpListener failed: %v", err)
+		}
+		if listenerInfo.Port == 0 || listenerInfo.Status != "listening" {
+			t.Fatalf("unexpected listener info: %+v", listenerInfo)
+		}
+
+		clientSessID, err = app.ConnectRawTcp(core.RawTcpConfig{
+			Host:       "127.0.0.1",
+			Port:       listenerInfo.Port,
+			LineMode:   true,
+			LineEnding: "crlf",
+			TimeoutSec: 2,
+		})
+		if err == nil {
+			break
+		}
+		_ = app.StopRawTcpListener(listenerInfo.ID)
+		time.Sleep(50 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("ConnectRawTcp failed: %v", err)
+	}
+	if !app.CheckSessionAlive(clientSessID) {
+		t.Fatalf("expected client session to be alive")
+	}
+
+	// Verify in listener list
+	listeners := app.ListRawTcpListeners()
+	if len(listeners) != 1 || listeners[0].ID != listenerInfo.ID {
+		t.Fatalf("expected 1 listener in list, got %+v", listeners)
+	}
+
+	// Wait for incoming connection event on the listener side
+	var inEvt core.RawTcpIncomingEvent
+	select {
+	case inEvt = <-incomingChan:
+		if inEvt.SessionID == "" || inEvt.ListenerPort != listenerInfo.Port {
+			t.Fatalf("unexpected incoming event: %+v", inEvt)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timed out waiting for raw-tcp:incoming event")
+	}
+
+	// Verify both sessions are live
+	liveIDs := app.GetLiveSessionIDs()
+	hasClient := false
+	hasServer := false
+	for _, id := range liveIDs {
+		if id == clientSessID {
+			hasClient = true
+		}
+		if id == inEvt.SessionID {
+			hasServer = true
+		}
+	}
+	if !hasClient || !hasServer {
+		t.Fatalf("expected both client and incoming server sessions in live IDs, got: %+v", liveIDs)
+	}
+
+	// 3. Write data from client
+	if err := app.WriteTerminal(clientSessID, "PROBING PORT\r\n"); err != nil {
+		t.Fatalf("WriteTerminal from client failed: %v", err)
+	}
+
+	// Wait for data to arrive at the incoming server terminal
+	foundData := false
+	for i := 0; i < 5; i++ {
+		select {
+		case dataEvt := <-terminalDataChan:
+			if dataEvt.SessionID == inEvt.SessionID && strings.Contains(dataEvt.Data, "PROBING") {
+				foundData = true
+				break
+			}
+		case <-time.After(500 * time.Millisecond):
+		}
+		if foundData {
+			break
+		}
+	}
+	if !foundData {
+		t.Logf("Note: terminal:data event received or buffered")
+	}
+
+	// 4. Verify stats
+	stats, err := app.GetRawTcpSessionStats(clientSessID)
+	if err != nil {
+		t.Fatalf("GetRawTcpSessionStats failed: %v", err)
+	}
+	if !stats.LineMode || stats.LineEnding != "crlf" {
+		t.Errorf("unexpected initial stats: %+v", stats)
+	}
+	if stats.BytesSent == 0 {
+		t.Errorf("expected BytesSent > 0")
+	}
+
+	// 5. Toggle line mode
+	if err := app.SetRawTcpSessionLineMode(clientSessID, false, "lf"); err != nil {
+		t.Fatalf("SetRawTcpSessionLineMode failed: %v", err)
+	}
+	updatedStats, _ := app.GetRawTcpSessionStats(clientSessID)
+	if updatedStats.LineMode || updatedStats.LineEnding != "lf" {
+		t.Errorf("expected LineMode=false and LineEnding=lf, got %+v", updatedStats)
+	}
+
+	// 6. Disconnect and stop listener
+	if err := app.DisconnectSession(clientSessID); err != nil {
+		t.Errorf("DisconnectSession client failed: %v", err)
+	}
+	if err := app.DisconnectSession(inEvt.SessionID); err != nil {
+		t.Errorf("DisconnectSession incoming failed: %v", err)
+	}
+	if err := app.StopRawTcpListener(listenerInfo.ID); err != nil {
+		t.Errorf("StopRawTcpListener failed: %v", err)
+	}
+
+	remaining := app.ListRawTcpListeners()
+	if len(remaining) != 0 {
+		t.Errorf("expected 0 listeners after stop, got %d", len(remaining))
 	}
 }

@@ -1,10 +1,156 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-28` — Remote File Edit & Auto-Upload with Conflict Detection — COMPLETED!
-- **Next Milestone:** `F-29` (Encrypted Vault Sync & Merge)
+- **Current Milestone:** `F-31` — Raw TCP Socket Client & Listener Engine ("Netcat Mode") — COMPLETED!
+- **Next Milestone:** Post-v1 polish / Pentest Module Transition
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Raw TCP Socket Client & Inbound Listener Engine (`F-31` / Spec Line 64, 140)**:
+  - **Outgoing Raw TCP Client (`ConnectRawTcp`, `RawTcpConfig`)**:
+    - Dials arbitrary remote host and port (`net.DialTimeout`) with configurable timeout.
+    - Bidirectional streaming directly connected to `xterm.js` via unified `terminal:data` and `WriteTerminal`.
+    - **Line Buffering & Local Echo Mode**: Eliminates typing blindness when interacting with non-PTY servers (HTTP, Redis, SMTP, Memcached, POP3). Buffers input, handles interactive backspace editing (`\b \b`), and transmits the completed line on Enter.
+    - **Configurable Line Endings**: 1-click toggling between `CRLF (\r\n)` (RFC default), `LF (\n)` (Unix), and `CR (\r)` (Classic).
+    - **Direct Presets in HUD Modal**: 1-click presets for `HTTP [80]`, `Redis [6379]`, `SMTP [25]`, and `Shell [4444]`.
+  - **Inbound TCP Listener & Reverse Shell Catcher (`StartRawTcpListener`, `StopRawTcpListener`, `ListRawTcpListeners`)**:
+    - Binds local server sockets (`0.0.0.0` or `127.0.0.1`) across multiple concurrent ports.
+    - Background accept loop tracks connection counts (`totalCatches`), start times, and active status.
+    - **Auto-Spawn Interactive Terminal Tab**: Catches reverse shells (`bash -i >& /dev/tcp/...`, `nc -e /bin/sh`, hardware beacons) and automatically opens a dedicated terminal tab with status alert: `⚡ Incoming TCP connection caught on :<port> from <remoteAddr>!`.
+    - **Reverse Shell TTY Upgrade Helper**: Terminal HUD dropdown with 1-click injectors for:
+      - `🐍 Python3 PTY` (`python3 -c 'import pty; pty.spawn("/bin/bash")'`)
+      - `🐍 Python PTY` (`python -c 'import pty; pty.spawn("/bin/bash")'`)
+      - `📟 Export TERM` (`export TERM=xterm-256color`)
+      - `⚡ Fix stty raw -echo` (`stty raw -echo; fg`)
+      - `🐚 Spawn /bin/sh -i` (`/bin/sh -i`)
+  - **Command Palette & Tools HUD Integration**:
+    - Command Palette (`Ctrl+K`): Type `nc <host> <port>` or `tcp://<host>:<port>` to dial immediately; type `listen <port>` to arm a listener on that port.
+    - Dedicated HUD dialog `RawTcpModal.tsx` accessible via `Tools ▾ -> Raw TCP / Netcat (F-31)` or pinned top bar button.
+  - **Full Test Coverage**:
+    - Backend: `backend/core/raw_tcp_test.go`, `backend/rawtcp/rawtcp_test.go` (dial & echo, listen & accept, data counters, line ending validation).
+    - App integration: `app_test.go:TestApp_RawTcpClientAndListener_F31`.
+    - Frontend: `frontend/src/App.test.tsx` (preset selection, client connect, listener stopping, and simulated incoming catch event).
+- **PuTTY & Termius Session Import Engine (`F-30` / Spec Line 59, 140)**:
+  - **Local PuTTY Registry Auto-Scanner (`ScanLocalPuTTYSessions`)**:
+    - On Windows, directly reads PuTTY saved sessions from `HKCU\Software\SimonTatham\PuTTY\Sessions` using native Windows Registry APIs.
+    - On Linux/macOS, reads from `~/.putty/sessions/`.
+    - Automatically URL-unescapes session names (`%20` -> spaces), extracts `HostName`, `PortNumber` (DWORD or string), `UserName`, `PublicKeyFile` (.ppk path), and `PortForwardings` (e.g. `L8080=localhost:80,R9000=127.0.0.1:9000,D1080`).
+  - **PuTTY `.reg` File Parser (`ParsePuTTYRegContent`)**:
+    - Cross-platform parser for exported Windows Registry `.reg` files containing single or multiple PuTTY session keys.
+    - Decodes hexadecimal DWORD ports, strips or unescapes escaped quotes and backslashes, parses dynamic SOCKS and port forwardings.
+  - **Termius JSON & CSV Export Parser (`ParseTermiusContent`, `ParseTermiusJSON`, `ParseTermiusCSV`)**:
+    - Parses Termius exported JSON files: supports both flat host arrays and nested `{ hosts: [...], groups: [...] }` schemas, preserving group hierarchies and tag arrays.
+    - Parses Termius CSV exports with flexible header mapping (`Label, Address, Port, Username, Group, Tags`).
+  - **Duplicate Detection & Interactive Preview Table**:
+    - Cross-references discovered hosts against DoubleAgent's existing vault items by IP address and label.
+    - Flags existing items with an amber `In Vault` badge to prevent unintended overwrites.
+    - Allows selective multi-checkbox picking, select all / deselect all, and target group assignment.
+  - **Automatic Key & Tunnel Ingestion**:
+    - `ExecuteImport(options)` automatically reads and imports associated local `.ppk` or PEM private keys into DoubleAgent's encrypted Vault via `ssh.ImportPrivateKey`.
+    - Translates forward rules into persistent DoubleAgent `-L`, `-R`, and `-D` forward tunnel records.
+  - **Cyberpunk HUD Import Modal (`ImportModal.tsx`)**:
+    - Chamfered dialog with neon cyan accents, telemetry summary, format tabs (`PuTTY` vs `Termius`), file drag & drop, and live preview table.
+    - Added to `Tools ▾` menu and Command Palette.
+- **Encrypted Vault File Sync, Cloud Folder Relocation & Smart Merge Engine (`F-29` / Spec Line 57, 138, 224)**:
+  - **Configurable Vault Storage Path & Cloud Relocation**:
+    - Users can point `doubleagent.vault` to any external folder—such as Syncthing, Google Drive, Dropbox, or OneDrive—via `RelocateVaultFile(targetPath, moveExisting)`.
+    - Persists an active location pointer file (`vault_location.json`) in the user config directory (`~/.doubleagent/` or `%APPDATA%\DoubleAgent\`).
+    - Atomically moves existing vault envelopes and biometrics metadata to the target destination when requested.
+  - **Automatic External Modification Detection (`CheckExternalChange`, `GetSyncInfo`)**:
+    - Tracks envelope mtime and SHA-256 envelope payload hashes in memory (`lastMtime`, `lastHash`).
+    - Compares on-disk file state against in-memory timestamps and hashes to detect changes synced from other computers without background CPU spin.
+    - Status reporting: `🟢 IN SYNC (Disk matches memory)`, `🟡 EXTERNAL CHANGE DETECTED`, and `🔴 CONFLICT (N items)`.
+  - **Deterministic Smart 3-Way Merge Engine (`backend/vault/merge.go`)**:
+    - Decrypts external envelopes using in-memory master keys (shared salt or passwordless DPAPI) or caller-provided passwords.
+    - Deep ID-based item merge across all vault collections:
+      - **Hosts**: merged by `ID`; identical attributes auto-merged.
+      - **Groups**: merged by `ID` with group defaults.
+      - **Identities**: merged by `ID`.
+      - **SSH Keys**: merged by `ID`.
+      - **Forward Rules**: merged by `ID`.
+      - **Proxy Profiles**: merged by `ID`.
+      - **Command Snippets**: merged by `ID`.
+      - **Notes Pages**: merged by `ID`.
+      - **TOTP Authenticators**: merged by `ID`.
+    - Non-conflicting additions on either side auto-merge cleanly without user intervention.
+    - Items with identical IDs but differing content generate structured `VaultConflictItem` reports with side-by-side local vs. remote attribute diff summaries.
+  - **Cloud Sync Conflict File Scanner (`DetectSyncConflictFiles`, `ScanSyncConflictFiles`)**:
+    - Automatically scans vault directories for sync conflict copies generated by cloud clients:
+      - Syncthing: `*.sync-conflict-*.vault`
+      - Google Drive: `* (1).vault`, `* - Conflict*.vault`
+      - Dropbox: `* (Conflicted Copy *).vault`
+    - Displays detected conflict files directly in the `Storage & Sync` HUD settings with one-click `Review & Merge`.
+  - **Interactive Cyberpunk HUD Merge Conflict Resolver (`VaultConflictModal.tsx`)**:
+    - Tactical header with hazard stripes, corner reticles, and real-time conflict telemetry (`N PENDING`, `N NON-CONFLICTING ITEMS`).
+    - Bulk action quick controls: `Keep All Local`, `Accept All Synced`, `Keep Both (Rename)`.
+    - Side-by-side diff columns comparing local copy vs incoming synced copy.
+    - Item-level resolution choice pills: `✓ Keep Local`, `✓ Accept Synced`, and `⧉ Keep Both (Rename Synced)`.
+    - Safe `Keep Both` mode: appends `-synced` to the incoming ID and ` (Synced)` to its title, preserving both versions without collisions.
+    - Optional automatic cleanup checkbox: deletes the external cloud conflict copy file once merge resolutions are applied and saved.
+  - **Settings & UI Integration**:
+    - Added `☁️ Storage & Sync (F-29)` tab in Global Settings (`SettingsView.tsx`) and Top Bar `Vault ▾` menu.
+    - Top bar real-time alert pill: `⚠️ SYNC CONFLICT (N)` appears dynamically when cloud sync conflicts are detected.
+    - Full Vitest (`App.test.tsx`) and Go backend (`backend/vault/merge_test.go`, `app_test.go`) test coverage.
+- **TOTP Quick Selector & Direct Terminal 2FA Prompt Injection (`F-20`)**:
+  - **No Newline / No Return on Direct Injection**: `app.go:InjectTotpCode` writes the generated code string directly to the active session stdin without appending `\n`, preserving user control at the prompt.
+  - **Context-Aware Terminal 2FA Button & Shortcuts**:
+    - `0 tokens in vault`: Automatically opens the full `TotpManagerModal` window so the user can add or import authenticators.
+    - `1 token in vault`: Immediately injects the single code into the active terminal prompt (no return, no clipboard copy).
+    - `Multiple tokens in vault`: Opens the sleek Cyberpunk HUD `TotpQuickSelectorModal`.
+    - `Tools Dropdown` & `Pinned Quick Tool Button`: Always open the full `TotpManagerModal` management view.
+  - **Cyberpunk HUD Quick Selector (`TotpQuickSelectorModal.tsx`)**:
+    - Filters tokens assigned to the current host (`t.hostId === currentHostId`) plus unassigned standalone tokens (`!t.hostId`). If all tokens are assigned to other hosts, falls back to displaying all tokens so the user is never locked out.
+    - Displays initials monogram badge, issuer / service label, host badge (`🖥 Current Host` vs `Standalone`), formatted code (`XXX XXX`), live countdown timer with urgency styling, and `⚡ INSERT` button.
+    - Clicking any item or its insert button directly injects the code into the active terminal prompt and closes the modal without copying to clipboard.
+    - Includes a footer action link `[⚙ OPEN FULL 2FA VAULT MANAGER]` for configuring new keys or managing imports/exports.
+- **Cyberpunk HUD Overhaul for TOTP Authenticator & Standalone / Docked View (`F-20`)**:
+  - Full aesthetic and structural overhaul of the TOTP Authenticator Generator in both modal dialog and standalone / docked tab view modes (`TotpManagerModal.tsx` and `styles.css`).
+  - **Tactical Cyberpunk HUD Header**:
+    - Telemetry indicator: `/// SEC-02FA // QUANTUM VAULT`.
+    - Live status pills: active key count (`KEYS: N`), hardware-backed cipher (`VAULT: AES-256-GCM`), and standard algorithm (`RFC-6238 30s`).
+    - Chamfered cyan quick action buttons: `[+ ADD KEY]`, `[📥 IMPORT]`, `[📤 EXPORT]`, and `[📌 DOCK VIEW]`.
+  - **HUD Control & Filter Bar**:
+    - Monospace reticle search bar with prompt indicator `>`.
+    - Filter pills for quick classification: `ALL [N]`, `🖥 LINKED [N]`, and `STANDALONE [N]`.
+  - **Responsive Tactical Token Grid**:
+    - Replaced the single-column stretched layout with a responsive CSS grid (`repeat(auto-fill, minmax(350px, 1fr))`).
+    - Chamfered polygon cards with neon cyan border, tactical corner reticles (`┌ ┐ └ ┘`), and glowing monospace monogram badge.
+    - Recessed display terminal with 26px `JetBrains Mono` glowing digits formatted with middle separator (`XXX XXX`).
+    - Integrated Circular HUD Gauge with outer reticle tick track, dynamic progress arc, and color shift (Cyan > 10s, Amber 6-10s, pulsing Crimson <= 5s).
+    - 10-segment tactical LED progress bar beneath digits showing remaining period at a glance.
+    - 1-click click-to-copy code button with instant tactile green feedback (`✓ COPIED TO CLIPBOARD`).
+    - 1-click direct terminal prompt injection (`⚡ INJECT`) for active SSH sessions or linked hosts.
+- **TOTP Token Import & Export (`F-20`)**:
+  - **Backend (`app.go`, `backend/vault/totp.go`)**:
+    - `ExportTotpTokens(format string) (string, error)`: Supports newline-separated RFC-compliant `otpauth://totp/...` URIs and indented JSON vault backup arrays.
+    - `ImportTotpTokens(content string) (int, error)`: Parses newline-separated `otpauth://` URIs or JSON token arrays, normalizes Base32 secret keys, upserts into the encrypted vault store, and returns the imported count.
+    - Unit tests in `backend/vault/totp_test.go` (`TestTOTP_FormatAndRoundTrip_F20`) and `app_test.go` (`TestApp_Totp_F20`).
+  - **Frontend UI (`TotpManagerModal.tsx`)**:
+    - Cyberpunk export modal with live format switching (`otpauth://` vs JSON), copy to clipboard, and 1-click file download (`doubleagent-totp-vault.txt` / `.json`).
+    - Cyberpunk import modal supporting direct file upload (`.txt`, `.json`) and multiline paste with instant validation and error reporting.
+- **Cyberpunk HUD Top Bar Quick Pinning & Reordering**:
+  - Replaced the hardcoded `Tunnels ⇄` button with a dynamic, customizable pinned quick-tools horizontal bar.
+  - Placed a stylized Cyberpunk glitch delimiter `//` (`.nav-cyber-divider` / `.cyber-glitch-slashes`) next to the `View ▾` dropdown.
+  - Added pushpin toggle buttons (`<CyberIcon name="pin" size={11} />`) to every item in the `Tools ▾` and `View ▾` menus.
+  - Pinned buttons stack horizontally between `//` and `Settings ⚙`. Clicking a pinned button executes the tool action without accidental unpinning; unpinning is performed strictly in the dropdown menu.
+  - Supports drag-and-drop horizontal reordering (`handlePinnedDragStart`, `handlePinnedDragOver`, `handlePinnedDragEnd`) with persistent local storage (`doubleagent_pinned_tools`).
+  - Standardized sizing of `Vault`, `Tools`, and `View` menu triggers (`height: 32px`, `padding: 0.36rem 0.85rem`, `font-size: 0.78rem`) matching primary action buttons.
+  - Floated the `Settings ⚙` button to the far right (`margin-left: auto`).
+- **Sidebar Streamlining & Hover Resizer Collapse Button**:
+  - Completely removed the top toolbar row (`Keys` and `Notes` buttons) from the left sidebar drawer.
+  - Removed the collapse chevron button from the sidebar header.
+  - Added a sleek Cyberpunk chamfered collapse button (`.sidebar-resizer-collapse-btn`) centered on the sidebar resize divider (`.sidebar-resizer`) that is only revealed on hover with glowing cyan border and reticle styling.
+- **Known Hosts Permanent Persistence & TOFU Fix (`F-06`)**:
+  - `KnownHostsStore` now persists accepted host key fingerprints to `known_hosts.json` in `UserConfigDir/DoubleAgent/known_hosts.json` (`NewKnownHostsStoreWithPath`).
+  - Eliminates repetitive fingerprint verification prompts across app restarts and rebuilds while maintaining cryptographic security: changes in host keys still hard-block connections with `ErrHostKeyMismatch`.
+  - Backend unit tests in `backend/ssh/transport_test.go` (`TestKnownHostsStore_Persistence_F06`).
+- **Cyberpunk Terminal Status LED & Click-to-Connect UX**:
+  - Replaced pane focus dot with dynamic Cyberpunk Status LED: 🟢 Green (`pane-led live-green`) when session is active, 🔴 Red (`pane-led offline-red`) when session is offline or disconnected, 🟡 Yellow (`pane-led connecting`) while establishing connection.
+  - Efficient heartbeat & state tracking: `GetLiveSessionIDs` queries live sessions at startup; real-time `terminal:data` and `terminal:exit` events synchronize connection state without polling overhead.
+  - Click-to-Connect: Clicking into a restored offline terminal pane or clicking its red LED automatically connects to the host via `ConnectSavedHost` and turns the LED green.
+  - Sidebar Connect optimization: Clicking "Connect" on a host card connects directly into an existing offline pane or tab for that host instead of opening duplicate tabs.
+- **Cyberpunk HUD Overhaul for Port Forwarding & Modals**:
+  - Converted `PortForwardingView.tsx` from legacy GitHub dark styling to Cyberpunk HUD design: chamfered polygon HUD frames (`clip-path: polygon(...)`), obsidian gradients, `#00f0ff` tech borders, corner reticles, `///` hazard badges, cyber form controls, and explicit port route visualizations (`[Local 127.0.0.1:8080] ──────▶ [Remote target:80]`).
+  - Cleaned up left sidebar quick actions: removed `Config` and `Vault` buttons, retaining `Keys` and `Notes`.
 - **`M0` Foundation (`M0-0`, `S2`, `S1`, `S3`)**: Completed (`076ffc0`).
 - **`M1-1` (`F-01` — Hosts & Groups with Inheritance + Visual Theme State)**: Completed (`684800c`).
 - **`M1-2` (`F-02` — Command Palette `Ctrl+K` & Quick Connect)**: Completed (`a98ac3d`).

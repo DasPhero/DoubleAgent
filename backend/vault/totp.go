@@ -188,3 +188,40 @@ func ParseOTPAuthURI(uriStr string) (*core.TotpRecord, error) {
 		Period:    period,
 	}, nil
 }
+
+// FormatOTPAuthURI constructs a standard RFC 6238 otpauth://totp/... URI from a TotpRecord.
+func FormatOTPAuthURI(rec core.TotpRecord) string {
+	label := strings.TrimSpace(rec.Label)
+	issuer := strings.TrimSpace(rec.Issuer)
+	if label == "" {
+		if issuer != "" {
+			label = issuer
+		} else {
+			label = "Authenticator"
+		}
+	}
+
+	fullLabel := label
+	if issuer != "" && !strings.HasPrefix(strings.ToLower(label), strings.ToLower(issuer)+":") {
+		fullLabel = issuer + ":" + label
+	}
+
+	encodedLabel := url.PathEscape(fullLabel)
+
+	q := url.Values{}
+	q.Set("secret", strings.TrimSpace(rec.Secret))
+	if issuer != "" {
+		q.Set("issuer", issuer)
+	}
+	if rec.Algorithm != "" && strings.ToUpper(rec.Algorithm) != "SHA1" {
+		q.Set("algorithm", strings.ToUpper(rec.Algorithm))
+	}
+	if rec.Digits > 0 && rec.Digits != 6 {
+		q.Set("digits", strconv.Itoa(rec.Digits))
+	}
+	if rec.Period > 0 && rec.Period != 30 {
+		q.Set("period", strconv.Itoa(rec.Period))
+	}
+
+	return fmt.Sprintf("otpauth://totp/%s?%s", encodedLabel, q.Encode())
+}

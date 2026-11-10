@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +22,7 @@ import (
 	"doubleagent/backend/core"
 	"doubleagent/backend/data"
 	"doubleagent/backend/pty"
+	"doubleagent/backend/rawtcp"
 	"doubleagent/backend/serial"
 	"doubleagent/backend/ssh"
 	"doubleagent/backend/vault"
@@ -41,6 +44,8 @@ type App struct {
 	activeStreams    map[string]*core.SshShellStreams
 	localSessions    map[string]pty.Session
 	serialSessions   map[string]serial.Port
+	rawTcpSessions   map[string]core.RawTcpSession
+	rawTcpListeners  map[string]core.RawTcpListener
 	sessionHostID    map[string]string
 	sessionPasswords map[string]string
 	sessionRequests  map[string]core.ConnectRequest
@@ -51,6 +56,9 @@ type App struct {
 	logMgr           *core.SessionLogManager
 	remoteEditMgr    *core.RemoteEditManager
 	workspaceStore   data.WorkspaceStore
+
+	pendingMergeExternalPayload *core.VaultPayload
+	pendingMergeFilePath        string
 }
 
 type activeTransferTask struct {
@@ -64,6 +72,27 @@ func defaultVaultPath() string {
 		return "doubleagent.vault"
 	}
 	return filepath.Join(cfgDir, "DoubleAgent", "doubleagent.vault")
+}
+
+func vaultPointerPath() string {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil || cfgDir == "" {
+		return ""
+	}
+	return filepath.Join(cfgDir, "DoubleAgent", "vault_location.txt")
+}
+
+func getEffectiveVaultPath() string {
+	ptr := vaultPointerPath()
+	if ptr != "" {
+		if data, err := os.ReadFile(ptr); err == nil {
+			trimmed := strings.TrimSpace(string(data))
+			if trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+	return defaultVaultPath()
 }
 
 func defaultLogsDir() string {
@@ -82,9 +111,17 @@ func defaultWorkspacePath() string {
 	return filepath.Join(cfgDir, "DoubleAgent", "workspace.json")
 }
 
+func defaultKnownHostsPath() string {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil || cfgDir == "" {
+		return filepath.Join(os.TempDir(), "doubleagent-known_hosts.json")
+	}
+	return filepath.Join(cfgDir, "DoubleAgent", "known_hosts.json")
+}
+
 // NewApp creates a new App application struct with the default SSH transport and encrypted Vault store.
 func NewApp() *App {
-	kh := ssh.NewKnownHostsStore()
+	kh := ssh.NewKnownHostsStoreWithPath(defaultKnownHostsPath())
 	return NewAppWithDependencies(ssh.NewTransport(kh), kh, nil, runtime.EventsEmit)
 }
 
@@ -118,6 +155,8 @@ func NewAppWithDependencies(
 		activeStreams:    make(map[string]*core.SshShellStreams),
 		localSessions:    make(map[string]pty.Session),
 		serialSessions:   make(map[string]serial.Port),
+		rawTcpSessions:   make(map[string]core.RawTcpSession),
+		rawTcpListeners:  make(map[string]core.RawTcpListener),
 		sessionHostID:    make(map[string]string),
 		sessionPasswords: make(map[string]string),
 		sessionRequests:  make(map[string]core.ConnectRequest),
@@ -131,7 +170,7 @@ func NewAppWithDependencies(
 
 	if vaultStore == nil {
 		vaultStore = vault.NewStore(vault.StoreOptions{
-			FilePath:        defaultVaultPath(),
+			FilePath:        getEffectiveVaultPath(),
 			MaxBackups:      3,
 			AutoLockTimeout: 15 * time.Minute,
 			OnAutoLock: func() {
@@ -503,6 +542,188 @@ func (a *App) ImportSSHConfig(configContent string) (core.SSHConfigParseResult, 
 	return parsed, nil
 }
 
+func (a *App) annotateExistingHosts(res *core.ImportScanResult) {
+	if res == nil || len(res.Hosts) == 0 {
+		return
+	}
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return
+	}
+	existingAddr := make(map[string]bool)
+	existingLabel := make(map[string]bool)
+	for _, h := range payload.Hosts {
+		existingAddr[strings.ToLower(strings.TrimSpace(h.Address))] = true
+		existingLabel[strings.ToLower(strings.TrimSpace(h.Label))] = true
+	}
+	for i := range res.Hosts {
+		addr := strings.ToLower(strings.TrimSpace(res.Hosts[i].Address))
+		lbl := strings.ToLower(strings.TrimSpace(res.Hosts[i].Label))
+		if existingAddr[addr] || existingLabel[lbl] {
+			res.Hosts[i].AlreadyExist = true
+		}
+	}
+}
+
+// ScanLocalPuTTYSessions scans local PuTTY sessions from Windows Registry or ~/.putty (F-30).
+func (a *App) ScanLocalPuTTYSessions() (core.ImportScanResult, error) {
+	res, err := core.ScanLocalPuTTYSessions()
+	if err != nil {
+		return res, err
+	}
+	a.annotateExistingHosts(&res)
+	return res, nil
+}
+
+// ParsePuTTYRegContent parses .reg file content for PuTTY sessions (F-30).
+func (a *App) ParsePuTTYRegContent(content string) (core.ImportScanResult, error) {
+	res := core.ParsePuTTYRegContent(content)
+	a.annotateExistingHosts(&res)
+	return res, nil
+}
+
+// ParseTermiusContent parses Termius JSON or CSV export content (F-30).
+func (a *App) ParseTermiusContent(content string) (core.ImportScanResult, error) {
+	trimmed := strings.TrimSpace(content)
+	var res core.ImportScanResult
+	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+		res = core.ParseTermiusJSON(content)
+	} else {
+		res = core.ParseTermiusCSV(content)
+	}
+	a.annotateExistingHosts(&res)
+	return res, nil
+}
+
+// ExecuteImport imports the selected items into DoubleAgent's encrypted vault (F-30).
+func (a *App) ExecuteImport(options core.ImportExecuteOptions) (core.ImportExecuteResult, error) {
+	var result core.ImportExecuteResult
+	if len(options.SelectedHosts) == 0 {
+		return result, nil
+	}
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return result, err
+	}
+
+	nowNano := time.Now().UTC().UnixNano()
+	groupMap := make(map[string]string)
+	for _, g := range payload.Groups {
+		groupMap[strings.ToLower(strings.TrimSpace(g.Name))] = g.ID
+	}
+
+	// Helper to find or create group
+	ensureGroup := func(groupName string) string {
+		trimmed := strings.TrimSpace(groupName)
+		if trimmed == "" {
+			return ""
+		}
+		lower := strings.ToLower(trimmed)
+		if gid, ok := groupMap[lower]; ok {
+			return gid
+		}
+		newGID := fmt.Sprintf("grp-import-%d-%d", nowNano, result.GroupsCreated+1)
+		payload.Groups = append(payload.Groups, core.GroupRecord{
+			ID:   newGID,
+			Name: trimmed,
+		})
+		groupMap[lower] = newGID
+		result.GroupsCreated++
+		return newGID
+	}
+
+	// If a default group is specified, ensure it
+	var defaultGroupID string
+	if options.DefaultGroup != "" {
+		defaultGroupID = ensureGroup(options.DefaultGroup)
+	}
+
+	for idx, entry := range options.SelectedHosts {
+		idSuffix := fmt.Sprintf("%d-%d", nowNano, idx)
+		user := entry.Username
+		if user == "" {
+			user = "root"
+		}
+
+		targetGroupID := defaultGroupID
+		if entry.Group != "" {
+			targetGroupID = ensureGroup(entry.Group)
+		}
+
+		identityID := fmt.Sprintf("id-imp-%s", idSuffix)
+		authMethod := core.AuthAgent
+		var keyID string
+
+		// If KeyPath is given, expand and attempt import
+		if entry.KeyPath != "" && options.ImportKeys {
+			expandedPath := entry.KeyPath
+			if len(expandedPath) >= 2 && expandedPath[:2] == "~/" {
+				if home, err := os.UserHomeDir(); err == nil {
+					expandedPath = filepath.Join(home, expandedPath[2:])
+				}
+			}
+			if rawKeyBytes, err := os.ReadFile(expandedPath); err == nil {
+				keyLabel := entry.Label + " Key"
+				if keyRec, err := ssh.ImportPrivateKey(keyLabel, string(rawKeyBytes), ""); err == nil {
+					payload.Keys = append(payload.Keys, keyRec)
+					keyID = keyRec.ID
+					authMethod = core.AuthPrivateKey
+					result.KeysImported++
+				} else {
+					result.Warnings = append(result.Warnings, fmt.Sprintf("Key for %q could not be parsed: %v", entry.Label, err))
+				}
+			} else {
+				result.Warnings = append(result.Warnings, fmt.Sprintf("Key file %q for %q not readable: %v", entry.KeyPath, entry.Label, err))
+			}
+		}
+
+		payload.Identities = append(payload.Identities, core.IdentityRecord{
+			ID:         identityID,
+			Label:      entry.Label + " Identity",
+			Username:   user,
+			AuthMethod: authMethod,
+			KeyID:      keyID,
+			Password:   entry.Password,
+		})
+
+		hostID := fmt.Sprintf("host-imp-%s", idSuffix)
+		payload.Hosts = append(payload.Hosts, core.HostRecord{
+			ID:           hostID,
+			GroupID:      targetGroupID,
+			Label:        entry.Label,
+			Address:      entry.Address,
+			Port:         entry.Port,
+			IdentityID:   identityID,
+			Tags:         entry.Tags,
+			ProxyCommand: entry.ProxyCommand,
+		})
+		result.HostsImported++
+
+		// Import forward rules
+		for fIdx, rule := range entry.ForwardRules {
+			fwdID := fmt.Sprintf("fwd-imp-%s-%d", idSuffix, fIdx)
+			payload.ForwardRules = append(payload.ForwardRules, core.ForwardRule{
+				ID:          fwdID,
+				HostID:      hostID,
+				Type:        core.ForwardRuleType(rule.Type),
+				BindAddress: "127.0.0.1",
+				BindPort:    rule.BindPort,
+				TargetHost:  rule.TargetHost,
+				TargetPort:  rule.TargetPort,
+				Label:       fmt.Sprintf("%s-%s%d", entry.Label, rule.Type, rule.BindPort),
+			})
+			result.TunnelsConfigured++
+		}
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return result, fmt.Errorf("save vault payload: %w", err)
+	}
+
+	return result, nil
+}
+
 // buildSshConfigForHost resolves proxy settings (ProxyJump, ProxyCommand, SOCKS5) and credentials for a host (F-14).
 func (a *App) buildSshConfigForHost(resolved core.ResolvedHost, payload core.VaultPayload) (core.SshSessionConfig, error) {
 	cfg := core.SshSessionConfig{
@@ -829,6 +1050,7 @@ func (a *App) OpenTerminalWithOptions(targetSessionID string, opts core.Terminal
 	a.mu.Lock()
 	locSess, isLocal := a.localSessions[targetSessionID]
 	_, isSerial := a.serialSessions[targetSessionID]
+	rawSess, isRawTcp := a.rawTcpSessions[targetSessionID]
 	hostID := a.sessionHostID[targetSessionID]
 	req, hasReq := a.sessionRequests[targetSessionID]
 	a.mu.Unlock()
@@ -849,6 +1071,25 @@ func (a *App) OpenTerminalWithOptions(targetSessionID string, opts core.Terminal
 
 	if isSerial {
 		return "", errors.New("cannot duplicate serial connection; port is already open")
+	}
+
+	if isRawTcp && rawSess != nil {
+		stats := rawSess.Stats()
+		if stats.IsListener {
+			return "", errors.New("cannot duplicate incoming reverse shell session")
+		}
+		host, portStr, err := net.SplitHostPort(stats.RemoteAddr)
+		if err != nil {
+			return "", err
+		}
+		var port uint16
+		_, _ = fmt.Sscanf(portStr, "%d", &port)
+		return a.ConnectRawTcp(core.RawTcpConfig{
+			Host:       host,
+			Port:       port,
+			LineMode:   stats.LineMode,
+			LineEnding: stats.LineEnding,
+		})
 	}
 
 	if targetSessionID == "" {
@@ -1098,7 +1339,114 @@ func (a *App) SendSerialBreak(sessionID string) error {
 	return port.SendBreak()
 }
 
-// WriteTerminal writes user keystrokes from xterm.js into the active SSH, local shell, or serial port stdin (F-07, F-23).
+// ConnectRawTcp opens an outgoing raw TCP client socket session (F-31).
+func (a *App) ConnectRawTcp(cfg core.RawTcpConfig) (string, error) {
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	sess, err := rawtcp.Dial(ctx, cfg)
+	if err != nil {
+		return "", err
+	}
+
+	sessionID := sess.ID()
+	a.mu.Lock()
+	a.rawTcpSessions[sessionID] = sess
+	a.mu.Unlock()
+
+	go a.streamReaderLoop(sessionID, sess, true)
+	return sessionID, nil
+}
+
+// StartRawTcpListener starts a local TCP listener to catch incoming connections / reverse shells (F-31).
+func (a *App) StartRawTcpListener(cfg core.RawTcpListenerConfig) (core.RawTcpListenerInfo, error) {
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	listener, err := rawtcp.Listen(ctx, cfg, func(sess core.RawTcpSession) {
+		sessionID := sess.ID()
+		a.mu.Lock()
+		a.rawTcpSessions[sessionID] = sess
+		a.mu.Unlock()
+
+		go a.streamReaderLoop(sessionID, sess, true)
+
+		stats := sess.Stats()
+		a.emit(a.ctx, "raw-tcp:incoming", core.RawTcpIncomingEvent{
+			SessionID:    sessionID,
+			ListenerPort: stats.ListenerPort,
+			RemoteAddr:   stats.RemoteAddr,
+		})
+	})
+	if err != nil {
+		return core.RawTcpListenerInfo{}, err
+	}
+
+	a.mu.Lock()
+	a.rawTcpListeners[listener.ID()] = listener
+	a.mu.Unlock()
+
+	return listener.Info(), nil
+}
+
+// StopRawTcpListener stops an active raw TCP listener by ID (F-31).
+func (a *App) StopRawTcpListener(listenerID string) error {
+	a.mu.Lock()
+	listener, ok := a.rawTcpListeners[listenerID]
+	delete(a.rawTcpListeners, listenerID)
+	a.mu.Unlock()
+
+	if !ok || listener == nil {
+		return errors.New("listener not found")
+	}
+	return listener.Close()
+}
+
+// ListRawTcpListeners returns information on all registered TCP listeners (F-31).
+func (a *App) ListRawTcpListeners() []core.RawTcpListenerInfo {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	list := make([]core.RawTcpListenerInfo, 0, len(a.rawTcpListeners))
+	for _, l := range a.rawTcpListeners {
+		if l != nil {
+			list = append(list, l.Info())
+		}
+	}
+	return list
+}
+
+// GetRawTcpSessionStats retrieves the real-time byte telemetry and settings of a raw TCP session (F-31).
+func (a *App) GetRawTcpSessionStats(sessionID string) (*core.RawTcpSessionStats, error) {
+	a.mu.Lock()
+	sess, ok := a.rawTcpSessions[sessionID]
+	a.mu.Unlock()
+
+	if !ok || sess == nil {
+		return nil, core.ErrSessionNotFound
+	}
+	stats := sess.Stats()
+	return &stats, nil
+}
+
+// SetRawTcpSessionLineMode toggles line buffering and line endings for a raw TCP session (F-31).
+func (a *App) SetRawTcpSessionLineMode(sessionID string, lineMode bool, lineEnding string) error {
+	a.mu.Lock()
+	sess, ok := a.rawTcpSessions[sessionID]
+	a.mu.Unlock()
+
+	if !ok || sess == nil {
+		return core.ErrSessionNotFound
+	}
+	sess.SetLineMode(lineMode)
+	sess.SetLineEnding(lineEnding)
+	return nil
+}
+
+// WriteTerminal writes user keystrokes from xterm.js into the active SSH, local shell, serial port, or raw TCP socket (F-07, F-23, F-31).
 func (a *App) WriteTerminal(sessionID string, data string) error {
 	a.vaultStore.Touch()
 	if a.logMgr != nil {
@@ -1107,6 +1455,7 @@ func (a *App) WriteTerminal(sessionID string, data string) error {
 	a.mu.Lock()
 	locSess, isLocal := a.localSessions[sessionID]
 	serPort, isSerial := a.serialSessions[sessionID]
+	rawSess, isRawTcp := a.rawTcpSessions[sessionID]
 	streams, isSSH := a.activeStreams[sessionID]
 	a.mu.Unlock()
 
@@ -1116,6 +1465,10 @@ func (a *App) WriteTerminal(sessionID string, data string) error {
 	}
 	if isSerial && serPort != nil {
 		_, err := serPort.Write([]byte(data))
+		return err
+	}
+	if isRawTcp && rawSess != nil {
+		_, err := rawSess.Write([]byte(data))
 		return err
 	}
 	if isSSH && streams != nil && streams.Stdin != nil {
@@ -1146,12 +1499,13 @@ func (a *App) ResizeTerminal(sessionID string, cols uint16, rows uint16) error {
 	a.mu.Lock()
 	locSess, isLocal := a.localSessions[sessionID]
 	_, isSerial := a.serialSessions[sessionID]
+	_, isRawTcp := a.rawTcpSessions[sessionID]
 	a.mu.Unlock()
 
 	if isLocal && locSess != nil {
 		return locSess.Resize(core.TerminalSize{Cols: cols, Rows: rows})
 	}
-	if isSerial {
+	if isSerial || isRawTcp {
 		return nil
 	}
 	return a.transport.ResizeShell(a.ctx, sessionID, core.TerminalSize{
@@ -1197,13 +1551,15 @@ func (a *App) InjectSessionPassword(sessionID string) error {
 	return err
 }
 
-// DisconnectSession closes the active SSH session, local shell, or serial port and removes its stream reference.
+// DisconnectSession closes the active SSH session, local shell, serial port, or raw TCP socket and removes its stream reference.
 func (a *App) DisconnectSession(sessionID string) error {
 	a.mu.Lock()
 	locSess, isLocal := a.localSessions[sessionID]
 	delete(a.localSessions, sessionID)
 	serPort, isSerial := a.serialSessions[sessionID]
 	delete(a.serialSessions, sessionID)
+	rawSess, isRawTcp := a.rawTcpSessions[sessionID]
+	delete(a.rawTcpSessions, sessionID)
 	delete(a.activeStreams, sessionID)
 	delete(a.sessionHostID, sessionID)
 	delete(a.sessionPasswords, sessionID)
@@ -1235,7 +1591,49 @@ func (a *App) DisconnectSession(sessionID string) error {
 	if isSerial && serPort != nil {
 		return serPort.Close()
 	}
+	if isRawTcp && rawSess != nil {
+		return rawSess.Close()
+	}
 	return a.transport.Disconnect(a.ctx, sessionID)
+}
+
+// CheckSessionAlive reports whether an SSH shell, local shell, serial, or raw TCP session is active.
+func (a *App) CheckSessionAlive(sessionID string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if _, ok := a.activeStreams[sessionID]; ok {
+		return true
+	}
+	if _, ok := a.localSessions[sessionID]; ok {
+		return true
+	}
+	if _, ok := a.serialSessions[sessionID]; ok {
+		return true
+	}
+	if _, ok := a.rawTcpSessions[sessionID]; ok {
+		return true
+	}
+	return false
+}
+
+// GetLiveSessionIDs returns all currently active session IDs across SSH, local, serial, and raw TCP connections.
+func (a *App) GetLiveSessionIDs() []string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	ids := make([]string, 0, len(a.activeStreams)+len(a.localSessions)+len(a.serialSessions)+len(a.rawTcpSessions))
+	for id := range a.activeStreams {
+		ids = append(ids, id)
+	}
+	for id := range a.localSessions {
+		ids = append(ids, id)
+	}
+	for id := range a.serialSessions {
+		ids = append(ids, id)
+	}
+	for id := range a.rawTcpSessions {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 func (a *App) streamReaderLoop(sessionID string, r io.Reader, emitExitOnEOF bool) {
@@ -1266,6 +1664,7 @@ func (a *App) streamReaderLoop(sessionID string, r io.Reader, emitExitOnEOF bool
 				delete(a.activeStreams, sessionID)
 				delete(a.localSessions, sessionID)
 				delete(a.serialSessions, sessionID)
+				delete(a.rawTcpSessions, sessionID)
 				delete(a.sessionHostID, sessionID)
 				delete(a.sessionPasswords, sessionID)
 				delete(a.sessionRequests, sessionID)
@@ -2571,6 +2970,140 @@ func (a *App) ParseOTPAuthURI(uri string) (*core.TotpRecord, error) {
 	return vault.ParseOTPAuthURI(uri)
 }
 
+// ExportTotpTokens exports stored TOTP tokens in either "uri" (line-separated otpauth:// URIs)
+// or "json" format (F-20).
+func (a *App) ExportTotpTokens(format string) (string, error) {
+	a.vaultStore.Touch()
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return "", err
+	}
+
+	if strings.ToLower(strings.TrimSpace(format)) == "json" {
+		data, err := json.MarshalIndent(payload.TotpRecords, "", "  ")
+		if err != nil {
+			return "", fmt.Errorf("failed to encode TOTP tokens to JSON: %w", err)
+		}
+		return string(data), nil
+	}
+
+	// Default: newline-separated otpauth:// URIs
+	var sb strings.Builder
+	for _, rec := range payload.TotpRecords {
+		sb.WriteString(vault.FormatOTPAuthURI(rec))
+		sb.WriteString("\n")
+	}
+	return sb.String(), nil
+}
+
+// ImportTotpTokens imports TOTP tokens from newline-separated otpauth:// URIs or JSON array string (F-20).
+// Returns the count of newly added or updated tokens.
+func (a *App) ImportTotpTokens(content string) (int, error) {
+	a.vaultStore.Touch()
+
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return 0, errors.New("import content cannot be empty")
+	}
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return 0, err
+	}
+
+	var candidates []core.TotpRecord
+
+	if strings.HasPrefix(content, "[") {
+		// Try parsing as JSON array
+		if err := json.Unmarshal([]byte(content), &candidates); err != nil {
+			return 0, fmt.Errorf("invalid TOTP JSON array: %w", err)
+		}
+	} else {
+		// Line-delimited URIs or single URI
+		lines := strings.Split(content, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			rec, err := vault.ParseOTPAuthURI(line)
+			if err != nil {
+				continue // skip invalid lines gracefully
+			}
+			candidates = append(candidates, *rec)
+		}
+	}
+
+	if len(candidates) == 0 {
+		return 0, errors.New("no valid TOTP records found in import content")
+	}
+
+	importedCount := 0
+	existingMap := make(map[string]int)
+	for i, tr := range payload.TotpRecords {
+		existingMap[tr.ID] = i
+		// Key by Issuer+Label for deduplication
+		key := strings.ToLower(tr.Issuer + "::" + tr.Label)
+		existingMap[key] = i
+	}
+
+	for _, c := range candidates {
+		c.Secret = strings.TrimSpace(c.Secret)
+		if c.Secret == "" {
+			continue
+		}
+		normSecret, err := vault.DecodeBase32Key(c.Secret)
+		if err != nil || len(normSecret) == 0 {
+			continue
+		}
+		if c.Label == "" {
+			if c.Issuer != "" {
+				c.Label = c.Issuer
+			} else {
+				c.Label = "Imported 2FA"
+			}
+		}
+		if c.Algorithm == "" {
+			c.Algorithm = "SHA1"
+		}
+		if c.Digits != 8 {
+			c.Digits = 6
+		}
+		if c.Period <= 0 {
+			c.Period = 30
+		}
+		if c.CreatedAt == "" {
+			c.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+		}
+
+		key := strings.ToLower(c.Issuer + "::" + c.Label)
+		if idx, found := existingMap[key]; found {
+			// Update existing secret and parameters
+			payload.TotpRecords[idx].Secret = c.Secret
+			payload.TotpRecords[idx].Algorithm = c.Algorithm
+			payload.TotpRecords[idx].Digits = c.Digits
+			payload.TotpRecords[idx].Period = c.Period
+			importedCount++
+		} else {
+			if c.ID == "" {
+				c.ID = fmt.Sprintf("totp-%d-%d", time.Now().UnixNano(), importedCount)
+			}
+			payload.TotpRecords = append(payload.TotpRecords, c)
+			existingMap[key] = len(payload.TotpRecords) - 1
+			importedCount++
+		}
+	}
+
+	if importedCount > 0 {
+		if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+			return 0, err
+		}
+	}
+
+	return importedCount, nil
+}
+
 // InjectTotpCode generates the current TOTP code and writes it directly to the active session stdin (F-20, Golden Rule 2).
 // If totpID is empty, it attempts to resolve the TOTP record associated with the active session's host or identity.
 func (a *App) InjectTotpCode(sessionID string, totpID string) error {
@@ -2638,8 +3171,8 @@ func (a *App) InjectTotpCode(sessionID string, totpID string) error {
 		a.logMgr.SuppressNextEcho(sessionID)
 	}
 
-	// Write code + newline directly into terminal session stdin
-	return a.WriteTerminal(sessionID, code+"\n")
+	// Write code directly into terminal session stdin without pressing return (F-20)
+	return a.WriteTerminal(sessionID, code)
 }
 
 // SaveNote creates or updates a hierarchical note or folder in the encrypted vault (F-17, Golden Rule 2).
@@ -2933,4 +3466,213 @@ func (a *App) ClearWorkspace() error {
 	a.mu.Unlock()
 
 	return ws.Clear()
+}
+
+// GetVaultSyncInfo returns synchronization and conflict metadata for the active vault file (F-29).
+func (a *App) GetVaultSyncInfo() (core.VaultSyncInfo, error) {
+	if a.vaultStore == nil {
+		return core.VaultSyncInfo{}, errors.New("vault store is uninitialized")
+	}
+	return a.vaultStore.GetSyncInfo()
+}
+
+// CheckVaultSyncStatus checks whether the on-disk vault file has changed externally (F-29).
+func (a *App) CheckVaultSyncStatus() (core.VaultSyncInfo, error) {
+	if a.vaultStore == nil {
+		return core.VaultSyncInfo{}, errors.New("vault store is uninitialized")
+	}
+	changed, err := a.vaultStore.CheckExternalChange()
+	if err != nil {
+		return core.VaultSyncInfo{}, err
+	}
+	info, err := a.vaultStore.GetSyncInfo()
+	if err != nil {
+		return core.VaultSyncInfo{}, err
+	}
+	if changed && !a.vaultStore.IsLocked() {
+		// External change detected while vault is unlocked: attempt live non-conflicting merge or report conflict
+		rawBytes, readErr := os.ReadFile(info.FilePath)
+		if readErr == nil {
+			if store, ok := a.vaultStore.(*vault.Store); ok {
+				externalPayload, decErr := store.DecryptExternalEnvelope(rawBytes, "")
+				if decErr == nil {
+					currentPayload, getErr := a.vaultStore.GetPayload()
+					if getErr == nil {
+						merged, report := vault.MergeVaultPayloads(currentPayload, externalPayload)
+						if !report.HasConflicts {
+							// Clean auto-merge!
+							_ = a.vaultStore.SavePayload(a.ctx, merged)
+							info.Status = core.VaultSyncStatusSynced
+							a.emit(a.ctx, "vault:updated", true)
+						} else {
+							info.Status = core.VaultSyncStatusConflict
+							info.DetectedConflict = true
+							info.ConflictCount = len(report.Conflicts)
+							a.mu.Lock()
+							a.pendingMergeExternalPayload = &externalPayload
+							a.pendingMergeFilePath = info.FilePath
+							a.mu.Unlock()
+						}
+					}
+				}
+			}
+		}
+	}
+	a.emit(a.ctx, "vault:sync_status", info)
+	return info, nil
+}
+
+// RelocateVaultFile moves or reconfigures the active encrypted vault file to a new target path (F-29).
+func (a *App) RelocateVaultFile(newPath string, moveExisting bool) error {
+	if newPath == "" {
+		return errors.New("new vault path cannot be empty")
+	}
+	newPath = filepath.Clean(newPath)
+	currentPath := a.vaultStore.GetFilePath()
+	if currentPath == newPath {
+		return nil
+	}
+
+	dir := filepath.Dir(newPath)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create directory for new vault path: %w", err)
+	}
+
+	if moveExisting {
+		if _, err := os.Stat(currentPath); err == nil {
+			// Copy current file to newPath
+			data, err := os.ReadFile(currentPath)
+			if err != nil {
+				return fmt.Errorf("read current vault: %w", err)
+			}
+			if err := os.WriteFile(newPath, data, 0o600); err != nil {
+				return fmt.Errorf("write new vault: %w", err)
+			}
+			_ = os.Remove(currentPath)
+			// Move .hello key if present
+			if helloData, err := os.ReadFile(currentPath + ".hello"); err == nil {
+				_ = os.WriteFile(newPath+".hello", helloData, 0o600)
+				_ = os.Remove(currentPath + ".hello")
+			}
+		}
+	}
+
+	ptr := vaultPointerPath()
+	if ptr != "" {
+		_ = os.MkdirAll(filepath.Dir(ptr), 0o700)
+		_ = os.WriteFile(ptr, []byte(newPath), 0o600)
+	}
+
+	if err := a.vaultStore.SetFilePath(newPath); err != nil {
+		return err
+	}
+
+	info, _ := a.vaultStore.GetSyncInfo()
+	a.emit(a.ctx, "vault:sync_status", info)
+	return nil
+}
+
+// ScanSyncConflictFiles returns all discovered Syncthing / Cloud sync conflict files in the vault folder (F-29).
+func (a *App) ScanSyncConflictFiles() ([]string, error) {
+	if a.vaultStore == nil {
+		return nil, errors.New("vault store is uninitialized")
+	}
+	info, err := a.vaultStore.GetSyncInfo()
+	if err != nil {
+		return nil, err
+	}
+	dir := filepath.Dir(info.FilePath)
+	return vault.DetectSyncConflictFiles(dir, filepath.Base(info.FilePath)), nil
+}
+
+// MergeExternalVaultFile reads an external vault file and prepares a merge against active vault (F-29).
+func (a *App) MergeExternalVaultFile(filePath string, password string) (core.VaultConflictReport, error) {
+	if a.vaultStore == nil {
+		return core.VaultConflictReport{}, errors.New("vault store is uninitialized")
+	}
+	if a.vaultStore.IsLocked() {
+		return core.VaultConflictReport{}, core.ErrVaultLocked
+	}
+	rawBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return core.VaultConflictReport{}, fmt.Errorf("read external vault file: %w", err)
+	}
+
+	store, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return core.VaultConflictReport{}, errors.New("invalid vault store implementation")
+	}
+
+	externalPayload, err := store.DecryptExternalEnvelope(rawBytes, password)
+	if err != nil {
+		return core.VaultConflictReport{}, fmt.Errorf("decrypt external vault: %w", err)
+	}
+
+	currentPayload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.VaultConflictReport{}, err
+	}
+
+	merged, report := vault.MergeVaultPayloads(currentPayload, externalPayload)
+
+	if !report.HasConflicts {
+		// Clean auto-merge: save directly!
+		if err := a.vaultStore.SavePayload(a.ctx, merged); err != nil {
+			return core.VaultConflictReport{}, fmt.Errorf("save merged vault: %w", err)
+		}
+		a.emit(a.ctx, "vault:updated", true)
+		info, _ := a.vaultStore.GetSyncInfo()
+		a.emit(a.ctx, "vault:sync_status", info)
+	} else {
+		a.mu.Lock()
+		a.pendingMergeExternalPayload = &externalPayload
+		a.pendingMergeFilePath = filePath
+		a.mu.Unlock()
+	}
+
+	return report, nil
+}
+
+// ResolveVaultConflicts applies user-specified resolutions to pending conflicts and saves the vault (F-29).
+func (a *App) ResolveVaultConflicts(resolutions map[string]string, deleteExternalFile bool) error {
+	a.mu.Lock()
+	ext := a.pendingMergeExternalPayload
+	extPath := a.pendingMergeFilePath
+	a.mu.Unlock()
+
+	if ext == nil {
+		return errors.New("no pending external vault merge in progress")
+	}
+	if a.vaultStore.IsLocked() {
+		return core.ErrVaultLocked
+	}
+
+	currentPayload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	resMap := make(map[string]core.VaultConflictResolution, len(resolutions))
+	for k, v := range resolutions {
+		resMap[k] = core.VaultConflictResolution(v)
+	}
+
+	resolved := vault.ResolveVaultConflicts(currentPayload, *ext, resMap)
+	if err := a.vaultStore.SavePayload(a.ctx, resolved); err != nil {
+		return fmt.Errorf("save resolved vault: %w", err)
+	}
+
+	if deleteExternalFile && extPath != "" && extPath != a.vaultStore.GetFilePath() {
+		_ = os.Remove(extPath)
+	}
+
+	a.mu.Lock()
+	a.pendingMergeExternalPayload = nil
+	a.pendingMergeFilePath = ""
+	a.mu.Unlock()
+
+	a.emit(a.ctx, "vault:updated", true)
+	info, _ := a.vaultStore.GetSyncInfo()
+	a.emit(a.ctx, "vault:sync_status", info)
+	return nil
 }

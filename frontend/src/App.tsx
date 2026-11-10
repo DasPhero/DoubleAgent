@@ -27,6 +27,7 @@ import { SnippetsManagerModal } from './components/SnippetsManagerModal';
 import { SnippetRunModal } from './components/SnippetRunModal';
 import { TotpSummary, TotpRecord, TotpCodeResponse } from './types/totp';
 import { TotpManagerModal } from './components/TotpManagerModal';
+import { TotpQuickSelectorModal } from './components/TotpQuickSelectorModal';
 import { NotePage, NotePageSummary, NoteSearchResult } from './types/note';
 import { NotesView } from './components/NotesView';
 import { HostNotesDrawer } from './components/HostNotesDrawer';
@@ -34,10 +35,15 @@ import { SessionLogRecord, SessionLogStatus } from './types/sessionLog';
 import { SessionLogsModal } from './components/SessionLogsModal';
 import { BroadcastScope, BroadcastState } from './types/broadcast';
 import { WorkspaceState, ReconnectState, PersistedTabItem, PersistedWorkspaceNode } from './types/workspace';
-import { CyberIcon } from './components/CyberIcon';
+import { CyberIcon, CyberIconName } from './components/CyberIcon';
 import { NetworkMapView } from './components/NetworkMapView';
 import { RemoteEditorView } from './components/RemoteEditorView';
 import { RemoteEditSession, RemoteConflictInfo } from './types/remoteEdit';
+import { VaultSyncInfo, VaultConflictReport } from './types/vaultSync';
+import { VaultConflictModal } from './components/VaultConflictModal';
+import { ImportModal } from './components/ImportModal';
+import { RawTcpConfig, RawTcpListenerConfig, RawTcpListenerInfo, RawTcpSessionStats, RawTcpIncomingEvent } from './types/rawTcp';
+import { RawTcpModal } from './components/RawTcpModal';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -233,6 +239,11 @@ export type WorkspaceNode =
       sftpSessionId?: string;
       editSessionId?: string;
       editRemotePath?: string;
+      isRawTcp?: boolean;
+      rawTcpHost?: string;
+      rawTcpPort?: number;
+      initialLineMode?: boolean;
+      initialLineEnding?: 'crlf' | 'lf' | 'cr';
     }
   | {
       type: 'split';
@@ -253,6 +264,11 @@ export interface PaneItem {
   sftpSessionId?: string;
   editSessionId?: string;
   editRemotePath?: string;
+  isRawTcp?: boolean;
+  rawTcpHost?: string;
+  rawTcpPort?: number;
+  initialLineMode?: boolean;
+  initialLineEnding?: 'crlf' | 'lf' | 'cr';
 }
 
 export interface TabItem {
@@ -766,6 +782,8 @@ interface WailsAppBindings {
   WriteTerminal: (sessionId: string, data: string) => Promise<void>;
   ResizeTerminal: (sessionId: string, cols: number, rows: number) => Promise<void>;
   DisconnectSession: (sessionId: string) => Promise<void>;
+  CheckSessionAlive?: (sessionId: string) => Promise<boolean>;
+  GetLiveSessionIDs?: () => Promise<string[]>;
   OpenLocalTerminal?: (shellType: string, size: { cols: number; rows: number }) => Promise<string>;
   ListSerialPorts?: () => Promise<SerialPortInfo[]>;
   ConnectSerial?: (cfg: SerialConfig) => Promise<string>;
@@ -836,6 +854,18 @@ interface WailsAppBindings {
   OpenExternalEditor?: (editId: string) => Promise<void>;
   CloseRemoteEdit?: (editId: string) => Promise<void>;
   ListActiveRemoteEdits?: () => Promise<RemoteEditSession[]>;
+  GetVaultSyncInfo?: () => Promise<VaultSyncInfo>;
+  CheckVaultSyncStatus?: () => Promise<VaultSyncInfo>;
+  RelocateVaultFile?: (newPath: string, moveExisting: boolean) => Promise<void>;
+  ScanSyncConflictFiles?: () => Promise<string[]>;
+  MergeExternalVaultFile?: (filePath: string, password: string) => Promise<VaultConflictReport>;
+  ResolveVaultConflicts?: (resolutions: Record<string, string>, deleteExternalFile: boolean) => Promise<void>;
+  ConnectRawTcp?: (cfg: RawTcpConfig) => Promise<string>;
+  StartRawTcpListener?: (cfg: RawTcpListenerConfig) => Promise<RawTcpListenerInfo>;
+  StopRawTcpListener?: (listenerId: string) => Promise<void>;
+  ListRawTcpListeners?: () => Promise<RawTcpListenerInfo[]>;
+  GetRawTcpSessionStats?: (sessionId: string) => Promise<RawTcpSessionStats>;
+  SetRawTcpSessionLineMode?: (sessionId: string, lineMode: boolean, lineEnding: string) => Promise<void>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1057,6 +1087,13 @@ export function App({
   const [sshConfigText, setSshConfigText] = useState<string>('');
   const [sshConfigResult, setSshConfigResult] = useState<SSHConfigParseResult | null>(null);
 
+  // PuTTY & Termius Import state (F-30)
+  const [showImportModal, setShowImportModal] = useState<boolean>(false);
+
+  // Raw TCP Socket & Listener state (F-31)
+  const [showRawTcpModal, setShowRawTcpModal] = useState<boolean>(false);
+  const [rawTcpListeners, setRawTcpListeners] = useState<RawTcpListenerInfo[]>([]);
+
   // Add Group form state
   const [grpName, setGrpName] = useState<string>('');
   const [grpParentId, setGrpParentId] = useState<string>('');
@@ -1094,6 +1131,8 @@ export function App({
   const [tabs, setTabs] = useState<TabItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [liveSessions, setLiveSessions] = useState<Set<string>>(new Set());
+  const [connectingPaneIds, setConnectingPaneIds] = useState<Set<string>>(new Set());
 
   // Auto-Reconnect with Exponential Backoff & Workspace Session Restore (F-27)
   const tabsRef = useRef<TabItem[]>(tabs);
@@ -1119,6 +1158,63 @@ export function App({
   );
   const [groupTabsByHost, setGroupTabsByHost] = useState<boolean>(false);
   const [collapsedHostGroups, setCollapsedHostGroups] = useState<Set<string>>(new Set());
+
+  // Pinned Quick Tools in Top Bar
+  const [pinnedQuickTools, setPinnedQuickTools] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('doubleagent_pinned_tools');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return ['tunnels'];
+  });
+  const [draggedPinnedIndex, setDraggedPinnedIndex] = useState<number | null>(null);
+
+  const togglePinTool = (toolId: string): void => {
+    setPinnedQuickTools((prev) => {
+      let next: string[];
+      if (prev.includes(toolId)) {
+        next = prev.filter((id) => id !== toolId);
+      } else {
+        next = [...prev, toolId];
+      }
+      try {
+        localStorage.setItem('doubleagent_pinned_tools', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const handlePinnedDragStart = (index: number): void => {
+    setDraggedPinnedIndex(index);
+  };
+
+  const handlePinnedDragOver = (e: React.DragEvent, index: number): void => {
+    e.preventDefault();
+    if (draggedPinnedIndex === null || draggedPinnedIndex === index) return;
+    setPinnedQuickTools((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(draggedPinnedIndex, 1);
+      next.splice(index, 0, moved);
+      try {
+        localStorage.setItem('doubleagent_pinned_tools', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+    setDraggedPinnedIndex(index);
+  };
+
+  const handlePinnedDragEnd = (): void => {
+    setDraggedPinnedIndex(null);
+  };
 
   const toggleHostGroupCollapse = (groupKey: string): void => {
     setCollapsedHostGroups((prev) => {
@@ -1163,11 +1259,17 @@ export function App({
     globalSettingsRef.current = globalSettings;
   }, [globalSettings]);
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
-  const [settingsActiveTab, setSettingsActiveTab] = useState<'appearance' | 'security' | 'shortcuts' | 'about'>('appearance');
+  const [settingsActiveTab, setSettingsActiveTab] = useState<'appearance' | 'security' | 'sync' | 'shortcuts' | 'about'>('appearance');
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
   const [leaderArmed, setLeaderArmed] = useState<boolean>(false);
   const leaderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quickConnectInputRef = useRef<HTMLInputElement>(null);
+
+  // Vault File Sync & Conflict State (F-29)
+  const [syncInfo, setSyncInfo] = useState<VaultSyncInfo | null>(null);
+  const [showConflictModal, setShowConflictModal] = useState<boolean>(false);
+  const [activeConflictReport, setActiveConflictReport] = useState<VaultConflictReport | null>(null);
+  const [activeConflictFilePath, setActiveConflictFilePath] = useState<string | undefined>(undefined);
 
   // Port Forwarding & Tunnels State (F-13)
   const [showPortForwardingModal, setShowPortForwardingModal] = useState<boolean>(false);
@@ -1189,6 +1291,8 @@ export function App({
 
   // TOTP Authenticator Generator State (F-20)
   const [showTotpModal, setShowTotpModal] = useState<boolean>(false);
+  const [showTotpQuickSelector, setShowTotpQuickSelector] = useState<boolean>(false);
+  const [totpTokensList, setTotpTokensList] = useState<TotpSummary[]>([]);
 
   // Host Notes & Markdown Documentation State (F-17)
   const [notes, setNotes] = useState<NotePage[]>([]);
@@ -1375,6 +1479,7 @@ export function App({
 
   const openSessionTab = useCallback(
     (newSessionId: string, title: string, hostId?: string, explicitColor?: string): void => {
+      setLiveSessions((prev) => new Set(prev).add(newSessionId));
       tabCounterRef.current += 1;
       const seq = tabCounterRef.current;
       const paneId = `pane-${seq}-1`;
@@ -1472,7 +1577,7 @@ export function App({
   );
 
   const openSettingsTab = useCallback(
-    (subTab: 'appearance' | 'security' | 'shortcuts' | 'about' = 'appearance'): void => {
+    (subTab: 'appearance' | 'security' | 'sync' | 'shortcuts' | 'about' = 'appearance'): void => {
       setSettingsActiveTab(subTab);
       setTabs((prev) => {
         const existingTab = prev.find((t) => t.tabType === 'settings');
@@ -1611,6 +1716,72 @@ export function App({
     []
   );
 
+  const refreshRawTcpListeners = useCallback(async (): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.ListRawTcpListeners) return;
+    try {
+      const list = await api.ListRawTcpListeners();
+      setRawTcpListeners(list || []);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleConnectRawTcp = useCallback(async (cfg: RawTcpConfig): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.ConnectRawTcp) {
+      throw new Error('Raw TCP service unavailable in this environment.');
+    }
+    const sessionId = await api.ConnectRawTcp(cfg);
+    setLiveSessions((prev) => new Set(prev).add(sessionId));
+
+    tabCounterRef.current += 1;
+    const seq = tabCounterRef.current;
+    const tabId = `rawtcp-tab-${seq}`;
+    const paneId = `rawtcp-pane-${seq}-1`;
+    const title = `TCP: ${cfg.host}:${cfg.port}`;
+    const color = '#00f0ff';
+
+    const newTab: TabItem = {
+      id: tabId,
+      title,
+      color,
+      tabType: 'terminal',
+      activePaneId: paneId,
+      rootNode: {
+        type: 'pane',
+        id: paneId,
+        sessionId,
+        title,
+        paneType: 'terminal',
+        isRawTcp: true,
+        rawTcpHost: cfg.host,
+        rawTcpPort: cfg.port,
+        initialLineMode: cfg.lineMode,
+        initialLineEnding: cfg.lineEnding,
+      },
+    };
+
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(tabId);
+  }, []);
+
+  const handleStartRawTcpListener = useCallback(async (cfg: RawTcpListenerConfig): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.StartRawTcpListener) {
+      throw new Error('Raw TCP listener service unavailable.');
+    }
+    await api.StartRawTcpListener(cfg);
+    await refreshRawTcpListeners();
+  }, [refreshRawTcpListeners]);
+
+  const handleStopRawTcpListener = useCallback(async (id: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.StopRawTcpListener) return;
+    await api.StopRawTcpListener(id);
+    await refreshRawTcpListeners();
+  }, [refreshRawTcpListeners]);
+
   const getActiveSessionHostIds = useCallback((): string[] => {
     const ids = new Set<string>();
     for (const t of tabs) {
@@ -1669,6 +1840,9 @@ export function App({
               const allNotes = await api.ListNotes('all');
               setNotes(allNotes || []);
             }
+            if (api.GetVaultSyncInfo) {
+              api.GetVaultSyncInfo().then(setSyncInfo).catch(() => {});
+            }
           }
           return;
         } catch {
@@ -1685,6 +1859,9 @@ export function App({
         if (api.ListNotes) {
           const allNotes = await api.ListNotes('all');
           setNotes(allNotes || []);
+        }
+        if (api.GetVaultSyncInfo) {
+          api.GetVaultSyncInfo().then(setSyncInfo).catch(() => {});
         }
         if (api.ListForwardRules) {
           const rules = await api.ListForwardRules();
@@ -1724,8 +1901,29 @@ export function App({
     }
   }, []);
 
+  const refreshSyncInfo = useCallback(async (): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.GetVaultSyncInfo) {
+      try {
+        const info = await api.GetVaultSyncInfo();
+        setSyncInfo(info);
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
   useEffect(() => {
     void refreshVaultState();
+    void refreshSyncInfo();
+    const api = getWailsBindings();
+    if (api?.GetLiveSessionIDs) {
+      void api.GetLiveSessionIDs().then((ids) => {
+        if (Array.isArray(ids) && ids.length > 0) {
+          setLiveSessions(new Set(ids));
+        }
+      }).catch(() => {});
+    }
     const rt = getWailsRuntime();
     if (!rt) {
       return;
@@ -1737,6 +1935,7 @@ export function App({
       if (sid) {
         lastRxDataRef.current.set(sid, payload.data);
         setRxDataTicks((prev) => prev + 1);
+        setLiveSessions((prev) => (prev.has(sid) ? prev : new Set(prev).add(sid)));
       }
       const writer = writersRef.current.get(sid);
       if (writer) {
@@ -1767,6 +1966,12 @@ export function App({
       if (!exitedId) {
         return;
       }
+      setLiveSessions((prev) => {
+        if (!prev.has(exitedId)) return prev;
+        const next = new Set(prev);
+        next.delete(exitedId);
+        return next;
+      });
       writersRef.current.delete(exitedId);
       pendingDataBuffers.current.delete(exitedId);
       focusersRef.current.delete(exitedId);
@@ -1868,14 +2073,60 @@ export function App({
       }
     });
 
+    const offSync = rt.EventsOn('vault:sync_status', (raw: unknown) => {
+      if (raw && typeof raw === 'object') {
+        setSyncInfo(raw as VaultSyncInfo);
+      }
+    });
+
+    const offRawTcpIncoming = rt.EventsOn('raw-tcp:incoming', (raw: unknown) => {
+      const evt = raw as RawTcpIncomingEvent;
+      if (evt?.sessionId) {
+        setLiveSessions((prev) => new Set(prev).add(evt.sessionId));
+        tabCounterRef.current += 1;
+        const seq = tabCounterRef.current;
+        const tabId = `rawtcp-in-tab-${seq}`;
+        const paneId = `rawtcp-in-pane-${seq}-1`;
+        const title = `TCP :${evt.listenerPort} ◀ ${evt.remoteAddr}`;
+        const color = '#10b981';
+
+        const newTab: TabItem = {
+          id: tabId,
+          title,
+          color,
+          tabType: 'terminal',
+          activePaneId: paneId,
+          rootNode: {
+            type: 'pane',
+            id: paneId,
+            sessionId: evt.sessionId,
+            title,
+            paneType: 'terminal',
+            isRawTcp: true,
+            rawTcpHost: evt.remoteAddr,
+            rawTcpPort: evt.listenerPort,
+            initialLineMode: false,
+          },
+        };
+
+        setTabs((prev) => [...prev, newTab]);
+        setActiveTabId(tabId);
+        setStatusMessage(`⚡ Incoming TCP connection caught on :${evt.listenerPort} from ${evt.remoteAddr}!`);
+      }
+    });
+
+    void refreshRawTcpListeners();
+
     return () => {
       offData();
       offPrompt();
       offExit();
       offVaultLock();
       offForward();
+      offSync();
+      offRawTcpIncoming();
     };
-  }, [refreshVaultState, refreshForwardState]);
+  }, [refreshVaultState, refreshForwardState, refreshSyncInfo, refreshRawTcpListeners]);
 
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent): void => {
@@ -2501,7 +2752,84 @@ export function App({
     setStatusMessage(`Exported session log to ${targetPath}.`);
   };
 
+  const handleConnectPane = async (
+    node: PaneItem | Extract<WorkspaceNode, { type: 'pane' }>,
+    tabId: string
+  ): Promise<void> => {
+    if (!node.hostId) return;
+    const host = vaultSummary.hosts.find((h) => h.id === node.hostId);
+    if (!host) return;
+
+    const api = getWailsBindings();
+    setConnectingPaneIds((prev) => new Set(prev).add(node.id));
+    setStatusMessage(
+      `Connecting to ${host.label} (${host.effectiveUser}@${host.address}:${host.effectivePort})...`
+    );
+
+    try {
+      let newSessionId: string;
+      if (api?.ConnectSavedHost) {
+        newSessionId = await api.ConnectSavedHost(host.id, { cols: 120, rows: 34 });
+      } else {
+        newSessionId = `sess-preview-${host.id}-${Date.now()}`;
+      }
+
+      setLiveSessions((prev) => new Set(prev).add(newSessionId));
+
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== tabId) return t;
+          const replaceSid = (n: WorkspaceNode): WorkspaceNode => {
+            if (n.type === 'pane') {
+              if (n.id === node.id) {
+                return { ...n, sessionId: newSessionId, title: host.label };
+              }
+              return n;
+            }
+            return { ...n, children: n.children.map(replaceSid) };
+          };
+          return { ...t, rootNode: replaceSid(t.rootNode) };
+        })
+      );
+
+      if (host.sessionLogging) {
+        setActiveLogSessions((prev) => new Set(prev).add(newSessionId));
+        void refreshSessionLogs();
+      }
+      setStatusMessage(`Connected to ${host.label}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMessage(`Connection failed: ${msg}`);
+    } finally {
+      setConnectingPaneIds((prev) => {
+        const next = new Set(prev);
+        next.delete(node.id);
+        return next;
+      });
+    }
+  };
+
   const handleConnectSavedHost = async (host: HostSummary): Promise<void> => {
+    // If active tab or any open tab has a disconnected pane for this host, connect directly into it
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab) {
+      const activePanes = collectPanes(activeTab.rootNode);
+      const disc = activePanes.find((p) => p.hostId === host.id && !liveSessions.has(p.sessionId));
+      if (disc) {
+        await handleConnectPane(disc, activeTab.id);
+        return;
+      }
+    }
+    for (const t of tabs) {
+      const tPanes = collectPanes(t.rootNode);
+      const disc = tPanes.find((p) => p.hostId === host.id && !liveSessions.has(p.sessionId));
+      if (disc) {
+        setActiveTabId(t.id);
+        await handleConnectPane(disc, t.id);
+        return;
+      }
+    }
+
     const api = getWailsBindings();
     if (!api) {
       const previewId = `sess-preview-${host.id}-${Date.now()}`;
@@ -2515,6 +2843,7 @@ export function App({
     setStatusMessage(`Connecting to ${host.label} (${host.effectiveUser}@${host.address}:${host.effectivePort})...`);
     try {
       const id = await api.ConnectSavedHost(host.id, { cols: 120, rows: 34 });
+      setLiveSessions((prev) => new Set(prev).add(id));
       openSessionTab(id, host.label, host.id, host.color);
       if (host.sessionLogging) {
         setActiveLogSessions((prev) => {
@@ -3316,6 +3645,31 @@ export function App({
     } finally {
       focusersRef.current.get(sessionId)?.();
     }
+  };
+
+  const handleTerminalTotpClick = async (): Promise<void> => {
+    let tokens = vaultSummary.totpRecords || [];
+    const api = getWailsBindings();
+    if (api?.ListTotpRecords) {
+      try {
+        const live = await api.ListTotpRecords();
+        if (Array.isArray(live)) {
+          tokens = live;
+        }
+      } catch {
+        // fallback
+      }
+    }
+    setTotpTokensList(tokens);
+    if (tokens.length === 0) {
+      setShowTotpModal(true);
+      return;
+    }
+    if (tokens.length === 1) {
+      await handleInjectTotp(tokens[0].id);
+      return;
+    }
+    setShowTotpQuickSelector(true);
   };
 
   const handleOpenLocalTerminal = async (shellType: string): Promise<void> => {
@@ -5634,6 +5988,39 @@ export function App({
               <span className="pane-drag-handle" aria-hidden="true">
                 <CyberIcon name="grip" size={12} />
               </span>
+              {(() => {
+                const isSessionAlive = liveSessions.has(node.sessionId);
+                const isConnecting = connectingPaneIds.has(node.id);
+                const ledClass = isSessionAlive
+                  ? 'live-green'
+                  : isConnecting
+                  ? 'connecting'
+                  : 'offline-red';
+                const ledTitle = isSessionAlive
+                  ? '● Session Active (Connected)'
+                  : isConnecting
+                  ? '● Connecting to host...'
+                  : node.hostId
+                  ? '● Session Disconnected — Click to connect'
+                  : '● Disconnected';
+
+                return (
+                  <span
+                    className={`pane-led ${ledClass}`}
+                    title={ledTitle}
+                    onClick={
+                      !isSessionAlive && node.hostId
+                        ? (e) => {
+                            e.stopPropagation();
+                            void handleConnectPane(node, tab.id);
+                          }
+                        : undefined
+                    }
+                    role={!isSessionAlive && node.hostId ? 'button' : undefined}
+                    aria-label={ledTitle}
+                  />
+                );
+              })()}
               <span
                 className={`pane-focus-dot ${isPaneActive ? 'active' : ''}`}
                 title={isPaneActive ? 'Active Pane' : 'Click to focus'}
@@ -6019,6 +6406,11 @@ export function App({
             settings={globalSettings}
             onFontSizeChange={handleFontSizeChange}
             onToggleSearch={togglePaneSearch}
+            isRawTcp={node.isRawTcp}
+            rawTcpHost={node.rawTcpHost}
+            rawTcpPort={node.rawTcpPort}
+            initialLineMode={node.initialLineMode}
+            initialLineEnding={node.initialLineEnding}
             onCwdChange={(sid, cwd) => {
               setSessionCwd(sid, cwd);
               setTabs((prev) =>
@@ -6058,6 +6450,38 @@ export function App({
                 });
               }}
             />
+          )}
+
+          {!reconnectStates.has(node.id) && !liveSessions.has(node.sessionId) && node.hostId && (
+            <div
+              className="terminal-offline-overlay"
+              role="button"
+              tabIndex={0}
+              aria-label={`Disconnected. Click to connect to ${node.title}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleConnectPane(node, tab.id);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  void handleConnectPane(node, tab.id);
+                }
+              }}
+              title={`Click to connect session to ${node.title}`}
+            >
+              <div className="terminal-offline-badge">
+                <span
+                  className={`pane-led ${connectingPaneIds.has(node.id) ? 'connecting' : 'offline-red'}`}
+                />
+                <span className="terminal-offline-title">
+                  /// OFFLINE · SESSION DISCONNECTED ///
+                </span>
+                <span className="terminal-offline-action">
+                  {connectingPaneIds.has(node.id) ? 'CONNECTING...' : 'CLICK TO CONNECT'}
+                </span>
+              </div>
+            </div>
           )}
 
           {reconnectStates.has(node.id) && (() => {
@@ -6370,7 +6794,7 @@ export function App({
         void handleInjectPassword();
         break;
       case 'inject_totp':
-        void handleInjectTotp();
+        void handleTerminalTotpClick();
         break;
       case 'open_snippets':
         setShowSnippetsModal(true);
@@ -6561,6 +6985,362 @@ export function App({
     );
   });
 
+  // Pinnable Tools & Views Registry for Cyberpunk HUD Top Bar
+  const pinnableRegistry: Record<
+    string,
+    {
+      label: string;
+      shortLabel?: string;
+      title?: string;
+      ariaLabel?: string;
+      icon: CyberIconName;
+      action: () => void;
+      disabled?: boolean;
+      active?: boolean;
+    }
+  > = {
+    // Terminals & Consoles
+    powershell: {
+      label: 'Local Shell (PowerShell)',
+      shortLabel: 'PowerShell',
+      icon: 'bolt',
+      action: () => {
+        void handleOpenLocalTerminal('powershell');
+      },
+    },
+    cmd: {
+      label: 'Local Shell (Command Prompt)',
+      shortLabel: 'CMD',
+      icon: 'terminal',
+      action: () => {
+        void handleOpenLocalTerminal('cmd');
+      },
+    },
+    wsl: {
+      label: 'Local Shell (WSL Linux)',
+      shortLabel: 'WSL',
+      icon: 'terminal',
+      action: () => {
+        void handleOpenLocalTerminal('wsl');
+      },
+    },
+    'dir-default': {
+      label: 'New in Default Directory',
+      shortLabel: 'Default Dir',
+      icon: 'home',
+      action: () => {
+        void handleOpenTerminalDirectory('default');
+      },
+    },
+    'dir-cwd': {
+      label: 'New in Current Directory (CWD)',
+      shortLabel: 'CWD',
+      icon: 'folder',
+      action: () => {
+        void handleOpenTerminalDirectory('current');
+      },
+    },
+    'dir-root': {
+      label: 'New Root Shell in Current Directory',
+      shortLabel: 'Root Shell',
+      icon: 'bolt',
+      action: () => {
+        void handleOpenTerminalDirectory('root');
+      },
+    },
+    serial: {
+      label: 'Serial / UART Console (COM)',
+      shortLabel: 'Serial COM',
+      icon: 'serial',
+      action: () => {
+        void handleOpenSerialModal();
+      },
+    },
+
+    // Tools & Utilities
+    palette: {
+      label: 'Command Palette',
+      shortLabel: 'Palette',
+      icon: 'search',
+      action: () => {
+        setPaletteQuery('');
+        setShowCommandPalette(true);
+      },
+    },
+    totp: {
+      label: 'TOTP Authenticator Generator',
+      shortLabel: 'TOTP 2FA',
+      icon: 'shield',
+      action: () => {
+        setShowTotpModal(true);
+      },
+    },
+    keychain: {
+      label: 'Keychain',
+      shortLabel: 'Keychain',
+      icon: 'key',
+      action: () => {
+        setModalError('');
+        setShowKeychainModal(true);
+      },
+    },
+    broadcast: {
+      label: broadcastState.enabled ? 'Disarm Broadcast' : 'Broadcast Input Mode',
+      shortLabel: 'Broadcast',
+      icon: 'broadcast',
+      active: broadcastState.enabled,
+      action: () => {
+        handleToggleBroadcast();
+      },
+    },
+    notes: {
+      label: 'Host Notes & Docs',
+      shortLabel: 'Notes',
+      icon: 'note',
+      action: () => {
+        setNotesModalHostId(activeTab?.hostId);
+        setNotesModalInitialNoteId(null);
+        setShowNotesModal(true);
+      },
+    },
+    'session-logs': {
+      label: 'Session Logs & Recordings',
+      shortLabel: 'Session Logs',
+      icon: 'terminal',
+      action: () => {
+        void refreshSessionLogs();
+        setShowSessionLogsModal(true);
+      },
+    },
+    snippets: {
+      label: 'Command Snippets & Variables',
+      shortLabel: 'Snippets',
+      icon: 'bolt',
+      action: () => {
+        setShowSnippetsModal(true);
+      },
+    },
+    tunnels: {
+      label: 'Port Forwarding (-L, -R, -D)',
+      shortLabel: activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} Tunnels` : 'Tunnels ⇄',
+      ariaLabel: 'Port Forwarding',
+      icon: 'network',
+      active: activeTunnels.length > 0,
+      action: () => {
+        setShowPortForwardingModal(true);
+      },
+    },
+    'proxy-profiles': {
+      label: 'Proxy Profiles (Jump, SOCKS5)',
+      shortLabel: 'Proxies',
+      icon: 'shield',
+      action: () => {
+        setShowProxyProfilesModal(true);
+      },
+    },
+    'network-map': {
+      label: 'Interactive Network Topology Map',
+      shortLabel: 'Network Map',
+      icon: 'network',
+      action: () => {
+        openNetworkMapTab();
+      },
+    },
+    sftp: {
+      label: 'SFTP File Browser',
+      shortLabel: 'SFTP',
+      icon: 'folder',
+      disabled: !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-'),
+      action: () => {
+        if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
+          openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
+        }
+      },
+    },
+    'ssh-config': {
+      label: 'Import ssh_config',
+      shortLabel: 'Import Config',
+      icon: 'gear',
+      action: () => {
+        setModalError('');
+        setSshConfigResult(null);
+        setShowSSHConfigModal(true);
+      },
+    },
+    'import-putty-termius': {
+      label: 'Import PuTTY / Termius (F-30)',
+      shortLabel: 'PuTTY / Termius',
+      icon: 'folder',
+      action: () => {
+        setShowImportModal(true);
+      },
+    },
+    'raw-tcp': {
+      label: 'Raw TCP / Netcat (F-31)',
+      shortLabel: 'Raw TCP',
+      icon: 'bolt',
+      action: () => {
+        setShowRawTcpModal(true);
+      },
+    },
+    proxychains: {
+      label: 'Export proxychains.conf',
+      shortLabel: 'Proxychains',
+      icon: 'shield',
+      action: () => {
+        void handleOpenProxychainsExport();
+      },
+    },
+
+    // View Options
+    'sidebar-toggle': {
+      label: sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar',
+      shortLabel: 'Sidebar',
+      icon: 'chevron-left',
+      action: () => {
+        setSidebarCollapsed((prev) => !prev);
+      },
+    },
+    'new-tab': {
+      label: 'New Connection Tab',
+      shortLabel: '+ Tab',
+      icon: 'plus',
+      action: () => {
+        handleOpenNewConnectionTab();
+      },
+    },
+    'new-split': {
+      label: 'New Connection Split',
+      shortLabel: '+ Split',
+      icon: 'split-h',
+      action: () => {
+        handleOpenNewConnectionSplit('right');
+      },
+    },
+    'view-map': {
+      label: 'Network Topology Map',
+      shortLabel: 'Network Map',
+      icon: 'network',
+      action: () => {
+        openNetworkMapTab();
+      },
+    },
+    'split-h': {
+      label: 'Split Horizontal',
+      shortLabel: 'Split H',
+      icon: 'split-h',
+      action: () => {
+        void handleSplitPane('horizontal');
+      },
+    },
+    'split-v': {
+      label: 'Split Vertical',
+      shortLabel: 'Split V',
+      icon: 'split-v',
+      action: () => {
+        void handleSplitPane('vertical');
+      },
+    },
+    find: {
+      label: 'Find in Terminal',
+      shortLabel: 'Find',
+      icon: 'search',
+      disabled: !activePane,
+      action: () => {
+        if (activePane) {
+          togglePaneSearch(activePane.sessionId);
+        }
+      },
+    },
+    'group-tabs': {
+      label: 'Group Tabs by Host',
+      shortLabel: groupTabsByHost ? 'Grouped' : 'Ungrouped',
+      icon: 'folder',
+      active: groupTabsByHost,
+      action: () => {
+        setGroupTabsByHost((prev) => !prev);
+      },
+    },
+    'zoom-in': {
+      label: 'Zoom In Pane',
+      shortLabel: 'Zoom +',
+      icon: 'plus',
+      disabled: !activePane,
+      action: () => {
+        if (activePane) {
+          const next = changeTerminalFontSize(activePane.sessionId, +1);
+          setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+        }
+      },
+    },
+    'zoom-out': {
+      label: 'Zoom Out Pane',
+      shortLabel: 'Zoom -',
+      icon: 'minus',
+      disabled: !activePane,
+      action: () => {
+        if (activePane) {
+          const next = changeTerminalFontSize(activePane.sessionId, -1);
+          setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+        }
+      },
+    },
+    'zoom-reset': {
+      label: 'Reset Pane Zoom',
+      shortLabel: 'Zoom 100%',
+      icon: 'gear',
+      disabled: !activePane,
+      action: () => {
+        if (activePane) {
+          resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
+          setPaneFontSizes((prev) =>
+            new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
+          );
+        }
+      },
+    },
+  };
+
+  const renderDropdownRow = (
+    toolId: string,
+    label: string,
+    shortcut?: string,
+    action?: () => void,
+    disabled?: boolean,
+    active?: boolean
+  ) => {
+    const isPinned = pinnedQuickTools.includes(toolId);
+    return (
+      <div key={toolId} className="nav-dropdown-row">
+        <button
+          type="button"
+          role="menuitem"
+          className={`nav-dropdown-item ${active ? 'active' : ''}`}
+          disabled={disabled}
+          onClick={() => {
+            setActiveDropdownMenu(null);
+            action?.();
+          }}
+        >
+          <span>{label}</span>
+          {shortcut && <span className="nav-dropdown-shortcut">{shortcut}</span>}
+        </button>
+        <button
+          type="button"
+          className={`nav-pin-btn ${isPinned ? 'pinned' : ''}`}
+          title={isPinned ? `Unpin ${label} from top bar` : `Pin ${label} to top bar`}
+          aria-label={isPinned ? `Unpin ${label}` : `Pin ${label}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            togglePinTool(toolId);
+          }}
+        >
+          <CyberIcon name="pin" size={11} />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <main
       className={`app-shell ${vaultLocked ? 'theme-locked' : `theme-unlocked theme-${globalSettings.colorTheme}`}`}
@@ -6615,8 +7395,9 @@ export function App({
               {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
             </button>
           )}
+        </div>
 
-          <nav className="nav-menu-bar" aria-label="Application Menu">
+        <nav className="nav-menu-bar" aria-label="Application Menu">
             {/* Vault Dropdown */}
             <div
               className="nav-menu-container"
@@ -6681,6 +7462,17 @@ export function App({
                   >
                     <span>Vault Security &amp; Hello</span>
                   </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      openSettingsTab('sync');
+                    }}
+                  >
+                    <span>Storage &amp; Sync (F-29)</span>
+                  </button>
                   <div className="nav-dropdown-divider" />
                   <button
                     type="button"
@@ -6744,92 +7536,15 @@ export function App({
                     </div>
 
                     <div className="tools-sub-header">Local &amp; Directory Shells</div>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleOpenLocalTerminal('powershell');
-                      }}
-                    >
-                      <span>Local Shell (PowerShell)</span>
-                      <span className="nav-dropdown-shortcut">⚡ pwsh</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleOpenLocalTerminal('cmd');
-                      }}
-                    >
-                      <span>Local Shell (Command Prompt)</span>
-                      <span className="nav-dropdown-shortcut">cmd</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleOpenLocalTerminal('wsl');
-                      }}
-                    >
-                      <span>Local Shell (WSL Linux)</span>
-                      <span className="nav-dropdown-shortcut">🐧 wsl</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleOpenTerminalDirectory('default');
-                      }}
-                    >
-                      <span>New in Default Directory</span>
-                      <span className="nav-dropdown-shortcut">🏠</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleOpenTerminalDirectory('current');
-                      }}
-                    >
-                      <span>New in Current Directory (CWD)</span>
-                      <span className="nav-dropdown-shortcut">📂</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleOpenTerminalDirectory('root');
-                      }}
-                    >
-                      <span>New Root Shell in Current Directory</span>
-                      <span className="nav-dropdown-shortcut">⚡ root</span>
-                    </button>
+                    {renderDropdownRow('powershell', 'Local Shell (PowerShell)', '⚡ pwsh', () => void handleOpenLocalTerminal('powershell'))}
+                    {renderDropdownRow('cmd', 'Local Shell (Command Prompt)', 'cmd', () => void handleOpenLocalTerminal('cmd'))}
+                    {renderDropdownRow('wsl', 'Local Shell (WSL Linux)', '🐧 wsl', () => void handleOpenLocalTerminal('wsl'))}
+                    {renderDropdownRow('dir-default', 'New in Default Directory', '🏠', () => void handleOpenTerminalDirectory('default'))}
+                    {renderDropdownRow('dir-cwd', 'New in Current Directory (CWD)', '📂', () => void handleOpenTerminalDirectory('current'))}
+                    {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', '⚡ root', () => void handleOpenTerminalDirectory('root'))}
 
                     <div className="tools-sub-header">Hardware &amp; Session Actions</div>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleOpenSerialModal();
-                      }}
-                    >
-                      <span>Serial / UART Console (COM)</span>
-                      <span className="nav-dropdown-shortcut">🔌 COM</span>
-                    </button>
+                    {renderDropdownRow('serial', 'Serial / UART Console (COM)', '🔌 COM', () => void handleOpenSerialModal())}
 
                     {activePane && (
                       <>
@@ -6851,7 +7566,7 @@ export function App({
                           className="nav-dropdown-item"
                           onClick={() => {
                             setActiveDropdownMenu(null);
-                            void handleInjectTotp();
+                            void handleTerminalTotpClick();
                           }}
                         >
                           <span>Inject 2FA Code</span>
@@ -6868,178 +7583,68 @@ export function App({
                     </div>
 
                     <div className="tools-sub-header">Security &amp; Credentials</div>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setPaletteQuery('');
-                        setShowCommandPalette(true);
-                      }}
-                    >
-                      <span>Command Palette</span>
-                      <span className="nav-dropdown-shortcut">Ctrl+K</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setShowTotpModal(true);
-                      }}
-                    >
-                      <span>TOTP Authenticator Generator</span>
-                      <span className="nav-dropdown-shortcut">🔐 2FA</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setModalError('');
-                        setShowKeychainModal(true);
-                      }}
-                    >
-                      <span>Keychain</span>
-                      <span className="nav-dropdown-shortcut">🔑</span>
-                    </button>
+                    {renderDropdownRow('palette', 'Command Palette', 'Ctrl+K', () => {
+                      setPaletteQuery('');
+                      setShowCommandPalette(true);
+                    })}
+                    {renderDropdownRow('totp', 'TOTP Authenticator Generator', '🔐 2FA', () => setShowTotpModal(true))}
+                    {renderDropdownRow('keychain', 'Keychain', '🔑', () => {
+                      setModalError('');
+                      setShowKeychainModal(true);
+                    })}
 
                     <div className="tools-sub-header">Automation &amp; Networking</div>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className={`nav-dropdown-item ${broadcastState.enabled ? 'active' : ''}`}
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        handleToggleBroadcast();
-                      }}
-                    >
-                      <span>{broadcastState.enabled ? '🔴 Disarm Broadcast Mode' : '📡 Broadcast Input Mode'}</span>
-                      <span className="nav-dropdown-shortcut">Alt+B</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setNotesModalHostId(activeTab?.hostId);
-                        setNotesModalInitialNoteId(null);
-                        setShowNotesModal(true);
-                      }}
-                    >
-                      <span>Host Notes &amp; Docs</span>
-                      <span className="nav-dropdown-shortcut">📝</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void refreshSessionLogs();
-                        setShowSessionLogsModal(true);
-                      }}
-                    >
-                      <span>Session Logs &amp; Recordings</span>
-                      <span className="nav-dropdown-shortcut">⏺</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setShowSnippetsModal(true);
-                      }}
-                    >
-                      <span>Command Snippets &amp; Variables</span>
-                      <span className="nav-dropdown-shortcut">⚡ Snippets</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setShowPortForwardingModal(true);
-                      }}
-                    >
-                      <span>Port Forwarding (-L, -R, -D)</span>
-                      <span className="nav-dropdown-shortcut">
-                        {activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} active` : '⇄ Tunnels'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setShowProxyProfilesModal(true);
-                      }}
-                    >
-                      <span>Proxy Profiles (Jump, SOCKS5, Command)</span>
-                      <span className="nav-dropdown-shortcut">🛡️ Profiles</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        openNetworkMapTab();
-                      }}
-                    >
-                      <span>Interactive Network Topology Map (F-37)</span>
-                      <span className="nav-dropdown-shortcut">🌐 Map</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      disabled={!sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')}
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
+                    {renderDropdownRow(
+                      'broadcast',
+                      broadcastState.enabled ? '🔴 Disarm Broadcast Mode' : '📡 Broadcast Input Mode',
+                      'Alt+B',
+                      handleToggleBroadcast,
+                      false,
+                      broadcastState.enabled
+                    )}
+                    {renderDropdownRow('notes', 'Host Notes & Docs', '📝', () => {
+                      setNotesModalHostId(activeTab?.hostId);
+                      setNotesModalInitialNoteId(null);
+                      setShowNotesModal(true);
+                    })}
+                    {renderDropdownRow('session-logs', 'Session Logs & Recordings', '⏺', () => {
+                      void refreshSessionLogs();
+                      setShowSessionLogsModal(true);
+                    })}
+                    {renderDropdownRow('snippets', 'Command Snippets & Variables', '⚡ Snippets', () => setShowSnippetsModal(true))}
+                    {renderDropdownRow(
+                      'tunnels',
+                      'Port Forwarding (-L, -R, -D)',
+                      activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} active` : '⇄ Tunnels',
+                      () => setShowPortForwardingModal(true),
+                      false,
+                      activeTunnels.length > 0
+                    )}
+                    {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5, Command)', '🛡️ Profiles', () => setShowProxyProfilesModal(true))}
+                    {renderDropdownRow('network-map', 'Interactive Network Topology Map (F-37)', '🌐 Map', () => openNetworkMapTab())}
+                    {renderDropdownRow(
+                      'sftp',
+                      'SFTP File Browser',
+                      '📁 SFTP',
+                      () => {
                         if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
                           openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
                         }
-                      }}
-                    >
-                      <span>SFTP File Browser</span>
-                      <span className="nav-dropdown-shortcut">📁 SFTP</span>
-                    </button>
+                      },
+                      !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
+                    )}
+                    {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
 
                     <div className="tools-sub-header">Config Import &amp; Export</div>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setModalError('');
-                        setSshConfigResult(null);
-                        setShowSSHConfigModal(true);
-                      }}
-                    >
-                      <span>Import ssh_config</span>
-                      <span className="nav-dropdown-shortcut">⚙️</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleOpenProxychainsExport();
-                      }}
-                    >
-                      <span>Export proxychains.conf</span>
-                      <span className="nav-dropdown-shortcut">⛓️ Export</span>
-                    </button>
+                    {renderDropdownRow('ssh-config', 'Import ssh_config', '⚙️', () => {
+                      setModalError('');
+                      setSshConfigResult(null);
+                      setShowSSHConfigModal(true);
+                    })}
+                    {renderDropdownRow('import-putty-termius', 'Import PuTTY / Termius (F-30)', '📥', () => {
+                      setShowImportModal(true);
+                    })}
+                    {renderDropdownRow('proxychains', 'Export proxychains.conf', '⛓️ Export', () => void handleOpenProxychainsExport())}
                   </div>
                 </div>
               )}
@@ -7072,187 +7677,112 @@ export function App({
                   onMouseEnter={() => handleMenuEnter('view')}
                   onMouseMove={handleMenuMove}
                 >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setSidebarCollapsed((prev) => !prev);
-                    }}
-                  >
-                    <span>{sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}</span>
-                    <span className="nav-dropdown-shortcut">Ctrl+B</span>
-                  </button>
+                  {renderDropdownRow('sidebar-toggle', sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar', 'Ctrl+B', () => setSidebarCollapsed((prev) => !prev))}
                   <div className="nav-dropdown-divider" />
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      handleOpenNewConnectionTab();
-                    }}
-                  >
-                    <span>New Connection Tab</span>
-                    <span className="nav-dropdown-shortcut">+ Tab</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      handleOpenNewConnectionSplit('right');
-                    }}
-                  >
-                    <span>New Connection Split</span>
-                    <span className="nav-dropdown-shortcut">+ Split</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      openNetworkMapTab();
-                    }}
-                  >
-                    <span>Network Topology Map</span>
-                    <span className="nav-dropdown-shortcut">🌐 Map</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleSplitPane('horizontal');
-                    }}
-                  >
-                    <span>Split Horizontal</span>
-                    <span className="nav-dropdown-shortcut">⬌</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleSplitPane('vertical');
-                    }}
-                  >
-                    <span>Split Vertical</span>
-                    <span className="nav-dropdown-shortcut">⬍</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    disabled={!activePane}
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      if (activePane) {
-                        togglePaneSearch(activePane.sessionId);
-                      }
-                    }}
-                  >
-                    <span>Find in Terminal</span>
-                    <span className="nav-dropdown-shortcut">Ctrl+F</span>
-                  </button>
+                  {renderDropdownRow('new-tab', 'New Connection Tab', '+ Tab', handleOpenNewConnectionTab)}
+                  {renderDropdownRow('new-split', 'New Connection Split', '+ Split', () => handleOpenNewConnectionSplit('right'))}
+                  {renderDropdownRow('view-map', 'Network Topology Map', '🌐 Map', openNetworkMapTab)}
+                  {renderDropdownRow('split-h', 'Split Horizontal', '⬌', () => void handleSplitPane('horizontal'))}
+                  {renderDropdownRow('split-v', 'Split Vertical', '⬍', () => void handleSplitPane('vertical'))}
+                  {renderDropdownRow('find', 'Find in Terminal', 'Ctrl+F', () => {
+                    if (activePane) {
+                      togglePaneSearch(activePane.sessionId);
+                    }
+                  }, !activePane)}
                   <div className="nav-dropdown-divider" />
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setGroupTabsByHost((prev) => !prev);
-                    }}
-                  >
-                    <span>Group Tabs by Host</span>
-                    <span className="nav-dropdown-shortcut">
-                      {groupTabsByHost ? '✓ Active' : 'Off'}
-                    </span>
-                  </button>
+                  {renderDropdownRow('group-tabs', 'Group Tabs by Host', groupTabsByHost ? '✓ Active' : 'Off', () => setGroupTabsByHost((prev) => !prev), false, groupTabsByHost)}
                   <div className="nav-dropdown-divider" />
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    disabled={!activePane}
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      if (activePane) {
-                        const next = changeTerminalFontSize(activePane.sessionId, +1);
-                        setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
-                      }
-                    }}
-                  >
-                    <span>Zoom In Pane</span>
-                    <span className="nav-dropdown-shortcut">Ctrl +</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    disabled={!activePane}
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      if (activePane) {
-                        const next = changeTerminalFontSize(activePane.sessionId, -1);
-                        setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
-                      }
-                    }}
-                  >
-                    <span>Zoom Out Pane</span>
-                    <span className="nav-dropdown-shortcut">Ctrl -</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    disabled={!activePane}
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      if (activePane) {
-                        resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
-                        setPaneFontSizes((prev) =>
-                          new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
-                        );
-                      }
-                    }}
-                  >
-                    <span>Reset Pane Zoom</span>
-                    <span className="nav-dropdown-shortcut">Ctrl 0</span>
-                  </button>
+                  {renderDropdownRow('zoom-in', 'Zoom In Pane', 'Ctrl +', () => {
+                    if (activePane) {
+                      const next = changeTerminalFontSize(activePane.sessionId, +1);
+                      setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+                    }
+                  }, !activePane)}
+                  {renderDropdownRow('zoom-out', 'Zoom Out Pane', 'Ctrl -', () => {
+                    if (activePane) {
+                      const next = changeTerminalFontSize(activePane.sessionId, -1);
+                      setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+                    }
+                  }, !activePane)}
+                  {renderDropdownRow('zoom-reset', 'Reset Pane Zoom', 'Ctrl 0', () => {
+                    if (activePane) {
+                      resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
+                      setPaneFontSizes((prev) =>
+                        new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
+                      );
+                    }
+                  }, !activePane)}
                 </div>
               )}
             </div>
 
-            {/* Port Forwarding / Tunnels Pill Button */}
-            <button
-              type="button"
-              className={`nav-menu-trigger ${activeTunnels.length > 0 ? 'active' : ''}`}
-              onClick={() => setShowPortForwardingModal(true)}
-              title="Port Forwarding & Tunnels"
-              aria-label="Port Forwarding"
-              style={
-                activeTunnels.length > 0
-                  ? {
-                      color: 'var(--color-primary-green, #10b981)',
-                      borderColor: 'rgba(16, 185, 129, 0.4)',
-                    }
-                  : undefined
-              }
-            >
-              <span>{activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} Tunnels` : 'Tunnels ⇄'}</span>
-            </button>
+            {/* Cyberpunk delimiter next to View */}
+            <div className="nav-cyber-divider" aria-hidden="true">
+              <span className="cyber-glitch-slashes">//</span>
+            </div>
 
-            {/* Global Settings */}
+            {/* Pinned Quick-Tool Buttons */}
+            {pinnedQuickTools.map((toolId, index) => {
+              const item = pinnableRegistry[toolId];
+              if (!item) return null;
+              return (
+                <button
+                  key={toolId}
+                  type="button"
+                  className={`nav-menu-trigger nav-pinned-btn ${item.active ? 'active' : ''} ${
+                    draggedPinnedIndex === index ? 'dragging' : ''
+                  }`}
+                  draggable
+                  onDragStart={() => handlePinnedDragStart(index)}
+                  onDragOver={(e) => handlePinnedDragOver(e, index)}
+                  onDragEnd={handlePinnedDragEnd}
+                  onClick={item.action}
+                  title={`${item.title || item.label} (Drag to reorder, unpin in dropdown menu)`}
+                  aria-label={item.ariaLabel || item.label}
+                  disabled={item.disabled}
+                  style={
+                    item.active
+                      ? {
+                          color: 'var(--color-primary-green, #10b981)',
+                          borderColor: 'rgba(16, 185, 129, 0.4)',
+                        }
+                      : undefined
+                  }
+                >
+                  <span className="pinned-drag-grip" aria-hidden="true">⋮</span>
+                  <CyberIcon name={item.icon} size={11} />
+                  <span>{item.shortLabel || item.label}</span>
+                </button>
+              );
+            })}
+
+            {/* Sync Warning / Conflict Pill */}
+            {syncInfo?.detectedConflict && (
+              <button
+                type="button"
+                className="nav-menu-trigger nav-sync-conflict-btn"
+                style={{
+                  color: '#ef4444',
+                  borderColor: 'rgba(239, 68, 68, 0.6)',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                }}
+                onClick={() => {
+                  setSettingsActiveTab('sync');
+                  setShowGlobalSettingsModal(true);
+                }}
+                title="Cloud sync conflict detected! Click to review and resolve."
+                aria-label="Cloud Sync Conflict"
+              >
+                <CyberIcon name="bolt" size={11} />
+                <span>SYNC CONFLICT ({syncInfo.conflictCount})</span>
+              </button>
+            )}
+
+            {/* Global Settings (floated to the far right) */}
             <button
               type="button"
-              className="nav-menu-trigger"
+              className="nav-menu-trigger nav-settings-right"
+              style={{ marginLeft: syncInfo?.detectedConflict ? '0.5rem' : 'auto' }}
               onClick={() => {
                 setSettingsActiveTab('appearance');
                 setShowGlobalSettingsModal(true);
@@ -7260,10 +7790,10 @@ export function App({
               title="Global Settings (Ctrl+,)"
               aria-label="Settings ⚙"
             >
+              <CyberIcon name="gear" size={12} />
               <span>Settings ⚙</span>
             </button>
           </nav>
-        </div>
       </header>
 
       <div className="workspace-body">
@@ -7296,91 +7826,8 @@ export function App({
             </div>
           ) : (
             <>
-              {!vaultLocked && (
-                <nav className="sidebar-quick-toolbar" aria-label="Quick Actions">
-                  <button
-                    type="button"
-                    className="sidebar-quick-btn"
-                    title="Open SSH Keychain"
-                    aria-label="SSH Keychain"
-                    onClick={() => {
-                      setModalError('');
-                      setShowKeychainModal(true);
-                    }}
-                  >
-                    <span className="sidebar-quick-icon">
-                      <CyberIcon name="key" size={13} />
-                    </span>
-                    <span className="sidebar-quick-text">Keys</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="sidebar-quick-btn"
-                    title="Import ssh_config"
-                    aria-label="Import ssh_config"
-                    onClick={() => {
-                      setModalError('');
-                      setSshConfigResult(null);
-                      setShowSSHConfigModal(true);
-                    }}
-                  >
-                    <span className="sidebar-quick-icon">
-                      <CyberIcon name="gear" size={13} />
-                    </span>
-                    <span className="sidebar-quick-text">Config</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="sidebar-quick-btn"
-                    title="Vault Security & Windows Hello"
-                    aria-label="Vault Security"
-                    onClick={() => {
-                      setModalError('');
-                      openSettingsTab('security');
-                    }}
-                  >
-                    <span className="sidebar-quick-icon">
-                      <CyberIcon name="shield" size={13} />
-                    </span>
-                    <span className="sidebar-quick-text">Vault</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="sidebar-quick-btn"
-                    title="Host Notes & Documentation (Click to open or drag onto terminal view to dock)"
-                    aria-label="Host Notes & Documentation"
-                    draggable
-                    onDragStart={() =>
-                      startWorkspaceDrag({
-                        type: 'tool',
-                        toolType: 'notes',
-                        hostId: activePane?.hostId || activeTab?.hostId,
-                        title: 'Host Notes',
-                      })
-                    }
-                    onDragEnd={() => startWorkspaceDrag(null)}
-                    onClick={() => openNotesTab()}
-                  >
-                    <span className="sidebar-quick-icon">
-                      <CyberIcon name="note" size={13} />
-                    </span>
-                    <span className="sidebar-quick-text">Notes</span>
-                  </button>
-                </nav>
-              )}
               <div className="sidebar-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <h2>Hosts &amp; Groups</h2>
-                  <button
-                    type="button"
-                    className="sidebar-toggle-btn"
-                    onClick={() => setSidebarCollapsed(true)}
-                    title="Collapse Sidebar (Ctrl+B)"
-                    aria-label="Collapse Sidebar"
-                  >
-                    <CyberIcon name="chevron-left" size={13} />
-                  </button>
-                </div>
+                <h2>Hosts &amp; Groups</h2>
                 {!vaultLocked && (
                   <div className="sidebar-actions">
                     <button
@@ -7621,7 +8068,20 @@ export function App({
         aria-orientation="vertical"
         aria-label="Resize sidebar"
         title="Drag to resize sidebar"
-      />
+      >
+        <button
+          type="button"
+          className="sidebar-resizer-collapse-btn"
+          title="Collapse Sidebar (Ctrl+B)"
+          aria-label="Collapse Sidebar"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSidebarCollapsed(true);
+          }}
+        >
+          <CyberIcon name="chevron-left" size={12} />
+        </button>
+      </div>
     )}
 
         {tabs.length > 0 && activeTab && activePane ? (
@@ -8225,7 +8685,7 @@ export function App({
                       className="hud-seg-btn"
                       aria-label="🔐 2FA / TOTP"
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => void handleInjectTotp()}
+                      onClick={() => void handleTerminalTotpClick()}
                       title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt"
                     >
                       <CyberIcon name="totp" size={12} />
@@ -8294,6 +8754,13 @@ export function App({
                         onChangePassword={handleChangePasswordDirect}
                         onResetVault={handleResetVault}
                         availableSnippets={vaultSummary.snippets || []}
+                        syncInfo={syncInfo}
+                        onRefreshSync={refreshSyncInfo}
+                        onOpenConflictResolver={(rep, file) => {
+                          setActiveConflictReport(rep);
+                          setActiveConflictFilePath(file);
+                          setShowConflictModal(true);
+                        }}
                         isModal={false}
                       />
                     ) : tab.tabType === 'notes' ? (
@@ -8665,6 +9132,113 @@ export function App({
                     </div>
                     <div className="palette-tags">
                       <span className="kbd-badge">Open Map ↵</span>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {(() => {
+                const q = paletteQuery.toLowerCase().trim();
+                const showRaw =
+                  !q ||
+                  'raw'.includes(q) ||
+                  'tcp'.includes(q) ||
+                  'nc'.includes(q) ||
+                  'netcat'.includes(q) ||
+                  'listen'.includes(q) ||
+                  'reverse'.includes(q) ||
+                  'shell'.includes(q);
+                if (!showRaw) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      setShowRawTcpModal(true);
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong>⚡ Raw TCP Socket &amp; Listener (F-31)</strong>
+                      <span>Direct Netcat outgoing client or inbound reverse shell catcher</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Raw TCP ↵</span>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {(() => {
+                const cleanQ = paletteQuery.trim();
+                const isNc = cleanQ.startsWith('nc ') || cleanQ.startsWith('tcp://');
+                if (!isNc) return null;
+                let targetHost = '';
+                let targetPort = 8080;
+                if (cleanQ.startsWith('nc ')) {
+                  const parts = cleanQ.slice(3).trim().split(/\s+/);
+                  targetHost = parts[0] || '';
+                  if (parts[1]) targetPort = parseInt(parts[1], 10) || 8080;
+                } else if (cleanQ.startsWith('tcp://')) {
+                  const noProto = cleanQ.slice(6);
+                  const parts = noProto.split(':');
+                  targetHost = parts[0] || '';
+                  if (parts[1]) targetPort = parseInt(parts[1], 10) || 8080;
+                }
+                if (!targetHost) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item palette-quick-connect"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      void handleConnectRawTcp({
+                        host: targetHost,
+                        port: targetPort,
+                        lineMode: true,
+                        lineEnding: 'crlf',
+                      });
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong>▶ Connect Raw TCP to {targetHost}:{targetPort}</strong>
+                      <span>Direct raw socket connection</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Connect ↵</span>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {(() => {
+                const cleanQ = paletteQuery.trim();
+                if (!cleanQ.startsWith('listen ')) return null;
+                const portStr = cleanQ.slice(7).trim();
+                const port = parseInt(portStr, 10);
+                if (!port || port <= 0 || port > 65535) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item palette-quick-connect"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      void handleStartRawTcpListener({
+                        port,
+                        bindAddress: '0.0.0.0',
+                        autoSpawnTab: true,
+                      });
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong>⚡ Start Listener on :{port}</strong>
+                      <span>Inbound raw socket listener / reverse shell catcher</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Listen ↵</span>
                     </div>
                   </button>
                 );
@@ -9384,6 +9958,13 @@ export function App({
             onChangePassword={handleChangePasswordDirect}
             onResetVault={handleResetVault}
             availableSnippets={vaultSummary.snippets || []}
+            syncInfo={syncInfo}
+            onRefreshSync={refreshSyncInfo}
+            onOpenConflictResolver={(rep, file) => {
+              setActiveConflictReport(rep);
+              setActiveConflictFilePath(file);
+              setShowConflictModal(true);
+            }}
             onOpenAsTab={() => {
               setShowGlobalSettingsModal(false);
               openSettingsTab(settingsActiveTab);
@@ -9840,6 +10421,28 @@ export function App({
         />
       )}
 
+      {showTotpQuickSelector && (
+        <TotpQuickSelectorModal
+          isOpen={showTotpQuickSelector}
+          tokens={totpTokensList.length > 0 ? totpTokensList : (vaultSummary.totpRecords || [])}
+          currentHostId={activePane?.hostId || activeTab?.hostId}
+          currentHostLabel={
+            vaultSummary.hosts.find(
+              (h) => h.id === (activePane?.hostId || activeTab?.hostId)
+            )?.label || (activePane?.hostId || activeTab?.hostId ? 'Remote Host' : undefined)
+          }
+          onSelectAndInject={async (totpId) => {
+            setShowTotpQuickSelector(false);
+            await handleInjectTotp(totpId);
+          }}
+          onOpenFullVault={() => {
+            setShowTotpQuickSelector(false);
+            setShowTotpModal(true);
+          }}
+          onClose={() => setShowTotpQuickSelector(false)}
+        />
+      )}
+
       {showNotesModal && (
         <div
           className="modal-backdrop"
@@ -9937,6 +10540,48 @@ export function App({
             </div>
           </div>
         </div>
+      )}
+
+      {showConflictModal && activeConflictReport && (
+        <VaultConflictModal
+          isOpen={showConflictModal}
+          report={activeConflictReport}
+          conflictFilePath={activeConflictFilePath}
+          onClose={() => setShowConflictModal(false)}
+          onResolve={async (resolutions, deleteFile) => {
+            const api = getWailsBindings();
+            if (api?.ResolveVaultConflicts) {
+              await api.ResolveVaultConflicts(resolutions, deleteFile);
+            }
+            await refreshVaultState();
+            await refreshSyncInfo();
+            setStatusMessage('Vault conflicts successfully resolved and saved.');
+          }}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          existingGroups={vaultSummary.groups.map((g) => ({ id: g.id, name: g.name }))}
+          onImportComplete={async () => {
+            await refreshVaultState();
+            setStatusMessage('PuTTY / Termius sessions successfully imported into Vault.');
+          }}
+        />
+      )}
+
+      {showRawTcpModal && (
+        <RawTcpModal
+          isOpen={showRawTcpModal}
+          onClose={() => setShowRawTcpModal(false)}
+          onConnect={handleConnectRawTcp}
+          onStartListener={handleStartRawTcpListener}
+          onStopListener={handleStopRawTcpListener}
+          listeners={rawTcpListeners}
+          refreshListeners={refreshRawTcpListeners}
+        />
       )}
     </main>
   );

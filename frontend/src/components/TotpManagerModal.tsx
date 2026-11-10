@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { TotpSummary, TotpRecord, TotpCodeResponse } from '../types/totp';
 
 export interface HostSummaryOption {
@@ -27,6 +27,8 @@ interface WailsTotpApi {
   DeleteTotpRecord?: (id: string) => Promise<void>;
   ParseOTPAuthURI?: (uri: string) => Promise<TotpRecord>;
   InjectTotpCode?: (sessionId: string, totpId: string) => Promise<void>;
+  ExportTotpTokens?: (format: string) => Promise<string>;
+  ImportTotpTokens?: (content: string) => Promise<number>;
 }
 
 function getWailsTotpApi(): WailsTotpApi | undefined {
@@ -47,6 +49,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
   const [totpList, setTotpList] = useState<TotpSummary[]>([]);
   const [codes, setCodes] = useState<Record<string, TotpCodeResponse>>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState<'all' | 'linked' | 'unlinked'>('all');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successNotice, setSuccessNotice] = useState('');
@@ -68,6 +71,18 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
   const [formPeriod, setFormPeriod] = useState<number>(30);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [injectingId, setInjectingId] = useState<string | null>(null);
+
+  // Import / Export State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'uri' | 'json'>('uri');
+  const [exportContent, setExportContent] = useState('');
+  const [exportCopied, setExportCopied] = useState(false);
+
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importContent, setImportContent] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch TOTP list from backend
   const refreshTotpList = useCallback(async () => {
@@ -131,8 +146,13 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
   // Filtered list
   const filteredList = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return totpList;
     return totpList.filter((item) => {
+      // Host filter
+      if (filterMode === 'linked' && !item.hostId) return false;
+      if (filterMode === 'unlinked' && item.hostId) return false;
+
+      // Query filter
+      if (!q) return true;
       const hostLabel = item.hostId ? hostMap.get(item.hostId) || '' : '';
       return (
         item.label.toLowerCase().includes(q) ||
@@ -140,14 +160,18 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
         hostLabel.toLowerCase().includes(q)
       );
     });
-  }, [totpList, searchQuery, hostMap]);
+  }, [totpList, searchQuery, filterMode, hostMap]);
+
+  const linkedCount = useMemo(() => totpList.filter((t) => !!t.hostId).length, [totpList]);
+  const unlinkedCount = useMemo(() => totpList.filter((t) => !t.hostId).length, [totpList]);
 
   // Copy code to clipboard
   const handleCopyCode = async (id: string, code: string) => {
+    if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
       setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 1500);
+      setTimeout(() => setCopiedId(null), 1800);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMessage(`Failed to copy to clipboard: ${msg}`);
@@ -247,7 +271,6 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
       setErrorMessage('Backend binding SaveTotpRecord not found');
       return;
     }
-
     if (!formLabel.trim() && !formIssuer.trim()) {
       setErrorMessage('Account label or issuer is required');
       return;
@@ -314,6 +337,123 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
     }
   };
 
+  // Export handlers
+  const handleOpenExport = async (format: 'uri' | 'json' = 'uri') => {
+    setExportFormat(format);
+    setExportCopied(false);
+    const api = getWailsTotpApi();
+    if (!api?.ExportTotpTokens) {
+      setExportContent('// Export binding not available in current environment');
+      setShowExportModal(true);
+      return;
+    }
+    try {
+      const content = await api.ExportTotpTokens(format);
+      setExportContent(content || '');
+      setShowExportModal(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(`Failed to export tokens: ${msg}`);
+    }
+  };
+
+  const handleChangeExportFormat = async (format: 'uri' | 'json') => {
+    setExportFormat(format);
+    setExportCopied(false);
+    const api = getWailsTotpApi();
+    if (api?.ExportTotpTokens) {
+      try {
+        const content = await api.ExportTotpTokens(format);
+        setExportContent(content || '');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setErrorMessage(`Export format switch failed: ${msg}`);
+      }
+    }
+  };
+
+  const handleCopyExport = async () => {
+    if (!exportContent) return;
+    try {
+      await navigator.clipboard.writeText(exportContent);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(`Failed to copy export content: ${msg}`);
+    }
+  };
+
+  const handleDownloadExport = () => {
+    if (!exportContent) return;
+    const isJson = exportFormat === 'json';
+    const blob = new Blob([exportContent], {
+      type: isJson ? 'application/json;charset=utf-8;' : 'text/plain;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = isJson ? 'doubleagent-totp-vault.json' : 'doubleagent-totp-vault.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Import handlers
+  const handleOpenImport = () => {
+    setImportContent('');
+    setImportError('');
+    setShowImportModal(true);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setImportContent(text || '');
+      setImportError('');
+    };
+    reader.onerror = () => {
+      setImportError('Failed to read file from disk');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteImport = async () => {
+    const api = getWailsTotpApi();
+    if (!api?.ImportTotpTokens) {
+      setImportError('Backend binding ImportTotpTokens not available');
+      return;
+    }
+    const trimmed = importContent.trim();
+    if (!trimmed) {
+      setImportError('Please paste otpauth:// URIs or JSON content, or select a file');
+      return;
+    }
+
+    try {
+      setImportLoading(true);
+      setImportError('');
+      const count = await api.ImportTotpTokens(trimmed);
+      setShowImportModal(false);
+      setSuccessNotice(`Successfully imported ${count} authenticator token${count === 1 ? '' : 's'}!`);
+      setTimeout(() => setSuccessNotice(''), 3000);
+      await refreshTotpList();
+      await refreshCodes();
+      if (onRefreshVault) {
+        void onRefreshVault();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setImportError(`Import failed: ${msg}`);
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   // Format code display with a space in the middle: e.g. 123 456 or 1234 5678
   const formatCode = (rawCode?: string, digits = 6): string => {
     if (!rawCode) return '------';
@@ -330,437 +470,753 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
   }
 
   const content = (
-      <div
-        className={`modal-container totp-manager-modal ${isDocked ? 'is-docked-widget' : ''}`}
-        onClick={(e) => e.stopPropagation()}
-        role={isDocked ? 'region' : 'dialog'}
-        aria-label={isDocked ? 'Docked TOTP Authenticator' : 'TOTP Authenticator Generator'}
-      >
-        {!isDocked && (
-          <div className="modal-header">
-            <div className="modal-title-with-badge">
-              <span className="modal-icon">🔐</span>
-              <h2>TOTP Authenticator Generator</h2>
+    <div
+      className={`cyber-totp-container ${isDocked ? 'is-docked-view' : 'is-modal-view'}`}
+      onClick={(e) => e.stopPropagation()}
+      role={isDocked ? 'region' : 'dialog'}
+      aria-label={isDocked ? 'Docked TOTP Authenticator' : 'TOTP Authenticator Generator'}
+    >
+      {/* Reticle corner decoration overlays */}
+      <div className="cyber-corner-reticle cyber-corner-tl" />
+      <div className="cyber-corner-reticle cyber-corner-tr" />
+      <div className="cyber-corner-reticle cyber-corner-bl" />
+      <div className="cyber-corner-reticle cyber-corner-br" />
+
+      {/* Cyberpunk HUD Header Bar - Shown in both Modal and Docked modes */}
+      <div className="cyber-totp-hud-header">
+        <div className="cyber-hud-title-block">
+          <div className="cyber-hud-tag-line">
+            <span className="cyber-hazard-stripes">///</span>
+            <span className="cyber-hud-tag">SEC-02FA</span>
+            <span className="cyber-hud-delim">//</span>
+            <span className="cyber-hud-subtag">QUANTUM VAULT</span>
+          </div>
+          <h2 className="cyber-hud-title">
+            TOTP AUTHENTICATOR
+            {isDocked && <span className="cyber-docked-badge">[DOCKED PANE]</span>}
+          </h2>
+          <div className="cyber-telemetry-strip">
+            <span className="cyber-telemetry-chip chip-cyan" title="Total active authenticators in vault">
+              <span className="chip-dot" /> KEYS: <strong>{totpList.length}</strong>
+            </span>
+            <span className="cyber-telemetry-chip chip-green" title="Underlying hardware/Argon2id encryption">
+              <span className="chip-dot" /> VAULT: <strong>AES-256-GCM</strong>
+            </span>
+            <span className="cyber-telemetry-chip chip-amber" title="RFC-6238 Time-based One-Time Passwords">
+              <span className="chip-dot" /> RFC-6238 <strong>30s</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="cyber-hud-actions-block">
+          <button
+            type="button"
+            className="cyber-btn cyber-btn-primary"
+            onClick={handleOpenAdd}
+            aria-label="➕ Add Authenticator"
+            title="Register a new TOTP 2FA secret or paste URI"
+          >
+            <span className="btn-glitch-icon">+</span> ADD KEY
+          </button>
+          <button
+            type="button"
+            className="cyber-btn cyber-btn-secondary"
+            onClick={handleOpenImport}
+            title="Import authenticators from otpauth:// URIs or JSON vault backup"
+          >
+            📥 IMPORT
+          </button>
+          <button
+            type="button"
+            className="cyber-btn cyber-btn-secondary"
+            onClick={() => void handleOpenExport('uri')}
+            title="Export authenticators as otpauth:// URIs or JSON backup"
+          >
+            📤 EXPORT
+          </button>
+
+          {!isDocked && onDockToView && (
+            <button
+              type="button"
+              className="cyber-btn cyber-btn-accent"
+              onClick={onDockToView}
+              title="Dock TOTP Authenticator as a split panel inside current workspace view"
+            >
+              📌 DOCK VIEW
+            </button>
+          )}
+
+          {!isDocked && (
+            <button
+              type="button"
+              className="cyber-btn-close"
+              onClick={onClose}
+              aria-label="Close TOTP Authenticator"
+              title="Close window"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Alert Notices */}
+      {errorMessage && (
+        <div className="cyber-banner cyber-banner-error" role="alert">
+          <span className="banner-icon">⚠</span>
+          <span className="banner-text">{errorMessage}</span>
+          <button type="button" onClick={() => setErrorMessage('')} className="banner-close-btn">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {successNotice && (
+        <div className="cyber-banner cyber-banner-success" role="status">
+          <span className="banner-icon">✓</span>
+          <span className="banner-text">{successNotice}</span>
+        </div>
+      )}
+
+      {/* Cyberpunk Filter and Search Toolbar */}
+      <div className="cyber-totp-toolbar">
+        <div className="cyber-search-reticle">
+          <span className="search-prefix">&gt;</span>
+          <input
+            type="text"
+            placeholder="FILTER_BY_ISSUER_LABEL_OR_HOST..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="cyber-search-input"
+            autoFocus={!isDocked}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              className="cyber-search-clear"
+              onClick={() => setSearchQuery('')}
+              title="Clear search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <div className="cyber-filter-pills">
+          <button
+            type="button"
+            className={`cyber-pill-btn ${filterMode === 'all' ? 'active' : ''}`}
+            onClick={() => setFilterMode('all')}
+          >
+            ALL [{totpList.length}]
+          </button>
+          <button
+            type="button"
+            className={`cyber-pill-btn ${filterMode === 'linked' ? 'active' : ''}`}
+            onClick={() => setFilterMode('linked')}
+          >
+            🖥 LINKED [{linkedCount}]
+          </button>
+          <button
+            type="button"
+            className={`cyber-pill-btn ${filterMode === 'unlinked' ? 'active' : ''}`}
+            onClick={() => setFilterMode('unlinked')}
+          >
+            STANDALONE [{unlinkedCount}]
+          </button>
+        </div>
+      </div>
+
+      {/* Add / Edit Form Panel */}
+      {showAddEdit && (
+        <div className="cyber-form-panel">
+          <div className="cyber-form-header">
+            <div className="form-header-title">
+              <span className="form-hazard">///</span>
+              <h3>{editingId ? 'EDIT AUTHENTICATOR RECORD' : 'ENCRYPT NEW TOTP TOKEN'}</h3>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              {onDockToView && (
-                <button
-                  type="button"
-                  className="btn-secondary btn-sm"
-                  onClick={onDockToView}
-                  aria-label="Dock TOTP to View"
-                  title="Dock TOTP Authenticator as a split panel inside the current workspace view"
-                >
-                  📌 Dock to View
-                </button>
+            <div className="cyber-mode-toggle">
+              {!editingId && (
+                <>
+                  <button
+                    type="button"
+                    className={`cyber-tab-btn ${inputMode === 'uri' ? 'active' : ''}`}
+                    onClick={() => setInputMode('uri')}
+                  >
+                    🔗 PASTE URI
+                  </button>
+                  <button
+                    type="button"
+                    className={`cyber-tab-btn ${inputMode === 'manual' ? 'active' : ''}`}
+                    onClick={() => setInputMode('manual')}
+                  >
+                    ✏ MANUAL ENTRY
+                  </button>
+                </>
               )}
               <button
                 type="button"
-                className="modal-close-btn"
-                onClick={onClose}
-                aria-label="Close TOTP Authenticator"
+                className="cyber-btn-sm cyber-btn-secondary"
+                onClick={() => setShowAddEdit(false)}
               >
-                ✕
+                ✕ CANCEL
               </button>
             </div>
           </div>
-        )}
 
-        {errorMessage && (
-          <div className="modal-error-banner" role="alert">
-            <span>⚠️ {errorMessage}</span>
-            <button type="button" onClick={() => setErrorMessage('')} className="banner-dismiss">
-              ✕
-            </button>
-          </div>
-        )}
-
-        {successNotice && (
-          <div className="modal-success-banner" role="status">
-            <span>✓ {successNotice}</span>
-          </div>
-        )}
-
-        <div className="totp-toolbar">
-          <div className="totp-search-box">
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder="Filter by account, issuer, or linked host..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="form-control"
-              autoFocus
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                className="clear-search-btn"
-                onClick={() => setSearchQuery('')}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={handleOpenAdd}
-          >
-            ➕ Add Authenticator
-          </button>
-        </div>
-
-        {/* Add / Edit Form Modal Sub-panel */}
-        {showAddEdit && (
-          <div className="totp-add-panel">
-            <div className="totp-add-header">
-              <h3>{editingId ? 'Edit Authenticator' : 'Add New Authenticator'}</h3>
-              <div className="totp-mode-toggle">
-                {!editingId && (
-                  <>
-                    <button
-                      type="button"
-                      className={`btn-mode ${inputMode === 'uri' ? 'active' : ''}`}
-                      onClick={() => setInputMode('uri')}
-                    >
-                      🔗 Paste URI
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-mode ${inputMode === 'manual' ? 'active' : ''}`}
-                      onClick={() => setInputMode('manual')}
-                    >
-                      ✏️ Manual Entry
-                    </button>
-                  </>
-                )}
+          {inputMode === 'uri' && !editingId ? (
+            <div className="cyber-uri-entry">
+              <p className="cyber-form-hint">
+                Paste an <code>otpauth://totp/...</code> URI (from QR code, password manager export, or terminal):
+              </p>
+              <div className="cyber-uri-input-row">
+                <input
+                  type="text"
+                  placeholder="otpauth://totp/Issuer:user@domain.com?secret=JBSWY3DPEHPK3PXP..."
+                  value={formUri}
+                  onChange={(e) => setFormUri(e.target.value)}
+                  className="cyber-input"
+                />
                 <button
                   type="button"
-                  className="btn-secondary btn-sm"
-                  onClick={() => setShowAddEdit(false)}
+                  className="cyber-btn cyber-btn-primary"
+                  onClick={() => void handleParseUri()}
+                  aria-label="Parse URI"
                 >
-                  Cancel
+                  ⚡ PARSE URI
                 </button>
               </div>
             </div>
-
-            {inputMode === 'uri' && !editingId ? (
-              <div className="totp-uri-form">
-                <p className="totp-form-hint">
-                  Paste an <code>otpauth://totp/...</code> URI (from a QR code, password manager, or export string):
-                </p>
-                <div className="totp-uri-input-group">
-                  <input
-                    type="text"
-                    placeholder="otpauth://totp/Issuer:user@domain.com?secret=JBSWY3DPEHPK3PXP..."
-                    value={formUri}
-                    onChange={(e) => setFormUri(e.target.value)}
-                    className="form-control"
-                  />
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => void handleParseUri()}
-                  >
-                    Parse URI
-                  </button>
+          ) : (
+            <form onSubmit={(e) => void handleSave(e)} className="cyber-manual-form">
+              <div className="cyber-form-grid-2">
+                <div className="cyber-field-group">
+                  <label className="cyber-label">
+                    ISSUER / SERVICE:
+                    <input
+                      type="text"
+                      placeholder="e.g. GitHub, AWS, Bastion Host"
+                      value={formIssuer}
+                      onChange={(e) => setFormIssuer(e.target.value)}
+                      className="cyber-input"
+                    />
+                  </label>
+                </div>
+                <div className="cyber-field-group">
+                  <label className="cyber-label">
+                    ACCOUNT / LABEL: <span className="req">*</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. alice@example.com or root"
+                      value={formLabel}
+                      onChange={(e) => setFormLabel(e.target.value)}
+                      className="cyber-input"
+                      required
+                    />
+                  </label>
                 </div>
               </div>
-            ) : (
-              <form onSubmit={(e) => void handleSave(e)} className="totp-manual-form">
-                <div className="form-row-2">
-                  <div className="form-group">
-                    <label>
-                      Issuer / Service:
-                      <input
-                        type="text"
-                        placeholder="e.g. GitHub, AWS, Corporate Bastion"
-                        value={formIssuer}
-                        onChange={(e) => setFormIssuer(e.target.value)}
-                        className="form-control"
-                      />
-                    </label>
-                  </div>
-                  <div className="form-group">
-                    <label>
-                      Account / Label: <span className="req">*</span>
-                      <input
-                        type="text"
-                        placeholder="e.g. alice@example.com or admin"
-                        value={formLabel}
-                        onChange={(e) => setFormLabel(e.target.value)}
-                        className="form-control"
-                        required
-                      />
-                    </label>
-                  </div>
-                </div>
 
-                <div className="form-group">
-                  <label>
-                    Secret Key (Base32): {editingId ? '(Leave empty to keep current seed)' : <span className="req">*</span>}
-                    <div className="secret-input-wrapper">
-                      <input
-                        type={showSecret ? 'text' : 'password'}
-                        placeholder={editingId ? '••••••••••••••••' : 'e.g. JBSWY3DPEHPK3PXP'}
-                        value={formSecret}
-                        onChange={(e) => setFormSecret(e.target.value)}
-                        className="form-control"
-                        autoComplete="off"
-                        required={!editingId}
-                      />
-                      <button
-                        type="button"
-                        className="btn-icon-toggle"
-                        onClick={() => setShowSecret((prev) => !prev)}
-                        title={showSecret ? 'Hide secret' : 'Show secret'}
-                      >
-                        {showSecret ? '🙈' : '👁️'}
-                      </button>
-                    </div>
+              <div className="cyber-field-group">
+                <label className="cyber-label">
+                  SECRET KEY (BASE32): {editingId ? '(Leave blank to retain seed)' : <span className="req">*</span>}
+                  <div className="cyber-secret-wrapper">
+                    <input
+                      type={showSecret ? 'text' : 'password'}
+                      placeholder={editingId ? '••••••••••••••••' : 'e.g. JBSWY3DPEHPK3PXP'}
+                      value={formSecret}
+                      onChange={(e) => setFormSecret(e.target.value)}
+                      className="cyber-input font-mono"
+                      autoComplete="off"
+                      required={!editingId}
+                    />
+                    <button
+                      type="button"
+                      className="cyber-btn-eye"
+                      onClick={() => setShowSecret((prev) => !prev)}
+                      title={showSecret ? 'Hide secret' : 'Reveal secret'}
+                    >
+                      {showSecret ? '🙈' : '👁'}
+                    </button>
+                  </div>
+                </label>
+                <small className="cyber-text-dim">
+                  Seed is encrypted with AES-256-GCM / Argon2id in Go memory. Never exposed over network or plain logs.
+                </small>
+              </div>
+
+              <div className="cyber-form-grid-2">
+                <div className="cyber-field-group">
+                  <label className="cyber-label">
+                    LINK TO SSH HOST (OPTIONAL):
+                    <select
+                      value={formHostId}
+                      onChange={(e) => setFormHostId(e.target.value)}
+                      className="cyber-select"
+                    >
+                      <option value="">-- Standalone Service (None) --</option>
+                      {hosts.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.label} ({h.address})
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                  <small className="form-text-muted">
-                    Encrypted inside the Go vault. Never transmitted in cleartext or exported to summaries.
+                  <small className="cyber-text-dim">
+                    Enables 1-click 2FA auto-injection into active terminal prompts for this host.
                   </small>
                 </div>
 
-                <div className="form-row-2">
-                  <div className="form-group">
-                    <label>
-                      Link to Host (Optional):
+                <div className="cyber-form-grid-3">
+                  <div className="cyber-field-group">
+                    <label className="cyber-label">
+                      DIGITS:
                       <select
-                        value={formHostId}
-                        onChange={(e) => setFormHostId(e.target.value)}
-                        className="form-control"
+                        value={formDigits}
+                        onChange={(e) => setFormDigits(Number(e.target.value))}
+                        className="cyber-select"
                       >
-                        <option value="">-- Standalone Service (None) --</option>
-                        {hosts.map((h) => (
-                          <option key={h.id} value={h.id}>
-                            {h.label} ({h.address})
-                          </option>
-                        ))}
+                        <option value={6}>6</option>
+                        <option value={8}>8</option>
                       </select>
                     </label>
-                    <small className="form-text-muted">
-                      Allows 1-click 2FA injection directly during SSH sessions to this host.
-                    </small>
                   </div>
-
-                  <div className="form-row-3-nested">
-                    <div className="form-group">
-                      <label>
-                        Digits:
-                        <select
-                          value={formDigits}
-                          onChange={(e) => setFormDigits(Number(e.target.value))}
-                          className="form-control"
-                        >
-                          <option value={6}>6</option>
-                          <option value={8}>8</option>
-                        </select>
-                      </label>
-                    </div>
-                    <div className="form-group">
-                      <label>
-                        Period (s):
-                        <input
-                          type="number"
-                          value={formPeriod}
-                          onChange={(e) => setFormPeriod(Number(e.target.value))}
-                          min={5}
-                          max={300}
-                          className="form-control"
-                        />
-                      </label>
-                    </div>
-                    <div className="form-group">
-                      <label>
-                        Algorithm:
-                        <select
-                          value={formAlgorithm}
-                          onChange={(e) => setFormAlgorithm(e.target.value)}
-                          className="form-control"
-                        >
-                          <option value="SHA1">SHA1</option>
-                          <option value="SHA256">SHA256</option>
-                          <option value="SHA512">SHA512</option>
-                        </select>
-                      </label>
-                    </div>
+                  <div className="cyber-field-group">
+                    <label className="cyber-label">
+                      PERIOD (S):
+                      <input
+                        type="number"
+                        value={formPeriod}
+                        onChange={(e) => setFormPeriod(Number(e.target.value))}
+                        min={5}
+                        max={300}
+                        className="cyber-input"
+                      />
+                    </label>
+                  </div>
+                  <div className="cyber-field-group">
+                    <label className="cyber-label">
+                      ALGO:
+                      <select
+                        value={formAlgorithm}
+                        onChange={(e) => setFormAlgorithm(e.target.value)}
+                        className="cyber-select"
+                      >
+                        <option value="SHA1">SHA1</option>
+                        <option value="SHA256">SHA256</option>
+                        <option value="SHA512">SHA512</option>
+                      </select>
+                    </label>
                   </div>
                 </div>
+              </div>
 
-                <div className="totp-form-actions">
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setShowAddEdit(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    disabled={loading}
-                  >
-                    {editingId ? 'Save Changes' : 'Save to Encrypted Vault'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
-
-        {/* TOTP Cards List */}
-        <div className="totp-card-list">
-          {filteredList.length === 0 ? (
-            <div className="totp-empty-state">
-              <span className="empty-icon">🛡️</span>
-              <h3>No TOTP authenticators found</h3>
-              <p>
-                {searchQuery
-                  ? 'No authenticators match your search filter.'
-                  : 'Add your two-factor authentication (2FA) seeds securely into your encrypted vault to generate codes and inject them directly into your SSH sessions.'}
-              </p>
-              {!searchQuery && !showAddEdit && (
+              <div className="cyber-form-actions">
                 <button
                   type="button"
-                  className="btn-primary"
-                  onClick={handleOpenAdd}
+                  className="cyber-btn cyber-btn-secondary"
+                  onClick={() => setShowAddEdit(false)}
                 >
-                  ➕ Add First Authenticator
+                  CANCEL
                 </button>
-              )}
-            </div>
-          ) : (
-            filteredList.map((item) => {
-              const codeResp = codes[item.id];
-              const remaining = codeResp ? codeResp.remainingSeconds : 30;
-              const period = item.period || 30;
-              const fraction = Math.max(0, Math.min(1, remaining / period));
-              const isUrgent = remaining <= 5;
+                <button
+                  type="submit"
+                  className="cyber-btn cyber-btn-primary"
+                  disabled={loading}
+                  aria-label={editingId ? 'Save Changes' : 'Save to Encrypted Vault'}
+                >
+                  {editingId ? '✓ SAVE CHANGES' : '🛡 ENCRYPT TO VAULT'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
-              // SVG Circle properties
-              const radius = 14;
-              const circumference = 2 * Math.PI * radius;
-              const strokeDashoffset = circumference * (1 - fraction);
+      {/* Cyberpunk Token Card Grid */}
+      <div className="cyber-totp-card-grid">
+        {filteredList.length === 0 ? (
+          <div className="cyber-empty-state">
+            <div className="cyber-empty-radar" />
+            <div className="cyber-empty-icon">🛡️</div>
+            <h3 className="cyber-empty-title">/// ZERO AUTHENTICATOR SEEDS IN SCOPE ///</h3>
+            <p className="cyber-empty-desc">
+              {searchQuery
+                ? 'No authenticators match the search query.'
+                : 'Your encrypted vault contains no TOTP seeds. Add your two-factor authentication keys to generate rolling 30s tokens and inject them with 1 click into terminal prompts.'}
+            </p>
+            {!searchQuery && !showAddEdit && (
+              <div className="cyber-empty-actions">
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-primary"
+                  onClick={handleOpenAdd}
+                  aria-label="➕ Add Authenticator"
+                >
+                  + ADD FIRST KEY
+                </button>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  onClick={handleOpenImport}
+                >
+                  📥 IMPORT BACKUP
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          filteredList.map((item) => {
+            const codeResp = codes[item.id];
+            const remaining = codeResp ? codeResp.remainingSeconds : 30;
+            const period = item.period || 30;
+            const fraction = Math.max(0, Math.min(1, remaining / period));
+            const isUrgent = remaining <= 5;
+            const isWarning = remaining > 5 && remaining <= 10;
 
-              const hostLabel = item.hostId ? hostMap.get(item.hostId) : undefined;
+            // SVG Circle HUD Gauge properties
+            const radius = 17;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset = circumference * (1 - fraction);
 
-              return (
-                <div key={item.id} className="totp-card">
-                  <div className="totp-card-left">
-                    <div className="totp-issuer-badge">
-                      {(item.issuer || item.label || '2FA').slice(0, 2).toUpperCase()}
+            // 10-segment tick bar
+            const totalSegments = 10;
+            const filledSegments = Math.ceil(fraction * totalSegments);
+
+            const hostLabel = item.hostId ? hostMap.get(item.hostId) : undefined;
+            const badgeInitials = (item.issuer || item.label || '2F').slice(0, 2).toUpperCase();
+
+            return (
+              <div
+                key={item.id}
+                className={`cyber-totp-card ${isUrgent ? 'card-urgent' : isWarning ? 'card-warning' : ''}`}
+              >
+                {/* Tactical Corner Accents */}
+                <div className="card-reticle card-reticle-tl" />
+                <div className="card-reticle card-reticle-tr" />
+                <div className="card-reticle card-reticle-bl" />
+                <div className="card-reticle card-reticle-br" />
+
+                {/* Card Top Row */}
+                <div className="card-top-row">
+                  <div className="card-issuer-monogram" title={item.issuer || item.label}>
+                    {badgeInitials}
+                  </div>
+                  <div className="card-identity-block">
+                    <div className="card-service-name">
+                      {item.issuer || item.label}
                     </div>
-                    <div className="totp-meta">
-                      <div className="totp-header-row">
-                        {item.issuer && <span className="totp-issuer-name">{item.issuer}</span>}
-                        {hostLabel && (
-                          <span className="totp-host-badge" title={`Linked to Host: ${hostLabel}`}>
-                            🖥️ {hostLabel}
-                          </span>
-                        )}
-                        {item.algorithm !== 'SHA1' && (
-                          <span className="totp-alg-badge">{item.algorithm}</span>
-                        )}
-                      </div>
-                      <div className="totp-account-label" title={item.label}>
-                        {item.label}
-                      </div>
+                    <div className="card-account-label" title={item.label}>
+                      {item.label}
                     </div>
                   </div>
+                  <div className="card-tags-block">
+                    {hostLabel && (
+                      <span className="card-host-pill" title={`Linked to Host: ${hostLabel}`}>
+                        <span className="pill-pulse" /> 🖥 {hostLabel}
+                      </span>
+                    )}
+                    <span className="card-meta-pill">
+                      {item.algorithm || 'SHA1'} · {period}s
+                    </span>
+                  </div>
+                </div>
 
-                  <div className="totp-card-center">
-                    <div className="totp-code-display" aria-label={`Code: ${codeResp?.code || ''}`}>
-                      <span className="totp-code-digits">
+                {/* Cyber Display Terminal with Big Digits and HUD Gauge */}
+                <div
+                  className="card-code-terminal"
+                  onClick={() => void handleCopyCode(item.id, codeResp?.code || '')}
+                  title="Click to copy 2FA code to clipboard"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      void handleCopyCode(item.id, codeResp?.code || '');
+                    }
+                  }}
+                >
+                  <div className="card-code-main">
+                    <div className="code-digits-wrapper">
+                      <span className={`cyber-code-digits ${isUrgent ? 'urgent-glow' : ''}`}>
                         {formatCode(codeResp?.code, item.digits)}
                       </span>
                     </div>
 
-                    {/* Circular Countdown Ring */}
+                    {/* HUD Circular Countdown Gauge */}
                     <div
-                      className={`totp-countdown-wheel ${isUrgent ? 'urgent' : ''}`}
-                      title={`${remaining}s remaining in this 30s period`}
+                      className={`cyber-hud-gauge ${isUrgent ? 'urgent' : isWarning ? 'warning' : ''}`}
+                      title={`${remaining}s remaining in this ${period}s window`}
                     >
-                      <svg width="34" height="34" viewBox="0 0 34 34">
+                      <svg width="46" height="46" viewBox="0 0 46 46">
+                        {/* Outer tick circle */}
                         <circle
-                          className="wheel-track"
-                          cx="17"
-                          cy="17"
+                          className="gauge-tick-track"
+                          cx="23"
+                          cy="23"
+                          r="21"
+                        />
+                        {/* Background track */}
+                        <circle
+                          className="gauge-bg-track"
+                          cx="23"
+                          cy="23"
                           r={radius}
                         />
+                        {/* Animated fill arc */}
                         <circle
-                          className="wheel-fill"
-                          cx="17"
-                          cy="17"
+                          className="gauge-fill-arc"
+                          cx="23"
+                          cy="23"
                           r={radius}
                           strokeDasharray={circumference}
                           strokeDashoffset={strokeDashoffset}
                         />
                       </svg>
-                      <span className="countdown-number">{remaining}</span>
+                      <span className="gauge-countdown-text">
+                        {remaining}
+                        <span className="gauge-countdown-unit">s</span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="totp-card-actions">
-                    <button
-                      type="button"
-                      className={`btn-action-copy ${copiedId === item.id ? 'copied' : ''}`}
-                      onClick={() => void handleCopyCode(item.id, codeResp?.code || '')}
-                      title="Copy 2FA code to clipboard"
-                    >
-                      {copiedId === item.id ? '✓ Copied' : '📋 Copy'}
-                    </button>
-
-                    {activeSessionId && (
-                      <button
-                        type="button"
-                        className="btn-action-inject"
-                        onClick={() => void handleInject(item.id)}
-                        disabled={injectingId === item.id}
-                        title="Auto-fill code directly into active SSH terminal prompt"
-                      >
-                        {injectingId === item.id ? '...' : '⚡ Insert'}
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      className="btn-action-icon"
-                      onClick={() => handleOpenEdit(item)}
-                      title="Edit authenticator details"
-                    >
-                      ✏️
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn-action-icon btn-action-delete"
-                      onClick={() => void handleDelete(item.id, item.label)}
-                      title="Delete authenticator from vault"
-                    >
-                      🗑️
-                    </button>
+                  {/* 10-Segment Tactical Bar */}
+                  <div className="cyber-segment-bar" aria-hidden="true">
+                    {Array.from({ length: totalSegments }).map((_, idx) => (
+                      <span
+                        key={idx}
+                        className={`seg-cell ${idx < filledSegments ? 'seg-active' : 'seg-inactive'} ${
+                          isUrgent ? 'seg-urgent' : isWarning ? 'seg-warning' : ''
+                        }`}
+                      />
+                    ))}
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
 
-        {!isDocked && (
-          <div className="modal-footer totp-modal-footer">
-            <div className="totp-footer-hint">
-              <span>🛡️ Threat Model: TOTP seeds remain encrypted inside the Go process; only ephemeral 30s codes leave the vault.</span>
-            </div>
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Close
-            </button>
-          </div>
+                {/* Card Actions Bottom Row */}
+                <div className="card-action-row">
+                  <button
+                    type="button"
+                    className={`cyber-btn-copy ${copiedId === item.id ? 'is-copied' : ''}`}
+                    onClick={() => void handleCopyCode(item.id, codeResp?.code || '')}
+                    title="Copy 2FA token to clipboard"
+                  >
+                    {copiedId === item.id ? '✓ COPIED TO CLIPBOARD' : '📋 COPY CODE'}
+                  </button>
+
+                  {activeSessionId && (
+                    <button
+                      type="button"
+                      className="cyber-btn-inject"
+                      onClick={() => void handleInject(item.id)}
+                      disabled={injectingId === item.id}
+                      title="Directly inject 2FA code into active SSH terminal prompt"
+                    >
+                      {injectingId === item.id ? '...' : '⚡ INJECT'}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="cyber-btn-icon"
+                    onClick={() => handleOpenEdit(item)}
+                    title="Edit authenticator parameters"
+                    aria-label={`Edit ${item.label}`}
+                  >
+                    ✏
+                  </button>
+
+                  <button
+                    type="button"
+                    className="cyber-btn-icon btn-delete"
+                    onClick={() => void handleDelete(item.id, item.label)}
+                    title="Delete authenticator from vault"
+                    aria-label={`Delete ${item.label}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
+
+      {/* Footer Info Strip */}
+      <div className="cyber-totp-footer">
+        <span className="footer-hazard">///</span>
+        <span className="footer-text">
+          ZERO-LEAK PROTOCOL · RAW SEEDS STAY SEALED IN VAULT MEMORY · AUTO-INJECT ROLLS OVER SECURE PTY CHANNELS
+        </span>
+        {!isDocked && (
+          <button type="button" className="cyber-btn-sm cyber-btn-secondary" onClick={onClose}>
+            CLOSE
+          </button>
+        )}
+      </div>
+
+      {/* Export Dialog Modal */}
+      {showExportModal && (
+        <div className="cyber-modal-overlay" onClick={() => setShowExportModal(false)}>
+          <div className="cyber-dialog-card" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-header">
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <h3>EXPORT TOTP AUTHENTICATOR BACKUP</h3>
+              </div>
+              <button
+                type="button"
+                className="cyber-btn-close"
+                onClick={() => setShowExportModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="dialog-body">
+              <div className="cyber-format-selector">
+                <label className="cyber-label">BACKUP FORMAT:</label>
+                <div className="format-pills">
+                  <button
+                    type="button"
+                    className={`cyber-tab-btn ${exportFormat === 'uri' ? 'active' : ''}`}
+                    onClick={() => void handleChangeExportFormat('uri')}
+                  >
+                    🔗 OTPAUTH:// URIS (STANDARD)
+                  </button>
+                  <button
+                    type="button"
+                    className={`cyber-tab-btn ${exportFormat === 'json' ? 'active' : ''}`}
+                    onClick={() => void handleChangeExportFormat('json')}
+                  >
+                    📦 JSON VAULT FORMAT
+                  </button>
+                </div>
+              </div>
+
+              <div className="dialog-warning-banner">
+                <span className="warn-icon">⚠</span>
+                <span>
+                  SECURITY WARNING: Exported content contains cleartext cryptographic seeds. Save strictly to an
+                  encrypted storage device or password manager.
+                </span>
+              </div>
+
+              <textarea
+                readOnly
+                value={exportContent}
+                className="cyber-export-textarea"
+                rows={10}
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="dialog-footer">
+              <button
+                type="button"
+                className={`cyber-btn ${exportCopied ? 'cyber-btn-success' : 'cyber-btn-primary'}`}
+                onClick={() => void handleCopyExport()}
+              >
+                {exportCopied ? '✓ COPIED ALL TO CLIPBOARD' : '📋 COPY TO CLIPBOARD'}
+              </button>
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-secondary"
+                onClick={handleDownloadExport}
+              >
+                💾 DOWNLOAD FILE
+              </button>
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-secondary"
+                onClick={() => setShowExportModal(false)}
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Dialog Modal */}
+      {showImportModal && (
+        <div className="cyber-modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="cyber-dialog-card" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-header">
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <h3>IMPORT TOTP AUTHENTICATOR BACKUP</h3>
+              </div>
+              <button
+                type="button"
+                className="cyber-btn-close"
+                onClick={() => setShowImportModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="dialog-body">
+              <p className="cyber-form-hint">
+                Import from newline-separated <code>otpauth://totp/...</code> URIs or a JSON array of token objects.
+                Duplicate keys will be updated with the latest parameters.
+              </p>
+
+              <div className="import-file-row">
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  📁 LOAD FROM FILE (.TXT / .JSON)
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept=".txt,.json,.conf"
+                  onChange={handleFileUpload}
+                />
+              </div>
+
+              {importError && (
+                <div className="cyber-banner cyber-banner-error" role="alert">
+                  <span className="banner-icon">⚠</span>
+                  <span className="banner-text">{importError}</span>
+                </div>
+              )}
+
+              <textarea
+                placeholder="otpauth://totp/GitHub:alice@domain.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub&#10;otpauth://totp/AWS:admin?secret=NBSWY3DPEHPK3PXP&#10;-- OR paste JSON array --"
+                value={importContent}
+                onChange={(e) => setImportContent(e.target.value)}
+                className="cyber-export-textarea"
+                rows={10}
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="dialog-footer">
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-primary"
+                onClick={() => void handleExecuteImport()}
+                disabled={importLoading}
+              >
+                {importLoading ? 'IMPORTING...' : '🚀 IMPORT AUTHENTICATORS'}
+              </button>
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-secondary"
+                onClick={() => setShowImportModal(false)}
+                disabled={importLoading}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 
   if (isDocked) {
@@ -768,7 +1224,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop cyber-modal-backdrop" onClick={onClose}>
       {content}
     </div>
   );

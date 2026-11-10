@@ -13,9 +13,15 @@ export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;
 
 export function CheckRemoteConflict(arg1:string):Promise<core.RemoteConflictInfo>;
 
+export function CheckSessionAlive(arg1:string):Promise<boolean>;
+
+export function CheckVaultSyncStatus():Promise<core.VaultSyncInfo>;
+
 export function ClearWorkspace():Promise<void>;
 
 export function CloseRemoteEdit(arg1:string):Promise<void>;
+
+export function ConnectRawTcp(arg1:core.RawTcpConfig):Promise<string>;
 
 export function ConnectSSH(arg1:core.ConnectRequest):Promise<string>;
 
@@ -51,11 +57,15 @@ export function DuplicateSession(arg1:string,arg2:core.TerminalSize):Promise<str
 
 export function EnableQuickUnlock():Promise<void>;
 
+export function ExecuteImport(arg1:core.ImportExecuteOptions):Promise<core.ImportExecuteResult>;
+
 export function ExecuteSnippet(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
 
 export function ExportProxychainsConfig():Promise<string>;
 
 export function ExportSessionLog(arg1:string,arg2:string):Promise<void>;
+
+export function ExportTotpTokens(arg1:string):Promise<string>;
 
 export function GenerateProxychainsConfig(arg1:core.ProxychainsExportOptions):Promise<string>;
 
@@ -69,7 +79,11 @@ export function GetAllTotpCodes():Promise<Array<core.TotpCodeResponse>>;
 
 export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOptions>;
 
+export function GetLiveSessionIDs():Promise<Array<string>>;
+
 export function GetNote(arg1:string):Promise<core.NotePage>;
+
+export function GetRawTcpSessionStats(arg1:string):Promise<core.RawTcpSessionStats>;
 
 export function GetRemoteEditContent(arg1:string):Promise<string>;
 
@@ -81,11 +95,15 @@ export function GetTotpCode(arg1:string):Promise<core.TotpCodeResponse>;
 
 export function GetVaultSummary():Promise<core.VaultSummary>;
 
+export function GetVaultSyncInfo():Promise<core.VaultSyncInfo>;
+
 export function HealthCheck():Promise<core.AppStatus>;
 
 export function ImportSSHConfig(arg1:string):Promise<core.SSHConfigParseResult>;
 
 export function ImportSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
+
+export function ImportTotpTokens(arg1:string):Promise<number>;
 
 export function InitializeVault(arg1:string):Promise<void>;
 
@@ -105,6 +123,8 @@ export function ListNotes(arg1:string):Promise<Array<core.NotePage>>;
 
 export function ListProxyProfiles():Promise<Array<core.ProxyProfileSummary>>;
 
+export function ListRawTcpListeners():Promise<Array<core.RawTcpListenerInfo>>;
+
 export function ListRemoteDir(arg1:string,arg2:string):Promise<Array<core.FileItem>>;
 
 export function ListSerialPorts():Promise<Array<core.SerialPortInfo>>;
@@ -119,6 +139,8 @@ export function LoadWorkspace():Promise<core.WorkspaceState>;
 
 export function LockVault():Promise<void>;
 
+export function MergeExternalVaultFile(arg1:string,arg2:string):Promise<core.VaultConflictReport>;
+
 export function OpenExternalEditor(arg1:string):Promise<void>;
 
 export function OpenLocalTerminal(arg1:string,arg2:core.TerminalSize):Promise<string>;
@@ -127,7 +149,13 @@ export function OpenTerminalWithOptions(arg1:string,arg2:core.TerminalSpawnOptio
 
 export function ParseOTPAuthURI(arg1:string):Promise<core.TotpRecord>;
 
+export function ParsePuTTYRegContent(arg1:string):Promise<core.ImportScanResult>;
+
+export function ParseTermiusContent(arg1:string):Promise<core.ImportScanResult>;
+
 export function ReadSessionLog(arg1:string):Promise<string>;
+
+export function RelocateVaultFile(arg1:string,arg2:boolean):Promise<void>;
 
 export function ResetVault():Promise<void>;
 
@@ -136,6 +164,8 @@ export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void
 export function ResolveHostKeyPrompt(arg1:string,arg2:number,arg3:boolean):Promise<void>;
 
 export function ResolveSnippetTemplate(arg1:string,arg2:string,arg3:Record<string, string>):Promise<string>;
+
+export function ResolveVaultConflicts(arg1:Record<string, string>,arg2:boolean):Promise<void>;
 
 export function SaveForwardRule(arg1:core.ForwardRule):Promise<void>;
 
@@ -159,11 +189,17 @@ export function SaveTotpRecord(arg1:core.TotpRecord):Promise<void>;
 
 export function SaveWorkspace(arg1:core.WorkspaceState):Promise<void>;
 
+export function ScanLocalPuTTYSessions():Promise<core.ImportScanResult>;
+
+export function ScanSyncConflictFiles():Promise<Array<string>>;
+
 export function SearchCommandPalette(arg1:string):Promise<core.CommandPaletteResponse>;
 
 export function SearchNotes(arg1:string):Promise<Array<core.NoteSearchResult>>;
 
 export function SendSerialBreak(arg1:string):Promise<void>;
+
+export function SetRawTcpSessionLineMode(arg1:string,arg2:boolean,arg3:string):Promise<void>;
 
 export function SetSerialDTR(arg1:string,arg2:boolean):Promise<void>;
 
@@ -172,6 +208,8 @@ export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
 export function SetWorkspaceStore(arg1:data.WorkspaceStore):Promise<void>;
 
 export function StartForwardTunnel(arg1:string,arg2:string):Promise<string>;
+
+export function StartRawTcpListener(arg1:core.RawTcpListenerConfig):Promise<core.RawTcpListenerInfo>;
 
 export function StartRemoteEdit(arg1:string,arg2:string):Promise<core.RemoteEditSession>;
 
@@ -182,6 +220,8 @@ export function StartSftpDownload(arg1:string,arg2:string,arg3:string):Promise<s
 export function StartSftpUpload(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function StopForwardTunnel(arg1:string):Promise<void>;
+
+export function StopRawTcpListener(arg1:string):Promise<void>;
 
 export function StopSessionLogging(arg1:string):Promise<core.SessionLogStatus>;
 

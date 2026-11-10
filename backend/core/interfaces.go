@@ -561,7 +561,52 @@ type RemoteEditEvent struct {
 	Message       string           `json:"message,omitempty"`
 }
 
-// SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03).
+// VaultSyncStatus describes the synchronization state of the on-disk encrypted vault file (F-29).
+type VaultSyncStatus string
+
+const (
+	VaultSyncStatusSynced         VaultSyncStatus = "synced"
+	VaultSyncStatusExternalChange VaultSyncStatus = "external_change"
+	VaultSyncStatusConflict       VaultSyncStatus = "conflict"
+)
+
+// VaultConflictResolution specifies how to resolve a conflict for an item (F-29).
+type VaultConflictResolution string
+
+const (
+	ResolutionKeepLocal  VaultConflictResolution = "local"
+	ResolutionKeepRemote VaultConflictResolution = "remote"
+	ResolutionKeepBoth   VaultConflictResolution = "both"
+)
+
+// VaultConflictItem represents a single conflicting entity between local and remote vaults (F-29).
+type VaultConflictItem struct {
+	ID            string `json:"id"`
+	Type          string `json:"type"` // "host", "group", "identity", "key", "snippet", "note", "totp", "forward_rule", "proxy_profile"
+	Label         string `json:"label"`
+	LocalSummary  string `json:"localSummary"`
+	RemoteSummary string `json:"remoteSummary"`
+}
+
+// VaultConflictReport summarizes detected conflicts when merging two vaults (F-29).
+type VaultConflictReport struct {
+	HasConflicts bool                `json:"hasConflicts"`
+	Conflicts    []VaultConflictItem `json:"conflicts"`
+	AutoMerged   int                 `json:"autoMerged"`
+}
+
+// VaultSyncInfo provides telemetry and file metadata for the active vault file (F-29).
+type VaultSyncInfo struct {
+	FilePath          string          `json:"filePath"`
+	FileSize          int64           `json:"fileSize"`
+	LastModified      int64           `json:"lastModified"`
+	Status            VaultSyncStatus `json:"status"`
+	SyncConflictFiles []string        `json:"syncConflictFiles,omitempty"`
+	DetectedConflict  bool            `json:"detectedConflict"`
+	ConflictCount     int             `json:"conflictCount"`
+}
+
+// SecretStore defines the strict boundary interface for the encrypted vault (ADR-0007, F-03, F-29).
 // Implementations live in backend/vault; the master key never leaves the Go process.
 type SecretStore interface {
 	IsInitialized() bool
@@ -579,4 +624,8 @@ type SecretStore interface {
 	Touch()
 	GetPayload() (VaultPayload, error)
 	SavePayload(ctx context.Context, payload VaultPayload) error
+	GetFilePath() string
+	SetFilePath(newPath string) error
+	GetSyncInfo() (VaultSyncInfo, error)
+	CheckExternalChange() (bool, error)
 }

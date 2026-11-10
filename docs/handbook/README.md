@@ -6,9 +6,78 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, & `F-37`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, & `F-37`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Raw TCP Socket Client & Inbound Listener Engine ("Netcat Mode") (`F-31` / Spec Line 64, 140)**:
+  - **Direct Raw Socket Terminal (Outgoing Client)**:
+    - Dial any TCP host and port with zero SSH handshake overhead directly from DoubleAgent.
+    - Open **Tools ▾ &rarr; Raw TCP / Netcat (F-31)**, or type `nc <host> <port>` or `tcp://<host>:<port>` directly in the Command Palette (`Ctrl+K`).
+    - **1-Click Presets**: Instant configuration pills for common socket services: `HTTP [80]`, `Redis [6379]`, `SMTP [25]`, and `Shell [4444]`.
+    - **Line Buffering & Local Echo Mode**:
+      - Solves the typing blindness problem when interacting with raw non-PTY network services (HTTP, Redis, SMTP, Memcached, POP3).
+      - DoubleAgent provides interactive local line-editing with backspace and character erasure, transmitting the completed command line upon pressing Enter.
+      - 1-click toggle in the terminal toolbar between **Line Mode: ON/OFF** and selectable line endings: **CRLF (`\r\n`)** (default network RFC), **LF (`\n`)**, or **CR (`\r`)**.
+  - **Inbound TCP Listener & Reverse Shell Catcher**:
+    - Bind a local listening port on `0.0.0.0` or `127.0.0.1` directly from the **Inbound Listener** tab or Command Palette (`listen <port>`).
+    - Run multiple concurrent background listeners with real-time status pills (`🟢 ARMED :<port>`), live connection counters (`CATCHES: N`), and start timestamps.
+    - **Automatic Terminal Tab Spawning**:
+      - When an external target or device connects back (`bash -i >& /dev/tcp/...`, `nc -e /bin/sh`, hardware beacons), DoubleAgent automatically catches the connection and instantly opens an interactive terminal tab (`TCP :4444 ◀ <remoteAddr>`).
+      - Sounds a notification chime and displays a status alert banner.
+    - **Reverse Shell TTY Upgrade Helpers**:
+      - For caught reverse shells that lack a fully interactive PTY, the terminal toolbar features a **`⚡ TTY UPGRADE ▾`** dropdown with 1-click payload injectors:
+        - `🐍 Spawn Python3 PTY` (`python3 -c 'import pty; pty.spawn("/bin/bash")'`)
+        - `🐍 Spawn Python PTY` (`python -c 'import pty; pty.spawn("/bin/bash")'`)
+        - `📟 Export TERM` (`export TERM=xterm-256color`)
+        - `⚡ Fix stty raw -echo` (`stty raw -echo; fg`)
+        - `🐚 Spawn /bin/sh -i` (`/bin/sh -i`)
+- **PuTTY & Termius Session Migration & Import (`F-30` / Spec Line 59, 140)**:
+  - **Effortless Migration from Legacy & Cloud Clients**:
+    - Migrate all your existing servers, credentials, SSH keys, groups, and port forwardings from PuTTY or Termius directly into DoubleAgent's encrypted vault.
+    - Open **Tools ▾ &rarr; Import PuTTY / Termius (F-30)** or via Command Palette (`Ctrl+K` &rarr; "Import PuTTY / Termius").
+  - **PuTTY Import (Local Registry & `.reg` Exports)**:
+    - **1-Click Local Scan**: On Windows, click **`Scan Local PuTTY Sessions (Registry)`** to automatically read all saved sessions from `HKCU\Software\SimonTatham\PuTTY\Sessions`. On Linux, DoubleAgent scans `~/.putty/sessions/`.
+    - **`.reg` File Support**: Upload or paste an exported `.reg` file from another machine.
+    - Automatically decodes session names, addresses, ports (including hexadecimal DWORD values), usernames, and parses PuTTY `-L`, `-R`, and `-D` port forwarding strings into active DoubleAgent tunnels.
+    - If a session references a local `.ppk` private key file, DoubleAgent automatically imports and encrypts the key inside your vault.
+  - **Termius Import (JSON & CSV Exports)**:
+    - Drag & drop or upload your `termius.json` or `.csv` export, or paste the content directly.
+    - Supports both flat host arrays and nested schema with group hierarchies and tags.
+  - **Smart Duplicate Detection & Interactive Preview Table**:
+    - Discovered sessions are displayed in a Cyberpunk preview table before anything is saved.
+    - Items that already exist in your DoubleAgent vault are flagged with an **`In Vault`** status pill.
+    - Easily select or deselect hosts individually or in bulk (`Select All` / `Deselect All`).
+    - Choose a destination group (e.g. `Imported from PuTTY` or assign to an existing group).
+    - Click **`⚡ Import Selected`** to safely ingest the sessions into your encrypted vault.
+- **Encrypted Vault Storage, Cloud Sync (Google Drive / Syncthing) & Conflict Merge (`F-29` / Spec Line 57, 138, 224)**:
+  - **Single Encrypted Vault Storage**:
+    - All DoubleAgent configurations—saved hosts, groups, credentials, SSH keypairs, port forwarding tunnels, proxy profiles, command snippets, encrypted notes, and TOTP authenticators—are stored inside a single encrypted, tamper-evident envelope file (`doubleagent.vault`).
+    - The vault payload is authenticated and encrypted using `Argon2id` + `XChaCha20-Poly1305` with zero unencrypted secrets stored on disk.
+  - **Relocate Vault to Cloud Sync Folders**:
+    - Want to use DoubleAgent seamlessly across multiple laptops or workstations?
+    - Open **Vault ▾ &rarr; Storage &amp; Sync (F-29)** or **Global Settings (`Ctrl+,`) &rarr; ☁️ Storage &amp; Sync**.
+    - Under **Relocate Vault Storage Path**, enter the folder path inside your Syncthing, Google Drive, Dropbox, or OneDrive directory (e.g. `D:\Syncthing\DoubleAgent\doubleagent.vault`).
+    - Check **"Move current vault file and biometrics to new location"** and click **Relocate Vault**.
+    - DoubleAgent automatically updates its persistent location pointer and moves your files.
+  - **Automatic External Sync Change Detection**:
+    - DoubleAgent tracks file modification timestamps and envelope payload hashes.
+    - If another device updates the vault file via Syncthing or cloud drive, DoubleAgent detects it immediately:
+      - `🟢 IN SYNC`: Disk copy matches active memory state.
+      - `🟡 EXTERNAL CHANGE DETECTED`: Another machine updated the file; click **Scan External Changes** to reload or merge non-conflicting additions.
+  - **Cloud Sync Conflict Copy Detection & Smart Merge**:
+    - When two machines make changes offline, sync utilities (Syncthing, Google Drive, Dropbox) create conflict duplicate files (e.g. `doubleagent.sync-conflict-*.vault` or `doubleagent (1).vault`).
+    - DoubleAgent automatically scans the vault directory for these conflict files and highlights them:
+      - A warning pill **`⚠️ SYNC CONFLICT (N)`** appears in the top navigation bar.
+      - Each conflict copy is listed under **Cloud Sync Conflict Files** with file size and timestamp.
+    - Click **Review &amp; Merge** to launch the Cyberpunk HUD **Vault Merge Conflict Resolver**:
+      - **Automatic Merging**: Non-conflicting items added on either machine (new hosts, keys, rules, snippets, notes) are merged automatically without manual intervention.
+      - **Side-by-Side Diff Columns**: Any conflicting items (e.g. the same host modified on both machines) are displayed with local vs incoming summaries.
+      - **Resolution Options**:
+        - **`✓ Keep Local`**: Preserves your local device's version.
+        - **`✓ Accept Synced`**: Overwrites local with the incoming synced version.
+        - **`⧉ Keep Both (Rename Synced)`**: Preserves both copies, appending `(Synced)` to the incoming item label so no data is ever lost.
+      - **Bulk Actions**: `Keep All Local`, `Accept All Synced`, `Keep Both (Rename)`.
+      - **Clean Up**: Check **"Delete external conflict copy file after successful merge"** to automatically remove the sync artifact file once merged.
 - **Remote File Edit & Auto-Upload with Parallel Conflict Detection (`F-28` / Spec Line 56, 137, 223)**:
   - **In-App Syntax & Line Editor**:
     - Open any text file on the remote server for editing directly from the SFTP File Browser:
@@ -173,19 +242,25 @@ DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring 
   - **Encrypted Vault Storage & Security Boundary (Threat Model Line 155)**:
     - Two-factor authentication (TOTP) secret seeds live strictly inside the encrypted Go vault and are never exported in cleartext to frontend summaries or browser memory.
     - Only ephemeral calculated codes with remaining countdown seconds leave the Go process.
-  - **Live Codes & Circular 30-Second Countdown Wheel**:
-    - Real-time circular countdown wheel with second counter and dynamic urgent warning color (< 5 seconds) before token rollover.
-    - Clean formatting with digit separation for effortless reading (e.g. `123 456` or `1234 5678`).
-    - One-click **`📋 Copy`** button with instant "Copied!" checkmark feedback.
-  - **One-Click Terminal 2FA Prompt Auto-Injection**:
-    - When an SSH host or interactive shell prompts for 2FA / verification code, click **`🔐 2FA / TOTP`** in the terminal header (or press **`Ctrl+Shift+O`** / Leader **`o`**).
-    - The Go backend automatically resolves the TOTP authenticator linked to the active session's host or identity, calculates the current valid token, and writes it directly into the remote PTY `stdin`.
-  - **Quick Import via `otpauth://totp/...` URI**:
-    - Paste standard authenticator URLs (`otpauth://totp/Issuer:account?secret=...`) or QR code text directly into the modal.
-    - Automatically parses and populates Issuer, Account Label, Base32 Secret, Hash Algorithm (SHA1, SHA256, SHA512), Digits (6 or 8), and Period (default 30s).
+  - **Cyberpunk Tactical HUD & Responsive Grid (Standalone & Docked Mode)**:
+    - Rebuilt from the ground up matching the Cyberpunk HUD design language: obsidian dark glass background, chamfered corner frames (`clip-path: polygon(...)`), corner reticles (`┌ ┐ └ ┘`), and glowing cyan `#00f0ff` accents.
+    - Integrated HUD header displaying telemetry (`/// SEC-02FA // QUANTUM VAULT`, active key counts, `AES-256-GCM`, `RFC-6238 30s`).
+    - Responsive card grid populating 1, 2, or 3 columns in docked panes or standalone tab views.
+    - Large 26px `JetBrains Mono` glowing digits with middle space separation (`492 813`).
+    - Dual HUD countdown visualization: circular SVG gauge with tick tracks and animated fill arc (cyan > 10s, amber 6-10s, pulsing crimson <= 5s) plus a 10-segment tactical LED progress bar.
+    - 1-click **`📋 Copy`** button with immediate tactile green checkmark feedback (`✓ COPIED TO CLIPBOARD`).
+  - **Token Import & Export Engine**:
+    - **Export**: Export authenticators directly as standard line-separated `otpauth://totp/...` URIs or indented JSON vault backup files with 1-click clipboard copy and file download.
+    - **Import**: Bulk import authenticators from file upload (`.txt`, `.json`) or multiline paste (supporting Google Authenticator URIs and JSON token objects) with automated Base32 secret normalization and deduplication.
+  - **One-Click Terminal 2FA Prompt Auto-Injection & Quick Selector**:
+    - When an SSH host or interactive shell prompts for 2FA / verification code, click **`🔐 2FA / TOTP`** in the terminal header (or press **`Ctrl+Shift+O`** / Leader **`o`**):
+      - **Zero Authenticators**: Automatically opens the full TOTP Authenticator Manager window to add or import keys.
+      - **Single Authenticator**: Immediately injects the single valid 6- or 8-digit code directly into the active terminal prompt without appending a newline (`\n`), leaving you in complete control to press Enter.
+      - **Multiple Authenticators**: Opens the sleek Cyberpunk **2FA Quick Selector** modal displaying authenticators assigned to the current host and standalone unassigned keys. Clicking any authenticator (or its `⚡ INSERT` button) immediately injects the code into the prompt and dismisses the selector dialog without copying the code to the system clipboard.
+    - Top bar **Tools ▾ → TOTP Authenticator Generator** and the pinned quick-tool button always open the full management view with key creation, token editing, and import/export capabilities.
   - **Manual Entry & Host Association**:
     - Manage standalone authenticators or link authenticators to specific hosts for automatic context-aware injection.
-    - Accessible via **Tools ▾ -> TOTP Authenticator Generator (F-20)**, **`Alt+O`**, and the terminal toolbar at all times.
+    - Accessible via **Tools ▾ -> TOTP Authenticator Generator (F-20)**, **`Alt+O`**, docked split view (`+ View ▾`), and the terminal toolbar at all times.
 - **Proxy Profiles: ProxyJump, ProxyCommand, & proxychains Export (`F-14`)**:
   - **Proxy Profiles in Encrypted Vault**:
     - Configure reusable proxy profiles under **Tools ▾ -> Proxy Profiles (F-14)**:

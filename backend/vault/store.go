@@ -2,9 +2,12 @@
 package vault
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -87,6 +90,9 @@ type Store struct {
 	// Ephemeral in-memory fallback wrap key when OS DPAPI file isn't used.
 	quickWrapKey   []byte
 	quickWrappedMK []byte
+
+	lastMtime time.Time
+	lastHash  string
 }
 
 // Ensure Store satisfies core.SecretStore at compile time.
@@ -334,6 +340,7 @@ func (s *Store) unlockFromDiskWithKeyFuncLocked(ctx context.Context, keyFn func(
 	s.salt = salt
 	s.payload = ensureNonNilSlices(payload)
 	s.locked = false
+	s.updateFileMetadataLocked(rawBytes)
 	s.resetAutoLockTimerLocked()
 	return nil
 }
@@ -651,6 +658,7 @@ func (s *Store) writeEncryptedLocked(key, salt []byte, kdf KDFParams, payload co
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename temp vault file: %w", err)
 	}
+	s.updateFileMetadataLocked(encoded)
 	return nil
 }
 
@@ -761,3 +769,165 @@ func clonePayload(p core.VaultPayload) core.VaultPayload {
 	_ = json.Unmarshal(raw, &out)
 	return ensureNonNilSlices(out)
 }
+
+func (s *Store) updateFileMetadataLocked(rawBytes []byte) {
+	if fi, err := os.Stat(s.filePath); err == nil {
+		s.lastMtime = fi.ModTime()
+	}
+	h := sha256.Sum256(rawBytes)
+	s.lastHash = hex.EncodeToString(h[:])
+}
+
+// GetFilePath returns the active filesystem path of the encrypted vault file (F-29).
+func (s *Store) GetFilePath() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.filePath
+}
+
+// SetFilePath updates the target filesystem path for the vault file (F-29).
+func (s *Store) SetFilePath(newPath string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if newPath == "" {
+		return errors.New("vault file path cannot be empty")
+	}
+	s.filePath = newPath
+	if rawBytes, err := os.ReadFile(newPath); err == nil {
+		s.updateFileMetadataLocked(rawBytes)
+	}
+	return nil
+}
+
+// CheckExternalChange checks if the vault file on disk was modified externally (F-29).
+func (s *Store) CheckExternalChange() (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rawBytes, err := os.ReadFile(s.filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	h := sha256.Sum256(rawBytes)
+	currentHash := hex.EncodeToString(h[:])
+
+	if s.lastHash != "" && currentHash != s.lastHash {
+		return true, nil
+	}
+	return false, nil
+}
+
+// GetSyncInfo returns synchronization and conflict metadata for the vault file (F-29).
+func (s *Store) GetSyncInfo() (core.VaultSyncInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	info := core.VaultSyncInfo{
+		FilePath: s.filePath,
+		Status:   core.VaultSyncStatusSynced,
+	}
+
+	fi, err := os.Stat(s.filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return info, nil
+		}
+		return info, err
+	}
+
+	info.FileSize = fi.Size()
+	info.LastModified = fi.ModTime().Unix()
+
+	// Scan for conflict files in the same directory
+	dir := filepath.Dir(s.filePath)
+	conflictFiles := DetectSyncConflictFiles(dir, filepath.Base(s.filePath))
+	info.SyncConflictFiles = conflictFiles
+	if len(conflictFiles) > 0 {
+		info.DetectedConflict = true
+		info.ConflictCount = len(conflictFiles)
+	}
+
+	rawBytes, err := os.ReadFile(s.filePath)
+	if err == nil {
+		h := sha256.Sum256(rawBytes)
+		currentHash := hex.EncodeToString(h[:])
+		if s.lastHash != "" && currentHash != s.lastHash {
+			info.Status = core.VaultSyncStatusExternalChange
+		}
+	}
+
+	return info, nil
+}
+
+// DecryptExternalEnvelope reads and decrypts an external vault file with the given password
+// (or active master key if password is empty and salt matches) (F-29).
+func (s *Store) DecryptExternalEnvelope(envBytes []byte, password string) (core.VaultPayload, error) {
+	var env fileEnvelope
+	if err := json.Unmarshal(envBytes, &env); err != nil {
+		return core.VaultPayload{}, fmt.Errorf("%w: invalid envelope json", core.ErrVaultCorrupted)
+	}
+	if env.Version != currentFormatVersion || env.KDF.Algorithm != "argon2id" {
+		return core.VaultPayload{}, fmt.Errorf("%w: unsupported envelope version or kdf", core.ErrVaultCorrupted)
+	}
+
+	salt, err := base64.StdEncoding.DecodeString(env.Salt)
+	if err != nil || len(salt) != saltSize {
+		return core.VaultPayload{}, fmt.Errorf("%w: invalid salt", core.ErrVaultCorrupted)
+	}
+	nonce, err := base64.StdEncoding.DecodeString(env.Nonce)
+	if err != nil || len(nonce) != chacha20poly1305.NonceSizeX {
+		return core.VaultPayload{}, fmt.Errorf("%w: invalid nonce", core.ErrVaultCorrupted)
+	}
+	ciphertext, err := base64.StdEncoding.DecodeString(env.Ciphertext)
+	if err != nil {
+		return core.VaultPayload{}, fmt.Errorf("%w: invalid ciphertext encoding", core.ErrVaultCorrupted)
+	}
+
+	var key []byte
+	if password != "" || env.KDF.Passwordless {
+		key = argon2.IDKey([]byte(password), salt, env.KDF.Time, env.KDF.MemoryKB, env.KDF.Threads, env.KDF.KeyLen)
+		defer zeroBytes(key)
+	} else {
+		s.mu.Lock()
+		if s.locked || len(s.masterKey) == 0 {
+			s.mu.Unlock()
+			return core.VaultPayload{}, core.ErrVaultLocked
+		}
+		// If using active master key, verify salt matches
+		if bytes.Equal(s.salt, salt) {
+			key = make([]byte, len(s.masterKey))
+			copy(key, s.masterKey)
+		}
+		s.mu.Unlock()
+		if len(key) == 0 {
+			return core.VaultPayload{}, errors.New("different vault salt, password required to decrypt external vault")
+		}
+		defer zeroBytes(key)
+	}
+
+	aead, err := chacha20poly1305.NewX(key)
+	if err != nil {
+		return core.VaultPayload{}, err
+	}
+	aad, err := headerAAD(env.Version, env.KDF, env.Salt)
+	if err != nil {
+		return core.VaultPayload{}, err
+	}
+	plaintext, err := aead.Open(nil, nonce, ciphertext, aad)
+	if err != nil {
+		return core.VaultPayload{}, core.ErrVaultInvalidAuth
+	}
+	defer zeroBytes(plaintext)
+
+	var payload core.VaultPayload
+	if err := json.Unmarshal(plaintext, &payload); err != nil {
+		return core.VaultPayload{}, fmt.Errorf("%w: invalid payload json", core.ErrVaultCorrupted)
+	}
+
+	return ensureNonNilSlices(payload), nil
+}
+

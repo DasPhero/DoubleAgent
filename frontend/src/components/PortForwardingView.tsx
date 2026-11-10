@@ -150,70 +150,33 @@ export function PortForwardingView({
           onClose();
         }
       }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
-      }}
+      className="cyber-modal-backdrop"
     >
       <div
+        className="cyber-modal-card"
         style={{
-          width: '820px',
+          width: '880px',
+          maxWidth: '95vw',
           maxHeight: '90vh',
-          backgroundColor: '#161b22',
-          border: '1px solid #30363d',
-          borderRadius: '8px',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-          color: '#e6edf3',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          fontSize: '13px',
-          overflow: 'hidden',
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '12px 18px',
-            borderBottom: '1px solid #30363d',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: '#0d1117',
-          }}
-        >
+        <div className="cyber-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#58a6ff', margin: 0 }}>
-              Port Forwarding &amp; Tunnels
+            <h2 className="cyber-modal-title">
+              <span className="cyber-hazard-badge">///</span> PORT FORWARDING &amp; TUNNELS
             </h2>
-            <span style={{ fontSize: '11px', color: '#8b949e' }}>
-              {rules.length} rule{rules.length === 1 ? '' : 's'} • {activeTunnels.length} active tunnel{activeTunnels.length === 1 ? '' : 's'}
+            <span className="cyber-modal-meta">
+              {rules.length} rule{rules.length === 1 ? '' : 's'} • {activeTunnels.length} active
             </span>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {onOpenProxychainsExport && (
               <button
                 type="button"
+                className="hud-btn-outline"
                 onClick={onOpenProxychainsExport}
-                style={{
-                  padding: '4px 10px',
-                  backgroundColor: '#21262d',
-                  color: '#58a6ff',
-                  border: '1px solid #30363d',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  fontSize: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
+                style={{ fontSize: '11px', padding: '0.25rem 0.6rem' }}
               >
                 <span>⛓️</span>
                 <span>Export proxychains.conf</span>
@@ -222,36 +185,25 @@ export function PortForwardingView({
             {!showAddForm && (
               <button
                 type="button"
+                className="hud-btn-primary"
                 onClick={() => {
                   resetForm();
                   setShowAddForm(true);
                 }}
-                style={{
-                  padding: '4px 12px',
-                  backgroundColor: '#238636',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                }}
+                style={{ fontSize: '11px', padding: '0.25rem 0.75rem' }}
               >
                 + New Forward Rule
               </button>
             )}
             <button
               type="button"
+              className="hud-btn-danger"
               aria-label="Close Port Forwarding"
               onClick={onClose}
               style={{
-                padding: '4px 8px',
-                backgroundColor: 'transparent',
-                color: '#8b949e',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: 'bold',
+                fontSize: '12px',
+                padding: '0.2rem 0.55rem',
+                minWidth: '28px',
               }}
             >
               ×
@@ -260,47 +212,46 @@ export function PortForwardingView({
         </div>
 
         {/* Content Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        <div className="cyber-modal-body">
           {/* Add / Edit Rule Form */}
           {showAddForm && (
-            <form
-              onSubmit={handleSave}
-              style={{
-                backgroundColor: '#0d1117',
-                border: '1px solid #30363d',
-                borderRadius: '6px',
-                padding: '16px',
-                marginBottom: '16px',
-              }}
-            >
-              <h4 style={{ margin: '0 0 12px', color: '#58a6ff', fontSize: '13px' }}>
-                {editingRuleId ? 'Edit Forward Rule' : 'New Port Forwarding Rule'}
+            <form onSubmit={handleSave} className="cyber-hud-card">
+              <h4
+                style={{
+                  margin: '0 0 10px',
+                  color: '#00f0ff',
+                  fontSize: '13px',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {editingRuleId ? '/// EDIT FORWARD RULE ///' : '/// NEW FORWARD RULE ///'}
               </h4>
 
               {formError && (
-                <div style={{ padding: '6px 12px', backgroundColor: '#3e1b1e', color: '#ff7b72', marginBottom: '12px', borderRadius: '4px', fontSize: '12px' }}>
-                  {formError}
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'rgba(255, 0, 60, 0.15)',
+                    border: '1px solid #ff003c',
+                    color: '#ff4d6d',
+                    fontSize: '12px',
+                    fontFamily: 'JetBrains Mono, monospace',
+                  }}
+                >
+                  ⚠️ {formError}
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#8b949e', marginBottom: '4px' }}>
-                    Rule Type
-                  </label>
+                  <label className="cyber-label">Rule Type</label>
                   <select
                     aria-label="Rule Type"
                     value={ruleType}
                     onChange={(e) => setRuleType(e.target.value as ForwardRuleType)}
-                    style={{
-                      width: '100%',
-                      padding: '5px 8px',
-                      backgroundColor: '#161b22',
-                      color: '#e6edf3',
-                      border: '1px solid #30363d',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                    }}
+                    className="cyber-hud-select"
                   >
                     <option value="L">Local (-L) • Local Port ➔ Remote Target</option>
                     <option value="R">Remote (-R) • Remote Port ➔ Local Target</option>
@@ -309,47 +260,26 @@ export function PortForwardingView({
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#8b949e', marginBottom: '4px' }}>
-                    Rule Label / Description
-                  </label>
+                  <label className="cyber-label">Rule Label / Description</label>
                   <input
                     aria-label="Rule Label"
                     type="text"
                     placeholder="e.g. Postgres DB, Web Admin, Proxy"
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '5px 8px',
-                      backgroundColor: '#161b22',
-                      color: '#e6edf3',
-                      border: '1px solid #30363d',
-                      borderRadius: '4px',
-                      boxSizing: 'border-box',
-                      fontSize: '12px',
-                    }}
+                    className="cyber-hud-input"
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#8b949e', marginBottom: '4px' }}>
-                    Associated Host
-                  </label>
+                  <label className="cyber-label">Associated Host</label>
                   <select
                     aria-label="Associated Host"
                     value={hostId}
                     onChange={(e) => setHostId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '5px 8px',
-                      backgroundColor: '#161b22',
-                      color: '#e6edf3',
-                      border: '1px solid #30363d',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                    }}
+                    className="cyber-hud-select"
                   >
                     <option value="">Any Active SSH Session</option>
                     {hosts.map((h) => (
@@ -360,14 +290,14 @@ export function PortForwardingView({
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '18px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
                     <input
                       aria-label="Auto-start tunnel"
                       type="checkbox"
                       checked={autoStart}
                       onChange={(e) => setAutoStart(e.target.checked)}
-                      style={{ accentColor: '#238636' }}
+                      style={{ accentColor: '#00f0ff', width: '15px', height: '15px' }}
                     />
                     <span>Auto-start tunnel when connecting to host</span>
                   </label>
@@ -375,34 +305,27 @@ export function PortForwardingView({
               </div>
 
               {/* Bind & Target parameters */}
-              <div style={{ display: 'grid', gridTemplateColumns: ruleType === 'D' ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: ruleType === 'D' ? '1fr 1fr' : '1fr 1fr 1fr 1fr',
+                  gap: '10px',
+                }}
+              >
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#8b949e', marginBottom: '4px' }}>
-                    Bind Address
-                  </label>
+                  <label className="cyber-label">Bind Address</label>
                   <input
                     aria-label="Bind Address"
                     type="text"
                     value={bindAddress}
                     onChange={(e) => setBindAddress(e.target.value)}
                     placeholder="127.0.0.1"
-                    style={{
-                      width: '100%',
-                      padding: '5px 8px',
-                      backgroundColor: '#161b22',
-                      color: '#e6edf3',
-                      border: '1px solid #30363d',
-                      borderRadius: '4px',
-                      boxSizing: 'border-box',
-                      fontSize: '12px',
-                    }}
+                    className="cyber-hud-input"
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', color: '#8b949e', marginBottom: '4px' }}>
-                    Bind Port
-                  </label>
+                  <label className="cyber-label">Bind Port</label>
                   <input
                     aria-label="Bind Port"
                     type="number"
@@ -411,48 +334,26 @@ export function PortForwardingView({
                     placeholder="8080"
                     min="1"
                     max="65535"
-                    style={{
-                      width: '100%',
-                      padding: '5px 8px',
-                      backgroundColor: '#161b22',
-                      color: '#e6edf3',
-                      border: '1px solid #30363d',
-                      borderRadius: '4px',
-                      boxSizing: 'border-box',
-                      fontSize: '12px',
-                    }}
+                    className="cyber-hud-input"
                   />
                 </div>
 
                 {ruleType !== 'D' && (
                   <>
                     <div>
-                      <label style={{ display: 'block', fontSize: '11px', color: '#8b949e', marginBottom: '4px' }}>
-                        Target Host
-                      </label>
+                      <label className="cyber-label">Target Host</label>
                       <input
                         aria-label="Target Host"
                         type="text"
                         value={targetHost}
                         onChange={(e) => setTargetHost(e.target.value)}
                         placeholder="127.0.0.1"
-                        style={{
-                          width: '100%',
-                          padding: '5px 8px',
-                          backgroundColor: '#161b22',
-                          color: '#e6edf3',
-                          border: '1px solid #30363d',
-                          borderRadius: '4px',
-                          boxSizing: 'border-box',
-                          fontSize: '12px',
-                        }}
+                        className="cyber-hud-input"
                       />
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '11px', color: '#8b949e', marginBottom: '4px' }}>
-                        Target Port
-                      </label>
+                      <label className="cyber-label">Target Port</label>
                       <input
                         aria-label="Target Port"
                         type="number"
@@ -461,48 +362,26 @@ export function PortForwardingView({
                         placeholder="80"
                         min="1"
                         max="65535"
-                        style={{
-                          width: '100%',
-                          padding: '5px 8px',
-                          backgroundColor: '#161b22',
-                          color: '#e6edf3',
-                          border: '1px solid #30363d',
-                          borderRadius: '4px',
-                          boxSizing: 'border-box',
-                          fontSize: '12px',
-                        }}
+                        className="cyber-hud-input"
                       />
                     </div>
                   </>
                 )}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
                 <button
                   type="button"
+                  className="hud-btn-outline"
                   onClick={resetForm}
-                  style={{
-                    padding: '4px 12px',
-                    backgroundColor: '#21262d',
-                    color: '#c9d1d9',
-                    border: '1px solid #30363d',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
+                  style={{ fontSize: '11px', padding: '0.35rem 0.8rem' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{
-                    padding: '4px 14px',
-                    backgroundColor: '#238636',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
+                  className="hud-btn-primary"
+                  style={{ fontSize: '11px', padding: '0.35rem 1rem' }}
                 >
                   Save Rule
                 </button>
@@ -512,68 +391,61 @@ export function PortForwardingView({
 
           {/* Active Running Tunnels Section */}
           {activeTunnels.length > 0 && (
-            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#0d1117', border: '1px solid #238636', borderRadius: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#3fb950', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3fb950', boxShadow: '0 0 6px #3fb950' }} />
-                  Running Tunnels ({activeTunnels.length})
+            <div
+              style={{
+                padding: '12px',
+                background: 'rgba(0, 240, 255, 0.05)',
+                border: '1px solid rgba(0, 240, 255, 0.35)',
+                clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#00ff9d', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.06em' }}>
+                  <span className="pane-led live-green" />
+                  /// RUNNING TUNNELS ({activeTunnels.length}) ///
                 </span>
-                <span style={{ fontSize: '11px', color: '#8b949e' }}>
-                  Active background port forwarders
+                <span style={{ fontSize: '10px', color: '#94a3b8', letterSpacing: '0.04em' }}>
+                  ACTIVE BACKGROUND FORWARDERS
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {activeTunnels.map((tun) => (
                   <div
                     key={tun.id}
+                    className="cyber-route-display"
                     style={{
-                      display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '6px 10px',
-                      backgroundColor: '#161b22',
-                      borderRadius: '4px',
-                      fontSize: '12px',
+                      flexWrap: 'wrap',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span
-                        style={{
-                          padding: '1px 6px',
-                          borderRadius: '3px',
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          backgroundColor: tun.type === 'L' ? '#3fb95022' : tun.type === 'R' ? '#a371f722' : '#d2992222',
-                          color: tun.type === 'L' ? '#3fb950' : tun.type === 'R' ? '#a371f7' : '#d29922',
-                        }}
-                      >
+                      <span className="cyber-route-chip">
                         -{tun.type}
                       </span>
-                      <span style={{ fontFamily: 'monospace' }}>
-                        {tun.bindAddress}:{tun.bindPort} ➔ {tun.type === 'D' ? 'SOCKS5 Proxy' : `${tun.targetHost}:${tun.targetPort}`}
+                      <span style={{ color: '#f1f5f9' }}>
+                        {tun.bindAddress}:{tun.bindPort}
                       </span>
-                      <span style={{ fontSize: '10px', color: '#8b949e' }}>
-                        In: {formatBytes(tun.bytesIn)} | Out: {formatBytes(tun.bytesOut)} | {tun.activeConns} conns
+                      <span className="cyber-route-arrow">──────▶</span>
+                      <span style={{ color: '#00f0ff' }}>
+                        {tun.type === 'D' ? 'SOCKS5 Dynamic Proxy' : `${tun.targetHost}:${tun.targetPort}`}
+                      </span>
+                      <span className="cyber-telemetry-badge">
+                        IN: <strong>{formatBytes(tun.bytesIn)}</strong> | OUT: <strong>{formatBytes(tun.bytesOut)}</strong> | <strong>{tun.activeConns} conns</strong>
                       </span>
                       {tun.errorMessage && (
-                        <span style={{ fontSize: '10px', color: '#ff7b72' }}>
+                        <span style={{ fontSize: '10px', color: '#ff4d6d' }}>
                           ⚠️ {tun.errorMessage}
                         </span>
                       )}
                     </div>
                     <button
                       type="button"
+                      className="hud-btn-danger"
                       onClick={() => void onStopTunnel(tun.id)}
-                      style={{
-                        padding: '2px 8px',
-                        backgroundColor: '#da3633',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                      }}
+                      style={{ fontSize: '10px', padding: '0.2rem 0.55rem' }}
                       title="Stop this running tunnel"
                     >
                       ⏹ Stop
@@ -586,11 +458,22 @@ export function PortForwardingView({
 
           {/* Rules List */}
           {rules.length === 0 ? (
-            <div style={{ padding: '36px', textAlign: 'center', color: '#8b949e', backgroundColor: '#0d1117', borderRadius: '6px', border: '1px dashed #30363d' }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>⚡</div>
-              <p style={{ margin: '0 0 8px', fontWeight: 600 }}>No Port Forwarding Rules configured</p>
+            <div
+              style={{
+                padding: '40px 20px',
+                textAlign: 'center',
+                color: '#94a3b8',
+                background: 'rgba(8, 14, 24, 0.7)',
+                border: '1px dashed rgba(0, 240, 255, 0.25)',
+                clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+              }}
+            >
+              <div style={{ fontSize: '26px', marginBottom: '8px', color: '#00f0ff' }}>⚡</div>
+              <p style={{ margin: '0 0 6px', fontWeight: 800, color: '#f1f5f9', letterSpacing: '0.06em' }}>
+                /// NO PORT FORWARDING RULES CONFIGURED ///
+              </p>
               <p style={{ margin: 0, fontSize: '12px' }}>
-                Add Local (-L), Remote (-R), or Dynamic SOCKS5 (-D) rules to securely route traffic through your SSH connections.
+                Add Local (-L), Remote (-R), or Dynamic SOCKS5 (-D) rules to route network traffic securely through SSH tunnels.
               </p>
             </div>
           ) : (
@@ -598,36 +481,16 @@ export function PortForwardingView({
               {rules.map((rule) => {
                 const activeTun = getTunnelForRule(rule);
                 const isActive = !!activeTun;
-                const typeColor =
-                  rule.type === 'L' ? '#3fb950' : rule.type === 'R' ? '#a371f7' : '#d29922';
                 const associatedHost = hosts.find((h) => h.id === rule.hostId);
 
                 return (
                   <div
                     key={rule.id}
-                    style={{
-                      padding: '10px 14px',
-                      backgroundColor: '#0d1117',
-                      border: `1px solid ${isActive ? typeColor : '#30363d'}`,
-                      borderRadius: '6px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      transition: 'border-color 0.15s ease',
-                    }}
+                    className={`cyber-rule-card ${isActive ? 'active' : ''}`}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span
-                          style={{
-                            padding: '2px 8px',
-                            backgroundColor: `${typeColor}22`,
-                            color: typeColor,
-                            borderRadius: '4px',
-                            fontWeight: 700,
-                            fontSize: '11px',
-                          }}
-                        >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span className="cyber-route-chip">
                           {rule.type === 'L'
                             ? 'Local -L'
                             : rule.type === 'R'
@@ -635,68 +498,75 @@ export function PortForwardingView({
                             : 'Dynamic -D (SOCKS5)'}
                         </span>
 
-                        <strong style={{ fontSize: '13px', color: '#e6edf3' }}>
+                        <strong style={{ fontSize: '13px', color: '#f1f5f9', letterSpacing: '0.04em' }}>
                           {rule.label || `${rule.bindAddress}:${rule.bindPort}`}
                         </strong>
 
                         {associatedHost && (
-                          <span style={{ fontSize: '11px', color: '#8b949e', backgroundColor: '#21262d', padding: '1px 6px', borderRadius: '3px' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              color: '#94a3b8',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              padding: '1px 6px',
+                            }}
+                          >
                             Host: {associatedHost.label}
                           </span>
                         )}
 
                         {rule.autoStart && (
-                          <span style={{ fontSize: '10px', color: '#7ee787', border: '1px solid #238636', padding: '1px 5px', borderRadius: '3px' }}>
-                            ⚡ Auto-start
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              color: '#00ff9d',
+                              border: '1px solid rgba(0, 255, 157, 0.4)',
+                              background: 'rgba(0, 255, 157, 0.1)',
+                              padding: '1px 5px',
+                            }}
+                          >
+                            ⚡ AUTO-START
                           </span>
                         )}
                       </div>
 
                       {/* Status indicator */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span className={`pane-led ${isActive ? 'live-green' : 'offline-red'}`} />
                         <span
                           style={{
-                            display: 'inline-block',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: isActive ? '#3fb950' : '#8b949e',
-                            boxShadow: isActive ? '0 0 6px #3fb950' : 'none',
+                            fontSize: '11px',
+                            color: isActive ? '#00ff9d' : '#94a3b8',
+                            fontWeight: 800,
+                            letterSpacing: '0.06em',
                           }}
-                        />
-                        <span style={{ fontSize: '11px', color: isActive ? '#3fb950' : '#8b949e', fontWeight: 600 }}>
+                        >
                           {isActive ? 'ACTIVE' : 'INACTIVE'}
                         </span>
                       </div>
                     </div>
 
                     {/* Mapping details & Metrics */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        fontSize: '12px',
-                        color: '#c9d1d9',
-                        backgroundColor: '#161b22',
-                        padding: '6px 10px',
-                        borderRadius: '4px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'monospace' }}>
-                        <span>{rule.bindAddress}:{rule.bindPort}</span>
-                        <span style={{ color: '#8b949e' }}>➔</span>
-                        <span>
+                    <div className="cyber-route-display" style={{ justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: '#cbd5e1' }}>
+                          {rule.bindAddress}:{rule.bindPort}
+                        </span>
+                        <span className="cyber-route-arrow">──────▶</span>
+                        <span style={{ color: '#00f0ff' }}>
                           {rule.type === 'D'
-                            ? 'SOCKS5 Proxy via SSH'
+                            ? 'SOCKS5 Dynamic Proxy'
                             : `${rule.targetHost}:${rule.targetPort}`}
                         </span>
                       </div>
 
                       {isActive && activeTun && (
-                        <div style={{ display: 'flex', gap: '14px', fontSize: '11px', color: '#8b949e' }}>
-                          <span>In: {formatBytes(activeTun.bytesIn)}</span>
-                          <span>Out: {formatBytes(activeTun.bytesOut)}</span>
+                        <div className="cyber-telemetry-badge">
+                          <span>IN: <strong>{formatBytes(activeTun.bytesIn)}</strong></span>
+                          <span>|</span>
+                          <span>OUT: <strong>{formatBytes(activeTun.bytesOut)}</strong></span>
+                          <span>|</span>
                           <span>{activeTun.activeConns} active connection{activeTun.activeConns === 1 ? '' : 's'}</span>
                         </div>
                       )}
@@ -708,7 +578,7 @@ export function PortForwardingView({
                         {!isActive ? (
                           <>
                             {activeSessions.length > 0 ? (
-                              <div style={{ display: 'flex', gap: '6px' }}>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                 <select
                                   value={
                                     selectedSessionForStart.get(rule.id) ||
@@ -724,14 +594,8 @@ export function PortForwardingView({
                                     const val = e.target.value;
                                     setSelectedSessionForStart((prev) => new Map(prev.set(rule.id, val)));
                                   }}
-                                  style={{
-                                    padding: '3px 6px',
-                                    backgroundColor: '#21262d',
-                                    color: '#c9d1d9',
-                                    border: '1px solid #30363d',
-                                    borderRadius: '3px',
-                                    fontSize: '11px',
-                                  }}
+                                  className="cyber-hud-select"
+                                  style={{ padding: '0.2rem 0.5rem', fontSize: '11px', width: 'auto' }}
                                 >
                                   <optgroup label="Active SSH Sessions">
                                     {activeSessions.map((s) => (
@@ -752,6 +616,7 @@ export function PortForwardingView({
                                 </select>
                                 <button
                                   type="button"
+                                  className="hud-btn-primary"
                                   disabled={startingRuleId === rule.id}
                                   onClick={async () => {
                                     const targetVal =
@@ -777,16 +642,7 @@ export function PortForwardingView({
                                       setStartingRuleId(null);
                                     }
                                   }}
-                                  style={{
-                                    padding: '3px 10px',
-                                    backgroundColor: '#238636',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '3px',
-                                    cursor: startingRuleId === rule.id ? 'wait' : 'pointer',
-                                    fontWeight: 600,
-                                    fontSize: '11px',
-                                  }}
+                                  style={{ fontSize: '11px', padding: '0.25rem 0.65rem' }}
                                 >
                                   {startingRuleId === rule.id ? 'Starting...' : '▶ Start Tunnel'}
                                 </button>
@@ -794,6 +650,7 @@ export function PortForwardingView({
                             ) : associatedHost && onStartTunnelWithHost ? (
                               <button
                                 type="button"
+                                className="hud-btn-primary"
                                 disabled={startingRuleId === rule.id}
                                 onClick={async () => {
                                   if (!rule.hostId) return;
@@ -804,19 +661,7 @@ export function PortForwardingView({
                                     setStartingRuleId(null);
                                   }
                                 }}
-                                style={{
-                                  padding: '3px 10px',
-                                  backgroundColor: '#238636',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '3px',
-                                  cursor: startingRuleId === rule.id ? 'wait' : 'pointer',
-                                  fontWeight: 600,
-                                  fontSize: '11px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                }}
+                                style={{ fontSize: '11px', padding: '0.25rem 0.65rem' }}
                                 title={`Connects to ${associatedHost.label} in background and starts the tunnel`}
                               >
                                 {startingRuleId === rule.id
@@ -824,21 +669,15 @@ export function PortForwardingView({
                                   : `⚡ Connect ${associatedHost.label} & Start Tunnel`}
                               </button>
                             ) : hosts.length > 0 && onStartTunnelWithHost ? (
-                              <div style={{ display: 'flex', gap: '6px' }}>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                 <select
                                   value={selectedHostForStart.get(rule.id) || hosts[0]?.id || ''}
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     setSelectedHostForStart((prev) => new Map(prev.set(rule.id, val)));
                                   }}
-                                  style={{
-                                    padding: '3px 6px',
-                                    backgroundColor: '#21262d',
-                                    color: '#c9d1d9',
-                                    border: '1px solid #30363d',
-                                    borderRadius: '3px',
-                                    fontSize: '11px',
-                                  }}
+                                  className="cyber-hud-select"
+                                  style={{ padding: '0.2rem 0.5rem', fontSize: '11px', width: 'auto' }}
                                 >
                                   {hosts.map((h) => (
                                     <option key={h.id} value={h.id}>
@@ -848,6 +687,7 @@ export function PortForwardingView({
                                 </select>
                                 <button
                                   type="button"
+                                  className="hud-btn-primary"
                                   disabled={startingRuleId === rule.id}
                                   onClick={async () => {
                                     const targetHostId =
@@ -860,16 +700,7 @@ export function PortForwardingView({
                                       setStartingRuleId(null);
                                     }
                                   }}
-                                  style={{
-                                    padding: '3px 10px',
-                                    backgroundColor: '#238636',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '3px',
-                                    cursor: startingRuleId === rule.id ? 'wait' : 'pointer',
-                                    fontWeight: 600,
-                                    fontSize: '11px',
-                                  }}
+                                  style={{ fontSize: '11px', padding: '0.25rem 0.65rem' }}
                                   title="Connect to selected host in background and start tunnel"
                                 >
                                   {startingRuleId === rule.id
@@ -878,7 +709,7 @@ export function PortForwardingView({
                                 </button>
                               </div>
                             ) : (
-                              <span style={{ fontSize: '11px', color: '#8b949e' }}>
+                              <span style={{ fontSize: '11px', color: '#94a3b8' }}>
                                 Connect to an SSH session or add a host to start this tunnel.
                               </span>
                             )}
@@ -886,17 +717,9 @@ export function PortForwardingView({
                         ) : (
                           <button
                             type="button"
+                            className="hud-btn-danger"
                             onClick={() => void onStopTunnel(activeTun.id)}
-                            style={{
-                              padding: '3px 10px',
-                              backgroundColor: '#da3633',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '3px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontSize: '11px',
-                            }}
+                            style={{ fontSize: '11px', padding: '0.25rem 0.65rem' }}
                           >
                             ⏹ Stop Tunnel
                           </button>
@@ -906,31 +729,17 @@ export function PortForwardingView({
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button
                           type="button"
+                          className="hud-btn-outline"
                           onClick={() => startEditRule(rule)}
-                          style={{
-                            padding: '2px 8px',
-                            backgroundColor: '#21262d',
-                            color: '#c9d1d9',
-                            border: '1px solid #30363d',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                          }}
+                          style={{ fontSize: '11px', padding: '0.2rem 0.55rem' }}
                         >
                           Edit
                         </button>
                         <button
                           type="button"
+                          className="hud-btn-danger"
                           onClick={() => void onDeleteRule(rule.id)}
-                          style={{
-                            padding: '2px 8px',
-                            backgroundColor: '#21262d',
-                            color: '#f85149',
-                            border: '1px solid #30363d',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            fontSize: '11px',
-                          }}
+                          style={{ fontSize: '11px', padding: '0.2rem 0.55rem' }}
                         >
                           Delete
                         </button>

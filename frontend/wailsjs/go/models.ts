@@ -454,6 +454,168 @@ export namespace core {
 	        this.totpId = source["totpId"];
 	    }
 	}
+	export class ImportedForwardRule {
+	    type: string;
+	    bindPort: number;
+	    targetHost: string;
+	    targetPort: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportedForwardRule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.bindPort = source["bindPort"];
+	        this.targetHost = source["targetHost"];
+	        this.targetPort = source["targetPort"];
+	    }
+	}
+	export class ImportedHostEntry {
+	    label: string;
+	    address: string;
+	    port: number;
+	    username: string;
+	    group?: string;
+	    tags?: string[];
+	    keyPath?: string;
+	    password?: string;
+	    proxyCommand?: string;
+	    forwardRules?: ImportedForwardRule[];
+	    alreadyExist?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportedHostEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.address = source["address"];
+	        this.port = source["port"];
+	        this.username = source["username"];
+	        this.group = source["group"];
+	        this.tags = source["tags"];
+	        this.keyPath = source["keyPath"];
+	        this.password = source["password"];
+	        this.proxyCommand = source["proxyCommand"];
+	        this.forwardRules = this.convertValues(source["forwardRules"], ImportedForwardRule);
+	        this.alreadyExist = source["alreadyExist"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ImportExecuteOptions {
+	    selectedHosts: ImportedHostEntry[];
+	    defaultGroup?: string;
+	    importKeys: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportExecuteOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.selectedHosts = this.convertValues(source["selectedHosts"], ImportedHostEntry);
+	        this.defaultGroup = source["defaultGroup"];
+	        this.importKeys = source["importKeys"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ImportExecuteResult {
+	    hostsImported: number;
+	    groupsCreated: number;
+	    keysImported: number;
+	    tunnelsConfigured: number;
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportExecuteResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hostsImported = source["hostsImported"];
+	        this.groupsCreated = source["groupsCreated"];
+	        this.keysImported = source["keysImported"];
+	        this.tunnelsConfigured = source["tunnelsConfigured"];
+	        this.warnings = source["warnings"];
+	    }
+	}
+	export class ImportScanResult {
+	    sourceType: string;
+	    hosts: ImportedHostEntry[];
+	    groups: string[];
+	    totalFound: number;
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportScanResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceType = source["sourceType"];
+	        this.hosts = this.convertValues(source["hosts"], ImportedHostEntry);
+	        this.groups = source["groups"];
+	        this.totalFound = source["totalFound"];
+	        this.warnings = source["warnings"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 	export class NotePage {
 	    id: string;
 	    hostId?: string;
@@ -734,6 +896,132 @@ export namespace core {
 	}
 	
 	
+	export class RawTcpConfig {
+	    host: string;
+	    port: number;
+	    lineMode: boolean;
+	    lineEnding: string;
+	    timeoutSec: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RawTcpConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.lineMode = source["lineMode"];
+	        this.lineEnding = source["lineEnding"];
+	        this.timeoutSec = source["timeoutSec"];
+	    }
+	}
+	export class RawTcpListenerConfig {
+	    port: number;
+	    bindAddress: string;
+	    autoSpawnTab: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RawTcpListenerConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.bindAddress = source["bindAddress"];
+	        this.autoSpawnTab = source["autoSpawnTab"];
+	    }
+	}
+	export class RawTcpListenerInfo {
+	    id: string;
+	    port: number;
+	    bindAddress: string;
+	    status: string;
+	    // Go type: time
+	    startedAt: any;
+	    totalCatches: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RawTcpListenerInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.port = source["port"];
+	        this.bindAddress = source["bindAddress"];
+	        this.status = source["status"];
+	        this.startedAt = this.convertValues(source["startedAt"], null);
+	        this.totalCatches = source["totalCatches"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RawTcpSessionStats {
+	    id: string;
+	    remoteAddr: string;
+	    localAddr: string;
+	    isListener: boolean;
+	    listenerPort?: number;
+	    bytesSent: number;
+	    bytesReceived: number;
+	    // Go type: time
+	    connectedAt: any;
+	    lineMode: boolean;
+	    lineEnding: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RawTcpSessionStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.remoteAddr = source["remoteAddr"];
+	        this.localAddr = source["localAddr"];
+	        this.isListener = source["isListener"];
+	        this.listenerPort = source["listenerPort"];
+	        this.bytesSent = source["bytesSent"];
+	        this.bytesReceived = source["bytesReceived"];
+	        this.connectedAt = this.convertValues(source["connectedAt"], null);
+	        this.lineMode = source["lineMode"];
+	        this.lineEnding = source["lineEnding"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class RemoteConflictInfo {
 	    hasConflict: boolean;
 	    remotePath: string;
@@ -1352,6 +1640,60 @@ export namespace core {
 	        this.error = source["error"];
 	    }
 	}
+	export class VaultConflictItem {
+	    id: string;
+	    type: string;
+	    label: string;
+	    localSummary: string;
+	    remoteSummary: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VaultConflictItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.label = source["label"];
+	        this.localSummary = source["localSummary"];
+	        this.remoteSummary = source["remoteSummary"];
+	    }
+	}
+	export class VaultConflictReport {
+	    hasConflicts: boolean;
+	    conflicts: VaultConflictItem[];
+	    autoMerged: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new VaultConflictReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hasConflicts = source["hasConflicts"];
+	        this.conflicts = this.convertValues(source["conflicts"], VaultConflictItem);
+	        this.autoMerged = source["autoMerged"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class VaultSummary {
 	    groups: GroupRecord[];
 	    hosts: HostSummary[];
@@ -1395,6 +1737,30 @@ export namespace core {
 		    }
 		    return a;
 		}
+	}
+	export class VaultSyncInfo {
+	    filePath: string;
+	    fileSize: number;
+	    lastModified: number;
+	    status: string;
+	    syncConflictFiles?: string[];
+	    detectedConflict: boolean;
+	    conflictCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new VaultSyncInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filePath = source["filePath"];
+	        this.fileSize = source["fileSize"];
+	        this.lastModified = source["lastModified"];
+	        this.status = source["status"];
+	        this.syncConflictFiles = source["syncConflictFiles"];
+	        this.detectedConflict = source["detectedConflict"];
+	        this.conflictCount = source["conflictCount"];
+	    }
 	}
 	
 	export class WorkspaceState {

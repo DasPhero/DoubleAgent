@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
@@ -93,7 +93,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     render(<App />);
 
     // Open Keychain and generate Ed25519 key
-    fireEvent.click(screen.getByRole('button', { name: /Keychain/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Tools/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Keychain/i }));
     fireEvent.change(screen.getByLabelText('Key Label'), { target: { value: 'Laptop Ed25519' } });
     fireEvent.click(screen.getByRole('button', { name: /Generate Keypair/i }));
 
@@ -103,8 +104,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('button', { name: /Copy Public Key/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
 
-    // Open Import ssh_config (F-22)
-    fireEvent.click(screen.getByRole('button', { name: /Import ssh_config/i }));
+    // Open Tools menu and click Import ssh_config (F-22)
+    fireEvent.click(screen.getByRole('button', { name: /^Tools/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Import ssh_config/i }));
     fireEvent.change(screen.getByLabelText('SSH Config Content'), {
       target: {
         value: `Host jump-eu
@@ -1512,6 +1514,24 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
             injectedSession = sessId;
             injectedTotpId = tId;
           },
+          ExportTotpTokens: async (format: string) => {
+            if (format === 'json') {
+              return JSON.stringify(totpRecords);
+            }
+            return totpRecords.map((r) => `otpauth://totp/${r.issuer}:${r.label}?secret=JBSWY3DPEHPK3PXP`).join('\n');
+          },
+          ImportTotpTokens: async () => {
+            totpRecords.push({
+              id: 'totp-imported',
+              label: 'imported@test',
+              issuer: 'ImportedService',
+              algorithm: 'SHA1',
+              digits: 6,
+              period: 30,
+              hostId: '',
+            });
+            return 1;
+          },
           ConnectSSH: async () => 'session-bastion-2fa',
           ConnectSavedHost: async () => 'session-bastion-2fa',
           WriteTerminal: async () => {},
@@ -1576,6 +1596,29 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
       expect(totpRecords.length).toBe(2);
 
+      // 4b. Test Export Modal
+      const exportBtn = screen.getByRole('button', { name: /EXPORT/i });
+      fireEvent.click(exportBtn);
+      expect(await screen.findByText(/EXPORT TOTP AUTHENTICATOR BACKUP/i)).toBeInTheDocument();
+      const copyExportBtn = screen.getByRole('button', { name: /COPY TO CLIPBOARD/i });
+      fireEvent.click(copyExportBtn);
+      expect(clipboardText).toContain('otpauth://totp');
+      const closeExportBtns = screen.getAllByRole('button', { name: /CLOSE/i });
+      fireEvent.click(closeExportBtns[closeExportBtns.length - 1]);
+
+      // 4c. Test Import Modal
+      const importBtn = screen.getByRole('button', { name: /IMPORT/i });
+      fireEvent.click(importBtn);
+      expect(await screen.findByText(/IMPORT TOTP AUTHENTICATOR BACKUP/i)).toBeInTheDocument();
+      const importTextarea = screen.getByPlaceholderText(/otpauth:\/\/totp/i);
+      fireEvent.change(importTextarea, {
+        target: { value: 'otpauth://totp/ImportedService:imported@test?secret=JBSWY3DPEHPK3PXP' },
+      });
+      const executeImportBtn = screen.getByRole('button', { name: /IMPORT AUTHENTICATORS/i });
+      fireEvent.click(executeImportBtn);
+      expect(await screen.findByText(/Successfully imported 1 authenticator token!/i)).toBeInTheDocument();
+      expect(totpRecords.length).toBe(3);
+
       // Close modal
       const closeBtn = screen.getByRole('button', { name: 'Close TOTP Authenticator' });
       fireEvent.click(closeBtn);
@@ -1588,10 +1631,32 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       const inject2faBtn = await screen.findByRole('button', { name: /🔐 2FA \/ TOTP/i });
       expect(inject2faBtn).toBeInTheDocument();
 
+      // With multiple tokens (3 defined), clicking 2FA opens the reduced quick selector dialog
       fireEvent.click(inject2faBtn);
+      const quickDialog = await screen.findByRole('dialog', { name: /Select 2FA Token to Inject/i });
+      expect(quickDialog).toBeInTheDocument();
+
+      // Click the insert button for the first token
+      const insertButtons = screen.getAllByRole('button', { name: /⚡ INSERT/i });
+      expect(insertButtons.length).toBeGreaterThan(0);
+      fireEvent.click(insertButtons[0]);
+
       expect(injectedSession).toBe('session-bastion-2fa');
-      expect(injectedTotpId).toBe('');
       expect(await screen.findByText(/TOTP 2FA code injected into active terminal prompt/i)).toBeInTheDocument();
+
+      // Verify single token behavior: leave only 1 token in vault
+      totpRecords.pop();
+      totpRecords.pop();
+      expect(totpRecords.length).toBe(1);
+      injectedSession = null;
+      injectedTotpId = null;
+
+      fireEvent.click(inject2faBtn);
+      await waitFor(() => {
+        expect(injectedSession).toBe('session-bastion-2fa');
+      });
+      expect(injectedTotpId).toBe(totpRecords[0].id);
+      expect(screen.queryByRole('dialog', { name: /Select 2FA Token to Inject/i })).not.toBeInTheDocument();
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }
@@ -2409,5 +2474,359 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     const closeBtn = screen.getByRole('button', { name: /Close Remote Editor/i });
     fireEvent.click(closeBtn);
     expect(onCloseMock).toHaveBeenCalled();
+  });
+
+  it('supports Encrypted Vault File Sync, cloud conflict detection, smart 3-way merge, and storage relocation (F-29)', async () => {
+    let relocatedPath = '';
+    let resolvedMap: Record<string, string> = {};
+    let cleanupFileCalled = false;
+
+    const mockSyncInfo = {
+      filePath: 'C:\\Users\\User\\.doubleagent\\doubleagent.vault',
+      fileSize: 4096,
+      lastModified: Date.now() - 60000,
+      status: 'synced' as const,
+      syncConflictFiles: ['C:\\Users\\User\\.doubleagent\\doubleagent.sync-conflict-20261110.vault'],
+      detectedConflict: false,
+      conflictCount: 0,
+    };
+
+    const mockConflictReport = {
+      hasConflicts: true,
+      autoMerged: 2,
+      conflicts: [
+        {
+          id: 'host-1',
+          type: 'host',
+          label: 'Ares Prod Server',
+          localSummary: '192.168.1.100:22 (deploy)',
+          remoteSummary: '192.168.1.100:2222 (root)',
+        },
+      ],
+    };
+
+    const mockApi = {
+      GetVaultSyncInfo: async () => mockSyncInfo,
+      CheckVaultSyncStatus: async () => mockSyncInfo,
+      RelocateVaultFile: async (targetPath: string) => {
+        relocatedPath = targetPath;
+      },
+      ScanSyncConflictFiles: async () => mockSyncInfo.syncConflictFiles || [],
+      MergeExternalVaultFile: async () => mockConflictReport,
+      ResolveVaultConflicts: async (resolutions: Record<string, string>, cleanup: boolean) => {
+        resolvedMap = resolutions;
+        cleanupFileCalled = cleanup;
+      },
+      GetVaultHosts: async () => [],
+      GetVaultGroups: async () => [],
+      GetVaultIdentities: async () => [],
+      GetForwardRules: async () => [],
+      GetActiveTunnels: async () => [],
+    };
+
+    (window as unknown as { go?: { main?: { App?: typeof mockApi } } }).go = {
+      main: { App: mockApi },
+    };
+
+    try {
+      render(<App />);
+
+      // 1. Open Settings modal via Vault menu -> Storage & Sync
+      fireEvent.click(screen.getByRole('button', { name: /^Vault ▾/i }));
+      const syncMenuItem = screen.getByRole('menuitem', { name: /Storage & Sync/i });
+      fireEvent.click(syncMenuItem);
+
+      // Verify Settings opens on the Storage & Sync tab
+      expect(screen.getByRole('tabpanel', { name: /Storage & Sync Settings/i })).toBeInTheDocument();
+
+      // 2. Verify vault storage path and telemetry details are rendered
+      expect(await screen.findByText(/doubleagent\.vault/i)).toBeInTheDocument();
+      expect(await screen.findByText(/IN SYNC/i)).toBeInTheDocument();
+
+      // 3. Verify Cloud Sync Conflicts section shows detected file
+      expect(screen.getByText('doubleagent.sync-conflict-20261110.vault')).toBeInTheDocument();
+
+      // 4. Test Relocate Vault File
+      const relocateInput = screen.getByPlaceholderText(/e\.g\. C:\\Users\\YourName\\Google Drive/i);
+      fireEvent.change(relocateInput, { target: { value: 'D:\\CloudSync\\doubleagent.vault' } });
+      const relocateBtn = screen.getByRole('button', { name: /Relocate Vault/i });
+      fireEvent.click(relocateBtn);
+
+      await waitFor(() => {
+        expect(relocatedPath).toBe('D:\\CloudSync\\doubleagent.vault');
+      });
+
+      // 5. Test Review & Merge detected cloud conflict file
+      const reviewMergeBtn = screen.getByRole('button', { name: /Review & Merge/i });
+      fireEvent.click(reviewMergeBtn);
+
+      // Verify Vault Conflict Modal opens with conflict telemetry and diffs
+      const conflictModal = await screen.findByRole('dialog', { name: /Vault Merge Conflict Resolution/i });
+      expect(conflictModal).toBeInTheDocument();
+      expect(screen.getByText(/1 PENDING/i)).toBeInTheDocument();
+      expect(screen.getByText(/2 NON-CONFLICTING ITEMS/i)).toBeInTheDocument();
+      expect(screen.getByText('Ares Prod Server')).toBeInTheDocument();
+      expect(screen.getByText('192.168.1.100:22 (deploy)')).toBeInTheDocument();
+      expect(screen.getByText('192.168.1.100:2222 (root)')).toBeInTheDocument();
+
+      // Select "Keep Both" resolution
+      const keepBothBtn = screen.getByRole('button', { name: /Keep Both \(Rename Synced\)/i });
+      fireEvent.click(keepBothBtn);
+
+      // Apply merge
+      const applyBtn = screen.getByRole('button', { name: /Apply Resolutions/i });
+      fireEvent.click(applyBtn);
+
+      await waitFor(() => {
+        expect(resolvedMap['host-1']).toBe('both');
+        expect(cleanupFileCalled).toBe(true);
+        expect(screen.queryByRole('dialog', { name: /Vault Merge Conflict Resolution/i })).not.toBeInTheDocument();
+      });
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
+
+  it('supports PuTTY and Termius session scanning, parsing, previewing, and vault importing (F-30)', async () => {
+    let executedOptions: unknown = null;
+
+    const mockScanResult = {
+      sourceType: 'putty_reg',
+      totalFound: 2,
+      hosts: [
+        {
+          label: 'PuTTY Prod Server',
+          address: '10.50.0.1',
+          port: 22,
+          username: 'deploy',
+          group: 'Production',
+          forwardRules: [{ type: 'L', bindPort: 8080, targetHost: 'localhost', targetPort: 80 }],
+          alreadyExist: false,
+        },
+        {
+          label: 'PuTTY Existing Host',
+          address: '10.50.0.2',
+          port: 22,
+          username: 'root',
+          alreadyExist: true,
+        },
+      ],
+      groups: ['Production'],
+    };
+
+    const mockExecuteResult = {
+      hostsImported: 2,
+      groupsCreated: 1,
+      keysImported: 0,
+      tunnelsConfigured: 1,
+    };
+
+    const mockApi = {
+      ScanLocalPuTTYSessions: async () => mockScanResult,
+      ParsePuTTYRegContent: async () => mockScanResult,
+      ParseTermiusContent: async () => mockScanResult,
+      ExecuteImport: async (options: unknown) => {
+        executedOptions = options;
+        return mockExecuteResult;
+      },
+      GetVaultHosts: async () => [],
+      GetVaultGroups: async () => [],
+      GetVaultIdentities: async () => [],
+      GetForwardRules: async () => [],
+      GetActiveTunnels: async () => [],
+    };
+
+    (window as unknown as { go?: { main?: { App?: typeof mockApi } } }).go = {
+      main: { App: mockApi },
+    };
+
+    try {
+      render(<App />);
+
+      // 1. Open Tools menu -> Import PuTTY / Termius (F-30)
+      fireEvent.click(screen.getByRole('button', { name: /^Tools ▾/i }));
+      const importMenuItem = screen.getByRole('menuitem', { name: /Import PuTTY \/ Termius/i });
+      fireEvent.click(importMenuItem);
+
+      // Verify Import Dialog opens
+      const importModal = screen.getByRole('dialog', { name: 'Import PuTTY and Termius Sessions' });
+      expect(importModal).toBeInTheDocument();
+
+      // 2. Click "Scan Local PuTTY Sessions (Registry)"
+      const scanBtn = screen.getByRole('button', { name: /Scan Local PuTTY Sessions/i });
+      fireEvent.click(scanBtn);
+
+      // Verify discovered telemetry and table rows
+      expect(await screen.findByText('2 HOSTS')).toBeInTheDocument();
+      expect(screen.getByText('PuTTY Prod Server')).toBeInTheDocument();
+      expect(screen.getByText('10.50.0.1:22')).toBeInTheDocument();
+      expect(screen.getByText('In Vault')).toBeInTheDocument();
+      expect(screen.getByText('⇄ 1 Tunnels')).toBeInTheDocument();
+
+      // 3. Click Import Selected button
+      const importBtn = screen.getByRole('button', { name: /Import Selected/i });
+      fireEvent.click(importBtn);
+
+      // Verify execution succeeded and status message displayed
+      await waitFor(() => {
+        expect(executedOptions).not.toBeNull();
+        expect(screen.getByText(/Migration Complete/i)).toBeInTheDocument();
+      });
+
+      // 4. Close dialog
+      const closeBtn = screen.getByRole('button', { name: /Close Import Dialog/i });
+      fireEvent.click(closeBtn);
+      expect(screen.queryByRole('dialog', { name: 'Import PuTTY and Termius Sessions' })).not.toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
+
+  it('supports Raw TCP Socket Client & Inbound Listener Engine with Line Buffering and auto-spawned reverse shell tabs (F-31)', async () => {
+    let dialedConfig: { host: string; port: number; lineMode: boolean; lineEnding: string } | null = null;
+    let stoppedListenerId = '';
+    const activeListenersList = [
+      {
+        id: 'listener-1',
+        port: 4444,
+        bindAddress: '0.0.0.0',
+        status: 'listening' as const,
+        startedAt: new Date().toISOString(),
+        totalCatches: 2,
+      },
+    ];
+
+    let registeredEventListener: ((data: unknown) => void) | null = null;
+
+    (window as unknown as { go?: unknown }).go = {
+      main: {
+        App: {
+          HealthCheck: vi.fn().mockResolvedValue({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            milestone: 'F-31',
+            vaultLocked: false,
+            vaultInitialized: true,
+          }),
+          GetVaultSummary: vi.fn().mockResolvedValue({
+            groups: [],
+            hosts: [],
+            identities: [],
+            keys: [],
+            proxyProfiles: [],
+            snippets: [],
+          }),
+          ConnectRawTcp: vi.fn().mockImplementation((cfg) => {
+            dialedConfig = cfg;
+            return Promise.resolve('raw-tcp-sess-100');
+          }),
+          StartRawTcpListener: vi.fn().mockImplementation((cfg) => {
+            return Promise.resolve({
+              id: 'listener-2',
+              port: cfg.port,
+              bindAddress: cfg.bindAddress,
+              status: 'listening',
+              startedAt: new Date().toISOString(),
+              totalCatches: 0,
+            });
+          }),
+          StopRawTcpListener: vi.fn().mockImplementation((id: string) => {
+            stoppedListenerId = id;
+            return Promise.resolve();
+          }),
+          ListRawTcpListeners: vi.fn().mockImplementation(() => Promise.resolve(activeListenersList)),
+        },
+      },
+    };
+
+    (window as unknown as { runtime?: unknown }).runtime = {
+      EventsOn: vi.fn().mockImplementation((eventName: string, cb: (data: unknown) => void) => {
+        if (eventName === 'raw-tcp:incoming') {
+          registeredEventListener = cb;
+        }
+        return vi.fn();
+      }),
+    };
+
+    try {
+      render(<App />);
+
+      // Wait for app to render
+      expect(screen.getByLabelText('DoubleAgent Workspace')).toBeInTheDocument();
+
+      // 1. Open Raw TCP modal via Tools dropdown
+      const toolsMenuBtn = screen.getByRole('button', { name: /^Tools/i });
+      fireEvent.click(toolsMenuBtn);
+      const rawTcpToolBtn = screen.getByText(/Raw TCP \/ Netcat \(F-31\)/i);
+      fireEvent.click(rawTcpToolBtn);
+
+      // Verify Raw TCP modal opens
+      expect(await screen.findByText(/Raw TCP Socket & Listener/i)).toBeInTheDocument();
+
+      // 2. Click Quick Preset "Redis [6379]"
+      const redisPresetBtn = screen.getByRole('button', { name: /Redis \[6379\]/i });
+      fireEvent.click(redisPresetBtn);
+
+      // Click "CONNECT RAW TCP"
+      const connectBtn = screen.getByRole('button', { name: /CONNECT RAW TCP/i });
+      fireEvent.click(connectBtn);
+
+      // Verify ConnectRawTcp was called with port 6379 and lineMode true
+      await waitFor(() => {
+        expect(dialedConfig).not.toBeNull();
+        expect(dialedConfig?.port).toBe(6379);
+        expect(dialedConfig?.lineMode).toBe(true);
+      });
+
+      // Verify newly spawned tab header with TCP: 127.0.0.1:6379
+      const tabHeaders = await screen.findAllByText(/TCP:\s*127\.0\.0\.1:6379/i);
+      expect(tabHeaders.length).toBeGreaterThanOrEqual(1);
+      // Verify Raw TCP HUD telemetry strip in terminal view
+      expect(screen.getByText('PROTO: RAW-TCP')).toBeInTheDocument();
+      expect(screen.getByText(/LINE MODE: ON/i)).toBeInTheDocument();
+
+      // 3. Test Inbound Listener mode
+      // Re-open Raw TCP modal
+      fireEvent.click(screen.getByRole('button', { name: /^Tools/i }));
+      fireEvent.click(screen.getByText(/Raw TCP \/ Netcat \(F-31\)/i));
+
+      // Switch to Listener tab
+      const listenerTabBtn = screen.getByRole('button', { name: /Inbound Listener/i });
+      fireEvent.click(listenerTabBtn);
+
+      // Verify existing active listener is displayed
+      expect(await screen.findByText('0.0.0.0:4444')).toBeInTheDocument();
+      expect(screen.getByText(/CATCHES:/i)).toBeInTheDocument();
+
+      // Stop listener
+      const stopListenerBtn = screen.getByRole('button', { name: /■ STOP LISTENER/i });
+      fireEvent.click(stopListenerBtn);
+      await waitFor(() => {
+        expect(stoppedListenerId).toBe('listener-1');
+      });
+
+      // Close modal
+      const closeDialogBtn = screen.getByRole('button', { name: /Close dialog/i });
+      fireEvent.click(closeDialogBtn);
+
+      // 4. Test simulated incoming catch event (auto-spawn tab)
+      expect(registeredEventListener).not.toBeNull();
+      act(() => {
+        registeredEventListener?.({
+          sessionId: 'raw-tcp-in-caught-999',
+          listenerId: 'listener-1',
+          listenerPort: 4444,
+          remoteAddr: '10.10.10.150:51234',
+        });
+      });
+
+      // Verify auto-spawned incoming shell tab
+      const caughtTabs = await screen.findAllByText(/TCP :4444 ◀ 10\.10\.10\.150:51234/i);
+      expect(caughtTabs.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/⚡ TTY UPGRADE ▾/i).length).toBeGreaterThanOrEqual(1);
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+      delete (window as unknown as { runtime?: unknown }).runtime;
+    }
   });
 });

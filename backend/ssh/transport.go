@@ -5,10 +5,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -46,15 +49,72 @@ var (
 
 // KnownHostsStore manages known host keys and SHA256 fingerprints (F-06).
 type KnownHostsStore struct {
-	mu      sync.RWMutex
-	records map[string]core.HostKeyInfo
+	mu       sync.RWMutex
+	filePath string
+	records  map[string]core.HostKeyInfo
 }
 
-// NewKnownHostsStore creates a KnownHostsStore ready for TOFU and mismatch checks.
+// NewKnownHostsStore creates an in-memory KnownHostsStore ready for TOFU and mismatch checks.
 func NewKnownHostsStore() *KnownHostsStore {
 	return &KnownHostsStore{
 		records: make(map[string]core.HostKeyInfo),
 	}
+}
+
+// NewKnownHostsStoreWithPath creates a persistent KnownHostsStore backed by disk.
+func NewKnownHostsStoreWithPath(filePath string) *KnownHostsStore {
+	store := &KnownHostsStore{
+		filePath: filePath,
+		records:  make(map[string]core.HostKeyInfo),
+	}
+	_ = store.Load()
+	return store
+}
+
+// SetFilePath configures the persistence path for known host keys.
+func (s *KnownHostsStore) SetFilePath(filePath string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.filePath = filePath
+}
+
+// Load reads persisted known hosts from disk if available.
+func (s *KnownHostsStore) Load() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.filePath == "" {
+		return nil
+	}
+	data, err := os.ReadFile(s.filePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	var loaded map[string]core.HostKeyInfo
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		return err
+	}
+	for k, v := range loaded {
+		s.records[k] = v
+	}
+	return nil
+}
+
+// saveUnlocked writes the records map to disk. Caller must hold s.mu.
+func (s *KnownHostsStore) saveUnlocked() error {
+	if s.filePath == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(s.filePath), 0o700); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(s.records, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(s.filePath, data, 0o600)
 }
 
 func hostRecordKey(host string, port uint16) string {
@@ -89,6 +149,7 @@ func (s *KnownHostsStore) VerifyOrTrust(host string, port uint16, key ssh.Public
 		}
 		existing.LastSeen = now
 		s.records[recKey] = existing
+		_ = s.saveUnlocked()
 		s.mu.Unlock()
 		return nil
 	}
@@ -116,19 +177,20 @@ func (s *KnownHostsStore) VerifyOrTrust(host string, port uint16, key ssh.Public
 	}
 
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// Re-check under lock in case a concurrent connection populated a different key.
 	if raced, racedExists := s.records[recKey]; racedExists {
 		if raced.Fingerprint != fp || raced.KeyType != kType {
-			s.mu.Unlock()
 			return core.ErrHostKeyMismatch
 		}
 		raced.LastSeen = now
 		s.records[recKey] = raced
-		s.mu.Unlock()
+		_ = s.saveUnlocked()
 		return nil
 	}
 	s.records[recKey] = candidate
-	s.mu.Unlock()
+	_ = s.saveUnlocked()
 	return nil
 }
 

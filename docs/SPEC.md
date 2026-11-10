@@ -136,6 +136,8 @@ Jedes Feature hat ein prüfbares Akzeptanzkriterium; der Coding Agent darf ein F
 | F-27 | Auto-Reconnect / Restore | v1 | Wiederverbindung mit Backoff; Tabs und Split-Layout nach Neustart wiederhergestellt |
 | F-28 | Remote-Edit | v1 | Remote-Datei im lokalen Editor; Speichern lädt hoch; paralleler Konflikt erkannt |
 | F-29 | Datei-Sync | v1 | Vault über Google Drive/Syncthing; Konflikt wird erkannt und gemerged |
+| F-30 | Import PuTTY / Termius | v1 | Import von PuTTY (Registry / .reg / Sessions) und Termius (JSON / CSV); Hosts, Keys, Gruppen, Tunnel übernommen |
+| F-31 | Raw TCP Socket & Listener | v1 | Raw-TCP-Client mit Line-Buffering & Local-Echo (HTTP/Redis/SMTP); Inbound-TCP-Listener zum Fangen von Reverse Shells mit automatischem Terminal-Tab |
 | F-37 | Netzwerkkarte | v1 | Hosts, Subnetze und konfigurierte Tunnel/Jumps als Graph (react-flow); Visualisierung |
 
 Spezialisierte Zusatzfunktionen stehen in einem separaten [Zusatzmodul](https://claude.ai/artifact/LjwimF4gRBxm7oi19EGTi3) mit eigener Spec.

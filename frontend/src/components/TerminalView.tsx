@@ -333,6 +333,11 @@ export interface TerminalViewProps {
   onFontSizeChange?: (sessionId: string, newSize: number) => void;
   onToggleSearch?: (sessionId: string) => void;
   onCwdChange?: (sessionId: string, cwd: string) => void;
+  isRawTcp?: boolean;
+  rawTcpHost?: string;
+  rawTcpPort?: number;
+  initialLineMode?: boolean;
+  initialLineEnding?: 'crlf' | 'lf' | 'cr';
 }
 
 export function TerminalView({
@@ -345,8 +350,22 @@ export function TerminalView({
   onFontSizeChange,
   onToggleSearch,
   onCwdChange,
+  isRawTcp,
+  rawTcpHost,
+  rawTcpPort,
+  initialLineMode,
+  initialLineEnding,
 }: TerminalViewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const [lineMode, setLineMode] = React.useState(initialLineMode ?? false);
+  const [lineEnding, setLineEnding] = React.useState<'crlf' | 'lf' | 'cr'>(initialLineEnding ?? 'crlf');
+  const [showTtyMenu, setShowTtyMenu] = React.useState(false);
+  const lineBufferRef = useRef('');
+  const lineModeRef = useRef(lineMode);
+  lineModeRef.current = lineMode;
+  const lineEndingRef = useRef(lineEnding);
+  lineEndingRef.current = lineEnding;
 
   const onInputRef = useRef(onInput);
   onInputRef.current = onInput;
@@ -477,7 +496,33 @@ export function TerminalView({
       });
 
       const dataDisposable = term.onData((data: string) => {
-        inputCallbacks.get(sessionId)?.(data);
+        if (isRawTcp && lineModeRef.current) {
+          for (let i = 0; i < data.length; i++) {
+            const ch = data[i];
+            if (ch === '\r' || ch === '\n') {
+              term.write('\r\n');
+              let ending = '\r\n';
+              if (lineEndingRef.current === 'lf') ending = '\n';
+              else if (lineEndingRef.current === 'cr') ending = '\r';
+              inputCallbacks.get(sessionId)?.(lineBufferRef.current + ending);
+              lineBufferRef.current = '';
+            } else if (ch === '\x7f' || ch === '\b') {
+              if (lineBufferRef.current.length > 0) {
+                lineBufferRef.current = lineBufferRef.current.slice(0, -1);
+                term.write('\b \b');
+              }
+            } else if (ch === '\x03') {
+              lineBufferRef.current = '';
+              term.write('^C\r\n');
+              inputCallbacks.get(sessionId)?.('\x03');
+            } else {
+              lineBufferRef.current += ch;
+              term.write(ch);
+            }
+          }
+        } else {
+          inputCallbacks.get(sessionId)?.(data);
+        }
       });
 
       const resizeDisposable = term.onResize(({ cols, rows }) => {
@@ -630,14 +675,116 @@ export function TerminalView({
       // preserve all buffer data and session logs.
       // Terminals are disposed cleanly via disposeTerminal(sessionId) upon session close.
     };
-  }, [sessionId, settings]);
+  }, [sessionId, settings, isRawTcp]);
 
   return (
     <div
-      className="terminal-container"
-      data-testid={`terminal-container-${sessionId}`}
-      ref={containerRef}
-    />
+      className="terminal-view-wrapper"
+      style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', position: 'relative' }}
+    >
+      {isRawTcp && (
+        <div className="raw-tcp-hud-bar">
+          <div className="raw-tcp-hud-left">
+            <span className="raw-tcp-hud-badge">PROTO: RAW-TCP</span>
+            {rawTcpHost && (
+              <span className="raw-tcp-hud-target">
+                {rawTcpHost}:{rawTcpPort}
+              </span>
+            )}
+          </div>
+          <div className="raw-tcp-hud-right">
+            <button
+              type="button"
+              className={`raw-tcp-tool-btn ${lineMode ? 'active' : ''}`}
+              onClick={() => {
+                const next = !lineMode;
+                setLineMode(next);
+                lineBufferRef.current = '';
+              }}
+              title="Toggle Line Buffering & Local Echo (essential for HTTP/SMTP/Redis)"
+            >
+              ⌨ LINE MODE: {lineMode ? 'ON' : 'OFF'}
+            </button>
+            <button
+              type="button"
+              className="raw-tcp-tool-btn"
+              onClick={() => {
+                const nextEnding = lineEnding === 'crlf' ? 'lf' : lineEnding === 'lf' ? 'cr' : 'crlf';
+                setLineEnding(nextEnding);
+              }}
+              title="Cycle Line Ending Sequence (CRLF / LF / CR)"
+            >
+              ↵ {lineEnding.toUpperCase()}
+            </button>
+            <div className="raw-tcp-tty-dropdown-wrap" style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="raw-tcp-tool-btn tty-upgrade-btn"
+                onClick={() => setShowTtyMenu((prev) => !prev)}
+                title="Reverse Shell TTY Upgrade Helpers"
+              >
+                ⚡ TTY UPGRADE ▾
+              </button>
+              {showTtyMenu && (
+                <div className="raw-tcp-tty-menu">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onInputRef.current(sessionId, `python3 -c 'import pty; pty.spawn("/bin/bash")'\n`);
+                      setShowTtyMenu(false);
+                    }}
+                  >
+                    🐍 Spawn Python3 PTY
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onInputRef.current(sessionId, `python -c 'import pty; pty.spawn("/bin/bash")'\n`);
+                      setShowTtyMenu(false);
+                    }}
+                  >
+                    🐍 Spawn Python PTY
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onInputRef.current(sessionId, `export TERM=xterm-256color\n`);
+                      setShowTtyMenu(false);
+                    }}
+                  >
+                    📟 Export TERM=xterm-256color
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onInputRef.current(sessionId, `stty raw -echo; fg\n`);
+                      setShowTtyMenu(false);
+                    }}
+                  >
+                    ⚡ Fix stty raw -echo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onInputRef.current(sessionId, `/bin/sh -i\n`);
+                      setShowTtyMenu(false);
+                    }}
+                  >
+                    🐚 Spawn /bin/sh -i
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      <div
+        className="terminal-container"
+        data-testid={`terminal-container-${sessionId}`}
+        ref={containerRef}
+        style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+      />
+    </div>
   );
 }
 

@@ -22,12 +22,24 @@ export function CheckRemoteConflict(arg1) {
   return window['go']['main']['App']['CheckRemoteConflict'](arg1);
 }
 
+export function CheckSessionAlive(arg1) {
+  return window['go']['main']['App']['CheckSessionAlive'](arg1);
+}
+
+export function CheckVaultSyncStatus() {
+  return window['go']['main']['App']['CheckVaultSyncStatus']();
+}
+
 export function ClearWorkspace() {
   return window['go']['main']['App']['ClearWorkspace']();
 }
 
 export function CloseRemoteEdit(arg1) {
   return window['go']['main']['App']['CloseRemoteEdit'](arg1);
+}
+
+export function ConnectRawTcp(arg1) {
+  return window['go']['main']['App']['ConnectRawTcp'](arg1);
 }
 
 export function ConnectSSH(arg1) {
@@ -98,6 +110,10 @@ export function EnableQuickUnlock() {
   return window['go']['main']['App']['EnableQuickUnlock']();
 }
 
+export function ExecuteImport(arg1) {
+  return window['go']['main']['App']['ExecuteImport'](arg1);
+}
+
 export function ExecuteSnippet(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExecuteSnippet'](arg1, arg2, arg3);
 }
@@ -108,6 +124,10 @@ export function ExportProxychainsConfig() {
 
 export function ExportSessionLog(arg1, arg2) {
   return window['go']['main']['App']['ExportSessionLog'](arg1, arg2);
+}
+
+export function ExportTotpTokens(arg1) {
+  return window['go']['main']['App']['ExportTotpTokens'](arg1);
 }
 
 export function GenerateProxychainsConfig(arg1) {
@@ -134,8 +154,16 @@ export function GetDefaultProxychainsOptions() {
   return window['go']['main']['App']['GetDefaultProxychainsOptions']();
 }
 
+export function GetLiveSessionIDs() {
+  return window['go']['main']['App']['GetLiveSessionIDs']();
+}
+
 export function GetNote(arg1) {
   return window['go']['main']['App']['GetNote'](arg1);
+}
+
+export function GetRawTcpSessionStats(arg1) {
+  return window['go']['main']['App']['GetRawTcpSessionStats'](arg1);
 }
 
 export function GetRemoteEditContent(arg1) {
@@ -158,6 +186,10 @@ export function GetVaultSummary() {
   return window['go']['main']['App']['GetVaultSummary']();
 }
 
+export function GetVaultSyncInfo() {
+  return window['go']['main']['App']['GetVaultSyncInfo']();
+}
+
 export function HealthCheck() {
   return window['go']['main']['App']['HealthCheck']();
 }
@@ -168,6 +200,10 @@ export function ImportSSHConfig(arg1) {
 
 export function ImportSSHKey(arg1, arg2, arg3) {
   return window['go']['main']['App']['ImportSSHKey'](arg1, arg2, arg3);
+}
+
+export function ImportTotpTokens(arg1) {
+  return window['go']['main']['App']['ImportTotpTokens'](arg1);
 }
 
 export function InitializeVault(arg1) {
@@ -206,6 +242,10 @@ export function ListProxyProfiles() {
   return window['go']['main']['App']['ListProxyProfiles']();
 }
 
+export function ListRawTcpListeners() {
+  return window['go']['main']['App']['ListRawTcpListeners']();
+}
+
 export function ListRemoteDir(arg1, arg2) {
   return window['go']['main']['App']['ListRemoteDir'](arg1, arg2);
 }
@@ -234,6 +274,10 @@ export function LockVault() {
   return window['go']['main']['App']['LockVault']();
 }
 
+export function MergeExternalVaultFile(arg1, arg2) {
+  return window['go']['main']['App']['MergeExternalVaultFile'](arg1, arg2);
+}
+
 export function OpenExternalEditor(arg1) {
   return window['go']['main']['App']['OpenExternalEditor'](arg1);
 }
@@ -250,8 +294,20 @@ export function ParseOTPAuthURI(arg1) {
   return window['go']['main']['App']['ParseOTPAuthURI'](arg1);
 }
 
+export function ParsePuTTYRegContent(arg1) {
+  return window['go']['main']['App']['ParsePuTTYRegContent'](arg1);
+}
+
+export function ParseTermiusContent(arg1) {
+  return window['go']['main']['App']['ParseTermiusContent'](arg1);
+}
+
 export function ReadSessionLog(arg1) {
   return window['go']['main']['App']['ReadSessionLog'](arg1);
+}
+
+export function RelocateVaultFile(arg1, arg2) {
+  return window['go']['main']['App']['RelocateVaultFile'](arg1, arg2);
 }
 
 export function ResetVault() {
@@ -268,6 +324,10 @@ export function ResolveHostKeyPrompt(arg1, arg2, arg3) {
 
 export function ResolveSnippetTemplate(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveSnippetTemplate'](arg1, arg2, arg3);
+}
+
+export function ResolveVaultConflicts(arg1, arg2) {
+  return window['go']['main']['App']['ResolveVaultConflicts'](arg1, arg2);
 }
 
 export function SaveForwardRule(arg1) {
@@ -314,6 +374,14 @@ export function SaveWorkspace(arg1) {
   return window['go']['main']['App']['SaveWorkspace'](arg1);
 }
 
+export function ScanLocalPuTTYSessions() {
+  return window['go']['main']['App']['ScanLocalPuTTYSessions']();
+}
+
+export function ScanSyncConflictFiles() {
+  return window['go']['main']['App']['ScanSyncConflictFiles']();
+}
+
 export function SearchCommandPalette(arg1) {
   return window['go']['main']['App']['SearchCommandPalette'](arg1);
 }
@@ -324,6 +392,10 @@ export function SearchNotes(arg1) {
 
 export function SendSerialBreak(arg1) {
   return window['go']['main']['App']['SendSerialBreak'](arg1);
+}
+
+export function SetRawTcpSessionLineMode(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetRawTcpSessionLineMode'](arg1, arg2, arg3);
 }
 
 export function SetSerialDTR(arg1, arg2) {
@@ -340,6 +412,10 @@ export function SetWorkspaceStore(arg1) {
 
 export function StartForwardTunnel(arg1, arg2) {
   return window['go']['main']['App']['StartForwardTunnel'](arg1, arg2);
+}
+
+export function StartRawTcpListener(arg1) {
+  return window['go']['main']['App']['StartRawTcpListener'](arg1);
 }
 
 export function StartRemoteEdit(arg1, arg2) {
@@ -360,6 +436,10 @@ export function StartSftpUpload(arg1, arg2, arg3) {
 
 export function StopForwardTunnel(arg1) {
   return window['go']['main']['App']['StopForwardTunnel'](arg1);
+}
+
+export function StopRawTcpListener(arg1) {
+  return window['go']['main']['App']['StopRawTcpListener'](arg1);
 }
 
 export function StopSessionLogging(arg1) {

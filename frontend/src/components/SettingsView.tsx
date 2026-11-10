@@ -8,10 +8,25 @@ import {
   normalizeKeyboardShortcut,
   findShortcutConflict,
 } from '../types/shortcuts';
+import type { VaultSyncInfo, VaultConflictReport } from '../types/vaultSync';
+import { CyberIcon } from './CyberIcon';
+
+interface WailsSyncApi {
+  GetVaultSyncInfo?: () => Promise<VaultSyncInfo>;
+  CheckVaultSyncStatus?: () => Promise<VaultSyncInfo>;
+  RelocateVaultFile?: (newPath: string, moveExisting: boolean) => Promise<void>;
+  ScanSyncConflictFiles?: () => Promise<string[]>;
+  MergeExternalVaultFile?: (filePath: string, password: string) => Promise<VaultConflictReport>;
+}
+
+function getWailsSyncApi(): WailsSyncApi | undefined {
+  const w = window as unknown as { go?: { main?: { App?: WailsSyncApi } } };
+  return w.go?.main?.App;
+}
 
 export interface SettingsViewProps {
-  activeTab: 'appearance' | 'security' | 'shortcuts' | 'about';
-  onTabChange: (tab: 'appearance' | 'security' | 'shortcuts' | 'about') => void;
+  activeTab: 'appearance' | 'security' | 'sync' | 'shortcuts' | 'about';
+  onTabChange: (tab: 'appearance' | 'security' | 'sync' | 'shortcuts' | 'about') => void;
   globalSettings: AppGlobalSettings;
   onUpdateSettings: (partial: Partial<AppGlobalSettings>) => void;
   onResetSettings: () => void;
@@ -24,6 +39,9 @@ export interface SettingsViewProps {
   onChangePassword: (currentPw: string, newPw: string) => Promise<void>;
   onResetVault: () => Promise<void>;
   availableSnippets?: Array<{ id: string; name: string }>;
+  syncInfo?: VaultSyncInfo | null;
+  onOpenConflictResolver?: (report: VaultConflictReport, conflictFile?: string) => void;
+  onRefreshSync?: () => Promise<void>;
   onClose?: () => void;
   onOpenAsTab?: () => void;
   isModal?: boolean;
@@ -46,6 +64,9 @@ export function SettingsView({
   onChangePassword,
   onResetVault,
   availableSnippets = [],
+  syncInfo,
+  onOpenConflictResolver,
+  onRefreshSync,
   onClose,
   onOpenAsTab,
   isModal = false,
@@ -55,6 +76,22 @@ export function SettingsView({
   const [confirmPw, setConfirmPw] = useState<string>('');
   const [pwError, setPwError] = useState<string>('');
   const [pwSuccess, setPwSuccess] = useState<string>('');
+
+  // Storage & Sync State (F-29)
+  const [relocatePath, setRelocatePath] = useState<string>('');
+  const [moveExisting, setMoveExisting] = useState<boolean>(true);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string>('');
+  const [syncErrorMsg, setSyncErrorMsg] = useState<string>('');
+  const [isRelocating, setIsRelocating] = useState<boolean>(false);
+  const [manualMergePath, setManualMergePath] = useState<string>('');
+  const [manualMergePw, setManualMergePw] = useState<string>('');
+  const [isMerging, setIsMerging] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (activeTab === 'sync' && onRefreshSync) {
+      void onRefreshSync();
+    }
+  }, [activeTab, onRefreshSync]);
 
   // Shortcuts & Leader Key State
   const currentKeybindings = useMemo(() => globalSettings.keybindings || {}, [globalSettings.keybindings]);
@@ -100,6 +137,88 @@ export function SettingsView({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setPwError(msg);
+    }
+  };
+
+  const handleRelocateVault = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!relocatePath.trim()) return;
+    setIsRelocating(true);
+    setSyncErrorMsg('');
+    setSyncStatusMsg('');
+    const api = getWailsSyncApi();
+    if (!api?.RelocateVaultFile) {
+      setSyncStatusMsg('Vault relocated successfully (mock mode).');
+      setIsRelocating(false);
+      return;
+    }
+    try {
+      await api.RelocateVaultFile(relocatePath.trim(), moveExisting);
+      setSyncStatusMsg('Encrypted vault file successfully relocated!');
+      setRelocatePath('');
+      if (onRefreshSync) await onRefreshSync();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSyncErrorMsg(`Relocation failed: ${msg}`);
+    } finally {
+      setIsRelocating(false);
+    }
+  };
+
+  const handleCheckSync = async () => {
+    setSyncErrorMsg('');
+    setSyncStatusMsg('');
+    const api = getWailsSyncApi();
+    if (!api?.CheckVaultSyncStatus) {
+      setSyncStatusMsg('Checked vault synchronization status.');
+      return;
+    }
+    try {
+      const updated = await api.CheckVaultSyncStatus();
+      if (updated.status === 'conflict') {
+        setSyncStatusMsg(`External conflict detected (${updated.conflictCount} items)!`);
+      } else if (updated.status === 'external_change') {
+        setSyncStatusMsg('External file modification detected.');
+      } else {
+        setSyncStatusMsg('In sync: Local file matches active vault.');
+      }
+      if (onRefreshSync) await onRefreshSync();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSyncErrorMsg(`Sync check failed: ${msg}`);
+    }
+  };
+
+  const handleMergeFile = async (filePath: string, password = '') => {
+    if (!filePath.trim()) return;
+    setIsMerging(true);
+    setSyncErrorMsg('');
+    setSyncStatusMsg('');
+    const api = getWailsSyncApi();
+    if (!api?.MergeExternalVaultFile) {
+      setSyncStatusMsg('External vault merged successfully (mock mode).');
+      setIsMerging(false);
+      return;
+    }
+    try {
+      const report = await api.MergeExternalVaultFile(filePath.trim(), password);
+      if (report.hasConflicts) {
+        if (onOpenConflictResolver) {
+          onOpenConflictResolver(report, filePath);
+        } else {
+          setSyncStatusMsg(`Conflicts detected (${report.conflicts.length} items). Please open conflict resolver.`);
+        }
+      } else {
+        setSyncStatusMsg(`Successfully merged external vault (${report.autoMerged} items auto-merged)!`);
+        setManualMergePath('');
+        setManualMergePw('');
+        if (onRefreshSync) await onRefreshSync();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSyncErrorMsg(`Merge failed: ${msg}`);
+    } finally {
+      setIsMerging(false);
     }
   };
 
@@ -250,6 +369,15 @@ export function SettingsView({
           onClick={() => onTabChange('security')}
         >
           🔒 Vault &amp; Security
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'sync'}
+          className={`settings-tab-btn ${activeTab === 'sync' ? 'active' : ''}`}
+          onClick={() => onTabChange('sync')}
+        >
+          ☁️ Storage &amp; Sync
         </button>
         <button
           type="button"
@@ -1038,6 +1166,177 @@ export function SettingsView({
                 No custom shortcuts configured yet. Click &quot;+ Add Custom Shortcut&quot; above to bind custom key combinations.
               </div>
             )}
+          </section>
+        </div>
+      )}
+
+      {/* Tab: Storage & Sync (F-29) */}
+      {activeTab === 'sync' && (
+        <div className="settings-tab-content" role="tabpanel" aria-label="Storage & Sync Settings">
+          {syncStatusMsg && (
+            <div className="alert-success" style={{ marginBottom: '1rem' }}>
+              {syncStatusMsg}
+            </div>
+          )}
+          {syncErrorMsg && (
+            <div className="alert-danger" style={{ marginBottom: '1rem' }}>
+              {syncErrorMsg}
+            </div>
+          )}
+
+          {/* Card 1: Active Vault Location & Live Telemetry */}
+          <section className="settings-section storage-sync-card">
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <CyberIcon name="shield" size={15} />
+              <span>Active Vault Location &amp; Sync State (F-29)</span>
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              DoubleAgent stores all hosts, credentials, SSH keys, port forwarding rules, notes, and 2FA tokens
+              inside a single tamper-evident encrypted vault file.
+            </p>
+
+            <div style={{ margin: '1rem 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>VAULT FILE PATH:</span>
+                {syncInfo && (
+                  <span className={`sync-status-pill ${syncInfo.status}`}>
+                    {syncInfo.status === 'synced' && '🟢 IN SYNC (Disk matches memory)'}
+                    {syncInfo.status === 'external_change' && '🟡 EXTERNAL CHANGE DETECTED'}
+                    {syncInfo.status === 'conflict' && `🔴 CONFLICT (${syncInfo.conflictCount} items)`}
+                  </span>
+                )}
+              </div>
+              <div className="font-mono" style={{ background: 'rgba(5, 9, 16, 0.8)', padding: '0.65rem 0.85rem', border: '1px solid rgba(255, 255, 255, 0.1)', wordBreak: 'break-all', fontSize: '0.8rem', color: '#00f0ff' }}>
+                {syncInfo?.filePath || 'Default user config directory'}
+              </div>
+              <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                <span>File Size: <strong>{syncInfo ? `${(syncInfo.fileSize / 1024).toFixed(1)} KB` : 'Unknown'}</strong></span>
+                <span>Last Modified: <strong>{syncInfo?.lastModified ? new Date(syncInfo.lastModified * 1000).toLocaleString() : 'Unknown'}</strong></span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => void handleCheckSync()}
+              >
+                🔄 Check for External Changes
+              </button>
+            </div>
+          </section>
+
+          {/* Card 2: Detected Cloud Sync Conflict Files (Syncthing / Google Drive) */}
+          {syncInfo?.syncConflictFiles && syncInfo.syncConflictFiles.length > 0 && (
+            <section className="settings-section storage-sync-card" style={{ borderLeft: '3px solid #f59e0b' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b' }}>
+                <CyberIcon name="bolt" size={15} />
+                <span>Detected Cloud Sync Conflicts ({syncInfo.syncConflictFiles.length})</span>
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                Syncthing or Google Drive generated conflict copy files when changes were synced from another machine.
+                You can review the diffs and safely merge them into your primary vault:
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+                {syncInfo.syncConflictFiles.map((f) => (
+                  <div key={f} className="conflict-file-item">
+                    <div style={{ overflow: 'hidden' }}>
+                      <div className="font-mono" style={{ fontSize: '0.78rem', color: '#f59e0b', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        {f.split(/[/\\]/).pop()}
+                      </div>
+                      <div className="font-mono" style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        {f}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => void handleMergeFile(f)}
+                      disabled={isMerging}
+                    >
+                      {isMerging ? 'Merging...' : 'Review & Merge'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Card 3: Relocate Vault File (Google Drive / Syncthing Folder) */}
+          <section className="settings-section storage-sync-card">
+            <h3>Relocate Vault Storage Path</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Move or point your encrypted vault to a Google Drive, Syncthing, Dropbox, or OneDrive folder to automatically
+              sync your servers and configurations across all your devices.
+            </p>
+            <form onSubmit={handleRelocateVault} style={{ marginTop: '0.85rem' }}>
+              <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                <label htmlFor="relocate-path" style={{ display: 'block', fontSize: '0.78rem', marginBottom: '0.25rem' }}>
+                  Target Vault Path:
+                </label>
+                <input
+                  id="relocate-path"
+                  type="text"
+                  className="form-input"
+                  style={{ width: '100%' }}
+                  placeholder="e.g. C:\Users\YourName\Google Drive\DoubleAgent\doubleagent.vault"
+                  value={relocatePath}
+                  onChange={(e) => setRelocatePath(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={moveExisting}
+                    onChange={(e) => setMoveExisting(e.target.checked)}
+                  />
+                  <span>Move current vault file and biometrics to new location</span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isRelocating || !relocatePath.trim()}
+              >
+                {isRelocating ? 'Relocating...' : 'Relocate Vault'}
+              </button>
+            </form>
+          </section>
+
+          {/* Card 4: Manual External Vault Merge */}
+          <section className="settings-section storage-sync-card">
+            <h3>Merge External Vault Backup</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Manually import and merge another <code>.vault</code> file into your active vault with automatic conflict detection.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px auto', gap: '0.5rem', marginTop: '0.85rem' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Path to external .vault file"
+                value={manualMergePath}
+                onChange={(e) => setManualMergePath(e.target.value)}
+              />
+              <input
+                type="password"
+                className="form-input"
+                placeholder="Password (if different)"
+                value={manualMergePw}
+                onChange={(e) => setManualMergePw(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isMerging || !manualMergePath.trim()}
+                onClick={() => void handleMergeFile(manualMergePath, manualMergePw)}
+              >
+                {isMerging ? 'Merging...' : 'Merge Vault'}
+              </button>
+            </div>
           </section>
         </div>
       )}

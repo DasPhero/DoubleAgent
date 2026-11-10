@@ -1,8 +1,11 @@
 package vault
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"doubleagent/backend/core"
 )
 
 // TestTOTP_RFC6238_F20 verifies standard RFC 6238 test vectors (F-20).
@@ -140,5 +143,46 @@ func TestTOTP_SecretNormalization_F20(t *testing.T) {
 		} else if code != expectedCode {
 			t.Errorf("variant %d (%q) gave %q, want %q", i, v, code, expectedCode)
 		}
+	}
+}
+
+// TestTOTP_FormatAndRoundTrip_F20 ensures FormatOTPAuthURI constructs valid RFC 6238 URIs that round-trip.
+func TestTOTP_FormatAndRoundTrip_F20(t *testing.T) {
+	orig := core.TotpRecord{
+		Label:     "user@bastion.corp",
+		Issuer:    "CyberBastion",
+		Secret:    "JBSWY3DPEHPK3PXP",
+		Algorithm: "SHA256",
+		Digits:    8,
+		Period:    60,
+	}
+
+	uri := FormatOTPAuthURI(orig)
+	if !strings.HasPrefix(uri, "otpauth://totp/") {
+		t.Fatalf("expected otpauth://totp/ prefix, got %q", uri)
+	}
+
+	parsed, err := ParseOTPAuthURI(uri)
+	if err != nil {
+		t.Fatalf("failed to parse formatted URI: %v", err)
+	}
+
+	if parsed.Issuer != orig.Issuer {
+		t.Errorf("expected Issuer %q, got %q", orig.Issuer, parsed.Issuer)
+	}
+	if parsed.Label != orig.Label {
+		t.Errorf("expected Label %q, got %q", orig.Label, parsed.Label)
+	}
+	if parsed.Secret != orig.Secret {
+		t.Errorf("expected Secret %q, got %q", orig.Secret, parsed.Secret)
+	}
+	if parsed.Algorithm != orig.Algorithm {
+		t.Errorf("expected Algorithm %q, got %q", orig.Algorithm, parsed.Algorithm)
+	}
+	if parsed.Digits != orig.Digits {
+		t.Errorf("expected Digits %d, got %d", orig.Digits, parsed.Digits)
+	}
+	if parsed.Period != orig.Period {
+		t.Errorf("expected Period %d, got %d", orig.Period, parsed.Period)
 	}
 }
