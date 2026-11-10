@@ -495,16 +495,18 @@ type SessionLogStatus struct {
 
 // VaultPayload is the top-level document encrypted inside the vault file (Spec Section 8, F-03, F-13, F-14, F-15, F-17, F-20).
 type VaultPayload struct {
-	SchemaVersion int              `json:"schemaVersion"`
-	Hosts         []HostRecord     `json:"hosts"`
-	Groups        []GroupRecord    `json:"groups"`
-	Identities    []IdentityRecord `json:"identities"`
-	Keys          []SshKeyRecord   `json:"keys"`
-	ForwardRules  []ForwardRule    `json:"forwardRules,omitempty"`
-	ProxyProfiles []ProxyProfile   `json:"proxyProfiles,omitempty"`
-	Snippets      []Snippet        `json:"snippets,omitempty"`
-	TotpRecords   []TotpRecord     `json:"totpRecords,omitempty"`
-	Notes         []NotePage       `json:"notes,omitempty"`
+	SchemaVersion int               `json:"schemaVersion"`
+	Hosts         []HostRecord      `json:"hosts"`
+	Groups        []GroupRecord     `json:"groups"`
+	Identities    []IdentityRecord  `json:"identities"`
+	Keys          []SshKeyRecord    `json:"keys"`
+	ForwardRules  []ForwardRule     `json:"forwardRules,omitempty"`
+	ProxyProfiles []ProxyProfile    `json:"proxyProfiles,omitempty"`
+	Snippets      []Snippet         `json:"snippets,omitempty"`
+	TotpRecords   []TotpRecord      `json:"totpRecords,omitempty"`
+	Notes         []NotePage        `json:"notes,omitempty"`
+	Engagements   []Engagement      `json:"engagements,omitempty"`
+	Credentials   []CredentialEntry `json:"credentials,omitempty"`
 }
 
 // RemoteEditStatus defines the synchronization status of a remote edited file (F-28).

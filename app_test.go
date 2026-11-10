@@ -1787,3 +1787,99 @@ func TestApp_RawTcpClientAndListener_F31(t *testing.T) {
 		t.Errorf("expected 0 listeners after stop, got %d", len(remaining))
 	}
 }
+
+func TestApp_PentestEngagementsAndCredentials_F36_F40(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_pentest_app.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), "VaultPass456!"); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, _ string, _ ...interface{}) {})
+
+	// 1. Create and Save Engagement
+	eng := core.Engagement{
+		ID:        "eng-corp-1",
+		Name:      "Bank Audit 2026",
+		Scope:     "10.0.0.0/8",
+		Timeframe: "Q4 2026",
+		LockoutPolicy: core.LockoutPolicy{
+			MaxAttemptsPerUser:   4,
+			LockoutWindowMinutes: 45,
+		},
+		IsActive: true,
+	}
+	if err := app.SaveEngagement(eng); err != nil {
+		t.Fatalf("SaveEngagement failed: %v", err)
+	}
+
+	engList, err := app.ListEngagements()
+	if err != nil || len(engList) != 1 {
+		t.Fatalf("expected 1 engagement in list, got %+v", engList)
+	}
+
+	activeEng, err := app.GetActiveEngagement()
+	if err != nil || activeEng == nil || activeEng.ID != "eng-corp-1" {
+		t.Fatalf("expected active engagement 'eng-corp-1', got %+v", activeEng)
+	}
+
+	// 2. Add Credentials
+	cred1 := core.CredentialEntry{
+		ID:           "cred-adm-1",
+		EngagementID: "eng-corp-1",
+		Category:     core.CredCategoryPlaintext,
+		Label:        "Domain Controller Admin",
+		Username:     "Administrator",
+		Secret:       "BankSecret#2026",
+		Realm:        "BANK.LOCAL",
+		HostID:       "host-bank-dc",
+		Source:       "sam",
+	}
+	cred2 := core.CredentialEntry{
+		ID:           "cred-svc-2",
+		EngagementID: "eng-corp-1",
+		Category:     core.CredCategoryPlaintext,
+		Label:        "Backup Account",
+		Username:     "svc_backup",
+		Secret:       "BankSecret#2026",
+		Realm:        "BANK.LOCAL",
+		Source:       "kerberoast",
+	}
+	if err := app.SaveCredential(cred1); err != nil {
+		t.Fatalf("SaveCredential 1 failed: %v", err)
+	}
+	if err := app.SaveCredential(cred2); err != nil {
+		t.Fatalf("SaveCredential 2 failed: %v", err)
+	}
+
+	// 3. Query Credentials
+	allCreds, err := app.ListCredentials("eng-corp-1", "")
+	if err != nil || len(allCreds) != 2 {
+		t.Fatalf("expected 2 credentials, got %d", len(allCreds))
+	}
+	hostCreds, err := app.ListCredentials("", "host-bank-dc")
+	if err != nil || len(hostCreds) != 1 || hostCreds[0].ID != "cred-1" && hostCreds[0].Username != "Administrator" {
+		t.Fatalf("expected 1 host credential for Administrator, got %+v", hostCreds)
+	}
+
+	// 4. Export Spray List with Lockout Check (F-36, F-40)
+	sprayRes, err := app.ExportSprayList(core.SprayExportOptions{
+		EngagementID: "eng-corp-1",
+		Format:       core.SprayFormatUserPassColon,
+	})
+	if err != nil {
+		t.Fatalf("ExportSprayList failed: %v", err)
+	}
+	if sprayRes.LineCount == 0 {
+		t.Fatalf("expected non-empty spray output")
+	}
+
+	// 5. Test Delete Credential
+	if err := app.DeleteCredential("cred-svc-2"); err != nil {
+		t.Fatalf("DeleteCredential failed: %v", err)
+	}
+	afterCreds, err := app.ListCredentials("eng-corp-1", "")
+	if err != nil || len(afterCreds) != 1 {
+		t.Fatalf("expected 1 credential after delete, got %d", len(afterCreds))
+	}
+}

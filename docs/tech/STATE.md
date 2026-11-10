@@ -1,10 +1,36 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-31` — Raw TCP Socket Client & Listener Engine ("Netcat Mode") — COMPLETED!
-- **Next Milestone:** Post-v1 polish / Pentest Module Transition
+- **Current Milestone:** `F-36` & `F-40` — Engagement Credential Store, Spray Lists & Lockout Guard — COMPLETED!
+- **Next Milestone:** Wave 1 MVP+ — Evidence Vault (`F-18`) & Save Selection Context Menu (`F-19`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Engagement Credential Store, Spray Lists & Lockout Guard (`F-36`, `F-40` / Pentest Spec Section 2, 3)**:
+  - **Engagement Data Model & Lockout Policy (`backend/core/pentest.go`)**:
+    - `Engagement`: ID, Name, Scope, Timeframe, `LockoutPolicy`, and `IsActive` state.
+    - `LockoutPolicy`: `MaxAttemptsPerUser`, `LockoutWindowMinutes`, `EnforceDelaySeconds`, `WarningThresholdPercent`.
+    - `CredentialEntry`: ID, `EngagementID`, `Category` (`plaintext`, `hash`, `ticket`, `token`, `ssh_key`, `api_key`), `Label`, `Username`, `Secret`, `Realm` (domain/workgroup), `HostID` (auto-mapped if captured from session), `Source`, `CapturedAt`, `Tags`.
+    - **Dual-View Architecture**: Every credential saved lives in the engagement-wide pool and is queryable by engagement or host — single record, two views, zero duplication.
+  - **Spray List Generator with Lockout Safety Analysis (`GenerateSprayList`, `F-36`, `F-40`)**:
+    - Formats supported:
+      - `Usernames Only`: unique account wordlists.
+      - `Passwords Only`: unique password and hash wordlists.
+      - `User:Pass Pairs`: paired credential sets formatted with configurable delimiter for Hydra, Medusa, basic auth.
+      - `Cartesian Product`: comprehensive all-users × all-passwords matrices for brute force attacks.
+      - `Spray 1 Password Across Users`: Kerbrute/NetExec-style spray sequence targeting all accounts with one password before advancing to the next.
+    - Custom Candidate Ingestion: Allows operators to paste additional usernames and passwords directly into candidate textareas.
+    - **Lockout Policy Guard**: Dynamically calculates attempts per account against the active engagement's `LockoutPolicy`. Shows yellow warning banner when approaching policy threshold and red critical alert when exceeding maximum attempts per account to prevent accidental Active Directory domain-wide account lockouts.
+  - **Vault Storage & Multi-Instance Synchronization (`backend/vault/pentest.go`, `backend/vault/merge.go`)**:
+    - Stored inside encrypted `VaultPayload.Engagements` and `VaultPayload.Credentials` (AES-256-GCM / Argon2id).
+    - Multi-instance sync (F-29): automatically merges non-conflicting engagements and credentials, and exposes conflict resolution if records diverge across machines.
+  - **Cyberpunk HUD Credential Store Modal (`CredentialStoreModal.tsx`)**:
+    - Three-tab design: Credential Pool with search/filter/hide-show secrets, Spray Generator & Export with live lockout gauge, and Engagement & Lockout Policy manager.
+    - Integrated into Tools dropdown (`⚔️ Credential Pool & Spray Lists (F-36)`) and Command Palette.
+  - **Test Coverage**:
+    - Core domain: `backend/core/pentest_test.go` (validation, spray formatting, lockout threshold detection).
+    - Vault storage: `backend/vault/pentest_test.go` (save, list, dual-view host vs engagement query, delete).
+    - App layer: `app_test.go:TestApp_PentestEngagementsAndCredentials_F36_F40`.
+    - Frontend: `frontend/src/App.test.tsx` (opening modal, verifying creds, spray generator tab, lockout warning banner).
 - **Raw TCP Socket Client & Inbound Listener Engine (`F-31` / Spec Line 64, 140)**:
   - **Outgoing Raw TCP Client (`ConnectRawTcp`, `RawTcpConfig`)**:
     - Dials arbitrary remote host and port (`net.DialTimeout`) with configurable timeout.

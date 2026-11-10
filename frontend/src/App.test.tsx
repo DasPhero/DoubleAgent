@@ -2829,4 +2829,115 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       delete (window as unknown as { runtime?: unknown }).runtime;
     }
   });
+
+  it('supports Pentest Credential Pool, Spray List Generator, and Lockout Guard (F-36, F-40)', async () => {
+    const mockEngagements = [
+      {
+        id: 'eng-bank-1',
+        name: 'Bank Audit 2026',
+        scope: '10.0.0.0/8',
+        timeframe: 'Q4 2026',
+        lockoutPolicy: {
+          maxAttemptsPerUser: 3,
+          lockoutWindowMinutes: 30,
+          enforceDelaySeconds: 600,
+          warningThresholdPercent: 66,
+        },
+        isActive: true,
+        createdAt: '2026-11-10T12:00:00Z',
+        updatedAt: '2026-11-10T12:00:00Z',
+      },
+    ];
+
+    const mockCredentials = [
+      {
+        id: 'cred-1',
+        engagementId: 'eng-bank-1',
+        category: 'plaintext' as const,
+        label: 'Domain Controller Admin',
+        username: 'da_admin',
+        secret: 'BankSecret2026!',
+        realm: 'CORP.LOCAL',
+        source: 'lsass',
+        capturedAt: '2026-11-10T12:00:00Z',
+      },
+      {
+        id: 'cred-2',
+        engagementId: 'eng-bank-1',
+        category: 'plaintext' as const,
+        label: 'SQL Service Account',
+        username: 'svc_sql',
+        secret: 'Summer2026!',
+        realm: 'CORP.LOCAL',
+        source: 'mimikatz',
+        capturedAt: '2026-11-10T12:00:00Z',
+      },
+    ];
+
+    try {
+      (window as unknown as { go: unknown }).go = {
+        main: {
+          App: {
+            ListEngagements: vi.fn().mockResolvedValue(mockEngagements),
+            GetActiveEngagement: vi.fn().mockResolvedValue(mockEngagements[0]),
+            ListCredentials: vi.fn().mockResolvedValue(mockCredentials),
+            SaveCredential: vi.fn().mockResolvedValue(undefined),
+            DeleteCredential: vi.fn().mockResolvedValue(undefined),
+            SaveEngagement: vi.fn().mockResolvedValue(undefined),
+            SetActiveEngagement: vi.fn().mockResolvedValue(undefined),
+            ExportSprayList: vi.fn().mockImplementation(() =>
+              Promise.resolve({
+                content: 'da_admin:BankSecret2026!\nsvc_sql:Summer2026!',
+                lineCount: 2,
+                uniqueUsers: 2,
+                uniquePasswords: 2,
+                warning: {
+                  exceedsPolicy: false,
+                  severity: 'warning' as const,
+                  message: 'Lockout warning: 2 attempts approaches threshold',
+                  totalCombinations: 4,
+                  MaxAttemptsPerAccount: 2,
+                  PolicyLimit: 3,
+                },
+              })
+            ),
+          },
+        },
+      };
+
+      render(<App />);
+
+      // 1. Open Tools menu -> Credential Pool & Spray Lists
+      const toolsMenuBtn = screen.getByRole('button', { name: /^Tools/i });
+      fireEvent.click(toolsMenuBtn);
+      const credToolBtn = screen.getByText(/Credential Pool & Spray Lists \(F-36\)/i);
+      fireEvent.click(credToolBtn);
+
+      // 2. Verify modal opened
+      expect(await screen.findByText(/CREDENTIAL STORE & SPRAY LISTS/i)).toBeInTheDocument();
+
+      // 3. Verify credentials listed in table
+      expect(await screen.findByText('CORP.LOCAL\\da_admin')).toBeInTheDocument();
+      expect(screen.getByText('CORP.LOCAL\\svc_sql')).toBeInTheDocument();
+
+      // 4. Switch to Spray Generator tab
+      const sprayTabBtn = screen.getByRole('button', { name: /Spray Generator & Export/i });
+      fireEvent.click(sprayTabBtn);
+
+      // Verify generated output and lockout warning rendered
+      expect(await screen.findByText(/LOCKOUT GUARD WARNING \(F-40\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Lockout warning: 2 attempts approaches threshold/i)).toBeInTheDocument();
+
+      // 5. Switch to Engagements tab
+      const engTabBtn = screen.getByRole('button', { name: /Engagements & Lockout Policy/i });
+      fireEvent.click(engTabBtn);
+      expect(await screen.findByText('Bank Audit 2026')).toBeInTheDocument();
+
+      // 6. Close modal
+      const closeBtn = screen.getByRole('button', { name: /Close dialog/i });
+      fireEvent.click(closeBtn);
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
 });

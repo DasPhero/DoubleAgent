@@ -58,6 +58,14 @@ export function CreateRemoteDir(arg1, arg2) {
   return window['go']['main']['App']['CreateRemoteDir'](arg1, arg2);
 }
 
+export function DeleteCredential(arg1) {
+  return window['go']['main']['App']['DeleteCredential'](arg1);
+}
+
+export function DeleteEngagement(arg1) {
+  return window['go']['main']['App']['DeleteEngagement'](arg1);
+}
+
 export function DeleteForwardRule(arg1) {
   return window['go']['main']['App']['DeleteForwardRule'](arg1);
 }
@@ -126,6 +134,10 @@ export function ExportSessionLog(arg1, arg2) {
   return window['go']['main']['App']['ExportSessionLog'](arg1, arg2);
 }
 
+export function ExportSprayList(arg1) {
+  return window['go']['main']['App']['ExportSprayList'](arg1);
+}
+
 export function ExportTotpTokens(arg1) {
   return window['go']['main']['App']['ExportTotpTokens'](arg1);
 }
@@ -136,6 +148,10 @@ export function GenerateProxychainsConfig(arg1) {
 
 export function GenerateSSHKey(arg1, arg2, arg3) {
   return window['go']['main']['App']['GenerateSSHKey'](arg1, arg2, arg3);
+}
+
+export function GetActiveEngagement() {
+  return window['go']['main']['App']['GetActiveEngagement']();
 }
 
 export function GetActiveTransfers() {
@@ -224,6 +240,14 @@ export function InjectTotpCode(arg1, arg2) {
 
 export function ListActiveRemoteEdits() {
   return window['go']['main']['App']['ListActiveRemoteEdits']();
+}
+
+export function ListCredentials(arg1, arg2) {
+  return window['go']['main']['App']['ListCredentials'](arg1, arg2);
+}
+
+export function ListEngagements() {
+  return window['go']['main']['App']['ListEngagements']();
 }
 
 export function ListForwardRules() {
@@ -330,6 +354,14 @@ export function ResolveVaultConflicts(arg1, arg2) {
   return window['go']['main']['App']['ResolveVaultConflicts'](arg1, arg2);
 }
 
+export function SaveCredential(arg1) {
+  return window['go']['main']['App']['SaveCredential'](arg1);
+}
+
+export function SaveEngagement(arg1) {
+  return window['go']['main']['App']['SaveEngagement'](arg1);
+}
+
 export function SaveForwardRule(arg1) {
   return window['go']['main']['App']['SaveForwardRule'](arg1);
 }
@@ -392,6 +424,10 @@ export function SearchNotes(arg1) {
 
 export function SendSerialBreak(arg1) {
   return window['go']['main']['App']['SendSerialBreak'](arg1);
+}
+
+export function SetActiveEngagement(arg1) {
+  return window['go']['main']['App']['SetActiveEngagement'](arg1);
 }
 
 export function SetRawTcpSessionLineMode(arg1, arg2, arg3) {

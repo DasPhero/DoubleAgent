@@ -6,9 +6,28 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, & `F-37`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-36`, `F-37`, & `F-40`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Engagement Credential Pool, Spray List Generator & Lockout Guard (`F-36`, `F-40` / Pentest Module Wave 1)**:
+  - **Engagement-Scoped Credential Pool (`F-36`)**:
+    - Manage engagements (assessments, penetration tests, red team operations) with defined scope, timeframes, and active lockout policies.
+    - Unified credential store capturing usernames, passwords, hashes (NTLM, SHA-256), Kerberos tickets, API tokens, and SSH keys.
+    - Dual-view filtering: browse credentials engagement-wide or filter by specific target host without duplicating records.
+    - 1-click clipboard copy, secret reveal toggle (`👁️`), search, category filtering, and direct vault synchronization.
+  - **Spray List Generator (`F-36`)**:
+    - Export spray-ready files in 5 industry-standard formats:
+      - `Usernames Only` (one username per line)
+      - `Passwords / Hashes Only` (one secret per line)
+      - `Colon Separated (user:password)` (for Hydra, Medusa, crackmapexec)
+      - `Cartesian Product (all users x all passwords)`
+      - `Spray: Password-First (pass1 for all users, delay, pass2...)` (mitigates lockout risk)
+    - Supports combining pool credentials with custom entered user/password lists.
+    - Configurable delimiters (`:`, `;`, `|`, tab) and 1-click text file download.
+  - **Active Lockout Guard Policy (`F-40`)**:
+    - Configurable safety limits per engagement: maximum attempts per account, lockout observation window (e.g., 30 minutes), and mandatory wait delay (e.g., 600s).
+    - Real-time pre-flight evaluation before spray generation: alerts if total candidate combinations per user reach or exceed lockout threshold (default 66% warning threshold, 100% hard alert).
+    - Displays detailed warning breakdown in the HUD with exact attempt counts, policy limits, and mitigation guidance.
 - **Raw TCP Socket Client & Inbound Listener Engine ("Netcat Mode") (`F-31` / Spec Line 64, 140)**:
   - **Direct Raw Socket Terminal (Outgoing Client)**:
     - Dial any TCP host and port with zero SSH handshake overhead directly from DoubleAgent.

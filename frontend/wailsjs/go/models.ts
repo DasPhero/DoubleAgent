@@ -218,6 +218,123 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class CredentialEntry {
+	    id: string;
+	    engagementId: string;
+	    category: string;
+	    label: string;
+	    username: string;
+	    secret: string;
+	    realm?: string;
+	    hostId?: string;
+	    source?: string;
+	    notes?: string;
+	    // Go type: time
+	    capturedAt: any;
+	    tags?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CredentialEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.engagementId = source["engagementId"];
+	        this.category = source["category"];
+	        this.label = source["label"];
+	        this.username = source["username"];
+	        this.secret = source["secret"];
+	        this.realm = source["realm"];
+	        this.hostId = source["hostId"];
+	        this.source = source["source"];
+	        this.notes = source["notes"];
+	        this.capturedAt = this.convertValues(source["capturedAt"], null);
+	        this.tags = source["tags"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LockoutPolicy {
+	    maxAttemptsPerUser: number;
+	    lockoutWindowMinutes: number;
+	    enforceDelaySeconds: number;
+	    warningThresholdPercent: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LockoutPolicy(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.maxAttemptsPerUser = source["maxAttemptsPerUser"];
+	        this.lockoutWindowMinutes = source["lockoutWindowMinutes"];
+	        this.enforceDelaySeconds = source["enforceDelaySeconds"];
+	        this.warningThresholdPercent = source["warningThresholdPercent"];
+	    }
+	}
+	export class Engagement {
+	    id: string;
+	    name: string;
+	    scope: string;
+	    timeframe: string;
+	    lockoutPolicy: LockoutPolicy;
+	    isActive: boolean;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new Engagement(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.scope = source["scope"];
+	        this.timeframe = source["timeframe"];
+	        this.lockoutPolicy = this.convertValues(source["lockoutPolicy"], LockoutPolicy);
+	        this.isActive = source["isActive"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class FileItem {
 	    name: string;
 	    path: string;
@@ -614,6 +731,7 @@ export namespace core {
 		    return a;
 		}
 	}
+	
 	
 	
 	export class NotePage {
@@ -1375,6 +1493,89 @@ export namespace core {
 	        this.time = source["time"];
 	        this.customVars = source["customVars"];
 	    }
+	}
+	
+	export class SprayExportOptions {
+	    engagementId: string;
+	    credentialIds: string[];
+	    format: string;
+	    customUserList?: string;
+	    customPasswordList?: string;
+	    delimiter?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayExportOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.engagementId = source["engagementId"];
+	        this.credentialIds = source["credentialIds"];
+	        this.format = source["format"];
+	        this.customUserList = source["customUserList"];
+	        this.customPasswordList = source["customPasswordList"];
+	        this.delimiter = source["delimiter"];
+	    }
+	}
+	export class SprayWarning {
+	    exceedsPolicy: boolean;
+	    severity: string;
+	    message: string;
+	    totalCombinations: number;
+	    maxAttemptsPerAccount: number;
+	    policyLimit: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayWarning(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.exceedsPolicy = source["exceedsPolicy"];
+	        this.severity = source["severity"];
+	        this.message = source["message"];
+	        this.totalCombinations = source["totalCombinations"];
+	        this.maxAttemptsPerAccount = source["maxAttemptsPerAccount"];
+	        this.policyLimit = source["policyLimit"];
+	    }
+	}
+	export class SprayExportResult {
+	    content: string;
+	    lineCount: number;
+	    uniqueUsers: number;
+	    uniquePasswords: number;
+	    warning?: SprayWarning;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.content = source["content"];
+	        this.lineCount = source["lineCount"];
+	        this.uniqueUsers = source["uniqueUsers"];
+	        this.uniquePasswords = source["uniquePasswords"];
+	        this.warning = this.convertValues(source["warning"], SprayWarning);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	
 	export class SshKeySummary {

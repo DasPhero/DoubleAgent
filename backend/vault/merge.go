@@ -396,6 +396,78 @@ func MergeVaultPayloads(local, remote core.VaultPayload) (core.VaultPayload, cor
 		}
 	}
 
+	// 10. Engagements (F-36)
+	localEngagements := make(map[string]core.Engagement, len(local.Engagements))
+	for _, e := range local.Engagements {
+		localEngagements[e.ID] = e
+	}
+	remoteEngagements := make(map[string]core.Engagement, len(remote.Engagements))
+	for _, e := range remote.Engagements {
+		remoteEngagements[e.ID] = e
+	}
+
+	for _, le := range local.Engagements {
+		if re, exists := remoteEngagements[le.ID]; exists {
+			if jsonEqual(le, re) {
+				merged.Engagements = append(merged.Engagements, le)
+			} else {
+				report.HasConflicts = true
+				report.Conflicts = append(report.Conflicts, core.VaultConflictItem{
+					ID:            le.ID,
+					Type:          "engagement",
+					Label:         le.Name,
+					LocalSummary:  fmt.Sprintf("%s (%s)", le.Name, le.Timeframe),
+					RemoteSummary: fmt.Sprintf("%s (%s)", re.Name, re.Timeframe),
+				})
+				merged.Engagements = append(merged.Engagements, le)
+			}
+		} else {
+			merged.Engagements = append(merged.Engagements, le)
+		}
+	}
+	for _, re := range remote.Engagements {
+		if _, exists := localEngagements[re.ID]; !exists {
+			merged.Engagements = append(merged.Engagements, re)
+			report.AutoMerged++
+		}
+	}
+
+	// 11. Credentials (F-36)
+	localCreds := make(map[string]core.CredentialEntry, len(local.Credentials))
+	for _, c := range local.Credentials {
+		localCreds[c.ID] = c
+	}
+	remoteCreds := make(map[string]core.CredentialEntry, len(remote.Credentials))
+	for _, c := range remote.Credentials {
+		remoteCreds[c.ID] = c
+	}
+
+	for _, lc := range local.Credentials {
+		if rc, exists := remoteCreds[lc.ID]; exists {
+			if jsonEqual(lc, rc) {
+				merged.Credentials = append(merged.Credentials, lc)
+			} else {
+				report.HasConflicts = true
+				report.Conflicts = append(report.Conflicts, core.VaultConflictItem{
+					ID:            lc.ID,
+					Type:          "credential",
+					Label:         lc.Label,
+					LocalSummary:  fmt.Sprintf("%s (%s:%s)", lc.Label, lc.Username, lc.Category),
+					RemoteSummary: fmt.Sprintf("%s (%s:%s)", rc.Label, rc.Username, rc.Category),
+				})
+				merged.Credentials = append(merged.Credentials, lc)
+			}
+		} else {
+			merged.Credentials = append(merged.Credentials, lc)
+		}
+	}
+	for _, rc := range remote.Credentials {
+		if _, exists := localCreds[rc.ID]; !exists {
+			merged.Credentials = append(merged.Credentials, rc)
+			report.AutoMerged++
+		}
+	}
+
 	return ensureNonNilSlices(merged), report
 }
 
@@ -590,6 +662,72 @@ func ResolveVaultConflicts(local, remote core.VaultPayload, resolutions map[stri
 		}
 	}
 	resolved.TotpRecords = finalTotp
+
+	// 6. Engagements (F-36)
+	remoteEngagements := make(map[string]core.Engagement, len(remote.Engagements))
+	for _, e := range remote.Engagements {
+		remoteEngagements[e.ID] = e
+	}
+	var finalEngagements []core.Engagement
+	for _, e := range resolved.Engagements {
+		res, hasRes := resolutions[e.ID]
+		if !hasRes {
+			finalEngagements = append(finalEngagements, e)
+			continue
+		}
+		switch res {
+		case core.ResolutionKeepRemote:
+			if re, ok := remoteEngagements[e.ID]; ok {
+				finalEngagements = append(finalEngagements, re)
+			} else {
+				finalEngagements = append(finalEngagements, e)
+			}
+		case core.ResolutionKeepBoth:
+			finalEngagements = append(finalEngagements, e)
+			if re, ok := remoteEngagements[e.ID]; ok {
+				cloned := re
+				cloned.ID = fmt.Sprintf("%s-synced", re.ID)
+				cloned.Name = fmt.Sprintf("%s (Synced)", re.Name)
+				finalEngagements = append(finalEngagements, cloned)
+			}
+		default:
+			finalEngagements = append(finalEngagements, e)
+		}
+	}
+	resolved.Engagements = finalEngagements
+
+	// 7. Credentials (F-36)
+	remoteCreds := make(map[string]core.CredentialEntry, len(remote.Credentials))
+	for _, c := range remote.Credentials {
+		remoteCreds[c.ID] = c
+	}
+	var finalCreds []core.CredentialEntry
+	for _, c := range resolved.Credentials {
+		res, hasRes := resolutions[c.ID]
+		if !hasRes {
+			finalCreds = append(finalCreds, c)
+			continue
+		}
+		switch res {
+		case core.ResolutionKeepRemote:
+			if rc, ok := remoteCreds[c.ID]; ok {
+				finalCreds = append(finalCreds, rc)
+			} else {
+				finalCreds = append(finalCreds, c)
+			}
+		case core.ResolutionKeepBoth:
+			finalCreds = append(finalCreds, c)
+			if rc, ok := remoteCreds[c.ID]; ok {
+				cloned := rc
+				cloned.ID = fmt.Sprintf("%s-synced", rc.ID)
+				cloned.Label = fmt.Sprintf("%s (Synced)", rc.Label)
+				finalCreds = append(finalCreds, cloned)
+			}
+		default:
+			finalCreds = append(finalCreds, c)
+		}
+	}
+	resolved.Credentials = finalCreds
 
 	return ensureNonNilSlices(resolved)
 }

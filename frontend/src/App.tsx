@@ -44,6 +44,7 @@ import { VaultConflictModal } from './components/VaultConflictModal';
 import { ImportModal } from './components/ImportModal';
 import { RawTcpConfig, RawTcpListenerConfig, RawTcpListenerInfo, RawTcpSessionStats, RawTcpIncomingEvent } from './types/rawTcp';
 import { RawTcpModal } from './components/RawTcpModal';
+import { CredentialStoreModal } from './components/CredentialStoreModal';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -1093,6 +1094,9 @@ export function App({
   // Raw TCP Socket & Listener state (F-31)
   const [showRawTcpModal, setShowRawTcpModal] = useState<boolean>(false);
   const [rawTcpListeners, setRawTcpListeners] = useState<RawTcpListenerInfo[]>([]);
+
+  // Pentest Credential Pool & Spray Generator state (F-36, F-40)
+  const [showCredStoreModal, setShowCredStoreModal] = useState<boolean>(false);
 
   // Add Group form state
   const [grpName, setGrpName] = useState<string>('');
@@ -7183,6 +7187,14 @@ export function App({
         setShowRawTcpModal(true);
       },
     },
+    'cred-store': {
+      label: 'Credential Pool & Spray Lists (F-36)',
+      shortLabel: 'Credentials',
+      icon: 'shield',
+      action: () => {
+        setShowCredStoreModal(true);
+      },
+    },
     proxychains: {
       label: 'Export proxychains.conf',
       shortLabel: 'Proxychains',
@@ -7634,6 +7646,7 @@ export function App({
                       !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
                     )}
                     {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
+                    {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists (F-36)', '⚔️ Credentials', () => setShowCredStoreModal(true))}
 
                     <div className="tools-sub-header">Config Import &amp; Export</div>
                     {renderDropdownRow('ssh-config', 'Import ssh_config', '⚙️', () => {
@@ -10581,6 +10594,19 @@ export function App({
           onStopListener={handleStopRawTcpListener}
           listeners={rawTcpListeners}
           refreshListeners={refreshRawTcpListeners}
+        />
+      )}
+
+      {showCredStoreModal && (
+        <CredentialStoreModal
+          isOpen={showCredStoreModal}
+          onClose={() => setShowCredStoreModal(false)}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+          }))}
+          activeHostId={activeTab?.hostId}
         />
       )}
     </main>

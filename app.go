@@ -3676,3 +3676,238 @@ func (a *App) ResolveVaultConflicts(resolutions map[string]string, deleteExterna
 	a.emit(a.ctx, "vault:sync_status", info)
 	return nil
 }
+
+// ============================================================================
+// Pentest Module: Engagement & Credential Pool & Spray Lists (F-36, F-40)
+// ============================================================================
+
+// ListEngagements returns all engagements stored in the vault (F-36).
+func (a *App) ListEngagements() ([]core.Engagement, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	return payload.Engagements, nil
+}
+
+// GetActiveEngagement returns the currently active engagement (F-36).
+func (a *App) GetActiveEngagement() (*core.Engagement, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	for i := range payload.Engagements {
+		if payload.Engagements[i].IsActive {
+			eng := payload.Engagements[i]
+			return &eng, nil
+		}
+	}
+	return nil, nil
+}
+
+// SetActiveEngagement sets the specified engagement as active (F-36).
+func (a *App) SetActiveEngagement(id string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	found := false
+	for i := range payload.Engagements {
+		if payload.Engagements[i].ID == id {
+			payload.Engagements[i].IsActive = true
+			found = true
+		} else {
+			payload.Engagements[i].IsActive = false
+		}
+	}
+	if !found && id != "" {
+		return fmt.Errorf("engagement %q not found", id)
+	}
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// SaveEngagement inserts or updates an engagement in the vault (F-36).
+func (a *App) SaveEngagement(e core.Engagement) error {
+	if err := core.ValidateEngagement(e); err != nil {
+		return err
+	}
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	idx := -1
+	for i, existing := range payload.Engagements {
+		if existing.ID == e.ID {
+			idx = i
+			break
+		}
+	}
+	if idx >= 0 {
+		e.CreatedAt = payload.Engagements[idx].CreatedAt
+		e.UpdatedAt = now
+		payload.Engagements[idx] = e
+	} else {
+		if e.CreatedAt.IsZero() {
+			e.CreatedAt = now
+		}
+		e.UpdatedAt = now
+		if len(payload.Engagements) == 0 {
+			e.IsActive = true
+		}
+		payload.Engagements = append(payload.Engagements, e)
+	}
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DeleteEngagement removes an engagement and its associated credentials from the vault (F-36).
+func (a *App) DeleteEngagement(id string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	filteredEng := make([]core.Engagement, 0, len(payload.Engagements))
+	for _, e := range payload.Engagements {
+		if e.ID != id {
+			filteredEng = append(filteredEng, e)
+		}
+	}
+	payload.Engagements = filteredEng
+
+	filteredCreds := make([]core.CredentialEntry, 0, len(payload.Credentials))
+	for _, c := range payload.Credentials {
+		if c.EngagementID != id {
+			filteredCreds = append(filteredCreds, c)
+		}
+	}
+	payload.Credentials = filteredCreds
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// ListCredentials returns credentials filtered by engagement ID and/or host ID (F-36).
+func (a *App) ListCredentials(engagementID string, hostID string) ([]core.CredentialEntry, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	var res []core.CredentialEntry
+	for _, c := range payload.Credentials {
+		if engagementID != "" && c.EngagementID != engagementID {
+			continue
+		}
+		if hostID != "" && c.HostID != hostID {
+			continue
+		}
+		res = append(res, c)
+	}
+	return res, nil
+}
+
+// SaveCredential inserts or updates a credential in the engagement pool (F-36).
+func (a *App) SaveCredential(c core.CredentialEntry) error {
+	if err := core.ValidateCredential(c); err != nil {
+		return err
+	}
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	if c.CapturedAt.IsZero() {
+		c.CapturedAt = time.Now()
+	}
+	idx := -1
+	for i, existing := range payload.Credentials {
+		if existing.ID == c.ID {
+			idx = i
+			break
+		}
+	}
+	if idx >= 0 {
+		payload.Credentials[idx] = c
+	} else {
+		payload.Credentials = append(payload.Credentials, c)
+	}
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DeleteCredential removes a credential from the vault pool (F-36).
+func (a *App) DeleteCredential(id string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.CredentialEntry, 0, len(payload.Credentials))
+	for _, c := range payload.Credentials {
+		if c.ID != id {
+			filtered = append(filtered, c)
+		}
+	}
+	payload.Credentials = filtered
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// ExportSprayList generates formatted spray lists and checks for lockout warnings against the engagement policy (F-36, F-40).
+func (a *App) ExportSprayList(opts core.SprayExportOptions) (core.SprayExportResult, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return core.SprayExportResult{}, err
+	}
+
+	policy := core.DefaultLockoutPolicy()
+	if opts.EngagementID != "" {
+		for _, e := range payload.Engagements {
+			if e.ID == opts.EngagementID {
+				policy = e.LockoutPolicy
+				break
+			}
+		}
+	}
+
+	idSet := make(map[string]struct{}, len(opts.CredentialIDs))
+	for _, id := range opts.CredentialIDs {
+		idSet[id] = struct{}{}
+	}
+
+	var targetCreds []core.CredentialEntry
+	for _, c := range payload.Credentials {
+		if len(idSet) > 0 {
+			if _, ok := idSet[c.ID]; ok {
+				targetCreds = append(targetCreds, c)
+			}
+		} else if opts.EngagementID == "" || c.EngagementID == opts.EngagementID {
+			targetCreds = append(targetCreds, c)
+		}
+	}
+
+	return core.GenerateSprayList(targetCreds, policy, opts)
+}

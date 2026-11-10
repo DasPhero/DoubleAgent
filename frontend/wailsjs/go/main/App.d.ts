@@ -31,6 +31,10 @@ export function ConnectSerial(arg1:core.SerialConfig):Promise<string>;
 
 export function CreateRemoteDir(arg1:string,arg2:string):Promise<void>;
 
+export function DeleteCredential(arg1:string):Promise<void>;
+
+export function DeleteEngagement(arg1:string):Promise<void>;
+
 export function DeleteForwardRule(arg1:string):Promise<void>;
 
 export function DeleteGroup(arg1:string):Promise<void>;
@@ -65,11 +69,15 @@ export function ExportProxychainsConfig():Promise<string>;
 
 export function ExportSessionLog(arg1:string,arg2:string):Promise<void>;
 
+export function ExportSprayList(arg1:core.SprayExportOptions):Promise<core.SprayExportResult>;
+
 export function ExportTotpTokens(arg1:string):Promise<string>;
 
 export function GenerateProxychainsConfig(arg1:core.ProxychainsExportOptions):Promise<string>;
 
 export function GenerateSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
+
+export function GetActiveEngagement():Promise<core.Engagement>;
 
 export function GetActiveTransfers():Promise<Array<core.TransferTask>>;
 
@@ -114,6 +122,10 @@ export function InjectSessionPassword(arg1:string):Promise<void>;
 export function InjectTotpCode(arg1:string,arg2:string):Promise<void>;
 
 export function ListActiveRemoteEdits():Promise<Array<core.RemoteEditSession>>;
+
+export function ListCredentials(arg1:string,arg2:string):Promise<Array<core.CredentialEntry>>;
+
+export function ListEngagements():Promise<Array<core.Engagement>>;
 
 export function ListForwardRules():Promise<Array<core.ForwardRule>>;
 
@@ -167,6 +179,10 @@ export function ResolveSnippetTemplate(arg1:string,arg2:string,arg3:Record<strin
 
 export function ResolveVaultConflicts(arg1:Record<string, string>,arg2:boolean):Promise<void>;
 
+export function SaveCredential(arg1:core.CredentialEntry):Promise<void>;
+
+export function SaveEngagement(arg1:core.Engagement):Promise<void>;
+
 export function SaveForwardRule(arg1:core.ForwardRule):Promise<void>;
 
 export function SaveGroup(arg1:core.GroupRecord):Promise<void>;
@@ -198,6 +214,8 @@ export function SearchCommandPalette(arg1:string):Promise<core.CommandPaletteRes
 export function SearchNotes(arg1:string):Promise<Array<core.NoteSearchResult>>;
 
 export function SendSerialBreak(arg1:string):Promise<void>;
+
+export function SetActiveEngagement(arg1:string):Promise<void>;
 
 export function SetRawTcpSessionLineMode(arg1:string,arg2:boolean,arg3:string):Promise<void>;
 
