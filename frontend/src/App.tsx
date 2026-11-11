@@ -16,7 +16,7 @@ import {
 import { SignalAnalyzerView } from './components/SignalAnalyzerView';
 import { SftpBrowserView } from './components/SftpBrowserView';
 import { PortForwardingView } from './components/PortForwardingView';
-import { SettingsView } from './components/SettingsView';
+import { SettingsView, SettingsTabId } from './components/SettingsView';
 import { ProxyProfilesView } from './components/ProxyProfilesView';
 import { ProxychainsExportModal } from './components/ProxychainsExportModal';
 import { FileItem, TransferTask } from './types/sftp';
@@ -1067,7 +1067,6 @@ export function App({
   const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showAddHostModal, setShowAddHostModal] = useState<boolean>(false);
-  const [showAddGroupModal, setShowAddGroupModal] = useState<boolean>(false);
   const [showKeychainModal, setShowKeychainModal] = useState<boolean>(false);
   const [showSSHConfigModal, setShowSSHConfigModal] = useState<boolean>(false);
   const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
@@ -1126,16 +1125,6 @@ export function App({
   // Host Sidebar Tag / Label filtering & editing
   const [selectedHostTag, setSelectedHostTag] = useState<string>('all');
   const [editingHostId, setEditingHostId] = useState<string | null>(null);
-
-  // Add Group form state
-  const [grpName, setGrpName] = useState<string>('');
-  const [grpParentId, setGrpParentId] = useState<string>('');
-  const [grpPort, setGrpPort] = useState<string>('22');
-  const [grpUser, setGrpUser] = useState<string>('root');
-  const [grpKeepalive, setGrpKeepalive] = useState<string>('30');
-  const [grpInitialDir, setGrpInitialDir] = useState<string>('');
-  const [grpProxyProfileId, setGrpProxyProfileId] = useState<string>('');
-  const [grpSessionLogging, setGrpSessionLogging] = useState<boolean>(false);
 
   // Add Host form state
   const [hostLabel, setHostLabel] = useState<string>('');
@@ -1293,7 +1282,7 @@ export function App({
     globalSettingsRef.current = globalSettings;
   }, [globalSettings]);
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
-  const [settingsActiveTab, setSettingsActiveTab] = useState<'appearance' | 'security' | 'sync' | 'shortcuts' | 'about'>('appearance');
+  const [settingsActiveTab, setSettingsActiveTab] = useState<SettingsTabId>('appearance');
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
   const [leaderArmed, setLeaderArmed] = useState<boolean>(false);
   const leaderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1611,7 +1600,7 @@ export function App({
   );
 
   const openSettingsTab = useCallback(
-    (subTab: 'appearance' | 'security' | 'sync' | 'shortcuts' | 'about' = 'appearance'): void => {
+    (subTab: SettingsTabId = 'appearance'): void => {
       setSettingsActiveTab(subTab);
       setTabs((prev) => {
         const existingTab = prev.find((t) => t.tabType === 'settings');
@@ -2548,35 +2537,6 @@ export function App({
       setVaultLocked(true);
     }
     setStatusMessage('Vault locked (Dark Crimson Theme Active).');
-  };
-
-  const handleSaveGroup = async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault();
-    const newGroup: GroupRecord = {
-      id: `grp-${Date.now()}`,
-      name: grpName.trim(),
-      parentId: grpParentId || undefined,
-      defaultSettings: {
-        port: Number(grpPort) || 22,
-        username: grpUser.trim() || 'root',
-        initialDir: grpInitialDir.trim() || undefined,
-        keepaliveSecs: Number(grpKeepalive) || 30,
-        proxyProfileId: grpProxyProfileId || undefined,
-        sessionLogging: grpSessionLogging ? true : undefined,
-      },
-    };
-    const api = getWailsBindings();
-    if (api) {
-      await api.SaveGroup(newGroup);
-      await refreshVaultState();
-    } else {
-      setVaultSummary((prev) => ({ ...prev, groups: [...prev.groups, newGroup] }));
-    }
-    setGrpName('');
-    setGrpInitialDir('');
-    setGrpProxyProfileId('');
-    setGrpSessionLogging(false);
-    setShowAddGroupModal(false);
   };
 
   const handleSaveHost = async (e: React.FormEvent): Promise<void> => {
@@ -7732,36 +7692,6 @@ export function App({
                       },
                       !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
                     )}
-
-                    {activePane && (
-                      <>
-                        <div className="tools-sub-header">Session Quick Actions</div>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="nav-dropdown-item"
-                          onClick={() => {
-                            setActiveDropdownMenu(null);
-                            void handleInjectPassword();
-                          }}
-                        >
-                          <span>Inject Password</span>
-                          <span className="nav-dropdown-shortcut">🔑</span>
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="nav-dropdown-item"
-                          onClick={() => {
-                            setActiveDropdownMenu(null);
-                            void handleTerminalTotpClick();
-                          }}
-                        >
-                          <span>Inject 2FA Code</span>
-                          <span className="nav-dropdown-shortcut">🔐 2FA</span>
-                        </button>
-                      </>
-                    )}
                   </div>
 
                   {/* Column 2: Tools & Utilities */}
@@ -7801,28 +7731,6 @@ export function App({
                     })}
                     {renderDropdownRow('snippets', 'Command Snippets & Variables', '⚡ Snippets', () => setShowSnippetsModal(true))}
                     {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', '🛡️ Profiles', () => setShowProxyProfilesModal(true))}
-
-                    <div className="tools-sub-header">Config Migration</div>
-                    {renderDropdownRow('ssh-config', 'Import ssh_config', '⚙️', () => {
-                      setModalError('');
-                      setSshConfigResult(null);
-                      setShowSSHConfigModal(true);
-                    })}
-                    {renderDropdownRow('import-putty-termius', 'Import PuTTY / Termius (F-30)', '📥', () => {
-                      setShowImportModal(true);
-                    })}
-                  </div>
-
-                  {/* Column 3: Pentest Engagements (Dedicated Header & Column) */}
-                  <div className="tools-dropdown-col">
-                    <div className="tools-col-title">
-                      <span>⚔️ Pentest Engagements</span>
-                    </div>
-
-                    <div className="tools-sub-header">Target Assignments &amp; Evidence</div>
-                    {renderDropdownRow('engagement-hub', 'Engagement Hub & Scope (F-36)', '🎯 Scope', () => setShowEngagementHubModal(true))}
-                    {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists (F-36)', '🔑 Creds', () => setShowCredStoreModal(true))}
-                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence', () => setShowEvidenceModal(true))}
 
                     <div className="tools-sub-header">Network Attacks &amp; Sockets</div>
                     {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
@@ -8117,19 +8025,12 @@ export function App({
                   <div className="sidebar-actions">
                     <button
                       type="button"
-                      className="btn-secondary btn-sm"
-                      onClick={() => setShowAddGroupModal(true)}
-                    >
-                      + Group
-                    </button>
-                    <button
-                      type="button"
                       className="btn-primary btn-sm"
                       onClick={() => {
                         setEditingHostId(null);
                         setHostLabel('');
                         setHostAddr('');
-                        setHostPort('0');
+                        setHostPort('22');
                         setHostGroupId('');
                         setHostUser('');
                         setHostPass('');
@@ -8191,8 +8092,8 @@ export function App({
                     )
                   )}
 
-                  {/* Multi-Label & Group Filter Bar */}
-                  {(allHostTags.length > 0 || vaultSummary.groups.length > 0) && (
+                  {/* Multi-Label Filter Bar */}
+                  {allHostTags.length > 0 && (
                     <div className="sidebar-tags-filter-bar" role="toolbar" aria-label="Filter Hosts by Label">
                       <button
                         type="button"
@@ -8201,23 +8102,6 @@ export function App({
                       >
                         All ({vaultSummary.hosts.length})
                       </button>
-                      {vaultSummary.groups.map((grp) => {
-                        const count = vaultSummary.hosts.filter((h) => h.groupId === grp.id).length;
-                        const isSelected = selectedHostTag.toLowerCase() === `grp:${grp.id}`.toLowerCase();
-                        return (
-                          <button
-                            key={grp.id}
-                            type="button"
-                            className={`sidebar-tag-pill ${isSelected ? 'active' : ''}`}
-                            onClick={() => setSelectedHostTag((prev) => (prev.toLowerCase() === `grp:${grp.id}`.toLowerCase() ? 'all' : `grp:${grp.id}`))}
-                            title={`Filter by group ${grp.name} (${count} hosts)`}
-                          >
-                            <span>📁 </span>
-                            <span>{grp.name}</span>
-                            <span style={{ opacity: 0.7, marginLeft: '3px' }}>({count})</span>
-                          </button>
-                        );
-                      })}
                       {allHostTags.map((tag) => {
                         const count = vaultSummary.hosts.filter(
                           (h) => h.tags && h.tags.some((t) => t.toLowerCase() === tag.toLowerCase())
@@ -8312,15 +8196,6 @@ export function App({
                                 <CyberIcon name="folder" size={10} /> {h.initialDir}
                               </span>
                             )}
-                            {h.groupId && (() => {
-                              const grp = vaultSummary.groups.find((g) => g.id === h.groupId);
-                              return grp ? (
-                                <span className="host-group-tag" style={{ fontSize: '0.68rem', color: '#38bdf8', marginTop: '2px', display: 'inline-block' }} title={`Group: ${grp.name}`}>
-                                  <span>📁 </span>
-                                  <span>{grp.name}</span>
-                                </span>
-                              ) : null;
-                            })()}
                             {h.tags && h.tags.length > 0 && (
                               <div className="host-tags-list">
                                 {h.tags.map((tag) => (
@@ -9102,6 +8977,14 @@ export function App({
                         availableSnippets={vaultSummary.snippets || []}
                         syncInfo={syncInfo}
                         onRefreshSync={refreshSyncInfo}
+                        onOpenSSHConfigImport={() => {
+                          setModalError('');
+                          setSshConfigResult(null);
+                          setShowSSHConfigModal(true);
+                        }}
+                        onOpenPuttyTermiusImport={() => {
+                          setShowImportModal(true);
+                        }}
                         onOpenConflictResolver={(rep, file) => {
                           setActiveConflictReport(rep);
                           setActiveConflictFilePath(file);
@@ -9604,101 +9487,6 @@ export function App({
         </div>
       )}
 
-      {showAddGroupModal && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-label="New Host Group"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowAddGroupModal(false);
-            }
-          }}
-        >
-          <form className="modal-card" onSubmit={(e) => void handleSaveGroup(e)}>
-            <h2>New Host Group</h2>
-            <p>Hosts in this group inherit its default Port, Username, and Keepalive.</p>
-            <input
-              aria-label="Group Name"
-              placeholder="Group Name (e.g. Production)"
-              value={grpName}
-              onChange={(e) => setGrpName(e.target.value)}
-              required
-              autoFocus
-            />
-            <select
-              aria-label="Parent Group"
-              value={grpParentId}
-              onChange={(e) => setGrpParentId(e.target.value)}
-            >
-              <option value="">No Parent Group (Root)</option>
-              {vaultSummary.groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-            <input
-              aria-label="Default Group Port"
-              placeholder="Default Port (22)"
-              value={grpPort}
-              onChange={(e) => setGrpPort(e.target.value)}
-            />
-            <input
-              aria-label="Default Group Username"
-              placeholder="Default Username (root)"
-              value={grpUser}
-              onChange={(e) => setGrpUser(e.target.value)}
-            />
-            <input
-              aria-label="Default Keepalive Seconds"
-              placeholder="Keepalive Seconds (30)"
-              value={grpKeepalive}
-              onChange={(e) => setGrpKeepalive(e.target.value)}
-            />
-            <input
-              aria-label="Default Group Initial Directory"
-              placeholder="Default Initial Directory (e.g. /var/www, optional)"
-              value={grpInitialDir}
-              onChange={(e) => setGrpInitialDir(e.target.value)}
-            />
-            <select
-              aria-label="Default Group Proxy Profile"
-              value={grpProxyProfileId}
-              onChange={(e) => setGrpProxyProfileId(e.target.value)}
-            >
-              <option value="">No Default Proxy (Direct Connection)</option>
-              {(vaultSummary.proxyProfiles || []).map((p) => (
-                <option key={p.id} value={p.id}>
-                  Proxy: {p.name} ({p.type})
-                </option>
-              ))}
-            </select>
-            <label className="checkbox-label" style={{ marginTop: '0.25rem' }}>
-              <input
-                type="checkbox"
-                aria-label="Default Group Session Logging"
-                checked={grpSessionLogging}
-                onChange={(e) => setGrpSessionLogging(e.target.checked)}
-              />
-              Enable Session Logging by default
-            </label>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setShowAddGroupModal(false)}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary">
-                Save Group
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {showAddHostModal && (
         <div
           className="modal-backdrop"
@@ -9713,7 +9501,7 @@ export function App({
         >
           <form className="modal-card" onSubmit={(e) => void handleSaveHost(e)}>
             <h2>{editingHostId ? 'Edit SSH Host' : 'New SSH Host'}</h2>
-            <p>Leave Port at 0 or Username empty to inherit from the selected Group.</p>
+            <p>Configure SSH connection address, credentials, port, and labels.</p>
             <input
               aria-label="Host Label"
               placeholder="Label (e.g. Bastion EU)"
@@ -9747,28 +9535,15 @@ export function App({
                 ))}
               </select>
             </div>
-            <select
-              aria-label="Host Group"
-              value={hostGroupId}
-              onChange={(e) => setHostGroupId(e.target.value)}
-            >
-              <option value="">Ungrouped</option>
-              {vaultSummary.groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} (Default {g.defaultSettings.username || 'root'}:
-                  {g.defaultSettings.port || 22})
-                </option>
-              ))}
-            </select>
             <input
-              aria-label="Host Port Override"
-              placeholder="Port (0 = inherit from group)"
+              aria-label="Host Port"
+              placeholder="Port (default: 22)"
               value={hostPort}
               onChange={(e) => setHostPort(e.target.value)}
             />
             <input
-              aria-label="Host Username Override"
-              placeholder="Username (leave empty to inherit from group)"
+              aria-label="Host Username"
+              placeholder="Username (e.g. root, ubuntu, admin)"
               value={hostUser}
               onChange={(e) => setHostUser(e.target.value)}
             />
@@ -10328,6 +10103,16 @@ export function App({
             availableSnippets={vaultSummary.snippets || []}
             syncInfo={syncInfo}
             onRefreshSync={refreshSyncInfo}
+            onOpenSSHConfigImport={() => {
+              setShowGlobalSettingsModal(false);
+              setModalError('');
+              setSshConfigResult(null);
+              setShowSSHConfigModal(true);
+            }}
+            onOpenPuttyTermiusImport={() => {
+              setShowGlobalSettingsModal(false);
+              setShowImportModal(true);
+            }}
             onOpenConflictResolver={(rep, file) => {
               setActiveConflictReport(rep);
               setActiveConflictFilePath(file);

@@ -24,9 +24,11 @@ function getWailsSyncApi(): WailsSyncApi | undefined {
   return w.go?.main?.App;
 }
 
+export type SettingsTabId = 'appearance' | 'security' | 'sync' | 'shortcuts' | 'migration' | 'about';
+
 export interface SettingsViewProps {
-  activeTab: 'appearance' | 'security' | 'sync' | 'shortcuts' | 'about';
-  onTabChange: (tab: 'appearance' | 'security' | 'sync' | 'shortcuts' | 'about') => void;
+  activeTab: SettingsTabId;
+  onTabChange: (tab: SettingsTabId) => void;
   globalSettings: AppGlobalSettings;
   onUpdateSettings: (partial: Partial<AppGlobalSettings>) => void;
   onResetSettings: () => void;
@@ -42,6 +44,8 @@ export interface SettingsViewProps {
   syncInfo?: VaultSyncInfo | null;
   onOpenConflictResolver?: (report: VaultConflictReport, conflictFile?: string) => void;
   onRefreshSync?: () => Promise<void>;
+  onOpenSSHConfigImport?: () => void;
+  onOpenPuttyTermiusImport?: () => void;
   onClose?: () => void;
   onOpenAsTab?: () => void;
   isModal?: boolean;
@@ -67,6 +71,8 @@ export function SettingsView({
   syncInfo,
   onOpenConflictResolver,
   onRefreshSync,
+  onOpenSSHConfigImport,
+  onOpenPuttyTermiusImport,
   onClose,
   onOpenAsTab,
   isModal = false,
@@ -387,6 +393,15 @@ export function SettingsView({
           onClick={() => onTabChange('shortcuts')}
         >
           ⌨️ Keyboard Shortcuts
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'migration'}
+          className={`settings-tab-btn ${activeTab === 'migration' ? 'active' : ''}`}
+          onClick={() => onTabChange('migration')}
+        >
+          📥 Config Migration
         </button>
         <button
           type="button"
@@ -1336,6 +1351,62 @@ export function SettingsView({
               >
                 {isMerging ? 'Merging...' : 'Merge Vault'}
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* Tab: Config Migration */}
+      {activeTab === 'migration' && (
+        <div className="settings-grid" role="tabpanel" aria-label="Config Migration Settings">
+          <section className="settings-section">
+            <h3>Config &amp; Session Migration</h3>
+            <p className="setting-description">
+              Migrate existing host definitions, keys, jump chains, and session configurations from OpenSSH, PuTTY, or Termius directly into your encrypted vault.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+              {/* Card 1: OpenSSH config */}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>⚙️</span>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-bright)' }}>OpenSSH Configuration</h4>
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
+                    Parse and import host declarations from <code>~/.ssh/config</code>. Supports HostName, User, Port, IdentityFile, and ProxyJump directives.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ alignSelf: 'flex-start', padding: '0.45rem 1rem', fontSize: '0.82rem' }}
+                  onClick={() => onOpenSSHConfigImport?.()}
+                >
+                  Import ssh_config
+                </button>
+              </div>
+
+              {/* Card 2: PuTTY / Termius */}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>📥</span>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-bright)' }}>PuTTY &amp; Termius Sessions (F-30)</h4>
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
+                    Scan Windows Registry or .reg exports for saved PuTTY sessions, or import JSON session backups exported from Termius.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ alignSelf: 'flex-start', padding: '0.45rem 1rem', fontSize: '0.82rem' }}
+                  onClick={() => onOpenPuttyTermiusImport?.()}
+                >
+                  Import PuTTY / Termius
+                </button>
+              </div>
             </div>
           </section>
         </div>

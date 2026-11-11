@@ -21,29 +21,24 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(main).toHaveClass('theme-unlocked');
     expect(screen.getByText('Vault Unlocked (No PW)')).toBeInTheDocument();
 
-    // Create a Group with Port 2222 and Username deploy (F-01)
-    fireEvent.click(screen.getByRole('button', { name: /\+ Group/i }));
-    fireEvent.change(screen.getByLabelText('Group Name'), { target: { value: 'Production' } });
-    fireEvent.change(screen.getByLabelText('Default Group Port'), { target: { value: '2222' } });
-    fireEvent.change(screen.getByLabelText('Default Group Username'), {
-      target: { value: 'deploy' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Save Group/i }));
-
-    expect(screen.getByText(/Production/)).toBeInTheDocument();
-
-    // Create a Host in that group inheriting Port 2222 and Username deploy (F-01)
+    // Create a Host with Port 2222, Username deploy, and Labels 'production, dmz' (F-01)
     fireEvent.click(screen.getByRole('button', { name: /\+ Host/i }));
     fireEvent.change(screen.getByLabelText('Host Label'), { target: { value: 'Bastion 01' } });
     fireEvent.change(screen.getByLabelText('Host IP or Hostname'), {
       target: { value: '10.10.0.5' },
     });
-    const groupSelect = screen.getByLabelText('Host Group') as HTMLSelectElement;
-    fireEvent.change(groupSelect, { target: { value: groupSelect.options[1].value } });
+    fireEvent.change(screen.getByLabelText('Host Port'), { target: { value: '2222' } });
+    fireEvent.change(screen.getByLabelText('Host Username'), {
+      target: { value: 'deploy' },
+    });
+    fireEvent.change(screen.getByLabelText('Host Tags'), {
+      target: { value: 'production, dmz' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /Save Host/i }));
 
     expect(screen.getByText('Bastion 01')).toBeInTheDocument();
     expect(screen.getByText('deploy@10.10.0.5:2222')).toBeInTheDocument();
+    expect(screen.getByText('production')).toBeInTheDocument();
   });
 
   it('opens Command Palette via Ctrl+K, performs fuzzy search over Name/Address/Tags, and supports user@host:port Quick Connect (F-02)', () => {
@@ -104,9 +99,10 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('button', { name: /Copy Public Key/i }));
     fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
 
-    // Open Tools menu and click Import ssh_config (F-22)
-    fireEvent.click(screen.getByRole('button', { name: /^Tools/i }));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Import ssh_config/i }));
+    // Open Global Settings -> Config Migration and click Import ssh_config (F-22)
+    fireEvent.click(screen.getByRole('button', { name: /Settings ⚙/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Config Migration/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Import ssh_config/i }));
     fireEvent.change(screen.getByLabelText('SSH Config Content'), {
       target: {
         value: `Host jump-eu
@@ -2257,8 +2253,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     try {
       render(<App initialLocked={false} />);
 
-      // Wait for vault to load hosts and groups in sidebar
-      expect((await screen.findAllByText('Infrastructure')).length).toBeGreaterThan(0);
+      // Wait for vault to load hosts and labels in sidebar
+      expect((await screen.findAllByText('Internal-Postgres')).length).toBeGreaterThan(0);
 
       // 1. Open Tools dropdown and launch Network Topology Map tab
       const toolsMenuBtn = await screen.findByRole('button', { name: /Tools/i });
@@ -2643,10 +2639,11 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     try {
       render(<App />);
 
-      // 1. Open Tools menu -> Import PuTTY / Termius (F-30)
-      fireEvent.click(screen.getByRole('button', { name: /^Tools ▾/i }));
-      const importMenuItem = screen.getByRole('menuitem', { name: /Import PuTTY \/ Termius/i });
-      fireEvent.click(importMenuItem);
+      // 1. Open Settings -> Config Migration -> Import PuTTY / Termius (F-30)
+      fireEvent.click(screen.getByRole('button', { name: /Settings ⚙/i }));
+      fireEvent.click(screen.getByRole('tab', { name: /Config Migration/i }));
+      const openImportModalBtn = screen.getByRole('button', { name: /Import PuTTY \/ Termius/i });
+      fireEvent.click(openImportModalBtn);
 
       // Verify Import Dialog opens
       const importModal = screen.getByRole('dialog', { name: 'Import PuTTY and Termius Sessions' });
@@ -2907,9 +2904,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
       render(<App />);
 
-      // 1. Open Tools menu -> Credential Pool & Spray Lists
-      const toolsMenuBtn = screen.getByRole('button', { name: /^Tools/i });
-      fireEvent.click(toolsMenuBtn);
+      // 1. Open Engagement menu -> Credential Pool & Spray Lists
+      const engMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
+      fireEvent.click(engMenuBtn);
       const credToolBtn = screen.getByText(/Credential Pool & Spray Lists \(F-36\)/i);
       fireEvent.click(credToolBtn);
 
@@ -3017,9 +3014,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     try {
       render(<App />);
 
-      // 1. Open Tools menu -> Evidence Vault
-      const toolsMenuBtn = screen.getByRole('button', { name: /^Tools/i });
-      fireEvent.click(toolsMenuBtn);
+      // 1. Open Engagement menu -> Evidence Vault
+      const engMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
+      fireEvent.click(engMenuBtn);
       const eviToolBtn = screen.getByText(/Evidence Vault & Findings \(F-18\)/i);
       fireEvent.click(eviToolBtn);
 
