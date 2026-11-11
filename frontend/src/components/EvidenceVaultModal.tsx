@@ -4,6 +4,8 @@ import {
   EvidenceItem,
   EvidenceType,
   EvidenceSeverity,
+  FindingItem,
+  FindingStatus,
   TableEvidenceContent,
 } from '../types/pentest';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -30,6 +32,11 @@ interface WailsPentestEvidenceApi {
   GetEvidenceCategories?: (engagementId: string) => Promise<string[]>;
   AddEvidenceCategory?: (engagementId: string, category: string) => Promise<void>;
   GetEvidenceTemplates?: () => Promise<EvidenceItem[]>;
+  ListFindings?: (engagementId: string, hostId: string) => Promise<FindingItem[]>;
+  GetFinding?: (id: string) => Promise<FindingItem>;
+  SaveFinding?: (item: FindingItem) => Promise<void>;
+  DeleteFinding?: (id: string) => Promise<void>;
+  GetFindingTemplates?: () => Promise<FindingItem[]>;
 }
 
 function getEvidenceApi(): WailsPentestEvidenceApi | undefined {
@@ -43,9 +50,14 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
   hosts,
   activeHostId,
 }) => {
+  // Navigation Tabs: Findings (Vulnerabilities), Evidence Vault (Proof Artifacts), Assessment Report
+  const [activeTab, setActiveTab] = useState<'findings' | 'evidence' | 'report'>('findings');
+
+  const [findingsList, setFindingsList] = useState<FindingItem[]>([]);
+  const [findingTemplates, setFindingTemplates] = useState<FindingItem[]>([]);
   const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([]);
+  const [evidenceTemplates, setEvidenceTemplates] = useState<EvidenceItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [templates, setTemplates] = useState<EvidenceItem[]>([]);
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [activeEngagement, setActiveEngagementState] = useState<Engagement | null>(null);
 
@@ -53,6 +65,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedHostId, setSelectedHostId] = useState<string>(activeHostId || 'all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
+  const [evidenceReportFilter, setEvidenceReportFilter] = useState<'all' | 'reportable' | 'internal' | 'unlinked'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -62,18 +75,35 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
   const [newCatName, setNewCatName] = useState('');
 
   // Finding Editor State
-  const [isEditing, setIsEditing] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editCategory, setEditCategory] = useState('Vulnerabilities');
-  const [editSeverity, setEditSeverity] = useState<EvidenceSeverity>('medium');
-  const [editType, setEditType] = useState<EvidenceType>('text');
-  const [editHostId, setEditHostId] = useState<string>(activeHostId || '');
-  const [editSource, setEditSource] = useState('manual');
-  const [editTags, setEditTags] = useState('');
-  const [editTextContent, setEditTextContent] = useState('');
+  const [isEditingFinding, setIsEditingFinding] = useState(false);
+  const [findEditId, setFindEditId] = useState<string | null>(null);
+  const [findEditTitle, setFindEditTitle] = useState('');
+  const [findEditCategory, setFindEditCategory] = useState('Vulnerabilities');
+  const [findEditSeverity, setFindEditSeverity] = useState<EvidenceSeverity>('high');
+  const [findEditStatus, setFindEditStatus] = useState<FindingStatus>('draft');
+  const [findEditHostId, setFindEditHostId] = useState<string>(activeHostId || '');
+  const [findEditDescription, setFindEditDescription] = useState('');
+  const [findEditImpact, setFindEditImpact] = useState('');
+  const [findEditRemediation, setFindEditRemediation] = useState('');
+  const [findEditEvidenceIds, setFindEditEvidenceIds] = useState<string[]>([]);
+  const [findEditTags, setFindEditTags] = useState('');
+  const [selectedEvidenceToAttach, setSelectedEvidenceToAttach] = useState<string>('');
 
-  // Table Editor State
+  // Evidence Editor State
+  const [isEditingEvidence, setIsEditingEvidence] = useState(false);
+  const [eviEditId, setEviEditId] = useState<string | null>(null);
+  const [eviEditTitle, setEviEditTitle] = useState('');
+  const [eviEditCategory, setEviEditCategory] = useState('Credentials');
+  const [eviEditSeverity, setEviEditSeverity] = useState<EvidenceSeverity>('info');
+  const [eviEditType, setEviEditType] = useState<EvidenceType>('text');
+  const [eviEditHostId, setEviEditHostId] = useState<string>(activeHostId || '');
+  const [eviEditSource, setEviEditSource] = useState('manual');
+  const [eviEditTags, setEviEditTags] = useState('');
+  const [eviEditTextContent, setEviEditTextContent] = useState('');
+  const [eviEditInReport, setEviEditInReport] = useState<boolean>(true);
+  const [eviEditFindingId, setEviEditFindingId] = useState<string>('');
+
+  // Table Editor State (for evidence)
   const [tableHeaders, setTableHeaders] = useState<string[]>(['Port', 'Protocol', 'Service', 'State']);
   const [tableRows, setTableRows] = useState<string[][]>([
     ['22', 'tcp', 'ssh', 'open'],
@@ -94,6 +124,14 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
         setActiveEngagementState(act || null);
         activeId = act?.id || '';
       }
+      if (api.ListFindings) {
+        const findings = await api.ListFindings('', '');
+        setFindingsList(findings || []);
+      }
+      if (api.GetFindingTemplates) {
+        const fTpls = await api.GetFindingTemplates();
+        setFindingTemplates(fTpls || []);
+      }
       if (api.ListEvidence) {
         const items = await api.ListEvidence('', '');
         setEvidenceList(items || []);
@@ -104,10 +142,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       }
       if (api.GetEvidenceTemplates) {
         const tpls = await api.GetEvidenceTemplates();
-        setTemplates(tpls || []);
+        setEvidenceTemplates(tpls || []);
       }
     } catch (err: unknown) {
-      console.error('Failed to load evidence vault data:', err);
+      console.error('Failed to load pentest hub data:', err);
     }
   }, []);
 
@@ -115,7 +153,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     if (isOpen) {
       void refreshAll();
       setFeedbackMsg(null);
-      setIsEditing(false);
+      setIsEditingFinding(false);
+      setIsEditingEvidence(false);
     }
   }, [isOpen, refreshAll]);
 
@@ -127,37 +166,61 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     return m;
   }, [hosts]);
 
-  // Group templates by category (F-18)
-  const groupedTemplates = useMemo(() => {
-    const map = new Map<string, EvidenceItem[]>();
-    for (const tpl of templates) {
-      const cat = tpl.category || 'General';
-      const list = map.get(cat);
-      if (list) {
-        list.push(tpl);
-      } else {
-        map.set(cat, [tpl]);
-      }
+  const findingMap = useMemo(() => {
+    const m = new Map<string, FindingItem>();
+    for (const f of findingsList) {
+      m.set(f.id, f);
     }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [templates]);
+    return m;
+  }, [findingsList]);
 
-  // Filtered evidence items — strict encapsulation
-  const filteredEvidence = useMemo(() => {
-    return evidenceList.filter((item) => {
-      // Engagement encapsulation
+  // Filtered Findings — strict customer encapsulation
+  const filteredFindings = useMemo(() => {
+    return findingsList.filter((item) => {
       if (!activeEngagement) {
-        // Casual / No Engagement: strictly show global unattached findings
         if (item.engagementId) return false;
       } else {
-        // Customer Engagement: strictly show findings belonging to active engagement
         if (item.engagementId !== activeEngagement.id) return false;
       }
-      // Category filter
       if (selectedCategory !== 'all' && item.category !== selectedCategory) {
         return false;
       }
-      // Host filter
+      if (selectedHostId !== 'all') {
+        if (selectedHostId === 'unassigned') {
+          if (item.hostId) return false;
+        } else if (item.hostId !== selectedHostId && !item.affectedHosts?.includes(selectedHostId)) {
+          return false;
+        }
+      }
+      if (selectedSeverity !== 'all' && item.severity !== selectedSeverity) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const inTitle = item.title.toLowerCase().includes(q);
+        const inCat = item.category.toLowerCase().includes(q);
+        const inDesc = item.description.toLowerCase().includes(q);
+        const inRem = item.remediation ? item.remediation.toLowerCase().includes(q) : false;
+        const inTags = item.tags ? item.tags.some((t) => t.toLowerCase().includes(q)) : false;
+        if (!inTitle && !inCat && !inDesc && !inRem && !inTags) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [findingsList, activeEngagement, selectedCategory, selectedHostId, selectedSeverity, searchQuery]);
+
+  // Filtered Evidence Items — strict customer encapsulation & reportability
+  const filteredEvidence = useMemo(() => {
+    return evidenceList.filter((item) => {
+      if (!activeEngagement) {
+        if (item.engagementId) return false;
+      } else {
+        if (item.engagementId !== activeEngagement.id) return false;
+      }
+      if (selectedCategory !== 'all' && item.category !== selectedCategory) {
+        return false;
+      }
       if (selectedHostId !== 'all') {
         if (selectedHostId === 'unassigned') {
           if (item.hostId) return false;
@@ -165,11 +228,18 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
           return false;
         }
       }
-      // Severity filter
       if (selectedSeverity !== 'all' && item.severity !== selectedSeverity) {
         return false;
       }
-      // Search query
+      if (evidenceReportFilter === 'reportable' && item.inReport === false) {
+        return false;
+      }
+      if (evidenceReportFilter === 'internal' && item.inReport !== false) {
+        return false;
+      }
+      if (evidenceReportFilter === 'unlinked' && (item.findingId || findingsList.some((f) => f.evidenceIds?.includes(item.id)))) {
+        return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const inTitle = item.title.toLowerCase().includes(q);
@@ -183,33 +253,129 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       }
       return true;
     });
-  }, [evidenceList, activeEngagement, selectedCategory, selectedHostId, selectedSeverity, searchQuery]);
+  }, [evidenceList, activeEngagement, selectedCategory, selectedHostId, selectedSeverity, evidenceReportFilter, searchQuery, findingsList]);
 
-  // Counts per category — strict encapsulation
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const item of evidenceList) {
-      if (!activeEngagement) {
-        if (item.engagementId) continue;
-      } else {
-        if (item.engagementId !== activeEngagement.id) continue;
-      }
-      counts.set(item.category, (counts.get(item.category) || 0) + 1);
-    }
-    return counts;
-  }, [evidenceList, activeEngagement]);
-
-  // Reset editor
-  const openNewFinding = (presetTemplate?: EvidenceItem) => {
+  // Findings handlers
+  const openNewFinding = (presetTemplate?: FindingItem) => {
     if (presetTemplate) {
-      setEditId(null);
-      setEditTitle(presetTemplate.title);
-      setEditCategory(presetTemplate.category);
-      setEditSeverity(presetTemplate.severity || 'medium');
-      setEditType(presetTemplate.type);
-      setEditHostId(activeHostId || '');
-      setEditSource(presetTemplate.source || 'manual');
-      setEditTags(presetTemplate.tags ? presetTemplate.tags.join(', ') : '');
+      setFindEditId(null);
+      setFindEditTitle(presetTemplate.title);
+      setFindEditCategory(presetTemplate.category);
+      setFindEditSeverity(presetTemplate.severity || 'high');
+      setFindEditStatus('draft');
+      setFindEditHostId(activeHostId || '');
+      setFindEditDescription(presetTemplate.description);
+      setFindEditImpact(presetTemplate.impact || '');
+      setFindEditRemediation(presetTemplate.remediation || '');
+      setFindEditEvidenceIds([]);
+      setFindEditTags(presetTemplate.tags ? presetTemplate.tags.join(', ') : '');
+    } else {
+      setFindEditId(null);
+      setFindEditTitle('');
+      setFindEditCategory(categories[0] || 'Vulnerabilities');
+      setFindEditSeverity('high');
+      setFindEditStatus('draft');
+      setFindEditHostId(activeHostId || '');
+      setFindEditDescription('');
+      setFindEditImpact('');
+      setFindEditRemediation('');
+      setFindEditEvidenceIds([]);
+      setFindEditTags('');
+    }
+    setIsEditingFinding(true);
+    setIsEditingEvidence(false);
+  };
+
+  const openEditFinding = (f: FindingItem) => {
+    setFindEditId(f.id);
+    setFindEditTitle(f.title);
+    setFindEditCategory(f.category);
+    setFindEditSeverity(f.severity);
+    setFindEditStatus(f.status || 'draft');
+    setFindEditHostId(f.hostId || '');
+    setFindEditDescription(f.description);
+    setFindEditImpact(f.impact || '');
+    setFindEditRemediation(f.remediation || '');
+    // Gather all evidences that reference this finding or are in its evidenceIds
+    const linkedIds = new Set<string>(f.evidenceIds || []);
+    evidenceList.forEach((e) => {
+      if (e.findingId === f.id) linkedIds.add(e.id);
+    });
+    setFindEditEvidenceIds(Array.from(linkedIds));
+    setFindEditTags(f.tags ? f.tags.join(', ') : '');
+    setIsEditingFinding(true);
+    setIsEditingEvidence(false);
+  };
+
+  const handleSaveFinding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const api = getEvidenceApi();
+    if (!api?.SaveFinding) return;
+
+    if (!findEditTitle.trim() || !findEditDescription.trim()) {
+      setFeedbackMsg({ type: 'error', text: 'Finding title and description are required.' });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const findingId = findEditId || `find-${Date.now()}`;
+    const item: FindingItem = {
+      id: findingId,
+      engagementId: activeEngagement?.id || '',
+      title: findEditTitle.trim(),
+      category: findEditCategory,
+      severity: findEditSeverity,
+      status: findEditStatus,
+      hostId: findEditHostId || undefined,
+      affectedHosts: findEditHostId ? [findEditHostId] : undefined,
+      description: findEditDescription.trim(),
+      impact: findEditImpact.trim() || undefined,
+      remediation: findEditRemediation.trim() || undefined,
+      evidenceIds: findEditEvidenceIds,
+      createdAt: now,
+      updatedAt: now,
+      tags: findEditTags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
+    };
+
+    try {
+      await api.SaveFinding(item);
+      setFeedbackMsg({ type: 'success', text: `Saved finding: ${item.title}` });
+      setIsEditingFinding(false);
+      await refreshAll();
+    } catch (err: unknown) {
+      setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  const handleDeleteFinding = async (id: string, title: string) => {
+    if (!window.confirm(`Delete finding "${title}"?`)) return;
+    const api = getEvidenceApi();
+    if (!api?.DeleteFinding) return;
+    try {
+      await api.DeleteFinding(id);
+      setFeedbackMsg({ type: 'success', text: `Deleted finding "${title}"` });
+      await refreshAll();
+    } catch (err: unknown) {
+      setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  // Evidence handlers
+  const openNewEvidence = (presetTemplate?: EvidenceItem) => {
+    if (presetTemplate) {
+      setEviEditId(null);
+      setEviEditTitle(presetTemplate.title);
+      setEviEditCategory(presetTemplate.category);
+      setEviEditSeverity(presetTemplate.severity || 'info');
+      setEviEditType(presetTemplate.type);
+      setEviEditHostId(activeHostId || '');
+      setEviEditSource(presetTemplate.source || 'manual');
+      setEviEditTags(presetTemplate.tags ? presetTemplate.tags.join(', ') : '');
+      setEviEditInReport(presetTemplate.inReport !== false);
+      setEviEditFindingId(presetTemplate.findingId || '');
       if (presetTemplate.type === 'table') {
         try {
           const parsed = JSON.parse(presetTemplate.content) as TableEvidenceContent;
@@ -219,35 +385,40 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
           setTableHeaders(['Column 1', 'Column 2']);
           setTableRows([['', '']]);
         }
-        setEditTextContent('');
+        setEviEditTextContent('');
       } else {
-        setEditTextContent(presetTemplate.content);
+        setEviEditTextContent(presetTemplate.content);
       }
     } else {
-      setEditId(null);
-      setEditTitle('');
-      setEditCategory(categories[0] || 'Vulnerabilities');
-      setEditSeverity('medium');
-      setEditType('text');
-      setEditHostId(activeHostId || '');
-      setEditSource('manual');
-      setEditTags('');
-      setEditTextContent('');
+      setEviEditId(null);
+      setEviEditTitle('');
+      setEviEditCategory(categories[0] || 'Credentials');
+      setEviEditSeverity('info');
+      setEviEditType('text');
+      setEviEditHostId(activeHostId || '');
+      setEviEditSource('manual');
+      setEviEditTags('');
+      setEviEditTextContent('');
+      setEviEditInReport(true);
+      setEviEditFindingId('');
       setTableHeaders(['Port', 'Protocol', 'Service', 'State']);
       setTableRows([['22', 'tcp', 'ssh', 'open']]);
     }
-    setIsEditing(true);
+    setIsEditingEvidence(true);
+    setIsEditingFinding(false);
   };
 
-  const openEditFinding = (item: EvidenceItem) => {
-    setEditId(item.id);
-    setEditTitle(item.title);
-    setEditCategory(item.category);
-    setEditSeverity(item.severity || 'info');
-    setEditType(item.type);
-    setEditHostId(item.hostId || '');
-    setEditSource(item.source || 'manual');
-    setEditTags(item.tags ? item.tags.join(', ') : '');
+  const openEditEvidence = (item: EvidenceItem) => {
+    setEviEditId(item.id);
+    setEviEditTitle(item.title);
+    setEviEditCategory(item.category);
+    setEviEditSeverity(item.severity || 'info');
+    setEviEditType(item.type);
+    setEviEditHostId(item.hostId || '');
+    setEviEditSource(item.source || 'manual');
+    setEviEditTags(item.tags ? item.tags.join(', ') : '');
+    setEviEditInReport(item.inReport !== false);
+    setEviEditFindingId(item.findingId || '');
     if (item.type === 'table') {
       try {
         const parsed = JSON.parse(item.content) as TableEvidenceContent;
@@ -257,25 +428,26 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
         setTableHeaders(['Column 1', 'Column 2']);
         setTableRows([['', '']]);
       }
-      setEditTextContent('');
+      setEviEditTextContent('');
     } else {
-      setEditTextContent(item.content);
+      setEviEditTextContent(item.content);
     }
-    setIsEditing(true);
+    setIsEditingEvidence(true);
+    setIsEditingFinding(false);
   };
 
-  const handleSaveFinding = async (e: React.FormEvent) => {
+  const handleSaveEvidence = async (e: React.FormEvent) => {
     e.preventDefault();
     const api = getEvidenceApi();
     if (!api?.SaveEvidence) return;
 
-    if (!editTitle.trim()) {
-      setFeedbackMsg({ type: 'error', text: 'Finding title is required.' });
+    if (!eviEditTitle.trim()) {
+      setFeedbackMsg({ type: 'error', text: 'Evidence title is required.' });
       return;
     }
 
-    let finalContent = editTextContent;
-    if (editType === 'table') {
+    let finalContent = eviEditTextContent;
+    if (eviEditType === 'table') {
       const tableData: TableEvidenceContent = {
         headers: tableHeaders.map((h) => h.trim() || 'Col'),
         rows: tableRows.map((r) => r.map((c) => c.trim())),
@@ -283,45 +455,73 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       finalContent = JSON.stringify(tableData);
     }
 
-    const tagsArray = editTags
+    const tagsArray = eviEditTags
       .split(',')
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
+    const evidenceId = eviEditId || `evi-${Date.now()}`;
     const item: EvidenceItem = {
-      id: editId || `evi-${Date.now()}`,
+      id: evidenceId,
       engagementId: activeEngagement?.id || '',
-      category: editCategory,
-      title: editTitle.trim(),
-      type: editType,
+      findingId: eviEditFindingId || undefined,
+      category: eviEditCategory,
+      title: eviEditTitle.trim(),
+      type: eviEditType,
       content: finalContent,
-      hostId: editHostId || undefined,
-      severity: editSeverity,
-      source: editSource.trim() || 'manual',
+      hostId: eviEditHostId || undefined,
+      severity: eviEditSeverity,
+      source: eviEditSource.trim() || 'manual',
+      inReport: eviEditInReport,
       tags: tagsArray,
       capturedAt: new Date().toISOString(),
     };
 
     try {
       await api.SaveEvidence(item);
-      setFeedbackMsg({ type: 'success', text: `Saved finding: ${item.title}` });
-      setIsEditing(false);
+      // Link into parent finding if specified
+      if (eviEditFindingId && api.SaveFinding) {
+        const parentFinding = findingsList.find((f) => f.id === eviEditFindingId);
+        if (parentFinding && !parentFinding.evidenceIds?.includes(evidenceId)) {
+          await api.SaveFinding({
+            ...parentFinding,
+            evidenceIds: [...(parentFinding.evidenceIds || []), evidenceId],
+          });
+        }
+      }
+      setFeedbackMsg({ type: 'success', text: `Saved evidence: ${item.title}` });
+      setIsEditingEvidence(false);
       await refreshAll();
     } catch (err: unknown) {
       setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
     }
   };
 
-  const handleDeleteFinding = async (id: string, title: string) => {
-    if (!window.confirm(`Delete evidence item "${title}"?`)) return;
+  const handleDeleteEvidence = async (id: string, title: string) => {
+    if (!window.confirm(`Delete evidence artifact "${title}"?`)) return;
     const api = getEvidenceApi();
     if (!api?.DeleteEvidence) return;
     try {
       await api.DeleteEvidence(id);
-      setFeedbackMsg({ type: 'success', text: `Deleted evidence item "${title}"` });
+      setFeedbackMsg({ type: 'success', text: `Deleted evidence "${title}"` });
       await refreshAll();
     } catch (err: unknown) {
       setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  const handleToggleEvidenceInReport = async (item: EvidenceItem) => {
+    const api = getEvidenceApi();
+    if (!api?.SaveEvidence) return;
+    const updated: EvidenceItem = {
+      ...item,
+      inReport: item.inReport === false ? true : false,
+    };
+    try {
+      await api.SaveEvidence(updated);
+      await refreshAll();
+    } catch (err: unknown) {
+      console.error('Failed to toggle inReport status:', err);
     }
   };
 
@@ -343,7 +543,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     }
   };
 
-  const handleCopyFindingContent = async (text: string, id: string) => {
+  const handleCopyText = async (text: string, id: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedId(id);
@@ -353,7 +553,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     }
   };
 
-  // Table Row & Column manipulators
+  // Table helpers
   const handleAddTableRow = () => {
     const newRow = new Array(tableHeaders.length).fill('');
     setTableRows([...tableRows, newRow]);
@@ -392,10 +592,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     setTableHeaders(updated);
   };
 
-  // Export report as Markdown
+  // Export report as Markdown — ONLY INCLUDE REPORTABLE EVIDENCES!
   const handleExportMarkdownReport = () => {
     const lines: string[] = [];
-    lines.push(`# DoubleAgent — Pentest Evidence & Findings Report`);
+    lines.push(`# DoubleAgent — Pentest Assessment Report`);
     lines.push(`**Generated:** ${new Date().toLocaleString()}`);
     lines.push(`**Engagement:** ${activeEngagement?.name || 'Default Engagement'}`);
     if (activeEngagement?.scope) {
@@ -410,56 +610,92 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     lines.push(`## 1. Executive Summary & Findings Overview`);
     lines.push(``);
 
-    // Count by severity
+    // Count by severity from Findings
     const sevCount: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-    filteredEvidence.forEach((e) => {
-      const s = (e.severity || 'info').toLowerCase();
+    filteredFindings.forEach((f) => {
+      const s = (f.severity || 'info').toLowerCase();
       sevCount[s] = (sevCount[s] || 0) + 1;
     });
 
-    lines.push(`| Severity | Count |`);
+    lines.push(`| Severity | Findings Count |`);
     lines.push(`| :--- | :--- |`);
     lines.push(`| 🔴 Critical | ${sevCount.critical} |`);
     lines.push(`| 🟠 High | ${sevCount.high} |`);
     lines.push(`| 🟡 Medium | ${sevCount.medium} |`);
     lines.push(`| 🔵 Low | ${sevCount.low} |`);
     lines.push(`| ℹ️ Informational | ${sevCount.info} |`);
-    lines.push(`| **Total Findings** | **${filteredEvidence.length}** |`);
+    lines.push(`| **Total Findings** | **${filteredFindings.length}** |`);
     lines.push(``);
     lines.push(`---`);
     lines.push(``);
-    lines.push(`## 2. Detailed Findings & Evidence`);
+    lines.push(`## 2. Detailed Vulnerabilities & Verified Evidence`);
     lines.push(``);
 
-    filteredEvidence.forEach((item, index) => {
-      const hostLabel = item.hostId ? hostMap.get(item.hostId)?.label || item.hostId : 'Engagement-Wide';
-      lines.push(`### 2.${index + 1} [${(item.severity || 'INFO').toUpperCase()}] ${item.title}`);
+    filteredFindings.forEach((finding, index) => {
+      const hostLabel = finding.hostId ? hostMap.get(finding.hostId)?.label || finding.hostId : 'Engagement-Wide';
+      lines.push(`### 2.${index + 1} [${finding.severity.toUpperCase()}] ${finding.title}`);
       lines.push(``);
-      lines.push(`- **Category:** ${item.category}`);
+      lines.push(`- **Category:** ${finding.category}`);
+      lines.push(`- **Status:** ${finding.status.toUpperCase()}`);
       lines.push(`- **Target Host:** ${hostLabel}`);
-      lines.push(`- **Captured At:** ${item.capturedAt}`);
-      if (item.source) lines.push(`- **Source:** ${item.source}`);
-      if (item.tags && item.tags.length > 0) lines.push(`- **Tags:** \`${item.tags.join('`, `')}\``);
+      if (finding.cve) lines.push(`- **CVE:** ${finding.cve}`);
+      if (finding.cvss) lines.push(`- **CVSS Score:** ${finding.cvss}`);
+      if (finding.tags && finding.tags.length > 0) lines.push(`- **Tags:** \`${finding.tags.join('`, `')}\``);
       lines.push(``);
 
-      if (item.type === 'table') {
-        try {
-          const parsed = JSON.parse(item.content) as TableEvidenceContent;
-          if (parsed.headers && parsed.rows) {
-            lines.push(`| ${parsed.headers.join(' | ')} |`);
-            lines.push(`| ${parsed.headers.map(() => '---').join(' | ')} |`);
-            parsed.rows.forEach((row) => {
-              lines.push(`| ${row.join(' | ')} |`);
-            });
-            lines.push(``);
-          }
-        } catch {
-          lines.push(`\`\`\`\n${item.content}\n\`\`\`\n`);
-        }
-      } else {
-        lines.push(item.content);
+      lines.push(`#### Description`);
+      lines.push(finding.description);
+      lines.push(``);
+
+      if (finding.impact) {
+        lines.push(`#### Impact`);
+        lines.push(finding.impact);
         lines.push(``);
       }
+
+      if (finding.remediation) {
+        lines.push(`#### Remediation`);
+        lines.push(finding.remediation);
+        lines.push(``);
+      }
+
+      // Supporting Evidence artifacts — ONLY include inReport === true
+      const attached = evidenceList.filter(
+        (ev) =>
+          (finding.evidenceIds?.includes(ev.id) || ev.findingId === finding.id) &&
+          ev.inReport !== false // Exclude internal only evidence!
+      );
+
+      if (attached.length > 0) {
+        lines.push(`#### Verified Proof Artifacts (${attached.length})`);
+        lines.push(``);
+        attached.forEach((ev, evIdx) => {
+          lines.push(`##### Evidence ${evIdx + 1}: ${ev.title}`);
+          if (ev.source) lines.push(`- **Source:** ${ev.source}`);
+          lines.push(`- **Captured:** ${ev.capturedAt}`);
+          lines.push(``);
+
+          if (ev.type === 'table') {
+            try {
+              const parsed = JSON.parse(ev.content) as TableEvidenceContent;
+              if (parsed.headers && parsed.rows) {
+                lines.push(`| ${parsed.headers.join(' | ')} |`);
+                lines.push(`| ${parsed.headers.map(() => '---').join(' | ')} |`);
+                parsed.rows.forEach((row) => {
+                  lines.push(`| ${row.join(' | ')} |`);
+                });
+                lines.push(``);
+              }
+            } catch {
+              lines.push(`\`\`\`\n${ev.content}\n\`\`\`\n`);
+            }
+          } else {
+            lines.push(`\`\`\`text\n${ev.content}\n\`\`\``);
+            lines.push(``);
+          }
+        });
+      }
+
       lines.push(`---`);
       lines.push(``);
     });
@@ -469,7 +705,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pentest-evidence-report-${activeEngagement?.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'engagement'}.md`;
+    a.download = `pentest-report-${activeEngagement?.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'engagement'}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -483,11 +719,11 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       case 'high':
         return { bg: 'rgba(249, 115, 22, 0.2)', border: '#f97316', text: '#fdba74' };
       case 'medium':
-        return { bg: 'rgba(245, 158, 11, 0.2)', border: '#f59e0b', text: '#fde68a' };
+        return { bg: 'rgba(234, 179, 8, 0.2)', border: '#eab308', text: '#fde047' };
       case 'low':
         return { bg: 'rgba(59, 130, 246, 0.2)', border: '#3b82f6', text: '#93c5fd' };
       default:
-        return { bg: 'rgba(6, 182, 212, 0.2)', border: '#06b6d4', text: '#67e8f9' };
+        return { bg: 'rgba(100, 116, 139, 0.2)', border: '#64748b', text: '#cbd5e1' };
     }
   };
 
@@ -495,7 +731,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
   return (
     <div
-      className="cyber-modal-overlay"
+      className="cyber-dialog-backdrop modal-backdrop"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -504,7 +740,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       <div
         className="cyber-dialog-card evidence-dialog-card"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '960px', width: '95%', maxHeight: '90vh' }}
+        style={{ maxWidth: '1020px', width: '96%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}
       >
         {/* Reticles */}
         <div className="cyber-corner-reticle cyber-corner-tl" />
@@ -513,16 +749,16 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
         <div className="cyber-corner-reticle cyber-corner-br" />
 
         {/* Modal Header */}
-        <div className="dialog-header">
+        <div className="dialog-header" style={{ flexShrink: 0 }}>
           <div className="dialog-title" style={{ flex: 1, marginRight: '1rem' }}>
             <span className="cyber-hazard-stripes">///</span>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <h3 id="evidence-dialog-title" style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                <h3 id="evidence-dialog-title" style={{ margin: 0, fontSize: '1.05rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
                   🛡️ Evidence Vault &amp; Findings (F-18)
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.74rem', color: '#00f0ff', fontWeight: 700 }}>TARGET ENGAGEMENT:</span>
+                  <span style={{ fontSize: '0.74rem', color: '#00f0ff', fontWeight: 700 }}>ENGAGEMENT:</span>
                   <select
                     className="cyber-hud-select"
                     value={activeEngagement?.id || ''}
@@ -550,7 +786,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                 </div>
               </div>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
-                SEC-PENTEST // ENGAGEMENT-SCOPED FINDINGS, POCS &amp; STRUCTURED EVIDENCE
+                SEPARATED WORKFLOW // 1 FINDING &rarr; MULTIPLE EVIDENCES &amp; REPORTABLE ARTIFACT TOGGLE
                 {activeEngagement && (
                   <span style={{ marginLeft: '8px', color: '#10b981', fontWeight: 700 }}>
                     [ENCAPSULATED: {activeEngagement.name.toUpperCase()}]
@@ -569,121 +805,61 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
           </button>
         </div>
 
-        {/* Category Pills Bar */}
+        {/* Top-Level Tab Navigation */}
         <div
           style={{
-            padding: '0.65rem 1.25rem',
-            background: 'rgba(5, 10, 18, 0.65)',
-            borderBottom: '1px solid rgba(0, 240, 255, 0.15)',
             display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            overflowX: 'auto',
-            whiteSpace: 'nowrap',
+            gap: '0.5rem',
+            padding: '0.55rem 1.25rem',
+            background: 'rgba(5, 12, 22, 0.9)',
+            borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
+            flexShrink: 0,
           }}
         >
           <button
             type="button"
-            onClick={() => setSelectedCategory('all')}
-            style={{
-              padding: '4px 10px',
-              fontSize: '0.74rem',
-              fontFamily: 'JetBrains Mono, monospace',
-              border: selectedCategory === 'all' ? '1px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.12)',
-              background: selectedCategory === 'all' ? 'rgba(0, 240, 255, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-              color: selectedCategory === 'all' ? '#00f0ff' : '#94a3b8',
-              cursor: 'pointer',
-              borderRadius: '2px',
+            className={`cyber-btn ${activeTab === 'findings' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+            style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+            onClick={() => {
+              setActiveTab('findings');
+              setIsEditingFinding(false);
+              setIsEditingEvidence(false);
             }}
           >
-            All Categories ({evidenceList.length})
+            🎯 Findings ({filteredFindings.length})
           </button>
-
-          {categories.map((cat) => {
-            const count = categoryCounts.get(cat) || 0;
-            const isSel = selectedCategory === cat;
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: '0.74rem',
-                  fontFamily: 'JetBrains Mono, monospace',
-                  border: isSel ? '1px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.12)',
-                  background: isSel ? 'rgba(0, 240, 255, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                  color: isSel ? '#00f0ff' : '#94a3b8',
-                  cursor: 'pointer',
-                  borderRadius: '2px',
-                }}
-              >
-                {cat} {count > 0 && <span style={{ opacity: 0.8 }}>({count})</span>}
-              </button>
-            );
-          })}
-
           <button
             type="button"
-            onClick={() => setShowAddCategory(!showAddCategory)}
-            style={{
-              padding: '4px 8px',
-              fontSize: '0.72rem',
-              border: '1px dashed rgba(0, 240, 255, 0.4)',
-              background: 'transparent',
-              color: '#38bdf8',
-              cursor: 'pointer',
-              borderRadius: '2px',
+            className={`cyber-btn ${activeTab === 'evidence' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+            style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+            onClick={() => {
+              setActiveTab('evidence');
+              setIsEditingFinding(false);
+              setIsEditingEvidence(false);
             }}
           >
-            + Add Category
+            🛡️ Evidence Vault ({filteredEvidence.length})
+          </button>
+          <button
+            type="button"
+            className={`cyber-btn ${activeTab === 'report' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+            style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+            onClick={() => {
+              setActiveTab('report');
+              setIsEditingFinding(false);
+              setIsEditingEvidence(false);
+            }}
+          >
+            📄 Assessment Report
           </button>
         </div>
 
-        {/* Add Category Drawer */}
-        {showAddCategory && (
-          <form
-            onSubmit={handleAddCategory}
-            style={{
-              padding: '0.65rem 1.25rem',
-              background: 'rgba(0, 240, 255, 0.08)',
-              borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
-              display: 'flex',
-              gap: '0.65rem',
-              alignItems: 'center',
-            }}
-          >
-            <span style={{ fontSize: '0.78rem', color: '#00f0ff', fontFamily: 'JetBrains Mono, monospace' }}>
-              Create New Finding Category:
-            </span>
-            <input
-              type="text"
-              className="cyber-hud-input"
-              style={{ maxWidth: '260px', height: '28px', fontSize: '0.78rem' }}
-              placeholder="e.g. Cloud Infrastructure, Wireless"
-              value={newCatName}
-              onChange={(e) => setNewCatName(e.target.value)}
-              autoFocus
-            />
-            <button type="submit" className="cyber-btn cyber-btn-primary" style={{ padding: '3px 10px', fontSize: '0.74rem' }}>
-              Save Category
-            </button>
-            <button
-              type="button"
-              className="cyber-btn cyber-btn-secondary"
-              style={{ padding: '3px 10px', fontSize: '0.74rem' }}
-              onClick={() => setShowAddCategory(false)}
-            >
-              Cancel
-            </button>
-          </form>
-        )}
-
-        {/* Modal Body */}
+        {/* Scrollable Modal Body */}
         <div
           className="dialog-body"
           style={{
-            maxHeight: '74vh',
+            flex: 1,
+            minHeight: 0,
             overflowY: 'auto',
             padding: '1.25rem',
             display: 'flex',
@@ -712,132 +888,249 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
             </div>
           )}
 
-          {/* Action Toolbar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '280px' }}>
-              <input
-                type="text"
-                className="cyber-hud-input"
-                placeholder="Search findings by title, content, tags, host, source..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <select
-                className="cyber-hud-select"
-                value={selectedSeverity}
-                onChange={(e) => setSelectedSeverity(e.target.value)}
-                style={{ width: '135px', height: '32px' }}
-              >
-                <option value="all">All Severities</option>
-                <option value="critical">🔴 Critical</option>
-                <option value="high">🟠 High</option>
-                <option value="medium">🟡 Medium</option>
-                <option value="low">🔵 Low</option>
-                <option value="info">ℹ️ Info</option>
-              </select>
-              <select
-                className="cyber-hud-select"
-                value={selectedHostId}
-                onChange={(e) => setSelectedHostId(e.target.value)}
-                style={{ width: '140px', height: '32px' }}
-              >
-                <option value="all">All Hosts</option>
-                <option value="unassigned">Engagement-wide</option>
-                {hosts.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.label} {h.address ? `(${h.address})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* ========================================================= */}
+          {/* TAB 1: FINDINGS (Vulnerabilities)                          */}
+          {/* ========================================================= */}
+          {activeTab === 'findings' && !isEditingFinding && (
+            <>
+              {/* Toolbar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '280px' }}>
+                  <input
+                    type="text"
+                    className="cyber-hud-input"
+                    placeholder="Search findings by title, description, tags, category..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <select
+                    className="cyber-hud-select"
+                    value={selectedSeverity}
+                    onChange={(e) => setSelectedSeverity(e.target.value)}
+                    style={{ width: '135px', height: '32px' }}
+                  >
+                    <option value="all">All Severities</option>
+                    <option value="critical">🔴 Critical</option>
+                    <option value="high">🟠 High</option>
+                    <option value="medium">🟡 Medium</option>
+                    <option value="low">🔵 Low</option>
+                    <option value="info">ℹ️ Info</option>
+                  </select>
+                  <select
+                    className="cyber-hud-select"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    style={{ width: '135px', height: '32px' }}
+                  >
+                    <option value="all">All Categories</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="cyber-hud-select"
+                    value={selectedHostId}
+                    onChange={(e) => setSelectedHostId(e.target.value)}
+                    style={{ width: '140px', height: '32px' }}
+                  >
+                    <option value="all">All Hosts</option>
+                    <option value="unassigned">Engagement-wide</option>
+                    {hosts.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.label} {h.address ? `(${h.address})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              {/* Template quick-picker dropdown */}
-              {templates.length > 0 && (
-                <select
-                  className="cyber-hud-select"
-                  style={{ width: '185px', height: '32px', border: '1px solid rgba(0, 240, 255, 0.4)' }}
-                  defaultValue=""
-                  onChange={(e) => {
-                    const tpl = templates.find((t) => t.id === e.target.value);
-                    if (tpl) {
-                      openNewFinding(tpl);
-                    }
-                    e.target.value = '';
-                  }}
-                >
-                  <option value="" disabled>
-                    ✨ Use Finding Template...
-                  </option>
-                  {groupedTemplates.map(([cat, tpls]) => (
-                    <optgroup key={cat} label={`📂 ${cat.toUpperCase()}`}>
-                      {tpls.map((tpl) => (
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  {findingTemplates.length > 0 && (
+                    <select
+                      className="cyber-hud-select"
+                      style={{ width: '200px', height: '32px', border: '1px solid rgba(0, 240, 255, 0.4)' }}
+                      defaultValue=""
+                      onChange={(e) => {
+                        const tpl = findingTemplates.find((t) => t.id === e.target.value);
+                        if (tpl) {
+                          openNewFinding(tpl);
+                        }
+                        e.target.value = '';
+                      }}
+                    >
+                      <option value="" disabled>
+                        ✨ Use Finding Template...
+                      </option>
+                      {findingTemplates.map((tpl) => (
                         <option key={tpl.id} value={tpl.id}>
-                          [{tpl.severity?.toUpperCase() || 'INFO'}] {tpl.title}
+                          [{tpl.severity.toUpperCase()}] {tpl.title}
                         </option>
                       ))}
-                    </optgroup>
-                  ))}
-                </select>
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-primary"
+                    onClick={() => openNewFinding()}
+                  >
+                    + New Finding
+                  </button>
+                </div>
+              </div>
+
+              {/* Findings Cards */}
+              {filteredFindings.length === 0 ? (
+                <div
+                  style={{
+                    padding: '2.5rem',
+                    textAlign: 'center',
+                    background: 'rgba(0, 240, 255, 0.02)',
+                    border: '1px dashed rgba(0, 240, 255, 0.25)',
+                    color: '#94a3b8',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  No findings recorded yet. Click <strong>+ New Finding</strong> or select terminal text to create one.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {filteredFindings.map((finding) => {
+                    const badge = getSeverityBadgeColor(finding.severity);
+                    const hostObj = finding.hostId ? hostMap.get(finding.hostId) : undefined;
+                    // Count linked evidences
+                    const linkedEvCount = evidenceList.filter(
+                      (e) => finding.evidenceIds?.includes(e.id) || e.findingId === finding.id
+                    ).length;
+
+                    return (
+                      <div
+                        key={finding.id}
+                        style={{
+                          background: 'rgba(5, 11, 20, 0.85)',
+                          border: `1px solid ${badge.border}40`,
+                          borderLeft: `4px solid ${badge.border}`,
+                          padding: '0.85rem 1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.55rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                background: badge.bg,
+                                border: `1px solid ${badge.border}`,
+                                color: badge.text,
+                                padding: '2px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                fontFamily: 'JetBrains Mono, monospace',
+                              }}
+                            >
+                              {finding.severity}
+                            </span>
+                            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#f1f5f9' }}>
+                              {finding.title}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: '2px' }}>
+                              {finding.category}
+                            </span>
+                            {hostObj && (
+                              <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '2px' }}>
+                                🖥️ {hostObj.label}
+                              </span>
+                            )}
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                color: linkedEvCount > 0 ? '#00f0ff' : '#64748b',
+                                border: linkedEvCount > 0 ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid rgba(100, 116, 139, 0.25)',
+                                padding: '1px 6px',
+                                background: linkedEvCount > 0 ? 'rgba(0, 240, 255, 0.08)' : 'transparent',
+                                fontFamily: 'JetBrains Mono, monospace',
+                              }}
+                            >
+                              🛡️ {linkedEvCount} {linkedEvCount === 1 ? 'Evidence' : 'Evidences'}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              className="cyber-btn"
+                              style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+                              onClick={() => openEditFinding(finding)}
+                            >
+                              ✏️ Edit Finding
+                            </button>
+                            <button
+                              type="button"
+                              className="cyber-btn"
+                              style={{ padding: '2px 8px', fontSize: '0.72rem', color: '#ef4444' }}
+                              onClick={() => handleDeleteFinding(finding.id, finding.title)}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.45' }}>
+                          <MarkdownRenderer content={finding.description} />
+                        </div>
+
+                        {finding.remediation && (
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', background: 'rgba(0, 240, 255, 0.03)', padding: '0.4rem 0.6rem', borderLeft: '2px solid #00f0ff' }}>
+                            <strong style={{ color: '#00f0ff' }}>Remediation: </strong>
+                            {finding.remediation}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
+            </>
+          )}
 
-              <button
-                type="button"
-                className="cyber-btn cyber-btn-primary"
-                onClick={() => openNewFinding()}
-              >
-                + New Finding
-              </button>
-
-              <button
-                type="button"
-                className="cyber-btn cyber-btn-secondary"
-                onClick={handleExportMarkdownReport}
-                title="Download formatted Markdown findings report"
-              >
-                💾 Export Report (.md)
-              </button>
-            </div>
-          </div>
-
-          {/* EDIT / CREATE FINDING DRAWER */}
-          {isEditing && (
+          {/* FINDING EDITOR */}
+          {activeTab === 'findings' && isEditingFinding && (
             <div
               style={{
                 background: 'rgba(7, 14, 26, 0.95)',
                 border: '1px solid #00f0ff',
-                padding: '1.1rem',
-                borderRadius: '2px',
+                padding: '1.25rem',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.85rem',
-                boxShadow: '0 0 20px rgba(0, 240, 255, 0.15)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
-                  {editId ? '✏️ EDIT FINDING / EVIDENCE' : '⚡ NEW FINDING / EVIDENCE ENTRY'}
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
+                  {findEditId ? '✏️ EDIT SECURITY FINDING' : '⚡ CREATE NEW SECURITY FINDING'}
                 </span>
                 <button
                   type="button"
                   style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}
-                  onClick={() => setIsEditing(false)}
+                  onClick={() => setIsEditingFinding(false)}
                 >
                   ✕
                 </button>
               </div>
 
               <form onSubmit={handleSaveFinding} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {/* Title & Category Row */}
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label className="cyber-label">Finding Title</label>
                     <input
                       type="text"
                       className="cyber-hud-input"
-                      placeholder="e.g. Unquoted Service Path in VulnSvc"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="e.g. Kerberoasting on Domain Controller"
+                      value={findEditTitle}
+                      onChange={(e) => setFindEditTitle(e.target.value)}
                       required
                     />
                   </div>
@@ -845,8 +1138,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     <label className="cyber-label">Category</label>
                     <select
                       className="cyber-hud-select"
-                      value={editCategory}
-                      onChange={(e) => setEditCategory(e.target.value)}
+                      value={findEditCategory}
+                      onChange={(e) => setFindEditCategory(e.target.value)}
                     >
                       {categories.map((c) => (
                         <option key={c} value={c}>
@@ -859,8 +1152,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     <label className="cyber-label">Severity</label>
                     <select
                       className="cyber-hud-select"
-                      value={editSeverity}
-                      onChange={(e) => setEditSeverity(e.target.value as EvidenceSeverity)}
+                      value={findEditSeverity}
+                      onChange={(e) => setFindEditSeverity(e.target.value as EvidenceSeverity)}
                     >
                       <option value="critical">🔴 Critical</option>
                       <option value="high">🟠 High</option>
@@ -871,14 +1164,13 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   </div>
                 </div>
 
-                {/* Target Host, Source, Tags Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label className="cyber-label">Target Host</label>
                     <select
                       className="cyber-hud-select"
-                      value={editHostId}
-                      onChange={(e) => setEditHostId(e.target.value)}
+                      value={findEditHostId}
+                      onChange={(e) => setFindEditHostId(e.target.value)}
                     >
                       <option value="">(Engagement-wide / Unassigned)</option>
                       {hosts.map((h) => (
@@ -889,116 +1181,631 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     </select>
                   </div>
                   <div>
-                    <label className="cyber-label">Source (Origin)</label>
-                    <input
-                      type="text"
-                      className="cyber-hud-input"
-                      placeholder="manual, nmap, linpeas, mimikatz"
-                      value={editSource}
-                      onChange={(e) => setEditSource(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="cyber-label">Tags (comma-separated)</label>
-                    <input
-                      type="text"
-                      className="cyber-hud-input"
-                      placeholder="privesc, service, cve-2021-44228"
-                      value={editTags}
-                      onChange={(e) => setEditTags(e.target.value)}
-                    />
+                    <label className="cyber-label">Lifecycle Status</label>
+                    <select
+                      className="cyber-hud-select"
+                      value={findEditStatus}
+                      onChange={(e) => setFindEditStatus(e.target.value as FindingStatus)}
+                    >
+                      <option value="draft">Draft (In Progress)</option>
+                      <option value="confirmed">Confirmed (Verified)</option>
+                      <option value="reported">Reported to Client</option>
+                      <option value="remediated">Remediated / Verified Fixed</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* Content Type Switch: Free Text vs Structured Table */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid rgba(0, 240, 255, 0.2)', paddingBottom: '0.45rem' }}>
-                  <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Entry Format:</span>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.8rem', color: editType === 'text' ? '#00f0ff' : '#64748b' }}>
-                    <input
-                      type="radio"
-                      name="editType"
-                      value="text"
-                      checked={editType === 'text'}
-                      onChange={() => setEditType('text')}
-                      style={{ accentColor: '#00f0ff' }}
-                    />
-                    📝 Free Text (Markdown / PoC)
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.8rem', color: editType === 'table' ? '#00f0ff' : '#64748b' }}>
-                    <input
-                      type="radio"
-                      name="editType"
-                      value="table"
-                      checked={editType === 'table'}
-                      onChange={() => setEditType('table')}
-                      style={{ accentColor: '#00f0ff' }}
-                    />
-                    📊 Structured Table
-                  </label>
+                <div>
+                  <label className="cyber-label">Description / Narrative (Markdown)</label>
+                  <textarea
+                    className="cyber-hud-input font-mono"
+                    style={{ minHeight: '110px', resize: 'vertical' }}
+                    placeholder="Explain the vulnerability, cause, and conditions..."
+                    value={findEditDescription}
+                    onChange={(e) => setFindEditDescription(e.target.value)}
+                    required
+                  />
                 </div>
 
-                {/* FORMAT A: FREE TEXT (MARKDOWN) */}
-                {editType === 'text' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
-                    <label className="cyber-label">Evidence Details / Markdown / PoC</label>
+                    <label className="cyber-label">Impact Assessment</label>
                     <textarea
                       className="cyber-hud-input"
-                      rows={9}
-                      style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.82rem', lineHeight: '1.45' }}
-                      placeholder="Describe the vulnerability, paste terminal output, exploitation steps, and remediation..."
-                      value={editTextContent}
-                      onChange={(e) => setEditTextContent(e.target.value)}
+                      style={{ minHeight: '75px', resize: 'vertical' }}
+                      placeholder="Technical and business impact..."
+                      value={findEditImpact}
+                      onChange={(e) => setFindEditImpact(e.target.value)}
                     />
                   </div>
-                )}
+                  <div>
+                    <label className="cyber-label">Remediation Guidance</label>
+                    <textarea
+                      className="cyber-hud-input"
+                      style={{ minHeight: '75px', resize: 'vertical' }}
+                      placeholder="Hardening recommendations, configuration changes, or patches..."
+                      value={findEditRemediation}
+                      onChange={(e) => setFindEditRemediation(e.target.value)}
+                    />
+                  </div>
+                </div>
 
-                {/* FORMAT B: STRUCTURED TABLE */}
-                {editType === 'table' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="cyber-label" style={{ margin: 0 }}>
-                        Table Columns ({tableHeaders.length}) &amp; Rows ({tableRows.length})
-                      </span>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {/* ATTACHED EVIDENCES SECTION */}
+                <div
+                  style={{
+                    background: 'rgba(0, 240, 255, 0.04)',
+                    border: '1px solid rgba(0, 240, 255, 0.25)',
+                    padding: '0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.55rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#00f0ff', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
+                      🛡️ SUPPORTING EVIDENCES ({findEditEvidenceIds.length})
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                      1 Finding can have multiple evidences (mimikatz dump, hashes, network trace)
+                    </span>
+                  </div>
+
+                  {findEditEvidenceIds.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '0.4rem 0' }}>
+                      No evidences attached yet. Attach from the vault below or right-click terminal text.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {findEditEvidenceIds.map((evId) => {
+                        const ev = evidenceList.find((e) => e.id === evId);
+                        if (!ev) return null;
+                        return (
+                          <div
+                            key={ev.id}
+                            style={{
+                              background: 'rgba(2, 6, 12, 0.85)',
+                              border: '1px solid rgba(0, 240, 255, 0.2)',
+                              padding: '0.4rem 0.65rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              fontSize: '0.76rem',
+                              fontFamily: 'JetBrains Mono, monospace',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <span style={{ color: '#00f0ff' }}>🛡️ {ev.title}</span>
+                              <span style={{ color: '#64748b' }}>[{ev.type}]</span>
+                              <button
+                                type="button"
+                                style={{
+                                  background: ev.inReport !== false ? 'rgba(0, 240, 255, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                                  border: ev.inReport !== false ? '1px solid #00f0ff' : '1px solid #64748b',
+                                  color: ev.inReport !== false ? '#00f0ff' : '#94a3b8',
+                                  fontSize: '0.68rem',
+                                  padding: '1px 6px',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => handleToggleEvidenceInReport(ev)}
+                                title="Toggle whether this evidence is exported in client report"
+                              >
+                                {ev.inReport !== false ? '📄 In Report' : '🔒 Internal Only'}
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              className="cyber-btn"
+                              style={{ padding: '1px 6px', fontSize: '0.7rem', color: '#ef4444' }}
+                              onClick={() => setFindEditEvidenceIds(findEditEvidenceIds.filter((id) => id !== ev.id))}
+                              title="Detach evidence from this finding"
+                            >
+                              ✕ Detach
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Attach Existing Evidence Dropdown */}
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.2rem' }}>
+                    <select
+                      className="cyber-hud-select"
+                      value={selectedEvidenceToAttach}
+                      onChange={(e) => setSelectedEvidenceToAttach(e.target.value)}
+                      style={{ flex: 1, height: '28px', fontSize: '0.74rem' }}
+                    >
+                      <option value="">-- Attach Existing Evidence from Vault --</option>
+                      {evidenceList
+                        .filter((e) => !findEditEvidenceIds.includes(e.id))
+                        .map((e) => (
+                          <option key={e.id} value={e.id}>
+                            [{e.type.toUpperCase()}] {e.title} ({e.category})
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="cyber-btn cyber-btn-secondary"
+                      style={{ padding: '3px 10px', fontSize: '0.74rem' }}
+                      disabled={!selectedEvidenceToAttach}
+                      onClick={() => {
+                        if (selectedEvidenceToAttach && !findEditEvidenceIds.includes(selectedEvidenceToAttach)) {
+                          setFindEditEvidenceIds([...findEditEvidenceIds, selectedEvidenceToAttach]);
+                          setSelectedEvidenceToAttach('');
+                        }
+                      }}
+                    >
+                      + Attach
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary"
+                    onClick={() => setIsEditingFinding(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="cyber-btn cyber-btn-primary">
+                    💾 Save Finding
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 2: EVIDENCE VAULT (Raw Proof Artifacts)               */}
+          {/* ========================================================= */}
+          {activeTab === 'evidence' && !isEditingEvidence && (
+            <>
+              {/* Evidence Filters & Toolbar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '280px' }}>
+                  <input
+                    type="text"
+                    className="cyber-hud-input"
+                    placeholder="Search raw evidence by title, content, host, source..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <select
+                    className="cyber-hud-select"
+                    value={evidenceReportFilter}
+                    onChange={(e) => setEvidenceReportFilter(e.target.value as 'all' | 'reportable' | 'internal' | 'unlinked')}
+                    style={{ width: '160px', height: '32px' }}
+                  >
+                    <option value="all">All Evidence</option>
+                    <option value="reportable">📄 Reportable Only</option>
+                    <option value="internal">🔒 Internal Only</option>
+                    <option value="unlinked">⚠️ Unassigned</option>
+                  </select>
+                  <select
+                    className="cyber-hud-select"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    style={{ width: '135px', height: '32px' }}
+                  >
+                    <option value="all">All Categories</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="cyber-hud-select"
+                    value={selectedHostId}
+                    onChange={(e) => setSelectedHostId(e.target.value)}
+                    style={{ width: '140px', height: '32px' }}
+                  >
+                    <option value="all">All Hosts</option>
+                    <option value="unassigned">Engagement-wide</option>
+                    {hosts.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.label} {h.address ? `(${h.address})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  {evidenceTemplates.length > 0 && (
+                    <select
+                      className="cyber-hud-select"
+                      style={{ width: '185px', height: '32px', border: '1px solid rgba(0, 240, 255, 0.4)' }}
+                      defaultValue=""
+                      onChange={(e) => {
+                        const tpl = evidenceTemplates.find((t) => t.id === e.target.value);
+                        if (tpl) {
+                          openNewEvidence(tpl);
+                        }
+                        e.target.value = '';
+                      }}
+                    >
+                      <option value="" disabled>
+                        ✨ Use Evidence Preset...
+                      </option>
+                      {evidenceTemplates.map((tpl) => (
+                        <option key={tpl.id} value={tpl.id}>
+                          [{tpl.type.toUpperCase()}] {tpl.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-primary"
+                    onClick={() => openNewEvidence()}
+                  >
+                    + New Evidence Artifact
+                  </button>
+                </div>
+              </div>
+
+              {/* Evidence Cards */}
+              {filteredEvidence.length === 0 ? (
+                <div
+                  style={{
+                    padding: '2.5rem',
+                    textAlign: 'center',
+                    background: 'rgba(0, 240, 255, 0.02)',
+                    border: '1px dashed rgba(0, 240, 255, 0.25)',
+                    color: '#94a3b8',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  No evidence artifacts found matching filters.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {filteredEvidence.map((item) => {
+                    const hostObj = item.hostId ? hostMap.get(item.hostId) : undefined;
+                    const linkedFinding = item.findingId
+                      ? findingMap.get(item.findingId)
+                      : findingsList.find((f) => f.evidenceIds?.includes(item.id));
+
+                    let parsedTable: TableEvidenceContent | null = null;
+                    if (item.type === 'table') {
+                      try {
+                        parsedTable = JSON.parse(item.content) as TableEvidenceContent;
+                      } catch {
+                        parsedTable = null;
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          background: 'rgba(5, 11, 20, 0.85)',
+                          border: item.inReport !== false ? '1px solid rgba(0, 240, 255, 0.25)' : '1px solid rgba(100, 116, 139, 0.3)',
+                          borderLeft: item.inReport !== false ? '4px solid #00f0ff' : '4px solid #64748b',
+                          padding: '0.85rem 1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.55rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#f1f5f9' }}>
+                              {item.title}
+                            </span>
+                            {item.severity && (
+                              <span
+                                style={{
+                                  fontSize: '0.68rem',
+                                  padding: '1px 5px',
+                                  borderRadius: '2px',
+                                  fontWeight: 700,
+                                  background: getSeverityBadgeColor(item.severity).bg,
+                                  border: `1px solid ${getSeverityBadgeColor(item.severity).border}`,
+                                  color: getSeverityBadgeColor(item.severity).text,
+                                }}
+                              >
+                                {item.severity.toUpperCase()}
+                              </span>
+                            )}
+                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: '2px' }}>
+                              {item.category}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, monospace' }}>
+                              [{item.type.toUpperCase()}]
+                            </span>
+                            {hostObj && (
+                              <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '2px' }}>
+                                🖥️ {hostObj.label}
+                              </span>
+                            )}
+                            {item.tags?.map((t) => (
+                              <span key={t} style={{ fontSize: '0.68rem', color: '#94a3b8', background: 'rgba(255,255,255,0.04)', padding: '1px 5px', borderRadius: '2px' }}>
+                                #{t}
+                              </span>
+                            ))}
+                            {/* In-Report Toggle Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleEvidenceInReport(item)}
+                              style={{
+                                background: item.inReport !== false ? 'rgba(0, 240, 255, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                                border: item.inReport !== false ? '1px solid #00f0ff' : '1px solid #64748b',
+                                color: item.inReport !== false ? '#00f0ff' : '#94a3b8',
+                                fontSize: '0.68rem',
+                                padding: '1px 6px',
+                                cursor: 'pointer',
+                                fontFamily: 'JetBrains Mono, monospace',
+                              }}
+                              title="Click to toggle whether this evidence is exported in client report"
+                            >
+                              {item.inReport !== false ? '📄 In Report' : '🔒 Internal Only'}
+                            </button>
+                            {/* Linked Finding Pill */}
+                            {linkedFinding ? (
+                              <span style={{ fontSize: '0.7rem', color: '#a78bfa', background: 'rgba(167, 139, 250, 0.12)', border: '1px solid rgba(167, 139, 250, 0.3)', padding: '1px 6px', borderRadius: '2px', fontFamily: 'JetBrains Mono, monospace' }}>
+                                🎯 Linked: {linkedFinding.title}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.68rem', color: '#eab308', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '1px 6px', borderRadius: '2px', fontFamily: 'JetBrains Mono, monospace' }}>
+                                ⚠️ Standalone / Unassigned
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              className="cyber-btn"
+                              style={{ padding: '2px 7px', fontSize: '0.72rem' }}
+                              onClick={() => handleCopyText(item.content, item.id)}
+                            >
+                              {copiedId === item.id ? '✓ Copied' : '📋 Copy'}
+                            </button>
+                            <button
+                              type="button"
+                              className="cyber-btn"
+                              style={{ padding: '2px 7px', fontSize: '0.72rem' }}
+                              onClick={() => openEditEvidence(item)}
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="cyber-btn"
+                              style={{ padding: '2px 7px', fontSize: '0.72rem', color: '#ef4444' }}
+                              onClick={() => handleDeleteEvidence(item.id, item.title)}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Preview of Evidence Content */}
+                        <div
+                          style={{
+                            background: 'rgba(2, 6, 12, 0.85)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            padding: '0.65rem 0.85rem',
+                            fontSize: '0.8rem',
+                            maxHeight: '220px',
+                            overflowY: 'auto',
+                          }}
+                        >
+                          {item.type === 'table' && parsedTable ? (
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                                <thead>
+                                  <tr style={{ background: 'rgba(0, 240, 255, 0.08)', borderBottom: '1px solid rgba(0, 240, 255, 0.2)' }}>
+                                    {parsedTable.headers.map((h, i) => (
+                                      <th key={i} style={{ padding: '4px 8px', textAlign: 'left', color: '#00f0ff' }}>
+                                        {h}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {parsedTable.rows.map((row, ri) => (
+                                    <tr key={ri} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                      {row.map((cell, ci) => (
+                                        <td key={ci} style={{ padding: '4px 8px', color: '#cbd5e1' }}>
+                                          {cell}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <pre className="font-mono" style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#e2e8f0', fontSize: '0.78rem' }}>
+                              {item.content}
+                            </pre>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* EVIDENCE ARTIFACT EDITOR */}
+          {activeTab === 'evidence' && isEditingEvidence && (
+            <div
+              style={{
+                background: 'rgba(7, 14, 26, 0.95)',
+                border: '1px solid #00f0ff',
+                padding: '1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
+                  {eviEditId ? '✏️ EDIT EVIDENCE ARTIFACT' : '🛡️ CAPTURE NEW EVIDENCE ARTIFACT'}
+                </span>
+                <button
+                  type="button"
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}
+                  onClick={() => setIsEditingEvidence(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEvidence} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label className="cyber-label">Evidence Title</label>
+                    <input
+                      type="text"
+                      className="cyber-hud-input"
+                      placeholder="e.g. Mimikatz sekurlsa dump on DC01"
+                      value={eviEditTitle}
+                      onChange={(e) => setEviEditTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                      <label className="cyber-label">Category</label>
+                      <button
+                        type="button"
+                        style={{ background: 'none', border: 'none', color: '#00f0ff', cursor: 'pointer', fontSize: '0.68rem', fontFamily: 'JetBrains Mono, monospace' }}
+                        onClick={() => setShowAddCategory(!showAddCategory)}
+                      >
+                        {showAddCategory ? '✕ Cancel' : '+ New'}
+                      </button>
+                    </div>
+                    {showAddCategory ? (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <input
+                          type="text"
+                          className="cyber-hud-input"
+                          style={{ padding: '2px 4px', fontSize: '0.74rem' }}
+                          placeholder="New category..."
+                          value={newCatName}
+                          onChange={(e) => setNewCatName(e.target.value)}
+                        />
                         <button
                           type="button"
-                          className="cyber-btn cyber-btn-secondary"
-                          style={{ padding: '3px 8px', fontSize: '0.74rem' }}
-                          onClick={handleAddTableCol}
+                          className="cyber-btn cyber-btn-primary"
+                          style={{ padding: '1px 6px', fontSize: '0.68rem' }}
+                          onClick={handleAddCategory}
                         >
-                          + Add Column
+                          Add
                         </button>
-                        <button
-                          type="button"
-                          className="cyber-btn cyber-btn-secondary"
-                          style={{ padding: '3px 8px', fontSize: '0.74rem' }}
-                          onClick={handleAddTableRow}
-                        >
+                      </div>
+                    ) : (
+                      <select
+                        className="cyber-hud-select"
+                        value={eviEditCategory}
+                        onChange={(e) => setEviEditCategory(e.target.value)}
+                      >
+                        {categories.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="cyber-label">Type</label>
+                    <select
+                      className="cyber-hud-select"
+                      value={eviEditType}
+                      onChange={(e) => setEviEditType(e.target.value as EvidenceType)}
+                    >
+                      <option value="text">Text (Markdown / Log)</option>
+                      <option value="table">Structured Table</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label className="cyber-label">Target Host</label>
+                    <select
+                      className="cyber-hud-select"
+                      value={eviEditHostId}
+                      onChange={(e) => setEviEditHostId(e.target.value)}
+                    >
+                      <option value="">(Engagement-wide / Unassigned)</option>
+                      {hosts.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.label} {h.address ? `(${h.address})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="cyber-label">Attach to Finding (Optional)</label>
+                    <select
+                      className="cyber-hud-select"
+                      value={eviEditFindingId}
+                      onChange={(e) => setEviEditFindingId(e.target.value)}
+                    >
+                      <option value="">-- No Linked Finding (Standalone Proof) --</option>
+                      {findingsList.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          🎯 [{f.severity.toUpperCase()}] {f.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {eviEditType === 'text' ? (
+                  <div>
+                    <label className="cyber-label">Evidence Excerpt / Terminal Output</label>
+                    <textarea
+                      className="cyber-hud-input font-mono"
+                      style={{ minHeight: '140px', resize: 'vertical' }}
+                      placeholder="Paste terminal output, hashdump, or exploit proof..."
+                      value={eviEditTextContent}
+                      onChange={(e) => setEviEditTextContent(e.target.value)}
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label className="cyber-label">Structured Table Data</label>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button type="button" className="cyber-btn" style={{ padding: '1px 6px', fontSize: '0.68rem' }} onClick={handleAddTableRow}>
                           + Add Row
+                        </button>
+                        <button type="button" className="cyber-btn" style={{ padding: '1px 6px', fontSize: '0.68rem' }} onClick={handleAddTableCol}>
+                          + Add Col
                         </button>
                       </div>
                     </div>
-
-                    <div style={{ overflowX: 'auto', border: '1px solid rgba(0, 240, 255, 0.25)', background: 'rgba(3, 7, 18, 0.8)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                    <div style={{ overflowX: 'auto', maxHeight: '180px', overflowY: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', fontFamily: 'JetBrains Mono, monospace' }}>
                         <thead>
-                          <tr style={{ background: 'rgba(0, 240, 255, 0.12)' }}>
-                            {tableHeaders.map((hdr, ci) => (
-                              <th key={ci} style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid rgba(0, 240, 255, 0.25)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <tr style={{ background: 'rgba(0, 240, 255, 0.08)' }}>
+                            {tableHeaders.map((h, i) => (
+                              <th key={i} style={{ padding: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                                   <input
-                                    type="text"
                                     className="cyber-hud-input"
-                                    style={{ height: '24px', fontSize: '0.76rem', fontWeight: 700, color: '#00f0ff' }}
-                                    value={hdr}
-                                    onChange={(e) => handleHeaderChange(ci, e.target.value)}
+                                    style={{ padding: '2px 4px', fontSize: '0.74rem' }}
+                                    value={h}
+                                    onChange={(e) => handleHeaderChange(i, e.target.value)}
                                   />
                                   {tableHeaders.length > 1 && (
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteTableCol(ci)}
+                                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px' }}
                                       title="Delete column"
-                                      style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem' }}
+                                      onClick={() => handleDeleteTableCol(i)}
                                     >
                                       ✕
                                     </button>
@@ -1006,34 +1813,26 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                                 </div>
                               </th>
                             ))}
-                            <th style={{ width: '36px', padding: '6px' }}></th>
+                            <th style={{ width: '30px' }} />
                           </tr>
                         </thead>
                         <tbody>
                           {tableRows.map((row, ri) => (
-                            <tr key={ri} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                            <tr key={ri}>
                               {row.map((cell, ci) => (
-                                <td key={ci} style={{ padding: '4px 6px' }}>
+                                <td key={ci} style={{ padding: '2px' }}>
                                   <input
-                                    type="text"
                                     className="cyber-hud-input"
-                                    style={{ height: '24px', fontSize: '0.76rem' }}
+                                    style={{ padding: '2px 4px', fontSize: '0.74rem' }}
                                     value={cell}
                                     onChange={(e) => handleCellChange(ri, ci, e.target.value)}
                                   />
                                 </td>
                               ))}
-                              <td style={{ textAlign: 'center', padding: '4px' }}>
-                                {tableRows.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteTableRow(ri)}
-                                    title="Delete row"
-                                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.78rem' }}
-                                  >
-                                    ✕
-                                  </button>
-                                )}
+                              <td>
+                                <button type="button" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => handleDeleteTableRow(ri)}>
+                                  ✕
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -1043,237 +1842,191 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   </div>
                 )}
 
-                {/* Submit Row */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.35rem' }}>
+                {/* In-Report Toggle Checkbox */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.5rem 0.75rem',
+                    background: eviEditInReport ? 'rgba(0, 240, 255, 0.05)' : 'rgba(100, 116, 139, 0.1)',
+                    border: eviEditInReport ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid rgba(100, 116, 139, 0.3)',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    id="evi-edit-in-report"
+                    checked={eviEditInReport}
+                    onChange={(e) => setEviEditInReport(e.target.checked)}
+                    style={{ accentColor: '#00f0ff', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label
+                    htmlFor="evi-edit-in-report"
+                    style={{
+                      fontSize: '0.8rem',
+                      color: eviEditInReport ? '#00f0ff' : '#94a3b8',
+                      cursor: 'pointer',
+                      fontFamily: 'JetBrains Mono, Consolas, monospace',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {eviEditInReport
+                      ? '📄 Include in Assessment Report (Reportable Finding Proof)'
+                      : '🔒 Internal Vault Evidence Only (Excluded from Client Report)'}
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
                   <button
                     type="button"
                     className="cyber-btn cyber-btn-secondary"
-                    onClick={() => setIsEditing(false)}
+                    onClick={() => setIsEditingEvidence(false)}
                   >
                     Cancel
                   </button>
                   <button type="submit" className="cyber-btn cyber-btn-primary">
-                    💾 Save Finding to Vault
+                    💾 Save Evidence Artifact
                   </button>
                 </div>
               </form>
             </div>
           )}
 
-          {/* FINDINGS LIST */}
-          {filteredEvidence.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '2.5rem 1rem',
-                color: '#64748b',
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: '0.85rem',
-                border: '1px dashed rgba(255, 255, 255, 0.1)',
-                borderRadius: '2px',
-              }}
-            >
-              No findings matched the selected filters.
-              <div style={{ marginTop: '0.65rem' }}>
-                Click <span style={{ color: '#00f0ff' }}>"+ New Finding"</span> or select <span style={{ color: '#00f0ff' }}>"✨ Use Finding Template"</span> to capture evidence.
+          {/* ========================================================= */}
+          {/* TAB 3: ASSESSMENT REPORT LIVE PREVIEW & EXPORT            */}
+          {/* ========================================================= */}
+          {activeTab === 'report' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ margin: 0, color: '#00f0ff' }}>📄 Client Assessment Report Preview</h4>
+                  <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
+                    Compiles {filteredFindings.length} findings with their reportable evidence artifacts.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-primary"
+                  onClick={handleExportMarkdownReport}
+                >
+                  💾 Download Report (.md)
+                </button>
               </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {filteredEvidence.map((item) => {
-                const sevColor = getSeverityBadgeColor(item.severity);
-                const hostObj = item.hostId ? hostMap.get(item.hostId) : undefined;
 
-                let parsedTable: TableEvidenceContent | null = null;
-                if (item.type === 'table') {
-                  try {
-                    parsedTable = JSON.parse(item.content) as TableEvidenceContent;
-                  } catch {
-                    parsedTable = null;
-                  }
-                }
-
-                return (
-                  <div
-                    key={item.id}
-                    style={{
-                      background: 'rgba(5, 11, 20, 0.85)',
-                      border: `1px solid ${sevColor.border}55`,
-                      borderLeft: `4px solid ${sevColor.border}`,
-                      padding: '0.85rem 1rem',
-                      borderRadius: '2px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.55rem',
-                      position: 'relative',
-                    }}
-                  >
-                    {/* Top Row: Severity, Title, Category, Host, Actions */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        {/* Severity Badge */}
-                        <span
-                          style={{
-                            background: sevColor.bg,
-                            border: `1px solid ${sevColor.border}`,
-                            color: sevColor.text,
-                            padding: '1px 6px',
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            fontFamily: 'JetBrains Mono, monospace',
-                            borderRadius: '2px',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {(item.severity || 'INFO').toUpperCase()}
-                        </span>
-
-                        {/* Title */}
-                        <span style={{ fontSize: '0.92rem', fontWeight: 600, color: '#f1f5f9' }}>
-                          {item.title}
-                        </span>
-
-                        {/* Category Pill */}
-                        <span
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.15)',
-                            color: '#94a3b8',
-                            padding: '1px 6px',
-                            fontSize: '0.68rem',
-                            fontFamily: 'JetBrains Mono, monospace',
-                            borderRadius: '2px',
-                          }}
-                        >
-                          {item.category}
-                        </span>
-
-                        {/* Host Pill */}
-                        {hostObj ? (
-                          <span
-                            style={{
-                              background: 'rgba(56, 189, 248, 0.12)',
-                              border: '1px solid rgba(56, 189, 248, 0.35)',
-                              color: '#38bdf8',
-                              padding: '1px 6px',
-                              fontSize: '0.68rem',
-                              fontFamily: 'JetBrains Mono, monospace',
-                              borderRadius: '2px',
-                            }}
-                          >
-                            🖥️ {hostObj.label}
-                          </span>
-                        ) : (
-                          <span
-                            style={{
-                              background: 'rgba(148, 163, 184, 0.08)',
-                              border: '1px solid rgba(148, 163, 184, 0.2)',
-                              color: '#94a3b8',
-                              padding: '1px 6px',
-                              fontSize: '0.68rem',
-                              fontFamily: 'JetBrains Mono, monospace',
-                              borderRadius: '2px',
-                            }}
-                          >
-                            🌐 Engagement-wide
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Card Action Buttons */}
-                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                        <button
-                          type="button"
-                          className="cyber-btn"
-                          style={{ padding: '2px 7px', fontSize: '0.72rem' }}
-                          onClick={() => handleCopyFindingContent(item.content, item.id)}
-                          title="Copy finding content"
-                        >
-                          {copiedId === item.id ? '✓ Copied' : '📋 Copy'}
-                        </button>
-                        <button
-                          type="button"
-                          className="cyber-btn"
-                          style={{ padding: '2px 7px', fontSize: '0.72rem' }}
-                          onClick={() => openEditFinding(item)}
-                          title="Edit finding"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="cyber-btn"
-                          style={{ padding: '2px 7px', fontSize: '0.72rem', color: '#ef4444' }}
-                          onClick={() => handleDeleteFinding(item.id, item.title)}
-                          title="Delete finding"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Metadata Sub-row: Source, Timestamp, Tags */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.72rem', color: '#64748b', fontFamily: 'JetBrains Mono, monospace', flexWrap: 'wrap' }}>
-                      {item.source && <span>Source: <span style={{ color: '#94a3b8' }}>{item.source}</span></span>}
-                      <span>Captured: <span style={{ color: '#94a3b8' }}>{new Date(item.capturedAt).toLocaleString()}</span></span>
-                      {item.tags && item.tags.length > 0 && (
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          {item.tags.map((tag) => (
-                            <span key={tag} style={{ background: 'rgba(0, 240, 255, 0.08)', color: '#38bdf8', padding: '0 4px', borderRadius: '2px', fontSize: '0.68rem' }}>
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content Display: Text (Markdown) vs Table */}
+              {/* Informational banner about internal non-reportable evidences */}
+              {(() => {
+                const internalCount = evidenceList.filter((e) => e.inReport === false).length;
+                if (internalCount > 0) {
+                  return (
                     <div
                       style={{
-                        background: 'rgba(2, 6, 12, 0.75)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        padding: '0.65rem 0.85rem',
-                        borderRadius: '2px',
-                        marginTop: '0.2rem',
-                        fontSize: '0.8rem',
-                        maxHeight: '260px',
-                        overflowY: 'auto',
+                        background: 'rgba(56, 189, 248, 0.08)',
+                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                        padding: '0.5rem 0.8rem',
+                        fontSize: '0.76rem',
+                        color: '#38bdf8',
+                        fontFamily: 'JetBrains Mono, monospace',
                       }}
                     >
-                      {item.type === 'table' && parsedTable ? (
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', fontFamily: 'JetBrains Mono, monospace' }}>
-                            <thead>
-                              <tr style={{ background: 'rgba(0, 240, 255, 0.08)', borderBottom: '1px solid rgba(0, 240, 255, 0.2)' }}>
-                                {parsedTable.headers.map((h, i) => (
-                                  <th key={i} style={{ padding: '4px 8px', textAlign: 'left', color: '#00f0ff' }}>
-                                    {h}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {parsedTable.rows.map((row, ri) => (
-                                <tr key={ri} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                                  {row.map((cell, ci) => (
-                                    <td key={ci} style={{ padding: '4px 8px', color: '#cbd5e1' }}>
-                                      {cell}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="markdown-body" style={{ color: '#e2e8f0', lineHeight: '1.45' }}>
-                          <MarkdownRenderer content={item.content} />
-                        </div>
-                      )}
+                      ℹ️ Note: {internalCount} internal vault evidence artifacts marked as non-reportable are automatically excluded from this report.
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                }
+                return null;
+              })()}
+
+              <div
+                style={{
+                  background: 'rgba(2, 6, 12, 0.95)',
+                  border: '1px solid rgba(0, 240, 255, 0.3)',
+                  padding: '1.25rem',
+                  fontSize: '0.85rem',
+                  color: '#cbd5e1',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  maxHeight: '52vh',
+                  overflowY: 'auto',
+                }}
+              >
+                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
+                  <h2 style={{ color: '#00f0ff', margin: '0 0 0.5rem 0' }}>DoubleAgent — Pentest Assessment Report</h2>
+                  <div><strong>Engagement:</strong> {activeEngagement?.name || 'Default Engagement'}</div>
+                  {activeEngagement?.scope && <div><strong>Scope:</strong> {activeEngagement.scope}</div>}
+                  {activeEngagement?.timeframe && <div><strong>Timeframe:</strong> {activeEngagement.timeframe}</div>}
+                </div>
+
+                <div>
+                  <h3 style={{ color: '#38bdf8', margin: '0 0 0.5rem 0' }}>1. Executive Findings Summary</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(0, 240, 255, 0.1)', borderBottom: '1px solid #00f0ff' }}>
+                        <th style={{ padding: '6px', textAlign: 'left', color: '#00f0ff' }}>Finding Title</th>
+                        <th style={{ padding: '6px', textAlign: 'left', color: '#00f0ff' }}>Severity</th>
+                        <th style={{ padding: '6px', textAlign: 'left', color: '#00f0ff' }}>Category</th>
+                        <th style={{ padding: '6px', textAlign: 'left', color: '#00f0ff' }}>Reportable Evidences</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredFindings.map((f) => {
+                        const repEvs = evidenceList.filter(
+                          (e) => (f.evidenceIds?.includes(e.id) || e.findingId === f.id) && e.inReport !== false
+                        );
+                        return (
+                          <tr key={f.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                            <td style={{ padding: '6px' }}>{f.title}</td>
+                            <td style={{ padding: '6px', textTransform: 'uppercase', fontWeight: 700 }}>{f.severity}</td>
+                            <td style={{ padding: '6px' }}>{f.category}</td>
+                            <td style={{ padding: '6px' }}>🛡️ {repEvs.length}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div>
+                  <h3 style={{ color: '#38bdf8', margin: '1rem 0 0.5rem 0' }}>2. Detailed Findings</h3>
+                  {filteredFindings.map((f, i) => {
+                    const repEvs = evidenceList.filter(
+                      (e) => (f.evidenceIds?.includes(e.id) || e.findingId === f.id) && e.inReport !== false
+                    );
+                    return (
+                      <div key={f.id} style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
+                        <h4 style={{ color: '#f1f5f9', margin: '0 0 0.25rem 0' }}>
+                          2.{i + 1} [{f.severity.toUpperCase()}] {f.title}
+                        </h4>
+                        <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginBottom: '0.5rem' }}>
+                          Category: {f.category} | Status: {f.status.toUpperCase()}
+                        </div>
+                        <div style={{ marginBottom: '0.5rem' }}>
+                          <strong>Description:</strong>
+                          <div style={{ marginTop: '0.2rem' }}>{f.description}</div>
+                        </div>
+                        {f.remediation && (
+                          <div style={{ marginBottom: '0.5rem' }}>
+                            <strong>Remediation:</strong>
+                            <div style={{ marginTop: '0.2rem' }}>{f.remediation}</div>
+                          </div>
+                        )}
+                        {repEvs.length > 0 && (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <strong style={{ color: '#00f0ff' }}>Supporting Evidence Proofs ({repEvs.length}):</strong>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.3rem' }}>
+                              {repEvs.map((ev) => (
+                                <div key={ev.id} style={{ background: 'rgba(0,0,0,0.4)', padding: '0.4rem 0.6rem', border: '1px solid rgba(0, 240, 255, 0.15)' }}>
+                                  <div style={{ fontSize: '0.74rem', color: '#00f0ff', marginBottom: '2px' }}>🛡️ {ev.title}</div>
+                                  <pre style={{ margin: 0, fontSize: '0.72rem', whiteSpace: 'pre-wrap', color: '#cbd5e1' }}>{ev.content}</pre>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>

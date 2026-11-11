@@ -1,10 +1,23 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-19` — Terminal Selection Quick Save to Vault (`Auswahl speichern`) — COMPLETED!
+- **Current Milestone:** `F-18` / `F-19` — Pentest Triad Overhaul: Findings, Evidence & Notes with Terminal Quick Save — COMPLETED!
 - **Next Milestone:** Wave 1 MVP+ — Snippet Chains (`F-16`) / Engagement PDF/HTML Reporting (`F-41`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Formal Triad Architecture: Findings vs. Evidence vs. Notes (`F-18`, `F-19`)**:
+  - **Findings (`FindingItem`)**: High-level security vulnerabilities, misconfigurations, and risk exposures with severity rating (`critical`, `high`, `medium`, `low`, `info`), lifecycle status (`draft`, `confirmed`, `reported`, `remediated`), CVE/CVSS scores, structured description narrative, impact analysis, and remediation advice. A finding links to multiple supporting evidences (`evidenceIds: string[]`) and killchain notes (`noteIds: string[]`).
+  - **Evidence Artifacts (`EvidenceItem`)**: Raw forensic proof, console dumps, exploit outputs, hash extractions, or structured network tables. Every evidence item features an `inReport: boolean` flag allowing operators to keep internal vault verification proof separate from client-facing deliverables.
+  - **Notes (`NotePage`)**: Reconnaissance scratchpads, methodology checklists, port scan outputs (nmap), directory brute logs (gobuster), or privilege escalation traces (linpeas). Supports host scoping (`hostId`) and engagement scoping (`engagementId`).
+  - **Client Assessment Report Engine (`EvidenceVaultModal.tsx`)**:
+    - Compiles confirmed findings grouped by severity with executive summaries and mitigation roadmaps.
+    - **Strictly excludes evidence items where `inReport === false`**; only verified client-facing proof artifacts are embedded in the generated assessment deliverable.
+- **Terminal Selection Context Menu & Workflow Triad (`TerminalContextMenu.tsx`, `SaveSelectionModals.tsx`)**:
+  - Extended context menu on right-click over terminal text selections:
+    - `🔑 Save as Credential...`: Extracts user:pass, SSH keys, or hashes with heuristic detection.
+    - `🛡️ Save as Evidence... [PROOF]`: Saves excerpt as concrete evidence with category, host/engagement mapping, finding attachment selector, and `[✓] Include in Assessment Report` toggle.
+    - `📝 Save to Notes (Recon)... [RECON]`: Quick-saves tool output directly into Host Notes or Engagement Notes.
+    - `🎯 Create Finding from Selection... [REPORT]`: Directly generates a full vulnerability finding and automatically links the terminal selection as Evidence #1.
 - **Terminal Selection Quick Save to Vault (`F-19` / Pentest Module Line 27, 49-50, 58)**:
   - **Terminal Selection Context Menu (`TerminalContextMenu.tsx`)**:
     - Floating Cyberpunk HUD context menu triggered on right-click over any highlighted selection inside an active xterm.js terminal session.

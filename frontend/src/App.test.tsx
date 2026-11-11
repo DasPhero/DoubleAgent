@@ -3007,6 +3007,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
           DeleteEvidence: vi.fn().mockResolvedValue(undefined),
           AddEvidenceCategory: vi.fn().mockResolvedValue(undefined),
           GetEvidenceTemplates: vi.fn().mockResolvedValue([]),
+          ListFindings: vi.fn().mockResolvedValue([]),
+          GetFindingTemplates: vi.fn().mockResolvedValue([]),
         },
       },
     };
@@ -3023,6 +3025,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // 2. Verify modal opened
       expect(await screen.findByText(/Evidence Vault & Findings \(F-18\)/i)).toBeInTheDocument();
       expect(screen.getByText(/Corpo Red Team 2026/i)).toBeInTheDocument();
+
+      // Switch to Evidence tab
+      fireEvent.click(screen.getByRole('button', { name: /Evidence Vault/i }));
 
       // 3. Verify evidence items rendered
       expect(await screen.findByText('Sudo NOPASSWD find binary')).toBeInTheDocument();

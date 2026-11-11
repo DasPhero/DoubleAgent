@@ -9,9 +9,10 @@ import (
 func BuildNoteSummary(note NotePage) NotePageSummary {
 	snippet := cleanSnippet(note.Body, 120)
 	return NotePageSummary{
-		ID:        note.ID,
-		HostID:    note.HostID,
-		ParentID:  note.ParentID,
+		ID:           note.ID,
+		HostID:       note.HostID,
+		EngagementID: note.EngagementID,
+		ParentID:     note.ParentID,
 		IsFolder:  note.IsFolder,
 		Title:     note.Title,
 		Type:      note.Type,

@@ -48,11 +48,13 @@ import { CredentialStoreModal } from './components/CredentialStoreModal';
 import { EvidenceVaultModal } from './components/EvidenceVaultModal';
 import { EngagementHubModal } from './components/EngagementHubModal';
 import { NewEngagementModal } from './components/NewEngagementModal';
-import { Engagement, CredentialEntry, EvidenceItem } from './types/pentest';
+import { Engagement, CredentialEntry, EvidenceItem, FindingItem } from './types/pentest';
 import { TerminalContextMenu } from './components/TerminalContextMenu';
 import {
   SaveSelectionCredModal,
   SaveSelectionEvidenceModal,
+  SaveSelectionNoteModal,
+  SaveSelectionFindingModal,
 } from './components/SaveSelectionModals';
 import {
   CustomShortcutItem,
@@ -905,6 +907,11 @@ interface WailsAppBindings {
   ListCredentials?: (engagementId: string, hostId: string) => Promise<CredentialEntry[]>;
   SaveEvidence?: (item: EvidenceItem) => Promise<void>;
   ListEvidence?: (engagementId: string, hostId: string) => Promise<EvidenceItem[]>;
+  SaveFinding?: (item: FindingItem) => Promise<void>;
+  ListFindings?: (engagementId: string, hostId: string) => Promise<FindingItem[]>;
+  GetFinding?: (id: string) => Promise<FindingItem>;
+  DeleteFinding?: (id: string) => Promise<void>;
+  GetFindingTemplates?: () => Promise<FindingItem[]>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1158,6 +1165,16 @@ export function App({
     hostId?: string;
   } | null>(null);
   const [saveSelectionEvidenceModal, setSaveSelectionEvidenceModal] = useState<{
+    isOpen: boolean;
+    selectedText: string;
+    hostId?: string;
+  } | null>(null);
+  const [saveSelectionNoteModal, setSaveSelectionNoteModal] = useState<{
+    isOpen: boolean;
+    selectedText: string;
+    hostId?: string;
+  } | null>(null);
+  const [saveSelectionFindingModal, setSaveSelectionFindingModal] = useState<{
     isOpen: boolean;
     selectedText: string;
     hostId?: string;
@@ -3263,7 +3280,35 @@ export function App({
     }
     const matchedHost = vaultSummary.hosts.find((h) => h.id === ev.hostId);
     const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
-    setStatusMessage(`Saved evidence finding "${ev.title}"${hostNote} to vault (F-19).`);
+    const reportNote = ev.inReport ? ' [Reportable]' : ' [Internal Only]';
+    setStatusMessage(`Saved evidence artifact "${ev.title}"${hostNote}${reportNote} to vault (F-19).`);
+  };
+
+  const handleSaveSelectionNote = async (note: NotePage) => {
+    const api = getWailsBindings();
+    if (api?.SaveNote) {
+      await api.SaveNote(note);
+      if (api.ListNotes) {
+        const allNotes = await api.ListNotes('all');
+        setNotes(allNotes || []);
+      }
+    }
+    const matchedHost = vaultSummary.hosts.find((h) => h.id === note.hostId);
+    const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
+    setStatusMessage(`Saved recon note "${note.title}"${hostNote} to vault (F-17).`);
+  };
+
+  const handleSaveSelectionFinding = async (finding: FindingItem, evidence: EvidenceItem) => {
+    const api = getWailsBindings();
+    if (api?.SaveEvidence) {
+      await api.SaveEvidence(evidence);
+    }
+    if (api?.SaveFinding) {
+      await api.SaveFinding(finding);
+    }
+    const matchedHost = vaultSummary.hosts.find((h) => h.id === finding.hostId);
+    const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
+    setStatusMessage(`Created security finding "${finding.title}"${hostNote} with attached evidence (F-18).`);
   };
 
   const handleGenerateProxychainsConfig = async (opts: ProxychainsExportOptions): Promise<string> => {
@@ -11417,6 +11462,20 @@ export function App({
               hostId: terminalContextMenu.hostId,
             });
           }}
+          onSaveToNotes={() => {
+            setSaveSelectionNoteModal({
+              isOpen: true,
+              selectedText: terminalContextMenu.selectedText,
+              hostId: terminalContextMenu.hostId,
+            });
+          }}
+          onCreateFinding={() => {
+            setSaveSelectionFindingModal({
+              isOpen: true,
+              selectedText: terminalContextMenu.selectedText,
+              hostId: terminalContextMenu.hostId,
+            });
+          }}
           onRunInTerminal={() => {
             handleTerminalInput(terminalContextMenu.sessionId, terminalContextMenu.selectedText + '\n');
           }}
@@ -11461,6 +11520,46 @@ export function App({
           }))}
           onSave={handleSaveSelectionEvidence}
           onClose={() => setSaveSelectionEvidenceModal(null)}
+        />
+      )}
+
+      {saveSelectionNoteModal?.isOpen && (
+        <SaveSelectionNoteModal
+          isOpen={saveSelectionNoteModal.isOpen}
+          selectedText={saveSelectionNoteModal.selectedText}
+          initialHostId={saveSelectionNoteModal.hostId}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+          }))}
+          initialEngagementId={activeEngagement?.id}
+          engagements={engagementsList.map((e) => ({
+            id: e.id,
+            name: e.name,
+          }))}
+          onSave={handleSaveSelectionNote}
+          onClose={() => setSaveSelectionNoteModal(null)}
+        />
+      )}
+
+      {saveSelectionFindingModal?.isOpen && (
+        <SaveSelectionFindingModal
+          isOpen={saveSelectionFindingModal.isOpen}
+          selectedText={saveSelectionFindingModal.selectedText}
+          initialHostId={saveSelectionFindingModal.hostId}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+          }))}
+          initialEngagementId={activeEngagement?.id}
+          engagements={engagementsList.map((e) => ({
+            id: e.id,
+            name: e.name,
+          }))}
+          onSave={handleSaveSelectionFinding}
+          onClose={() => setSaveSelectionFindingModal(null)}
         />
       )}
     </main>

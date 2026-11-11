@@ -78,6 +78,10 @@ export function DeleteEvidence(arg1) {
   return window['go']['main']['App']['DeleteEvidence'](arg1);
 }
 
+export function DeleteFinding(arg1) {
+  return window['go']['main']['App']['DeleteFinding'](arg1);
+}
+
 export function DeleteForwardRule(arg1) {
   return window['go']['main']['App']['DeleteForwardRule'](arg1);
 }
@@ -202,6 +206,14 @@ export function GetEvidenceTemplates() {
   return window['go']['main']['App']['GetEvidenceTemplates']();
 }
 
+export function GetFinding(arg1) {
+  return window['go']['main']['App']['GetFinding'](arg1);
+}
+
+export function GetFindingTemplates() {
+  return window['go']['main']['App']['GetFindingTemplates']();
+}
+
 export function GetHostPassword(arg1) {
   return window['go']['main']['App']['GetHostPassword'](arg1);
 }
@@ -300,6 +312,10 @@ export function ListEngagements() {
 
 export function ListEvidence(arg1, arg2) {
   return window['go']['main']['App']['ListEvidence'](arg1, arg2);
+}
+
+export function ListFindings(arg1, arg2) {
+  return window['go']['main']['App']['ListFindings'](arg1, arg2);
 }
 
 export function ListForwardRules() {
@@ -416,6 +432,10 @@ export function SaveEngagement(arg1) {
 
 export function SaveEvidence(arg1) {
   return window['go']['main']['App']['SaveEvidence'](arg1);
+}
+
+export function SaveFinding(arg1) {
+  return window['go']['main']['App']['SaveFinding'](arg1);
 }
 
 export function SaveForwardRule(arg1) {

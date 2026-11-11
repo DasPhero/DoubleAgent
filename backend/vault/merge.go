@@ -504,6 +504,42 @@ func MergeVaultPayloads(local, remote core.VaultPayload) (core.VaultPayload, cor
 		}
 	}
 
+	// 13. Findings (F-18 / Pentest Reporting)
+	localFindings := make(map[string]core.FindingItem, len(local.Findings))
+	for _, f := range local.Findings {
+		localFindings[f.ID] = f
+	}
+	remoteFindings := make(map[string]core.FindingItem, len(remote.Findings))
+	for _, f := range remote.Findings {
+		remoteFindings[f.ID] = f
+	}
+
+	for _, lf := range local.Findings {
+		if rf, exists := remoteFindings[lf.ID]; exists {
+			if jsonEqual(lf, rf) {
+				merged.Findings = append(merged.Findings, lf)
+			} else {
+				report.HasConflicts = true
+				report.Conflicts = append(report.Conflicts, core.VaultConflictItem{
+					ID:            lf.ID,
+					Type:          "finding",
+					Label:         lf.Title,
+					LocalSummary:  fmt.Sprintf("[%s] %s (%s)", lf.Category, lf.Title, lf.Severity),
+					RemoteSummary: fmt.Sprintf("[%s] %s (%s)", rf.Category, rf.Title, rf.Severity),
+				})
+				merged.Findings = append(merged.Findings, lf)
+			}
+		} else {
+			merged.Findings = append(merged.Findings, lf)
+		}
+	}
+	for _, rf := range remote.Findings {
+		if _, exists := localFindings[rf.ID]; !exists {
+			merged.Findings = append(merged.Findings, rf)
+			report.AutoMerged++
+		}
+	}
+
 	return ensureNonNilSlices(merged), report
 }
 
@@ -797,6 +833,39 @@ func ResolveVaultConflicts(local, remote core.VaultPayload, resolutions map[stri
 		}
 	}
 	resolved.Evidence = finalEvidence
+
+	// 9. Findings (F-18 / Pentest Reporting)
+	remoteFindings := make(map[string]core.FindingItem, len(remote.Findings))
+	for _, f := range remote.Findings {
+		remoteFindings[f.ID] = f
+	}
+	var finalFindings []core.FindingItem
+	for _, f := range resolved.Findings {
+		res, hasRes := resolutions[f.ID]
+		if !hasRes {
+			finalFindings = append(finalFindings, f)
+			continue
+		}
+		switch res {
+		case core.ResolutionKeepRemote:
+			if rf, ok := remoteFindings[f.ID]; ok {
+				finalFindings = append(finalFindings, rf)
+			} else {
+				finalFindings = append(finalFindings, f)
+			}
+		case core.ResolutionKeepBoth:
+			finalFindings = append(finalFindings, f)
+			if rf, ok := remoteFindings[f.ID]; ok {
+				cloned := rf
+				cloned.ID = fmt.Sprintf("%s-synced", rf.ID)
+				cloned.Title = fmt.Sprintf("%s (Synced)", rf.Title)
+				finalFindings = append(finalFindings, cloned)
+			}
+		default:
+			finalFindings = append(finalFindings, f)
+		}
+	}
+	resolved.Findings = finalFindings
 
 	return ensureNonNilSlices(resolved)
 }

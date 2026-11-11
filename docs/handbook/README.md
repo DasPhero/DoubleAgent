@@ -4,7 +4,28 @@ Welcome to the DoubleAgent user handbook.
 
 ## Overview
 
-DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
+DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, per-host notes, and comprehensive penetration testing engagement workflows.
+
+## Understanding the Pentest Workflow Triad: Findings vs. Evidence vs. Notes
+
+DoubleAgent strictly distinguishes between three tiers of operational intelligence:
+1. **Notes (Reconnaissance & Scratchpads)**:
+   - Unstructured scan logs (nmap, gobuster, linpeas), operator scratchpads, and killchain methodology steps.
+   - Associated with a target host or engagement. Notes stay in your documentation vault and are never automatically treated as formal client vulnerabilities.
+2. **Evidence Artifacts (Forensic Proof & Artifacts)**:
+   - Verified raw proof: terminal dumps, mimikatz outputs, crack results, hash files, or structured tabular data.
+   - **Not all evidence needs to be reported:** each evidence artifact has an `inReport` toggle (`📄 In Report` vs `🔒 Internal Vault Only`). Operators can log noisy intermediate proof without polluting the final client deliverables. Multiple evidence artifacts can link to one parent Finding.
+3. **Findings (Vulnerabilities & Risk Exposures)**:
+   - High-level vulnerabilities, misconfigurations, or weaknesses requiring remediation (e.g. *Privilege Escalation via Sudo NOPASSWD*, *Unquoted Service Path*, *AS-REP Roasting*).
+   - Structured with severity rating (`Critical`, `High`, `Medium`, `Low`, `Info`), lifecycle status (`Draft`, `Confirmed`, `Reported`, `Remediated`), description narrative, impact, and remediation guidance.
+   - Supported by one or more linked Evidence proof artifacts and killchain Notes.
+
+### Capturing from Terminal Output (Right-Click Context Menu)
+Highlighting text in any terminal session displays four quick-save targets:
+- `🔑 Save as Credential...`: Heuristically extracts user:pass, API keys, or hashes into the Credential Pool.
+- `🛡️ Save as Evidence... [PROOF]`: Preserves output as forensic evidence, with finding attachment and in-report toggle.
+- `📝 Save to Notes (Recon)... [RECON]`: Directly logs recon logs and port scan matrices into Host or Engagement Notes.
+- `🎯 Create Finding from Selection... [REPORT]`: Generates a structured Finding and attaches the highlighted excerpt as Evidence #1.
 
 ## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-36`, `F-37`, & `F-40`)
 

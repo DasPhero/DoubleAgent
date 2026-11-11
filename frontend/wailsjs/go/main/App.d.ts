@@ -41,6 +41,8 @@ export function DeleteEngagement(arg1:string):Promise<void>;
 
 export function DeleteEvidence(arg1:string):Promise<void>;
 
+export function DeleteFinding(arg1:string):Promise<void>;
+
 export function DeleteForwardRule(arg1:string):Promise<void>;
 
 export function DeleteGroup(arg1:string):Promise<void>;
@@ -103,6 +105,10 @@ export function GetEvidenceCategories(arg1:string):Promise<Array<string>>;
 
 export function GetEvidenceTemplates():Promise<Array<core.EvidenceItem>>;
 
+export function GetFinding(arg1:string):Promise<core.FindingItem>;
+
+export function GetFindingTemplates():Promise<Array<core.FindingItem>>;
+
 export function GetHostPassword(arg1:string):Promise<string>;
 
 export function GetIdentityPassword(arg1:string):Promise<string>;
@@ -152,6 +158,8 @@ export function ListCredentials(arg1:string,arg2:string):Promise<Array<core.Cred
 export function ListEngagements():Promise<Array<core.Engagement>>;
 
 export function ListEvidence(arg1:string,arg2:string):Promise<Array<core.EvidenceItem>>;
+
+export function ListFindings(arg1:string,arg2:string):Promise<Array<core.FindingItem>>;
 
 export function ListForwardRules():Promise<Array<core.ForwardRule>>;
 
@@ -210,6 +218,8 @@ export function SaveCredential(arg1:core.CredentialEntry):Promise<void>;
 export function SaveEngagement(arg1:core.Engagement):Promise<void>;
 
 export function SaveEvidence(arg1:core.EvidenceItem):Promise<void>;
+
+export function SaveFinding(arg1:core.FindingItem):Promise<void>;
 
 export function SaveForwardRule(arg1:core.ForwardRule):Promise<void>;
 

@@ -8,6 +8,7 @@ export interface NoteHostOption {
 export interface NotePage {
   id: string;
   hostId?: string; // empty string for global workspace notes
+  engagementId?: string; // associated engagement ID (if applicable)
   parentId?: string; // empty string for root items
   isFolder: boolean;
   title: string;
@@ -22,6 +23,7 @@ export interface NotePage {
 export interface NotePageSummary {
   id: string;
   hostId?: string;
+  engagementId?: string;
   parentId?: string;
   isFolder: boolean;
   title: string;

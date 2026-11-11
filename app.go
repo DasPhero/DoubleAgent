@@ -4149,6 +4149,117 @@ func (a *App) GetEvidenceTemplates() []core.EvidenceItem {
 	return core.DefaultEvidenceTemplates()
 }
 
+// ListFindings returns findings filtered by engagement ID and/or host ID (F-18).
+func (a *App) ListFindings(engagementID string, hostID string) ([]core.FindingItem, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	var res []core.FindingItem
+	for _, f := range payload.Findings {
+		if engagementID != "" && f.EngagementID != engagementID {
+			continue
+		}
+		if hostID != "" && f.HostID != hostID {
+			match := false
+			for _, ah := range f.AffectedHosts {
+				if ah == hostID {
+					match = true
+					break
+				}
+			}
+			if !match {
+				continue
+			}
+		}
+		res = append(res, f)
+	}
+	return res, nil
+}
+
+// GetFinding returns a single finding item by ID (F-18).
+func (a *App) GetFinding(id string) (*core.FindingItem, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range payload.Findings {
+		if f.ID == id {
+			res := f
+			return &res, nil
+		}
+	}
+	return nil, fmt.Errorf("finding %q not found", id)
+}
+
+// SaveFinding stores or updates a finding item in the vault (F-18).
+func (a *App) SaveFinding(item core.FindingItem) error {
+	if err := core.ValidateFindingItem(item); err != nil {
+		return err
+	}
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = now
+	}
+	item.UpdatedAt = now
+	if item.Status == "" {
+		item.Status = core.FindingStatusDraft
+	}
+
+	idx := -1
+	for i, existing := range payload.Findings {
+		if existing.ID == item.ID {
+			idx = i
+			break
+		}
+	}
+	if idx >= 0 {
+		payload.Findings[idx] = item
+	} else {
+		payload.Findings = append(payload.Findings, item)
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DeleteFinding removes a finding item from the vault (F-18).
+func (a *App) DeleteFinding(id string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.FindingItem, 0, len(payload.Findings))
+	for _, f := range payload.Findings {
+		if f.ID != id {
+			filtered = append(filtered, f)
+		}
+	}
+	payload.Findings = filtered
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// GetFindingTemplates returns structured starter findings for common vulnerability classes.
+func (a *App) GetFindingTemplates() []core.FindingItem {
+	return core.DefaultFindingTemplates()
+}
+
 // ExportEngagementPackage serializes an engagement and all its enclosed artifacts into an exportable .daeng package (F-36).
 func (a *App) ExportEngagementPackage(engagementID string, password string) (string, error) {
 	st, ok := a.vaultStore.(*vault.Store)

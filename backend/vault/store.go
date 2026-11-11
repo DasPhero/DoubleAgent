@@ -769,6 +769,9 @@ func ensureNonNilSlices(p core.VaultPayload) core.VaultPayload {
 	if p.Evidence == nil {
 		p.Evidence = []core.EvidenceItem{}
 	}
+	if p.Findings == nil {
+		p.Findings = []core.FindingItem{}
+	}
 	return p
 }
 

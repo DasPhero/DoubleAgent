@@ -4,7 +4,9 @@ import {
   CredentialEntry,
   EvidenceItem,
   EvidenceSeverity,
+  FindingItem,
 } from '../types/pentest';
+import { NotePage } from '../types/note';
 
 export interface HostSummaryOption {
   id: string;
@@ -466,6 +468,7 @@ export interface SaveSelectionEvidenceModalProps {
   hosts: HostSummaryOption[];
   initialEngagementId?: string;
   engagements: EngagementSummaryOption[];
+  findings?: FindingItem[];
   categories?: string[];
   onSave: (evidence: EvidenceItem) => Promise<void>;
   onClose: () => void;
@@ -490,6 +493,7 @@ export function SaveSelectionEvidenceModal({
   hosts,
   initialEngagementId,
   engagements,
+  findings = [],
   categories = DEFAULT_CATEGORIES,
   onSave,
   onClose,
@@ -500,6 +504,8 @@ export function SaveSelectionEvidenceModal({
   const [content, setContent] = useState<string>('');
   const [hostId, setHostId] = useState<string>(initialHostId || '');
   const [engagementId, setEngagementId] = useState<string>(initialEngagementId || '');
+  const [findingId, setFindingId] = useState<string>('');
+  const [inReport, setInReport] = useState<boolean>(true);
   const [tagsInput, setTagsInput] = useState<string>('terminal, evidence');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -509,8 +515,8 @@ export function SaveSelectionEvidenceModal({
       const firstLine = selectedText.trim().split('\n')[0] || '';
       const summaryTitle =
         firstLine.length > 0 && firstLine.length <= 48
-          ? `Terminal Output: ${firstLine}`
-          : 'Terminal Output Finding';
+          ? `Evidence Proof: ${firstLine}`
+          : 'Terminal Evidence Proof';
 
       setTitle(summaryTitle);
       setContent(selectedText.trim());
@@ -518,6 +524,8 @@ export function SaveSelectionEvidenceModal({
       setSeverity('medium');
       setHostId(initialHostId || '');
       setEngagementId(initialEngagementId || '');
+      setFindingId('');
+      setInReport(true);
       setErrorMsg('');
     }
   }, [isOpen, selectedText, initialHostId, initialEngagementId]);
@@ -537,6 +545,7 @@ export function SaveSelectionEvidenceModal({
       const item: EvidenceItem = {
         id: `ev-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         engagementId: engagementId || '',
+        findingId: findingId || undefined,
         category,
         title: title.trim(),
         type: 'text',
@@ -545,6 +554,7 @@ export function SaveSelectionEvidenceModal({
         severity,
         capturedAt: new Date().toISOString(),
         source: 'terminal_selection',
+        inReport,
         tags: tagsInput
           .split(',')
           .map((t) => t.trim())
@@ -700,12 +710,12 @@ export function SaveSelectionEvidenceModal({
 
             <div>
               <label className="cyber-label" htmlFor="ev-title">
-                Finding / Evidence Title
+                Evidence Artifact Title
               </label>
               <input
                 id="ev-title"
                 className="cyber-hud-input"
-                placeholder="e.g. Unshadowed Hash Extraction from /etc/shadow"
+                placeholder="e.g. Mimikatz LSASS Dump on DC01 or /etc/shadow extract"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -732,37 +742,72 @@ export function SaveSelectionEvidenceModal({
               </div>
 
               <div>
-                <label className="cyber-label" htmlFor="ev-severity">
-                  Severity Rating
+                <label className="cyber-label" htmlFor="ev-finding">
+                  Attach to Finding (Optional)
                 </label>
                 <select
-                  id="ev-severity"
+                  id="ev-finding"
                   className="cyber-hud-select"
-                  value={severity}
-                  onChange={(e) => setSeverity(e.target.value as EvidenceSeverity)}
+                  value={findingId}
+                  onChange={(e) => setFindingId(e.target.value)}
                 >
-                  <option value="critical">🔴 Critical Severity</option>
-                  <option value="high">🟠 High Severity</option>
-                  <option value="medium">🟡 Medium Severity</option>
-                  <option value="low">🟢 Low Severity</option>
-                  <option value="info">🔵 Informational</option>
+                  <option value="">(None - Standalone Internal Evidence)</option>
+                  {findings.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      🎯 [{(f.severity || 'info').toUpperCase()}] {f.title}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
             <div>
               <label className="cyber-label" htmlFor="ev-content">
-                Captured Terminal Output / Log Proof
+                Captured Forensic Proof / Terminal Artifact
               </label>
               <textarea
                 id="ev-content"
                 className="cyber-hud-input font-mono"
-                style={{ minHeight: '130px', resize: 'vertical' }}
+                style={{ minHeight: '120px', resize: 'vertical' }}
                 placeholder="Captured terminal evidence text..."
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 required
               />
+            </div>
+
+            {/* In-Report Toggle */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                padding: '0.5rem 0.75rem',
+                background: inReport ? 'rgba(0, 240, 255, 0.05)' : 'rgba(100, 116, 139, 0.1)',
+                border: inReport ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid rgba(100, 116, 139, 0.3)',
+              }}
+            >
+              <input
+                type="checkbox"
+                id="ev-in-report"
+                checked={inReport}
+                onChange={(e) => setInReport(e.target.checked)}
+                style={{ accentColor: '#00f0ff', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <label
+                htmlFor="ev-in-report"
+                style={{
+                  fontSize: '0.8rem',
+                  color: inReport ? '#00f0ff' : '#94a3b8',
+                  cursor: 'pointer',
+                  fontFamily: 'JetBrains Mono, Consolas, monospace',
+                  userSelect: 'none',
+                }}
+              >
+                {inReport
+                  ? '📄 Include in Assessment Report (Reportable Finding Proof)'
+                  : '🔒 Internal Vault Evidence Only (Excluded from Client Report)'}
+              </label>
             </div>
 
             <div>
@@ -772,7 +817,7 @@ export function SaveSelectionEvidenceModal({
               <input
                 id="ev-tags"
                 className="cyber-hud-input"
-                placeholder="terminal, proof, nmap, hash"
+                placeholder="terminal, proof, mimikatz, hash"
                 value={tagsInput}
                 onChange={(e) => setTagsInput(e.target.value)}
               />
@@ -795,6 +840,702 @@ export function SaveSelectionEvidenceModal({
               disabled={isSaving}
             >
               {isSaving ? 'Saving...' : '🛡️ Save to Evidence Vault'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// Component: SaveSelectionNoteModal (For Recon, Nmap outputs, & Logs)
+// -------------------------------------------------------------
+export interface SaveSelectionNoteModalProps {
+  isOpen: boolean;
+  selectedText: string;
+  initialHostId?: string;
+  hosts: HostSummaryOption[];
+  initialEngagementId?: string;
+  engagements: EngagementSummaryOption[];
+  onSave: (note: NotePage) => Promise<void>;
+  onClose: () => void;
+}
+
+export function SaveSelectionNoteModal({
+  isOpen,
+  selectedText,
+  initialHostId,
+  hosts,
+  initialEngagementId,
+  engagements,
+  onSave,
+  onClose,
+}: SaveSelectionNoteModalProps): React.JSX.Element | null {
+  const [title, setTitle] = useState<string>('');
+  const [body, setBody] = useState<string>('');
+  const [hostId, setHostId] = useState<string>(initialHostId || '');
+  const [engagementId, setEngagementId] = useState<string>(initialEngagementId || '');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen && selectedText) {
+      const firstLine = selectedText.trim().split('\n')[0] || '';
+      const summaryTitle =
+        firstLine.length > 0 && firstLine.length <= 48
+          ? `Recon Output: ${firstLine}`
+          : 'Reconnaissance & Scan Notes';
+
+      setTitle(summaryTitle);
+      setBody(selectedText.trim());
+      setHostId(initialHostId || '');
+      setEngagementId(initialEngagementId || '');
+      setErrorMsg('');
+    }
+  }, [isOpen, selectedText, initialHostId, initialEngagementId]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !body.trim()) {
+      setErrorMsg('Please specify both a note title and note body.');
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMsg('');
+    try {
+      const now = new Date().toISOString();
+      const note: NotePage = {
+        id: `note-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        hostId: hostId || undefined,
+        engagementId: engagementId || undefined,
+        title: title.trim(),
+        type: 'markdown',
+        body: body.trim(),
+        isFolder: false,
+        order: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await onSave(note);
+      onClose();
+    } catch (err: unknown) {
+      setErrorMsg(`Failed to save note: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const matchedHost = hosts.find((h) => h.id === hostId);
+
+  return (
+    <div
+      className="modal-backdrop cyber-modal-overlay"
+      role="dialog"
+      aria-label="Save Terminal Selection to Host Notes"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSaving) onClose();
+      }}
+    >
+      <div
+        className="cyber-dialog-card modal-container"
+        style={{
+          width: '640px',
+          maxWidth: '92vw',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Four Corner Reticles */}
+        <span className="corner-reticle reticle-tl" />
+        <span className="corner-reticle reticle-tr" />
+        <span className="corner-reticle reticle-bl" />
+        <span className="corner-reticle reticle-br" />
+
+        {/* Pinned Header */}
+        <div className="dialog-header" style={{ flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <span className="cyber-hazard-stripes" style={{ fontSize: '1.25rem', color: '#00f0ff' }}>
+              ///
+            </span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#00f0ff', letterSpacing: '0.05em' }}>
+                📝 Save to Host / Engagement Notes
+              </h3>
+              <div
+                style={{
+                  fontSize: '0.7rem',
+                  color: '#38bdf8',
+                  fontFamily: 'JetBrains Mono, Consolas, monospace',
+                  marginTop: '2px',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                DOCUMENTATION // RECON &amp; SCAN SCRATCHPAD (F-17)
+              </div>
+            </div>
+          </div>
+          <button type="button" className="cyber-btn-close" onClick={onClose} aria-label="Close dialog">
+            ×
+          </button>
+        </div>
+
+        {/* Scrollable Form Body */}
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+        >
+          <div
+            className="dialog-body"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+            }}
+          >
+            {errorMsg && <div className="error-banner">{errorMsg}</div>}
+
+            <div
+              style={{
+                background: 'rgba(0, 240, 255, 0.05)',
+                border: '1px solid rgba(0, 240, 255, 0.25)',
+                padding: '0.55rem 0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.75rem',
+                fontFamily: 'JetBrains Mono, Consolas, monospace',
+              }}
+            >
+              <div>
+                <span style={{ color: '#94a3b8' }}>SOURCE: </span>
+                <strong style={{ color: '#00f0ff' }}>Terminal Output (Nmap / Recon)</strong>
+              </div>
+              {matchedHost && (
+                <div>
+                  <span style={{ color: '#94a3b8' }}>TARGET: </span>
+                  <strong style={{ color: '#38bdf8' }}>{matchedHost.label || matchedHost.address}</strong>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label className="cyber-label" htmlFor="note-engagement">
+                  Pentest Engagement
+                </label>
+                <select
+                  id="note-engagement"
+                  className="cyber-hud-select"
+                  value={engagementId}
+                  onChange={(e) => setEngagementId(e.target.value)}
+                >
+                  <option value="">🌐 Global / No Engagement</option>
+                  {engagements.map((eng) => (
+                    <option key={eng.id} value={eng.id}>
+                      🎯 {eng.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="cyber-label" htmlFor="note-host">
+                  Associated Host
+                </label>
+                <select
+                  id="note-host"
+                  className="cyber-hud-select"
+                  value={hostId}
+                  onChange={(e) => setHostId(e.target.value)}
+                >
+                  <option value="">(Global Workspace Note)</option>
+                  {hosts.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      🖥️ {h.label} ({h.address})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="cyber-label" htmlFor="note-title">
+                Note Title / Section
+              </label>
+              <input
+                id="note-title"
+                className="cyber-hud-input"
+                placeholder="e.g. Nmap Port Scan & Service Enumeration"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="cyber-label" htmlFor="note-body">
+                Markdown Body / Scan Log
+              </label>
+              <textarea
+                id="note-body"
+                className="cyber-hud-input font-mono"
+                style={{ minHeight: '180px', resize: 'vertical' }}
+                placeholder="Paste or edit scan findings..."
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Pinned Footer */}
+          <div className="dialog-footer" style={{ flexShrink: 0 }}>
+            <button
+              type="button"
+              className="cyber-btn cyber-btn-secondary"
+              onClick={onClose}
+              disabled={isSaving}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="cyber-btn cyber-btn-primary" disabled={isSaving}>
+              {isSaving ? 'Saving...' : '📝 Save to Notes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// Component: SaveSelectionFindingModal (Directly Creates Finding with Attached Evidence)
+// -------------------------------------------------------------
+export interface SaveSelectionFindingModalProps {
+  isOpen: boolean;
+  selectedText: string;
+  initialHostId?: string;
+  hosts: HostSummaryOption[];
+  initialEngagementId?: string;
+  engagements: EngagementSummaryOption[];
+  categories?: string[];
+  onSave: (finding: FindingItem, evidence: EvidenceItem) => Promise<void>;
+  onClose: () => void;
+}
+
+export function SaveSelectionFindingModal({
+  isOpen,
+  selectedText,
+  initialHostId,
+  hosts,
+  initialEngagementId,
+  engagements,
+  categories = DEFAULT_CATEGORIES,
+  onSave,
+  onClose,
+}: SaveSelectionFindingModalProps): React.JSX.Element | null {
+  const [title, setTitle] = useState<string>('');
+  const [category, setCategory] = useState<string>('Vulnerabilities');
+  const [severity, setSeverity] = useState<EvidenceSeverity>('high');
+  const [description, setDescription] = useState<string>('');
+  const [remediation, setRemediation] = useState<string>('');
+  const [evidenceContent, setEvidenceContent] = useState<string>('');
+  const [inReport, setInReport] = useState<boolean>(true);
+  const [hostId, setHostId] = useState<string>(initialHostId || '');
+  const [engagementId, setEngagementId] = useState<string>(initialEngagementId || '');
+  const [tagsInput, setTagsInput] = useState<string>('finding, vulnerability');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen && selectedText) {
+      const firstLine = selectedText.trim().split('\n')[0] || '';
+      const summaryTitle =
+        firstLine.length > 0 && firstLine.length <= 48
+          ? `Vulnerability: ${firstLine}`
+          : 'Security Finding';
+
+      setTitle(summaryTitle);
+      setDescription(`Observed vulnerable behavior in console output:\n\n\`\`\`text\n${selectedText.trim()}\n\`\`\``);
+      setEvidenceContent(selectedText.trim());
+      setCategory('Vulnerabilities');
+      setSeverity('high');
+      setRemediation('');
+      setHostId(initialHostId || '');
+      setEngagementId(initialEngagementId || '');
+      setInReport(true);
+      setErrorMsg('');
+    }
+  }, [isOpen, selectedText, initialHostId, initialEngagementId]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !description.trim()) {
+      setErrorMsg('Please specify both a finding title and vulnerability description.');
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMsg('');
+    try {
+      const now = new Date().toISOString();
+      const findingId = `find-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const evidenceId = `ev-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+      const evidence: EvidenceItem = {
+        id: evidenceId,
+        engagementId: engagementId || '',
+        findingId,
+        category,
+        title: `Proof of Concept: ${title.trim()}`,
+        type: 'text',
+        content: evidenceContent.trim() || selectedText.trim(),
+        hostId: hostId || undefined,
+        severity,
+        capturedAt: now,
+        source: 'terminal_selection',
+        inReport,
+        tags: ['poc', 'terminal_proof'],
+      };
+
+      const finding: FindingItem = {
+        id: findingId,
+        engagementId: engagementId || '',
+        title: title.trim(),
+        category,
+        severity,
+        status: 'draft',
+        hostId: hostId || undefined,
+        affectedHosts: hostId ? [hostId] : undefined,
+        description: description.trim(),
+        remediation: remediation.trim() || undefined,
+        evidenceIds: [evidenceId],
+        createdAt: now,
+        updatedAt: now,
+        tags: tagsInput
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+      };
+
+      await onSave(finding, evidence);
+      onClose();
+    } catch (err: unknown) {
+      setErrorMsg(`Failed to create finding: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const matchedHost = hosts.find((h) => h.id === hostId);
+
+  return (
+    <div
+      className="modal-backdrop cyber-modal-overlay"
+      role="dialog"
+      aria-label="Create Finding from Terminal Selection"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSaving) onClose();
+      }}
+    >
+      <div
+        className="cyber-dialog-card modal-container"
+        style={{
+          width: '740px',
+          maxWidth: '92vw',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Four Corner Reticles */}
+        <span className="corner-reticle reticle-tl" />
+        <span className="corner-reticle reticle-tr" />
+        <span className="corner-reticle reticle-bl" />
+        <span className="corner-reticle reticle-br" />
+
+        {/* Pinned Header */}
+        <div className="dialog-header" style={{ flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <span className="cyber-hazard-stripes" style={{ fontSize: '1.25rem', color: '#00f0ff' }}>
+              ///
+            </span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#00f0ff', letterSpacing: '0.05em' }}>
+                🎯 Create Security Finding from Selection
+              </h3>
+              <div
+                style={{
+                  fontSize: '0.7rem',
+                  color: '#38bdf8',
+                  fontFamily: 'JetBrains Mono, Consolas, monospace',
+                  marginTop: '2px',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                VULNERABILITY-INGEST // ATTACHES SELECTION AS PRIMARY EVIDENCE (F-18)
+              </div>
+            </div>
+          </div>
+          <button type="button" className="cyber-btn-close" onClick={onClose} aria-label="Close dialog">
+            ×
+          </button>
+        </div>
+
+        {/* Scrollable Form Body */}
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+        >
+          <div
+            className="dialog-body"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+            }}
+          >
+            {errorMsg && <div className="error-banner">{errorMsg}</div>}
+
+            <div
+              style={{
+                background: 'rgba(0, 240, 255, 0.05)',
+                border: '1px solid rgba(0, 240, 255, 0.25)',
+                padding: '0.55rem 0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.75rem',
+                fontFamily: 'JetBrains Mono, Consolas, monospace',
+              }}
+            >
+              <div>
+                <span style={{ color: '#94a3b8' }}>SOURCE: </span>
+                <strong style={{ color: '#00f0ff' }}>Terminal Output &rarr; Attached as Evidence #1</strong>
+              </div>
+              {matchedHost && (
+                <div>
+                  <span style={{ color: '#94a3b8' }}>TARGET: </span>
+                  <strong style={{ color: '#38bdf8' }}>{matchedHost.label || matchedHost.address}</strong>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label className="cyber-label" htmlFor="find-engagement">
+                  Pentest Engagement
+                </label>
+                <select
+                  id="find-engagement"
+                  className="cyber-hud-select"
+                  value={engagementId}
+                  onChange={(e) => setEngagementId(e.target.value)}
+                >
+                  <option value="">🌐 Global / No Engagement</option>
+                  {engagements.map((eng) => (
+                    <option key={eng.id} value={eng.id}>
+                      🎯 {eng.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="cyber-label" htmlFor="find-host">
+                  Affected Target Host
+                </label>
+                <select
+                  id="find-host"
+                  className="cyber-hud-select"
+                  value={hostId}
+                  onChange={(e) => setHostId(e.target.value)}
+                >
+                  <option value="">(No specific host)</option>
+                  {hosts.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      🖥️ {h.label} ({h.address})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="cyber-label" htmlFor="find-title">
+                Finding Title / Vulnerability Name
+              </label>
+              <input
+                id="find-title"
+                className="cyber-hud-input"
+                placeholder="e.g. Unquoted Service Path Privilege Escalation"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label className="cyber-label" htmlFor="find-category">
+                  Vulnerability Category
+                </label>
+                <select
+                  id="find-category"
+                  className="cyber-hud-select"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="cyber-label" htmlFor="find-severity">
+                  Severity Rating
+                </label>
+                <select
+                  id="find-severity"
+                  className="cyber-hud-select"
+                  value={severity}
+                  onChange={(e) => setSeverity(e.target.value as EvidenceSeverity)}
+                >
+                  <option value="critical">🔴 Critical Severity</option>
+                  <option value="high">🟠 High Severity</option>
+                  <option value="medium">🟡 Medium Severity</option>
+                  <option value="low">🟢 Low Severity</option>
+                  <option value="info">🔵 Informational</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="cyber-label" htmlFor="find-desc">
+                Vulnerability Description / Assessment Narrative
+              </label>
+              <textarea
+                id="find-desc"
+                className="cyber-hud-input"
+                style={{ minHeight: '90px', resize: 'vertical' }}
+                placeholder="Describe how the vulnerability was identified and why it is exploitable..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="cyber-label" htmlFor="find-remediation">
+                Remediation / Mitigation Advice
+              </label>
+              <textarea
+                id="find-remediation"
+                className="cyber-hud-input"
+                style={{ minHeight: '60px', resize: 'vertical' }}
+                placeholder="Recommended patches, configurations, or hardening steps..."
+                value={remediation}
+                onChange={(e) => setRemediation(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="cyber-label" htmlFor="find-evidence-content">
+                Attached Supporting Evidence Proof (Terminal Selection)
+              </label>
+              <textarea
+                id="find-evidence-content"
+                className="cyber-hud-input font-mono"
+                style={{ minHeight: '90px', resize: 'vertical' }}
+                value={evidenceContent}
+                onChange={(e) => setEvidenceContent(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* In-Report Toggle */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                padding: '0.45rem 0.75rem',
+                background: inReport ? 'rgba(0, 240, 255, 0.05)' : 'rgba(100, 116, 139, 0.1)',
+                border: inReport ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid rgba(100, 116, 139, 0.3)',
+              }}
+            >
+              <input
+                type="checkbox"
+                id="find-in-report"
+                checked={inReport}
+                onChange={(e) => setInReport(e.target.checked)}
+                style={{ accentColor: '#00f0ff', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <label
+                htmlFor="find-in-report"
+                style={{
+                  fontSize: '0.8rem',
+                  color: inReport ? '#00f0ff' : '#94a3b8',
+                  cursor: 'pointer',
+                  fontFamily: 'JetBrains Mono, Consolas, monospace',
+                  userSelect: 'none',
+                }}
+              >
+                {inReport
+                  ? '📄 Include this Proof in Client Assessment Report'
+                  : '🔒 Internal Proof Only (Hide excerpt from Client Report)'}
+              </label>
+            </div>
+
+            <div>
+              <label className="cyber-label" htmlFor="find-tags">
+                Tags (Comma-Separated)
+              </label>
+              <input
+                id="find-tags"
+                className="cyber-hud-input"
+                placeholder="vulnerability, privesc, rce"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Pinned Footer */}
+          <div className="dialog-footer" style={{ flexShrink: 0 }}>
+            <button
+              type="button"
+              className="cyber-btn cyber-btn-secondary"
+              onClick={onClose}
+              disabled={isSaving}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="cyber-btn cyber-btn-primary" disabled={isSaving}>
+              {isSaving ? 'Creating...' : '🎯 Create Finding with Attached Evidence'}
             </button>
           </div>
         </form>

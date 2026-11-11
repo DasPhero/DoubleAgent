@@ -402,6 +402,7 @@ export namespace core {
 	export class NotePage {
 	    id: string;
 	    hostId?: string;
+	    engagementId?: string;
 	    parentId?: string;
 	    isFolder: boolean;
 	    title: string;
@@ -421,6 +422,7 @@ export namespace core {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.hostId = source["hostId"];
+	        this.engagementId = source["engagementId"];
 	        this.parentId = source["parentId"];
 	        this.isFolder = source["isFolder"];
 	        this.title = source["title"];
@@ -449,9 +451,76 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class FindingItem {
+	    id: string;
+	    engagementId: string;
+	    title: string;
+	    category: string;
+	    severity: string;
+	    status: string;
+	    hostId?: string;
+	    affectedHosts?: string[];
+	    description: string;
+	    impact?: string;
+	    remediation?: string;
+	    cve?: string;
+	    cvss?: string;
+	    evidenceIds?: string[];
+	    noteIds?: string[];
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	    tags?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FindingItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.engagementId = source["engagementId"];
+	        this.title = source["title"];
+	        this.category = source["category"];
+	        this.severity = source["severity"];
+	        this.status = source["status"];
+	        this.hostId = source["hostId"];
+	        this.affectedHosts = source["affectedHosts"];
+	        this.description = source["description"];
+	        this.impact = source["impact"];
+	        this.remediation = source["remediation"];
+	        this.cve = source["cve"];
+	        this.cvss = source["cvss"];
+	        this.evidenceIds = source["evidenceIds"];
+	        this.noteIds = source["noteIds"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	        this.tags = source["tags"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class EvidenceItem {
 	    id: string;
 	    engagementId: string;
+	    findingId?: string;
 	    category: string;
 	    title: string;
 	    type: string;
@@ -461,6 +530,7 @@ export namespace core {
 	    // Go type: time
 	    capturedAt: any;
 	    source?: string;
+	    inReport: boolean;
 	    tags?: string[];
 	
 	    static createFrom(source: any = {}) {
@@ -471,6 +541,7 @@ export namespace core {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.engagementId = source["engagementId"];
+	        this.findingId = source["findingId"];
 	        this.category = source["category"];
 	        this.title = source["title"];
 	        this.type = source["type"];
@@ -479,6 +550,7 @@ export namespace core {
 	        this.severity = source["severity"];
 	        this.capturedAt = this.convertValues(source["capturedAt"], null);
 	        this.source = source["source"];
+	        this.inReport = source["inReport"];
 	        this.tags = source["tags"];
 	    }
 	
@@ -552,6 +624,7 @@ export namespace core {
 	    hosts?: HostRecord[];
 	    credentials?: CredentialEntry[];
 	    evidence?: EvidenceItem[];
+	    findings?: FindingItem[];
 	    notes?: NotePage[];
 	    snippets?: Snippet[];
 	    wordlists?: string[];
@@ -571,6 +644,7 @@ export namespace core {
 	        this.hosts = this.convertValues(source["hosts"], HostRecord);
 	        this.credentials = this.convertValues(source["credentials"], CredentialEntry);
 	        this.evidence = this.convertValues(source["evidence"], EvidenceItem);
+	        this.findings = this.convertValues(source["findings"], FindingItem);
 	        this.notes = this.convertValues(source["notes"], NotePage);
 	        this.snippets = this.convertValues(source["snippets"], Snippet);
 	        this.wordlists = source["wordlists"];
@@ -617,6 +691,7 @@ export namespace core {
 	        this.permissions = source["permissions"];
 	    }
 	}
+	
 	export class ForwardRule {
 	    id: string;
 	    hostId?: string;
@@ -959,6 +1034,7 @@ export namespace core {
 	export class NotePageSummary {
 	    id: string;
 	    hostId?: string;
+	    engagementId?: string;
 	    parentId?: string;
 	    isFolder: boolean;
 	    title: string;
@@ -978,6 +1054,7 @@ export namespace core {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.hostId = source["hostId"];
+	        this.engagementId = source["engagementId"];
 	        this.parentId = source["parentId"];
 	        this.isFolder = source["isFolder"];
 	        this.title = source["title"];

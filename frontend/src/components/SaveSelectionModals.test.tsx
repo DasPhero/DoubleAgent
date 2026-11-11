@@ -4,9 +4,12 @@ import {
   parseCredentialSelection,
   SaveSelectionCredModal,
   SaveSelectionEvidenceModal,
+  SaveSelectionNoteModal,
+  SaveSelectionFindingModal,
 } from './SaveSelectionModals';
 import { TerminalContextMenu } from './TerminalContextMenu';
-import { CredentialEntry, EvidenceItem } from '../types/pentest';
+import { CredentialEntry, EvidenceItem, FindingItem } from '../types/pentest';
+import { NotePage } from '../types/note';
 
 describe('F-19 Terminal Selection & Quick Save to Vault', () => {
   describe('parseCredentialSelection heuristics', () => {
@@ -141,7 +144,7 @@ describe('F-19 Terminal Selection & Quick Save to Vault', () => {
   });
 
   describe('SaveSelectionEvidenceModal', () => {
-    it('pre-populates terminal output proof, host, and saves finding to evidence vault', async () => {
+    it('pre-populates terminal output proof, host, and saves evidence with inReport toggle', async () => {
       let savedResult: EvidenceItem | undefined;
       const onSave = vi.fn().mockImplementation(async (e: EvidenceItem) => {
         savedResult = e;
@@ -156,6 +159,19 @@ describe('F-19 Terminal Selection & Quick Save to Vault', () => {
           hosts={[{ id: 'host-target-1', label: 'Production Server', address: '192.168.1.50' }]}
           initialEngagementId="eng-test-1"
           engagements={[{ id: 'eng-test-1', name: 'Internal Red Team' }]}
+          findings={[
+            {
+              id: 'find-100',
+              engagementId: 'eng-test-1',
+              title: 'Root Privilege Escalation',
+              category: 'Privilege Escalation',
+              severity: 'critical',
+              status: 'draft',
+              description: 'Vulnerable sudo config allows privilege escalation',
+              createdAt: '2026-11-10T12:00:00Z',
+              updatedAt: '2026-11-10T12:00:00Z',
+            },
+          ]}
           onSave={onSave}
           onClose={onClose}
         />
@@ -167,11 +183,15 @@ describe('F-19 Terminal Selection & Quick Save to Vault', () => {
       const hostSelect = screen.getByLabelText(/Associated Target Host \(F-19\)/i) as HTMLSelectElement;
       expect(hostSelect.value).toBe('host-target-1');
 
-      // Change severity to critical
-      const severitySelect = screen.getByLabelText(/Severity Rating/i);
-      fireEvent.change(severitySelect, { target: { value: 'critical' } });
+      // Check inReport checkbox defaults to checked
+      const reportCheckbox = screen.getByLabelText(/Include in Assessment Report/i) as HTMLInputElement;
+      expect(reportCheckbox).toBeChecked();
 
-      // Save finding
+      // Attach to finding
+      const findingSelect = screen.getByLabelText(/Attach to Finding \(Optional\)/i) as HTMLSelectElement;
+      fireEvent.change(findingSelect, { target: { value: 'find-100' } });
+
+      // Save finding proof
       fireEvent.click(screen.getByRole('button', { name: /Save to Evidence Vault/i }));
 
       await waitFor(() => {
@@ -184,8 +204,98 @@ describe('F-19 Terminal Selection & Quick Save to Vault', () => {
       expect(ev.content).toBe('uid=0(root) gid=0(root) groups=0(root)');
       expect(ev.hostId).toBe('host-target-1');
       expect(ev.engagementId).toBe('eng-test-1');
-      expect(ev.severity).toBe('critical');
+      expect(ev.findingId).toBe('find-100');
+      expect(ev.inReport).toBe(true);
       expect(ev.source).toBe('terminal_selection');
+    });
+  });
+
+  describe('SaveSelectionNoteModal', () => {
+    it('saves terminal output as recon note linked to host and engagement', async () => {
+      let savedNote: NotePage | undefined;
+      const onSave = vi.fn().mockImplementation(async (n: NotePage) => {
+        savedNote = n;
+      });
+      const onClose = vi.fn();
+
+      render(
+        <SaveSelectionNoteModal
+          isOpen={true}
+          selectedText="PORT STATE SERVICE\n22/tcp open ssh\n80/tcp open http"
+          initialHostId="host-target-1"
+          hosts={[{ id: 'host-target-1', label: 'Production Server', address: '192.168.1.50' }]}
+          initialEngagementId="eng-test-1"
+          engagements={[{ id: 'eng-test-1', name: 'Internal Red Team' }]}
+          onSave={onSave}
+          onClose={onClose}
+        />
+      );
+
+      expect(screen.getByRole('dialog', { name: /Save Terminal Selection to Host Notes/i })).toBeInTheDocument();
+      expect(screen.getByDisplayValue(/PORT STATE SERVICE/i)).toBeInTheDocument();
+
+      // Submit note
+      fireEvent.click(screen.getByRole('button', { name: /Save to Notes/i }));
+
+      await waitFor(() => {
+        expect(onSave).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalled();
+      });
+
+      expect(savedNote).toBeDefined();
+      expect(savedNote?.hostId).toBe('host-target-1');
+      expect(savedNote?.engagementId).toBe('eng-test-1');
+      expect(savedNote?.body).toContain('22/tcp open ssh');
+      expect(savedNote?.type).toBe('markdown');
+    });
+  });
+
+  describe('SaveSelectionFindingModal', () => {
+    it('creates a finding and links terminal output as initial evidence', async () => {
+      let savedFinding: FindingItem | undefined;
+      let savedEvidence: EvidenceItem | undefined;
+      const onSave = vi.fn().mockImplementation(async (f: FindingItem, e: EvidenceItem) => {
+        savedFinding = f;
+        savedEvidence = e;
+      });
+      const onClose = vi.fn();
+
+      render(
+        <SaveSelectionFindingModal
+          isOpen={true}
+          selectedText="Vulnerable sudo configuration: ALL=(ALL) NOPASSWD: /usr/bin/find"
+          initialHostId="host-target-1"
+          hosts={[{ id: 'host-target-1', label: 'Production Server', address: '192.168.1.50' }]}
+          initialEngagementId="eng-test-1"
+          engagements={[{ id: 'eng-test-1', name: 'Internal Red Team' }]}
+          onSave={onSave}
+          onClose={onClose}
+        />
+      );
+
+      expect(screen.getByRole('dialog', { name: /Create Finding from Terminal Selection/i })).toBeInTheDocument();
+
+      // Check severity select
+      const severitySelect = screen.getByLabelText(/Severity Rating/i) as HTMLSelectElement;
+      fireEvent.change(severitySelect, { target: { value: 'critical' } });
+
+      // Submit finding
+      fireEvent.click(screen.getByRole('button', { name: /Create Finding/i }));
+
+      await waitFor(() => {
+        expect(onSave).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalled();
+      });
+
+      expect(savedFinding).toBeDefined();
+      expect(savedEvidence).toBeDefined();
+      expect(savedFinding?.severity).toBe('critical');
+      expect(savedFinding?.hostId).toBe('host-target-1');
+      expect(savedFinding?.engagementId).toBe('eng-test-1');
+      expect(savedFinding?.evidenceIds).toContain(savedEvidence?.id);
+      expect(savedEvidence?.findingId).toBe(savedFinding?.id);
+      expect(savedEvidence?.inReport).toBe(true);
+      expect(savedEvidence?.content).toContain('NOPASSWD: /usr/bin/find');
     });
   });
 });

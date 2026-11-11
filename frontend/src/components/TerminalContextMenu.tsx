@@ -9,6 +9,8 @@ export interface TerminalContextMenuProps {
   onCopy: () => void;
   onSaveAsCredential: () => void;
   onSaveAsEvidence: () => void;
+  onSaveToNotes?: () => void;
+  onCreateFinding?: () => void;
   onRunInTerminal?: () => void;
   onClose: () => void;
 }
@@ -21,6 +23,8 @@ export function TerminalContextMenu({
   onCopy,
   onSaveAsCredential,
   onSaveAsEvidence,
+  onSaveToNotes,
+  onCreateFinding,
   onRunInTerminal,
   onClose,
 }: TerminalContextMenuProps): React.JSX.Element {
@@ -48,8 +52,8 @@ export function TerminalContextMenu({
   }, [onClose]);
 
   // Adjust position to stay strictly inside viewport
-  const menuWidth = 260;
-  const menuHeight = 220;
+  const menuWidth = 280;
+  const menuHeight = 330;
   const posX = Math.max(10, Math.min(x, (window.innerWidth || 800) - menuWidth - 10));
   const posY = Math.max(10, Math.min(y, (window.innerHeight || 600) - menuHeight - 10));
 
@@ -126,8 +130,43 @@ export function TerminalContextMenu({
         >
           <span className="item-icon">🛡️</span>
           <span className="item-label">Save as Evidence...</span>
-          <span className="item-tag">PENTEST</span>
+          <span className="item-tag">PROOF</span>
         </button>
+
+        {onSaveToNotes && (
+          <button
+            type="button"
+            className="menu-item-btn"
+            role="menuitem"
+            onClick={() => {
+              onSaveToNotes();
+              onClose();
+            }}
+          >
+            <span className="item-icon">📝</span>
+            <span className="item-label">Save to Notes (Recon)...</span>
+            <span className="item-tag" style={{ color: '#a78bfa' }}>RECON</span>
+          </button>
+        )}
+
+        {onCreateFinding && (
+          <button
+            type="button"
+            className="menu-item-btn"
+            role="menuitem"
+            style={{ color: '#ff0055' }}
+            onClick={() => {
+              onCreateFinding();
+              onClose();
+            }}
+          >
+            <span className="item-icon">🎯</span>
+            <span className="item-label">Create Finding from Selection...</span>
+            <span className="item-tag" style={{ color: '#ff0055', borderColor: 'rgba(255, 0, 85, 0.4)' }}>
+              REPORT
+            </span>
+          </button>
+        )}
 
         {onRunInTerminal && (
           <button
@@ -160,3 +199,4 @@ export function TerminalContextMenu({
     </div>
   );
 }
+
