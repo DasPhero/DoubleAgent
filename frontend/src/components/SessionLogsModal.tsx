@@ -144,13 +144,13 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
         }
       }}
     >
-      <div className="cyber-dialog-card session-logs-modal-card" style={{ maxWidth: '880px', width: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="cyber-dialog-card session-logs-modal-card" style={{ maxWidth: '880px', width: '95vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         <div className="cyber-corner-reticle cyber-corner-tl" />
         <div className="cyber-corner-reticle cyber-corner-tr" />
         <div className="cyber-corner-reticle cyber-corner-bl" />
         <div className="cyber-corner-reticle cyber-corner-br" />
 
-        <div className="dialog-header">
+        <div className="dialog-header" style={{ flexShrink: 0 }}>
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>

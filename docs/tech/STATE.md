@@ -1,10 +1,37 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-01`, `F-14`, `F-23`, `F-15`, `F-21`, `F-17` — Host Password Retrieval & Persistence Bugfix, Serial/UART Layout Fix, and Universal Cyberpunk HUD Modal Overhaul — COMPLETED!
+- **Current Milestone:** `F-01`, `F-14`, `F-18`, `F-23`, `F-37` — Modal Corner Reticle Pinning Architecture, Settings Cyberpunk HUD Overhaul, Network Topology Proxy Jump Visualization, and Unified HUD Modals — COMPLETED!
 - **Next Milestone:** Wave 1 MVP+ — Save Selection Context Menu (`F-19`) & Snippet Chains (`F-16`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Modal Corner Reticle Pinning Architecture & Scrolling Fix**:
+  - Resolved the defect where modal corner reticles (`.cyber-corner-reticle`) detached and scrolled up across dialog content (e.g., hovering over "HOST COLOR TAG" in the Host Modal).
+  - Enforced a strict modal container architecture across all dialogs:
+    - Outer frame: `.cyber-dialog-card` with `overflow: hidden !important; display: flex !important; flex-direction: column !important; position: relative !important;` containing permanently pinned `.cyber-corner-tl`, `.cyber-corner-tr`, `.cyber-corner-bl`, `.cyber-corner-br`.
+    - Pinned header: `.dialog-header` with `flex-shrink: 0;` and hazard stripes `///`.
+    - Inner scrollable body: `.dialog-body` or `form.dialog-body` with `flex: 1; min-height: 0; overflow-y: auto;`.
+    - Pinned footer: `.dialog-footer` with `flex-shrink: 0;` so action buttons are always accessible.
+  - Applied across all modals: Host Create/Edit, Settings, Command Palette, Keychain, Serial UART, Host Notes, Session Logs, Snippets, Proxy Profiles, and OpenSSH Ingest.
+- **Settings View Cyberpunk HUD Overhaul (`F-18`, `F-29`)**:
+  - Complete redesign of `SettingsView.tsx` into the Cyberpunk HUD design language.
+  - Features pinned `.dialog-header` with `///` hazard stripes, neon cyan `#00f0ff` title, subtitle, and `.cyber-btn-close`.
+  - Pinned tab navigation with cyber clip-path, neon cyan active state, and hover glow.
+  - Scrollable `.dialog-body.settings-dialog-body` containing Appearance, Vault Security, Cloud Sync & Merge, and Ingest & Migration sections with HUD glow borders.
+  - Pinned `.dialog-footer` with `.cyber-btn .cyber-btn-primary` Close button.
+- **Network Topology Map Proxy Jump Connection (`F-37`, `F-14`)**:
+  - `App.tsx` now passes `vaultSummary.proxyProfiles` to `<NetworkMapView />` across both docked pane and full workspace tab modes.
+  - Extended `TopologyHostItem` with `proxyProfileId?: string`.
+  - Implemented `getEffectiveJumpHopsForHost` to resolve hops from both explicit `h.jumpChain` AND configured `proxyProfile.jumpHostIds` (as well as SOCKS5 addresses and custom proxy commands).
+  - Graph now renders:
+    - Multi-hop amber dashed animated jump edges (`client-node -> hop 1 -> hop 2 -> target`).
+    - Synthesized external bastion nodes (`proxy-node-${hop}`) at `x: 420` for external proxy jumps.
+    - Updated stats telemetry: `stats.jumpChains` counts hosts routed via proxy jumps.
+    - Inspector panel shows proxy profile details, type (`jump`, `socks5`, `command`), and resolved jump hops.
+    - Module-level stable fallback arrays (`EMPTY_PROXY_PROFILES`, `EMPTY_HOSTS`, etc.) eliminate React hook invalidation loops.
+- **Serial / UART Console Bug Fix & Overflow Elimination (`F-23`)**:
+  - Fixed HTML nesting defect where `<label>` wrapped the port row, hardware telemetry card, and auto-detect button, causing layout breakage and squashed controls.
+  - Restructured into a clean 2-column responsive grid (`form-grid-2col`) with `min-width: 0` for Baud Rate and Line Ending selectors.
 - **Host Password Retrieval, Persistence Bugfix & Reveal Toggle (`F-01`)**:
   - Implemented `GetHostPassword(hostID string) (string, error)` and `GetIdentityPassword(identityID string) (string, error)` in `app.go` to securely fetch decrypted passwords from the active vault.
   - Resolved the password overwrite bug where editing a host without typing a new password generated an arbitrary identity ID and overwrote the password with an empty string, breaking SSH connections.
@@ -13,9 +40,6 @@
 - **Proxy Authentication & Bastion Management (`F-14`)**:
   - Added direct 1-click shortcut button `🛡️ Manage Proxy Profiles (SOCKS5 Auth)` in the Host modal to open `ProxyProfilesView`.
   - Added contextual HUD telemetry tips explaining ProxyJump (`[user@]bastion[:port]`), authenticated SOCKS5 via saved Proxy Profiles, and ProxyCommand commands with inline auth.
-- **Serial / UART Console Bug Fix & Overflow Elimination (`F-23`)**:
-  - Fixed HTML nesting defect where `<label>` wrapped the port row, hardware telemetry card, and auto-detect button, causing layout breakage and squashed controls.
-  - Restructured into a clean 2-column responsive grid (`form-grid-2col`) with `min-width: 0` for Baud Rate and Line Ending selectors.
 - **Universal Cyberpunk HUD Style Across All Modals & Views**:
   - Upgraded all remaining views into the Cyberpunk HUD design system with clipped corners (`cyber-dialog-card`), corner reticles (`cyber-corner-reticle`), hazard stripes (`///`), cyan headings, and monospace telemetry subtitles:
     - **Host Create / Edit Modal** (`App.tsx`)

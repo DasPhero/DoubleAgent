@@ -65,6 +65,7 @@ export interface TopologyHostItem {
   tags?: string[];
   color?: string;
   jumpChain?: string[];
+  proxyProfileId?: string;
 }
 
 export interface TopologyGroupItem {

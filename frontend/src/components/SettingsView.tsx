@@ -308,39 +308,60 @@ export function SettingsView({
 
   return (
     <div
-      className={isModal ? 'modal-card settings-card' : 'settings-workspace-view'}
+      className={isModal ? 'cyber-dialog-card settings-dialog-card' : 'settings-workspace-view cyber-workspace-card'}
       style={
-        !isModal
+        isModal
           ? {
+              maxWidth: '860px',
+              width: '95vw',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative',
+              padding: 0,
+            }
+          : {
               display: 'flex',
               flexDirection: 'column',
               height: '100%',
-              maxWidth: '860px',
+              maxWidth: '920px',
               margin: '0 auto',
               width: '100%',
               padding: '1.5rem',
               boxSizing: 'border-box',
+              overflowY: 'auto',
             }
-          : undefined
       }
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid rgba(0, 240, 255, 0.25)' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="cyber-hazard-stripes">///</span>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+      {/* Reticles when in modal mode */}
+      {isModal && (
+        <>
+          <div className="cyber-corner-reticle cyber-corner-tl" />
+          <div className="cyber-corner-reticle cyber-corner-tr" />
+          <div className="cyber-corner-reticle cyber-corner-bl" />
+          <div className="cyber-corner-reticle cyber-corner-br" />
+        </>
+      )}
+
+      {/* Header */}
+      <div className="dialog-header" style={{ flexShrink: 0 }}>
+        <div className="dialog-title">
+          <span className="cyber-hazard-stripes">///</span>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
               ⚙️ Global Settings &amp; Preferences (F-18, F-29)
-            </h2>
+            </h3>
+            <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              SYSTEM CONFIGURATION // THEMES · VAULT SECURITY · CLOUD SYNC · MIGRATION
+            </div>
           </div>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.76rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>
-            SYSTEM CONFIGURATION // THEMES · VAULT SECURITY · CLOUD SYNC · MIGRATION
-          </p>
         </div>
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {isModal && onOpenAsTab && (
             <button
               type="button"
-              className="btn-secondary btn-sm"
+              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
               onClick={onOpenAsTab}
               title="Open Settings in a dedicated workspace tab"
             >
@@ -350,10 +371,9 @@ export function SettingsView({
           {isModal && onClose && (
             <button
               type="button"
-              className="tab-close-btn"
+              className="cyber-btn-close"
               onClick={onClose}
               aria-label="Close Settings"
-              style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}
             >
               ×
             </button>
@@ -362,7 +382,7 @@ export function SettingsView({
       </div>
 
       {/* Tabs navigation */}
-      <div className="settings-tab-nav" role="tablist" aria-label="Settings Subsections">
+      <div className="settings-tab-nav" role="tablist" aria-label="Settings Subsections" style={{ flexShrink: 0 }}>
         <button
           type="button"
           role="tab"
@@ -418,6 +438,9 @@ export function SettingsView({
           ℹ About DoubleAgent
         </button>
       </div>
+
+      {/* Body: Scrollable area */}
+      <div className="dialog-body settings-dialog-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem' }}>
 
       {/* Tab 1: Appearance & Terminal */}
       {activeTab === 'appearance' && (
@@ -605,7 +628,7 @@ export function SettingsView({
           <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '0.5rem' }}>
             <button
               type="button"
-              className="btn-secondary"
+              className="cyber-btn cyber-btn-secondary"
               onClick={onResetSettings}
               title="Restore default settings"
             >
@@ -672,7 +695,7 @@ export function SettingsView({
               {modalError && <div className="error-banner">{modalError}</div>}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.4rem' }}>
-                <button type="submit" className="btn-primary" disabled={vaultLocked}>
+                <button type="submit" className="cyber-btn cyber-btn-primary" disabled={vaultLocked}>
                   Save Master Password
                 </button>
               </div>
@@ -688,7 +711,7 @@ export function SettingsView({
               </span>
               <button
                 type="button"
-                className="btn-secondary"
+                className="cyber-btn cyber-btn-secondary"
                 disabled={helloPending || vaultLocked}
                 onClick={() => void onEnableQuickUnlock()}
               >
@@ -705,7 +728,7 @@ export function SettingsView({
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '0.3rem' }}>
               <button
                 type="button"
-                className="btn-danger"
+                className="cyber-btn cyber-btn-danger"
                 onClick={() => void onResetVault()}
                 title="Archives current vault and starts fresh"
               >
@@ -804,7 +827,7 @@ export function SettingsView({
               </div>
               <button
                 type="button"
-                className="btn-secondary btn-sm"
+                className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                 onClick={handleResetAllBindings}
                 title="Restore all keyboard shortcuts to factory defaults"
               >
@@ -932,7 +955,7 @@ export function SettingsView({
                           <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
                             <button
                               type="button"
-                              className="btn-primary btn-sm"
+                              className="cyber-btn cyber-btn-primary cyber-btn-sm"
                               disabled={!recordedCombo}
                               onClick={() => handleSaveRecordedKey(def.actionId)}
                               style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
@@ -941,7 +964,7 @@ export function SettingsView({
                             </button>
                             <button
                               type="button"
-                              className="btn-secondary btn-sm"
+                              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                               onClick={() => {
                                 setRecordingActionId(null);
                                 setRecordedCombo('');
@@ -956,7 +979,7 @@ export function SettingsView({
                           <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
                             <button
                               type="button"
-                              className="btn-secondary btn-sm"
+                              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                               onClick={() => {
                                 setRecordingActionId(def.actionId);
                                 setRecordedCombo('');
@@ -969,7 +992,7 @@ export function SettingsView({
                             {isOverridden && (
                               <button
                                 type="button"
-                                className="btn-secondary btn-sm"
+                                className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                                 onClick={() => handleResetSingleBinding(def.actionId)}
                                 title="Reset to default key"
                                 style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
@@ -999,7 +1022,7 @@ export function SettingsView({
               {!showAddShortcut && (
                 <button
                   type="button"
-                  className="btn-secondary btn-sm"
+                  className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                   onClick={() => {
                     setShowAddShortcut(true);
                     setNewShortcutKey('');
@@ -1123,7 +1146,7 @@ export function SettingsView({
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.3rem' }}>
                   <button
                     type="button"
-                    className="btn-secondary btn-sm"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                     onClick={() => {
                       setShowAddShortcut(false);
                       setNewShortcutKey('');
@@ -1135,7 +1158,7 @@ export function SettingsView({
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary btn-sm"
+                    className="cyber-btn cyber-btn-primary cyber-btn-sm"
                     disabled={!newShortcutKey.trim() || (customType === 'snippet' && !selectedSnippetId)}
                   >
                     Save Custom Shortcut
@@ -1238,7 +1261,7 @@ export function SettingsView({
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
               <button
                 type="button"
-                className="btn btn-sm btn-secondary"
+                className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                 onClick={() => void handleCheckSync()}
               >
                 🔄 Check for External Changes
@@ -1271,7 +1294,7 @@ export function SettingsView({
                     </div>
                     <button
                       type="button"
-                      className="btn btn-sm btn-primary"
+                      className="cyber-btn cyber-btn-primary cyber-btn-sm"
                       onClick={() => void handleMergeFile(f)}
                       disabled={isMerging}
                     >
@@ -1319,7 +1342,7 @@ export function SettingsView({
 
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="cyber-btn cyber-btn-primary"
                 disabled={isRelocating || !relocatePath.trim()}
               >
                 {isRelocating ? 'Relocating...' : 'Relocate Vault'}
@@ -1350,7 +1373,7 @@ export function SettingsView({
               />
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="cyber-btn cyber-btn-secondary"
                 disabled={isMerging || !manualMergePath.trim()}
                 onClick={() => void handleMergeFile(manualMergePath, manualMergePw)}
               >
@@ -1372,11 +1395,11 @@ export function SettingsView({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
               {/* Card 1: OpenSSH config */}
-              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div style={{ background: 'rgba(5, 10, 18, 0.75)', border: '1px solid rgba(0, 240, 255, 0.25)', borderRadius: '4px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '1.2rem' }}>⚙️</span>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-bright)' }}>OpenSSH Configuration</h4>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#00f0ff' }}>OpenSSH Configuration</h4>
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
                     Parse and import host declarations from <code>~/.ssh/config</code>. Supports HostName, User, Port, IdentityFile, and ProxyJump directives.
@@ -1384,7 +1407,7 @@ export function SettingsView({
                 </div>
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="cyber-btn cyber-btn-secondary"
                   style={{ alignSelf: 'flex-start', padding: '0.45rem 1rem', fontSize: '0.82rem' }}
                   onClick={() => onOpenSSHConfigImport?.()}
                 >
@@ -1393,11 +1416,11 @@ export function SettingsView({
               </div>
 
               {/* Card 2: PuTTY / Termius */}
-              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div style={{ background: 'rgba(5, 10, 18, 0.75)', border: '1px solid rgba(0, 240, 255, 0.25)', borderRadius: '4px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '1.2rem' }}>📥</span>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-bright)' }}>PuTTY &amp; Termius Sessions (F-30)</h4>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#00f0ff' }}>PuTTY &amp; Termius Sessions (F-30)</h4>
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
                     Scan Windows Registry or .reg exports for saved PuTTY sessions, or import JSON session backups exported from Termius.
@@ -1405,7 +1428,7 @@ export function SettingsView({
                 </div>
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="cyber-btn cyber-btn-secondary"
                   style={{ alignSelf: 'flex-start', padding: '0.45rem 1rem', fontSize: '0.82rem' }}
                   onClick={() => onOpenPuttyTermiusImport?.()}
                 >
@@ -1456,12 +1479,14 @@ export function SettingsView({
         </div>
       )}
 
-      {/* Modal Actions */}
+      </div>
+
+      {/* Pinned Footer (Modal only) */}
       {isModal && (
-        <div className="modal-actions" style={{ marginTop: '1rem' }}>
+        <div className="dialog-footer" style={{ flexShrink: 0 }}>
           <button
             type="button"
-            className="btn-secondary"
+            className="cyber-btn cyber-btn-primary"
             onClick={onClose}
           >
             Close

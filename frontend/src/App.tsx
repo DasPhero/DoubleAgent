@@ -5912,6 +5912,7 @@ export function App({
                 hosts={vaultSummary.hosts}
                 groups={vaultSummary.groups}
                 notes={notes}
+                proxyProfiles={vaultSummary.proxyProfiles}
                 activeSessionHostIds={getActiveSessionHostIds()}
                 activeTunnels={activeTunnels}
                 forwardRules={forwardRules}
@@ -9032,6 +9033,7 @@ export function App({
                         hosts={vaultSummary.hosts}
                         groups={vaultSummary.groups}
                         notes={notes}
+                        proxyProfiles={vaultSummary.proxyProfiles}
                         activeSessionHostIds={getActiveSessionHostIds()}
                         activeTunnels={activeTunnels}
                         forwardRules={forwardRules}
@@ -9201,7 +9203,7 @@ export function App({
             }
           }}
         >
-          <div className="cyber-dialog-card palette-card" style={{ maxWidth: '680px', width: '94vw', maxHeight: '88vh', overflowY: 'auto' }}>
+          <div className="cyber-dialog-card palette-card" style={{ maxWidth: '680px', width: '94vw', maxHeight: '88vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
             {/* Reticles */}
             <div className="cyber-corner-reticle cyber-corner-tl" />
             <div className="cyber-corner-reticle cyber-corner-tr" />
@@ -9209,7 +9211,7 @@ export function App({
             <div className="cyber-corner-reticle cyber-corner-br" />
 
             {/* Header */}
-            <div className="dialog-header">
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
@@ -9230,7 +9232,7 @@ export function App({
                 ×
               </button>
             </div>
-            <div className="dialog-body" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="dialog-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <p>
               Fuzzy search saved hosts by <strong>Name</strong>, <strong>Address</strong>, or{' '}
               <strong>Tags</strong>, or type <code>user@host:port</code> to connect directly.
@@ -9552,10 +9554,9 @@ export function App({
             }
           }}
         >
-          <form
+          <div
             className="cyber-dialog-card host-modal-card"
-            onSubmit={(e) => void handleSaveHost(e)}
-            style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflowY: 'auto' }}
+            style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}
           >
             {/* Reticles */}
             <div className="cyber-corner-reticle cyber-corner-tl" />
@@ -9564,7 +9565,7 @@ export function App({
             <div className="cyber-corner-reticle cyber-corner-br" />
 
             {/* Header */}
-            <div className="dialog-header">
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
@@ -9591,7 +9592,12 @@ export function App({
               </button>
             </div>
 
-            <div className="dialog-body" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <form
+              id="host-modal-form"
+              onSubmit={(e) => void handleSaveHost(e)}
+              className="dialog-body"
+              style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}
+            >
               <div>
                 <label className="cyber-label">Host Label</label>
                 <input
@@ -9835,26 +9841,26 @@ export function App({
                 />
                 Enable Session Logging for this Host
               </label>
+            </form>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="cyber-btn cyber-btn-secondary"
-                  onClick={() => {
-                    setShowAddHostModal(false);
-                    setEditingHostId(null);
-                    setEditingIdentityId('');
-                    setShowHostPass(false);
-                  }}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="cyber-btn cyber-btn-primary">
-                  {editingHostId ? 'Update Host' : 'Save Host'}
-                </button>
-              </div>
+            <div className="dialog-footer">
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-secondary"
+                onClick={() => {
+                  setShowAddHostModal(false);
+                  setEditingHostId(null);
+                  setEditingIdentityId('');
+                  setShowHostPass(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button type="submit" form="host-modal-form" className="cyber-btn cyber-btn-primary">
+                {editingHostId ? 'Update Host' : 'Save Host'}
+              </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
 
@@ -9869,7 +9875,7 @@ export function App({
             }
           }}
         >
-          <div className="cyber-dialog-card keychain-modal-card" style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="cyber-dialog-card keychain-modal-card" style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
             {/* Reticles */}
             <div className="cyber-corner-reticle cyber-corner-tl" />
             <div className="cyber-corner-reticle cyber-corner-tr" />
@@ -9877,7 +9883,7 @@ export function App({
             <div className="cyber-corner-reticle cyber-corner-br" />
 
             {/* Header */}
-            <div className="dialog-header">
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
@@ -9899,7 +9905,7 @@ export function App({
               </button>
             </div>
 
-            <div className="dialog-body" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div className="dialog-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <form onSubmit={(e) => void handleGenerateKey(e)} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 <div>
                   <label className="cyber-label">Key Label</label>
@@ -10012,7 +10018,7 @@ export function App({
 
       {showSSHConfigModal && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="Import SSH Config"
           onClick={(e) => {
@@ -10021,55 +10027,103 @@ export function App({
             }
           }}
         >
-          <form className="modal-card palette-card" onSubmit={(e) => void handleImportSSHConfig(e)}>
-            <h2>Import OpenSSH Config</h2>
-            <p>
-              Paste your <code>~/.ssh/config</code> below. Imports <strong>Host</strong>,{' '}
-              <strong>HostName</strong>, <strong>User</strong>, <strong>Port</strong>,{' '}
-              <strong>IdentityFile</strong>, and <strong>ProxyJump</strong>, and reports unsupported
-              directives.
-            </p>
-            <textarea
-              aria-label="SSH Config Content"
-              placeholder="Host bastion&#10;  HostName 203.0.113.10&#10;  User ops&#10;  Port 2222"
-              value={sshConfigText}
-              onChange={(e) => setSshConfigText(e.target.value)}
-              required
-            />
-            {sshConfigResult && (
-              <div className="info-banner" aria-label="SSH Config Import Summary">
-                <p>
-                  Imported <strong>{sshConfigResult.entries.length}</strong> host(s).
-                </p>
-                {sshConfigResult.warnings.length > 0 && (
-                  <ul aria-label="SSH Config Warnings">
-                    {sshConfigResult.warnings.map((w, idx) => (
-                      <li key={idx}>{w}</li>
-                    ))}
-                  </ul>
-                )}
+          <div
+            className="cyber-dialog-card"
+            style={{
+              maxWidth: '680px',
+              width: '94vw',
+              maxHeight: '88vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              padding: 0,
+            }}
+          >
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
+
+            {/* Header */}
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    ⚙️ Import OpenSSH Config
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    SSH-INGEST // ~/.ssh/config PARSER (HostName, User, Port, IdentityFile, ProxyJump)
+                  </div>
+                </div>
               </div>
-            )}
-            {modalError && <div className="error-banner">{modalError}</div>}
-            <div className="modal-actions">
               <button
                 type="button"
-                className="btn-secondary"
+                className="cyber-btn-close"
                 onClick={() => setShowSSHConfigModal(false)}
+                aria-label="Close dialog"
               >
-                Close
-              </button>
-              <button type="submit" className="btn-primary">
-                Parse &amp; Import Config
+                ×
               </button>
             </div>
-          </form>
+
+            <form
+              className="dialog-body"
+              onSubmit={(e) => void handleImportSSHConfig(e)}
+              style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+            >
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                Paste your <code>~/.ssh/config</code> below. Imports <strong>Host</strong>,{' '}
+                <strong>HostName</strong>, <strong>User</strong>, <strong>Port</strong>,{' '}
+                <strong>IdentityFile</strong>, and <strong>ProxyJump</strong>, and reports unsupported
+                directives.
+              </p>
+              <textarea
+                aria-label="SSH Config Content"
+                className="cyber-hud-input font-mono"
+                style={{ minHeight: '140px', resize: 'vertical' }}
+                placeholder="Host bastion&#10;  HostName 203.0.113.10&#10;  User ops&#10;  Port 2222"
+                value={sshConfigText}
+                onChange={(e) => setSshConfigText(e.target.value)}
+                required
+              />
+              {sshConfigResult && (
+                <div className="info-banner" aria-label="SSH Config Import Summary" style={{ background: 'rgba(0, 240, 255, 0.08)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.65rem 0.85rem' }}>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#38bdf8' }}>
+                    Imported <strong>{sshConfigResult.entries.length}</strong> host(s).
+                  </p>
+                  {sshConfigResult.warnings.length > 0 && (
+                    <ul aria-label="SSH Config Warnings" style={{ margin: '0.4rem 0 0 1rem', padding: 0, fontSize: '0.75rem', color: '#f59e0b' }}>
+                      {sshConfigResult.warnings.map((w, idx) => (
+                        <li key={idx}>{w}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {modalError && <div className="error-banner">{modalError}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  onClick={() => setShowSSHConfigModal(false)}
+                >
+                  Close
+                </button>
+                <button type="submit" className="cyber-btn cyber-btn-primary">
+                  Parse &amp; Import Config
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {showVaultModal && !vaultInitialized && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="Initialize Vault"
           onClick={(e) => {
@@ -10078,71 +10132,121 @@ export function App({
             }
           }}
         >
-          <div className="modal-card">
-            <div className="modal-brand-hero">
-              <img src={brandLogoText} alt="DoubleAgent" className="modal-vault-brand-img" />
-            </div>
-            <h2>Initialize Encrypted Vault</h2>
-            <p>
-              Choose how you want to protect your local SSH vault (you can change this anytime in{' '}
-              <strong>Vault Security</strong>):
-            </p>
-            <input
-              aria-label="Master Password"
-              type="password"
-              placeholder="New Master Password"
-              value={masterPassword}
-              onChange={(e) => setMasterPassword(e.target.value)}
-              disabled={helloPending}
-              autoFocus
-            />
-            <input
-              aria-label="Confirm Master Password"
-              type="password"
-              placeholder="Confirm Master Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={helloPending}
-            />
-            {helloPending && (
-              <div className="info-banner">
-                Waiting for Windows Hello / Security Key confirmation window...
+          <div
+            className="cyber-dialog-card"
+            style={{
+              maxWidth: '560px',
+              width: '94vw',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              padding: 0,
+            }}
+          >
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
+
+            {/* Header */}
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    🔒 Initialize Encrypted Vault
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    VAULT-INIT // ARGON2ID + XCHACHA20-POLY1305 KEY DERIVATION
+                  </div>
+                </div>
               </div>
-            )}
-            {modalError && <div className="error-banner">{modalError}</div>}
-            <div className="modal-actions">
               <button
                 type="button"
-                className="btn-secondary"
-                disabled={helloPending}
+                className="cyber-btn-close"
                 onClick={() => setShowVaultModal(false)}
+                aria-label="Close dialog"
               >
-                Cancel
+                ×
               </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={helloPending}
-                onClick={() => void handleInitializeVault(true)}
-              >
-                Skip Password for Now
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={helloPending}
-                onClick={() => void handleInitializeWithHello()}
-              >
-                {helloPending ? 'Verifying Hello...' : 'Use Windows Hello / Key'}
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={helloPending}
-                onClick={() => void handleInitializeVault(false)}
-              >
-                Create Vault
-              </button>
+            </div>
+
+            <div className="dialog-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="modal-brand-hero" style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+                <img src={brandLogoText} alt="DoubleAgent" className="modal-vault-brand-img" style={{ maxHeight: '42px' }} />
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                Choose how you want to protect your local SSH vault (you can change this anytime in{' '}
+                <strong style={{ color: '#00f0ff' }}>Vault Security</strong>):
+              </p>
+              <div>
+                <label className="cyber-label">Master Password</label>
+                <input
+                  aria-label="Master Password"
+                  className="cyber-hud-input"
+                  type="password"
+                  placeholder="New Master Password"
+                  value={masterPassword}
+                  onChange={(e) => setMasterPassword(e.target.value)}
+                  disabled={helloPending}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="cyber-label">Confirm Master Password</label>
+                <input
+                  aria-label="Confirm Master Password"
+                  className="cyber-hud-input"
+                  type="password"
+                  placeholder="Confirm Master Password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={helloPending}
+                />
+              </div>
+              {helloPending && (
+                <div className="info-banner" style={{ background: 'rgba(0, 240, 255, 0.08)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.65rem 0.85rem', color: '#38bdf8' }}>
+                  Waiting for Windows Hello / Security Key confirmation window...
+                </div>
+              )}
+              {modalError && <div className="error-banner">{modalError}</div>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  disabled={helloPending}
+                  onClick={() => setShowVaultModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  disabled={helloPending}
+                  onClick={() => void handleInitializeVault(true)}
+                >
+                  Skip Password for Now
+                </button>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  disabled={helloPending}
+                  onClick={() => void handleInitializeWithHello()}
+                >
+                  {helloPending ? 'Verifying Hello...' : 'Use Windows Hello / Key'}
+                </button>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-primary"
+                  disabled={helloPending}
+                  onClick={() => void handleInitializeVault(false)}
+                >
+                  Create Vault
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -10150,7 +10254,7 @@ export function App({
 
       {showVaultModal && vaultInitialized && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="Unlock Vault"
           onClick={(e) => {
@@ -10160,73 +10264,127 @@ export function App({
             }
           }}
         >
-          <form className="modal-card" onSubmit={(e) => void handleVaultUnlock(e)}>
-            <div className="modal-brand-hero">
-              <img src={appLogo} alt="DoubleAgent" className="modal-vault-icon-img" />
-            </div>
-            <h2>Unlock Encrypted Vault</h2>
-            <p>
-              Unlock with <strong>Windows Hello / Security Key</strong> (PIN, Fingerprint, YubiKey) or{' '}
-              {passwordless ? 'click Unlock below:' : 'enter your Master Password below:'}
-            </p>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={helloPending}
-              onClick={() => void handleQuickUnlockHello()}
-            >
-              {helloPending
-                ? 'Waiting for Windows Hello / Security Key...'
-                : 'Unlock with Windows Hello / Security Key'}
-            </button>
-            {!passwordless && (
-              <input
-                aria-label="Master Password"
-                type="password"
-                placeholder="Or enter Master Password"
-                value={masterPassword}
-                onChange={(e) => setMasterPassword(e.target.value)}
-                disabled={helloPending}
-              />
-            )}
-            {helloPending && (
-              <div className="info-banner">
-                Please complete the Windows Security prompt (check your taskbar if not focused).
+          <div
+            className="cyber-dialog-card"
+            style={{
+              maxWidth: '520px',
+              width: '94vw',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              padding: 0,
+            }}
+          >
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
+
+            {/* Header */}
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    🔓 Unlock Encrypted Vault
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    VAULT-ACCESS // ENTER MASTER PASSWORD OR USE HARDWARE KEY
+                  </div>
+                </div>
               </div>
-            )}
-            {modalError && <div className="error-banner">{modalError}</div>}
-            <div className="modal-actions">
               <button
                 type="button"
-                className="btn-danger"
-                disabled={helloPending}
-                onClick={() => void handleResetVault()}
-                title="Archives the current vault and starts fresh if you forgot the password"
-              >
-                Reset Vault
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={helloPending}
+                className="cyber-btn-close"
                 onClick={() => {
                   setShowVaultModal(false);
                   setMasterPassword('');
                 }}
+                aria-label="Close dialog"
               >
-                Cancel
-              </button>
-              <button type="submit" className="btn-secondary" disabled={helloPending}>
-                {passwordless ? 'Unlock (No Password)' : 'Unlock with Password'}
+                ×
               </button>
             </div>
-          </form>
+
+            <form
+              className="dialog-body"
+              onSubmit={(e) => void handleVaultUnlock(e)}
+              style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}
+            >
+              <div className="modal-brand-hero" style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
+                <img src={appLogo} alt="DoubleAgent" className="modal-vault-icon-img" style={{ maxHeight: '48px' }} />
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                Unlock with <strong>Windows Hello / Security Key</strong> (PIN, Fingerprint, YubiKey) or{' '}
+                {passwordless ? 'click Unlock below:' : 'enter your Master Password below:'}
+              </p>
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-primary"
+                disabled={helloPending}
+                onClick={() => void handleQuickUnlockHello()}
+                style={{ width: '100%', padding: '0.55rem' }}
+              >
+                {helloPending
+                  ? 'Waiting for Windows Hello / Security Key...'
+                  : '🔑 Unlock with Windows Hello / Security Key'}
+              </button>
+              {!passwordless && (
+                <div>
+                  <label className="cyber-label">Master Password</label>
+                  <input
+                    aria-label="Master Password"
+                    className="cyber-hud-input"
+                    type="password"
+                    placeholder="Or enter Master Password"
+                    value={masterPassword}
+                    onChange={(e) => setMasterPassword(e.target.value)}
+                    disabled={helloPending}
+                  />
+                </div>
+              )}
+              {helloPending && (
+                <div className="info-banner" style={{ background: 'rgba(0, 240, 255, 0.08)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.65rem 0.85rem', color: '#38bdf8' }}>
+                  Please complete the Windows Security prompt (check your taskbar if not focused).
+                </div>
+              )}
+              {modalError && <div className="error-banner">{modalError}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-danger"
+                  disabled={helloPending}
+                  onClick={() => void handleResetVault()}
+                  title="Archives the current vault and starts fresh if you forgot the password"
+                >
+                  Reset Vault
+                </button>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  disabled={helloPending}
+                  onClick={() => {
+                    setShowVaultModal(false);
+                    setMasterPassword('');
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="cyber-btn cyber-btn-secondary" disabled={helloPending}>
+                  {passwordless ? 'Unlock (No Password)' : 'Unlock with Password'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {showSettingsModal && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="Vault Security Settings"
           onClick={(e) => {
@@ -10235,69 +10393,125 @@ export function App({
             }
           }}
         >
-          <form className="modal-card" onSubmit={(e) => void handleChangePassword(e)}>
-            <h2>Vault Security &amp; Windows Hello</h2>
-            <p>
-              {passwordless
-                ? 'Your vault currently has no Master Password. Set one below to protect it.'
-                : 'Change your Master Password (leave New Password empty to switch to passwordless mode).'}
-            </p>
-            {!passwordless && (
-              <input
-                aria-label="Current Master Password"
-                type="password"
-                placeholder="Current Master Password (optional if unlocked via Hello)"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-              />
-            )}
-            <input
-              aria-label="New Master Password"
-              type="password"
-              placeholder="New Master Password (or leave empty for passwordless)"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-            <div className="quick-unlock-box">
-              <span>
-                Windows Hello / DPAPI Key:{' '}
-                <strong>{quickUnlockReady ? 'Active & Saved' : 'Not Armed'}</strong>
-              </span>
+          <div
+            className="cyber-dialog-card"
+            style={{
+              maxWidth: '540px',
+              width: '94vw',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              padding: 0,
+            }}
+          >
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
+
+            {/* Header */}
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    🛡️ Vault Security &amp; Windows Hello
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    VAULT-KEY // MASTER PASSWORD ROTATION &amp; HARDWARE CREDENTIALS
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
-                className="btn-secondary"
-                onClick={() => void handleEnableQuickUnlock()}
-              >
-                Sync Windows Hello / Key
-              </button>
-            </div>
-            {modalError && <div className="error-banner">{modalError}</div>}
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={() => void handleResetVault()}
-              >
-                Reset Vault
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
+                className="cyber-btn-close"
                 onClick={() => setShowSettingsModal(false)}
+                aria-label="Close dialog"
               >
-                Close
-              </button>
-              <button type="submit" className="btn-primary">
-                Save Password
+                ×
               </button>
             </div>
-          </form>
+
+            <form
+              className="dialog-body"
+              onSubmit={(e) => void handleChangePassword(e)}
+              style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+            >
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                {passwordless
+                  ? 'Your vault currently has no Master Password. Set one below to protect it.'
+                  : 'Change your Master Password (leave New Password empty to switch to passwordless mode).'}
+              </p>
+              {!passwordless && (
+                <div>
+                  <label className="cyber-label">Current Master Password</label>
+                  <input
+                    aria-label="Current Master Password"
+                    className="cyber-hud-input"
+                    type="password"
+                    placeholder="Current Master Password (optional if unlocked via Hello)"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="cyber-label">New Master Password</label>
+                <input
+                  aria-label="New Master Password"
+                  className="cyber-hud-input"
+                  type="password"
+                  placeholder="New Master Password (or leave empty for passwordless)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="quick-unlock-box" style={{ background: 'rgba(0, 240, 255, 0.05)', border: '1px solid rgba(0, 240, 255, 0.25)', padding: '0.65rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                  Windows Hello / DPAPI Key:{' '}
+                  <strong style={{ color: quickUnlockReady ? '#10b981' : '#f59e0b' }}>
+                    {quickUnlockReady ? 'Active & Saved' : 'Not Armed'}
+                  </strong>
+                </span>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                  onClick={() => void handleEnableQuickUnlock()}
+                >
+                  Sync Windows Hello / Key
+                </button>
+              </div>
+              {modalError && <div className="error-banner">{modalError}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-danger"
+                  onClick={() => void handleResetVault()}
+                >
+                  Reset Vault
+                </button>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  onClick={() => setShowSettingsModal(false)}
+                >
+                  Close
+                </button>
+                <button type="submit" className="cyber-btn cyber-btn-primary">
+                  Save Password
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {showGlobalSettingsModal && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="Global Settings"
           onClick={(e) => {
@@ -10360,7 +10574,7 @@ export function App({
         >
           <div
             className="cyber-dialog-card serial-modal-card"
-            style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflowY: 'auto' }}
+            style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}
           >
             {/* Reticles */}
             <div className="cyber-corner-reticle cyber-corner-tl" />
@@ -10369,7 +10583,7 @@ export function App({
             <div className="cyber-corner-reticle cyber-corner-br" />
 
             {/* Header */}
-            <div className="dialog-header">
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
@@ -10391,7 +10605,7 @@ export function App({
                 ×
               </button>
             </div>
-            <form className="dialog-body" onSubmit={(e) => void handleConnectSerial(e)} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <form className="dialog-body" onSubmit={(e) => void handleConnectSerial(e)} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {modalError && <p className="status-banner error">{modalError}</p>}
 
               <div>
@@ -10873,7 +11087,7 @@ export function App({
 
       {showNotesModal && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="Host Notes & Documentation"
           onClick={(e) => {
@@ -10882,7 +11096,24 @@ export function App({
             }
           }}
         >
-          <div className="modal-card notes-modal-card">
+          <div
+            className="cyber-dialog-card notes-modal-card"
+            style={{
+              maxWidth: '1040px',
+              width: '96vw',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative',
+              padding: 0,
+            }}
+          >
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
             <NotesView
               notes={notes}
               hosts={vaultSummary.hosts.map((h) => ({

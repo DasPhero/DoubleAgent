@@ -1535,9 +1535,11 @@ body,
 
 /* Global Settings Modal & Workspace View */
 .settings-card {
-  max-width: 660px;
-  max-height: 85vh;
-  overflow-y: auto;
+  max-width: 860px;
+  max-height: 90vh;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .settings-workspace-view {
@@ -1550,119 +1552,145 @@ body,
 
 .settings-tab-nav {
   display: flex;
-  gap: 0.5rem;
-  border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 0.5rem;
-  margin-bottom: 0.8rem;
+  gap: 0.35rem;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+  padding: 0.65rem 1.25rem;
+  background: rgba(8, 14, 26, 0.85);
+  overflow-x: auto;
 }
 
 .settings-tab-btn {
-  padding: 0.4rem 0.8rem;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  font-weight: 500;
+  padding: 0.45rem 0.85rem;
+  background: rgba(5, 10, 18, 0.75);
+  border: 1px solid rgba(0, 240, 255, 0.18);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .settings-tab-btn:hover {
-  color: var(--text-main);
-  background: rgba(255, 255, 255, 0.05);
+  color: #00f0ff;
+  border-color: rgba(0, 240, 255, 0.5);
+  background: rgba(0, 240, 255, 0.08);
 }
 
 .settings-tab-btn.active {
-  color: var(--accent-bright);
-  background: var(--accent-glow);
-  border-color: var(--accent-bright);
-  font-weight: 600;
+  color: #00f0ff;
+  background: rgba(0, 240, 255, 0.16);
+  border-color: #00f0ff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
 }
 
 .settings-grid {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 0.85rem;
   margin-top: 0.4rem;
 }
 
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding-bottom: 0.9rem;
-  border-bottom: 1px solid var(--border-subtle);
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: rgba(9, 15, 27, 0.65);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-left: 3px solid #00f0ff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  margin-bottom: 0.85rem;
 }
 
 .settings-section:last-of-type {
-  border-bottom: none;
-  padding-bottom: 0;
+  margin-bottom: 0;
 }
 
 .settings-section h3 {
   font-size: 0.88rem;
-  color: var(--accent-bright);
-  font-weight: 600;
+  color: #00f0ff;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
+  margin: 0 0 0.25rem 0;
 }
 
 .settings-field-row {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: 160px 1fr;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 .settings-field-row label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-weight: 500;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
-.settings-field-row input,
+.settings-field-row input[type="text"],
+.settings-field-row input[type="password"],
+.settings-field-row input[type="number"],
 .settings-field-row select {
-  background-color: rgba(9, 13, 20, 0.82);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 0.38rem 0.65rem;
-  color: var(--text-main);
+  background-color: #050a14 !important;
+  border: 1px solid rgba(0, 240, 255, 0.35) !important;
+  color: #e2e8f0 !important;
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.82rem;
+  padding: 0.42rem 0.75rem;
+  outline: none;
+  transition: all 0.15s ease;
   width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-field-row input:focus,
+.settings-field-row select:focus {
+  border-color: #00f0ff !important;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35) !important;
 }
 
 .theme-options-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
 
 .theme-card-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.65rem;
-  border-radius: 6px;
-  border: 1px solid var(--border-subtle);
-  background-color: rgba(9, 13, 20, 0.7);
-  color: var(--text-main);
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  background-color: rgba(6, 12, 22, 0.85);
+  color: #cbd5e1;
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .theme-card-btn:hover {
-  border-color: var(--accent-bright);
+  border-color: #00f0ff;
+  background-color: rgba(0, 240, 255, 0.08);
+  color: #00f0ff;
 }
 
 .theme-card-btn.active {
-  border-color: var(--accent-bright);
-  background-color: var(--accent-glow);
-  color: #f8fafc;
-  box-shadow: 0 0 8px var(--accent-glow);
+  border-color: #00f0ff;
+  background-color: rgba(0, 240, 255, 0.18);
+  color: #00f0ff;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
 }
 
 .theme-swatch {
@@ -3939,17 +3967,35 @@ body,
 }
 
 .cyber-dialog-card {
-  position: relative;
+  position: relative !important;
   width: 650px;
   max-width: 95vw;
   background: #070d18 !important;
   border: 1px solid rgba(0, 240, 255, 0.45);
   box-shadow: 0 0 45px rgba(0, 240, 255, 0.25), 0 20px 60px rgba(0, 0, 0, 0.95);
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
   z-index: 25001;
+}
+
+.cyber-dialog-card > .dialog-body,
+.cyber-dialog-card > form.dialog-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.cyber-dialog-card > .dialog-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid rgba(0, 240, 255, 0.2);
+  background: rgba(5, 10, 18, 0.95);
 }
 
 .dialog-header {
@@ -4674,12 +4720,13 @@ body,
 
 .notes-filter-select {
   width: 100%;
-  background: var(--bg-input, #161b22);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-  border-radius: 4px;
+  background: rgba(5, 12, 22, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #00f0ff;
+  border-radius: 2px;
   padding: 0.35rem 0.5rem;
   font-size: 0.8rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 .notes-search-box {
@@ -4689,12 +4736,20 @@ body,
 
 .notes-search-input {
   width: 100%;
-  background: var(--bg-input, #161b22);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-  border-radius: 4px;
+  background: rgba(5, 12, 22, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #f1f5f9;
+  border-radius: 2px;
   padding: 0.35rem 1.6rem 0.35rem 0.5rem;
   font-size: 0.78rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  box-sizing: border-box;
+}
+
+.notes-search-input:focus {
+  outline: none;
+  border-color: #00f0ff;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.35);
 }
 
 .notes-search-clear {
@@ -4713,25 +4768,28 @@ body,
   display: flex;
   gap: 0.4rem;
   padding: 0 0.75rem 0.5rem;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
 }
 
 .notes-tool-btn {
   flex: 1;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  color: var(--text-muted);
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 2px;
+  color: #38bdf8;
   font-size: 0.74rem;
   padding: 0.3rem 0.4rem;
   cursor: pointer;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  letter-spacing: 0.03em;
   transition: all 0.15s ease;
 }
 
 .notes-tool-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--accent);
-  color: var(--text-main);
+  background: rgba(0, 240, 255, 0.2);
+  border-color: #00f0ff;
+  color: #00f0ff;
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.25);
 }
 
 .notes-tree-list {
@@ -4835,8 +4893,10 @@ body,
 }
 
 .note-title-input:focus {
-  border-color: var(--border-subtle);
-  background: var(--bg-input, #161b22);
+  border-color: #00f0ff;
+  background: rgba(5, 12, 22, 0.95);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.35);
+  outline: none;
 }
 
 .note-actions-bar {
@@ -4846,48 +4906,58 @@ body,
 }
 
 .note-host-select {
-  background: var(--bg-input, #161b22);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  border-radius: 4px;
+  background: rgba(5, 12, 22, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #38bdf8;
+  border-radius: 2px;
   padding: 0.25rem 0.45rem;
   font-size: 0.76rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 .note-view-tabs {
   display: flex;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 4px;
+  background: rgba(5, 12, 22, 0.95);
+  border-radius: 2px;
   padding: 2px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid rgba(0, 240, 255, 0.3);
 }
 
 .note-tab-btn {
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: #94a3b8;
   padding: 0.2rem 0.55rem;
   font-size: 0.72rem;
-  border-radius: 3px;
+  border-radius: 2px;
   cursor: pointer;
+  font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 .note-tab-btn.active {
-  background: var(--accent);
-  color: #0b131a;
-  font-weight: 600;
+  background: #00f0ff;
+  color: #050c16;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
 }
 
 .note-save-btn {
-  background: var(--accent);
-  color: #0b131a;
+  background: #00f0ff;
+  color: #050c16;
   border: none;
-  border-radius: 4px;
+  border-radius: 2px;
   padding: 0.3rem 0.75rem;
   font-size: 0.76rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+  transition: all 0.15s ease;
+}
+
+.note-save-btn:hover {
+  background: #38bdf8;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
 }
 
 .note-save-btn:disabled {
@@ -4897,16 +4967,20 @@ body,
 
 .note-delete-btn {
   background: transparent;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #ef4444;
-  border-radius: 4px;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  color: #f43f5e;
+  border-radius: 2px;
   padding: 0.25rem 0.5rem;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  transition: all 0.15s ease;
 }
 
 .note-delete-btn:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(244, 63, 94, 0.2);
+  border-color: #f43f5e;
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.35);
 }
 
 .note-save-status {

@@ -178,7 +178,16 @@ export function SnippetsManagerModal({
         className={`${isDocked ? 'is-docked-widget modal-card' : 'cyber-dialog-card'} snippets-manager-card`}
         role={isDocked ? 'region' : undefined}
         aria-label={isDocked ? 'Docked Command Snippets' : undefined}
-        style={{ maxWidth: isDocked ? undefined : '780px', width: isDocked ? undefined : '94vw', maxHeight: isDocked ? undefined : '88vh', overflowY: 'auto' }}
+        style={{
+          maxWidth: isDocked ? undefined : '780px',
+          width: isDocked ? undefined : '94vw',
+          maxHeight: isDocked ? undefined : '88vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          position: 'relative',
+          padding: 0,
+        }}
       >
         {!isDocked && (
           <>
@@ -186,7 +195,7 @@ export function SnippetsManagerModal({
             <div className="cyber-corner-reticle cyber-corner-tr" />
             <div className="cyber-corner-reticle cyber-corner-bl" />
             <div className="cyber-corner-reticle cyber-corner-br" />
-            <div className="dialog-header" style={{ margin: '-1rem -1rem 1rem -1rem' }}>
+            <div className="dialog-header" style={{ flexShrink: 0 }}>
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
@@ -224,6 +233,7 @@ export function SnippetsManagerModal({
           </>
         )}
 
+        <div className="dialog-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: isDocked ? '0.75rem' : '1.25rem' }}>
         {error && <div className="error-banner">{error}</div>}
 
         {/* Main Content Area */}
@@ -463,6 +473,7 @@ export function SnippetsManagerModal({
             </div>
           </form>
         )}
+        </div>
       </div>
   );
 

@@ -25,6 +25,7 @@ import {
   TopologyHostItem,
   TopologyGroupItem,
 } from '../types/networkMap';
+import type { ProxyProfileSummary } from '../types/proxy';
 
 function isTunnelMatchingHost(
   tun: ForwardTunnelStatus,
@@ -328,6 +329,7 @@ export interface NetworkMapViewProps {
   hosts: TopologyHostItem[];
   groups: TopologyGroupItem[];
   notes?: NotePage[];
+  proxyProfiles?: ProxyProfileSummary[];
   activeSessionHostIds?: string[];
   activeTunnels?: ForwardTunnelStatus[];
   forwardRules?: ForwardRule[];
@@ -342,13 +344,45 @@ export interface NetworkMapViewProps {
   isDocked?: boolean;
 }
 
+// Module-level stable fallback arrays to prevent React dependency invalidation loops
+const EMPTY_NOTES: NotePage[] = [];
+const EMPTY_PROXY_PROFILES: ProxyProfileSummary[] = [];
+const EMPTY_STRINGS: string[] = [];
+const EMPTY_TUNNELS: ForwardTunnelStatus[] = [];
+const EMPTY_RULES: ForwardRule[] = [];
+
+export function getEffectiveJumpHopsForHost(
+  h: TopologyHostItem,
+  proxyProfiles?: ProxyProfileSummary[]
+): string[] {
+  if (h.jumpChain && h.jumpChain.length > 0) {
+    return h.jumpChain;
+  }
+  if (h.proxyProfileId && proxyProfiles) {
+    const profile = proxyProfiles.find((p) => p.id === h.proxyProfileId);
+    if (profile) {
+      if (profile.type === 'jump' && profile.jumpHostIds && profile.jumpHostIds.length > 0) {
+        return profile.jumpHostIds;
+      }
+      if (profile.type === 'socks5' && profile.socksAddress) {
+        return [`SOCKS5: ${profile.socksAddress}`];
+      }
+      if (profile.type === 'command' && profile.command) {
+        return [`ProxyCmd: ${profile.command}`];
+      }
+    }
+  }
+  return EMPTY_STRINGS;
+}
+
 export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
   hosts,
   groups,
-  notes = [],
-  activeSessionHostIds = [],
-  activeTunnels = [],
-  forwardRules = [],
+  notes = EMPTY_NOTES,
+  proxyProfiles = EMPTY_PROXY_PROFILES,
+  activeSessionHostIds = EMPTY_STRINGS,
+  activeTunnels = EMPTY_TUNNELS,
+  forwardRules = EMPTY_RULES,
   onConnectHost,
   onSplitConnectHost,
   onOpenSftp,
@@ -381,14 +415,22 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
       const isTunnelActive = activeTunnels.some((t) =>
         isTunnelMatchingHost(t, h.id, h.address, forwardRules)
       );
-      const hasJumpChain = Boolean(h.jumpChain && h.jumpChain.length > 0);
+      const effectiveHops = getEffectiveJumpHopsForHost(h, proxyProfiles);
+      const hasJumpChain = effectiveHops.length > 0;
 
       if (filterMode === 'active') return isSessionActive;
       if (filterMode === 'tunnels') return isTunnelActive;
-      if (filterMode === 'jumps') return hasJumpChain;
+      if (filterMode === 'jumps') {
+        if (hasJumpChain) return true;
+        // Also include any bastion host that is used as a jump hop by another host
+        return hosts.some((other) => {
+          const otherHops = getEffectiveJumpHopsForHost(other, proxyProfiles);
+          return otherHops.includes(h.id) || otherHops.includes(h.address) || otherHops.includes(h.label);
+        });
+      }
       return true;
     });
-  }, [hosts, searchQuery, filterMode, activeSessionHostIds, activeTunnels, forwardRules]);
+  }, [hosts, searchQuery, filterMode, activeSessionHostIds, activeTunnels, forwardRules, proxyProfiles]);
 
   // Compute telemetry statistics
   const stats: TopologyStats = useMemo(() => {
@@ -396,7 +438,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     let jumpCount = 0;
     for (const h of hosts) {
       subnets.add(extractSubnetCidr(h.address));
-      if (h.jumpChain && h.jumpChain.length > 0) {
+      if (getEffectiveJumpHopsForHost(h, proxyProfiles).length > 0) {
         jumpCount += 1;
       }
     }
@@ -407,7 +449,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
       activeTunnels: activeTunnels.length,
       jumpChains: jumpCount,
     };
-  }, [hosts, activeSessionHostIds, activeTunnels]);
+  }, [hosts, activeSessionHostIds, activeTunnels, proxyProfiles]);
 
   // Generate React Flow Nodes and Edges based on selected layout
   const { generatedNodes, generatedEdges } = useMemo(() => {
@@ -432,10 +474,9 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     // 2. Identify Jump / Bastion hosts vs End-hosts
     const bastionIds = new Set<string>();
     for (const h of filteredHosts) {
-      if (h.jumpChain) {
-        for (const hop of h.jumpChain) {
-          bastionIds.add(hop);
-        }
+      const hops = getEffectiveJumpHopsForHost(h, proxyProfiles);
+      for (const hop of hops) {
+        bastionIds.add(hop);
       }
     }
 
@@ -455,8 +496,8 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     // 4. Position Nodes according to Layout Mode
     if (layoutMode === 'hierarchical') {
       // Tier 1: Bastion / Jump hosts
-      const bastions = filteredHosts.filter((h) => bastionIds.has(h.id) || bastionIds.has(h.address));
-      const targets = filteredHosts.filter((h) => !bastionIds.has(h.id) && !bastionIds.has(h.address));
+      const bastions = filteredHosts.filter((h) => bastionIds.has(h.id) || bastionIds.has(h.address) || bastionIds.has(h.label));
+      const targets = filteredHosts.filter((h) => !bastionIds.has(h.id) && !bastionIds.has(h.address) && !bastionIds.has(h.label));
 
       let bastionY = 80;
       for (const h of bastions) {
@@ -489,7 +530,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             activeTunnelsCount: matchingHostTunnels.length,
             hostTunnels: matchingHostTunnels,
             hostRules: matchingHostRules,
-            jumpHops: h.jumpChain,
+            jumpHops: getEffectiveJumpHopsForHost(h, proxyProfiles),
             notesCount: notes.filter((n) => n.hostId === h.id).length,
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
@@ -500,6 +541,31 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
           },
         });
         bastionY += 190;
+      }
+
+      // Check for any external hops in bastionIds not matched by any saved host
+      for (const hop of Array.from(bastionIds)) {
+        const isSavedHost = hosts.some((c) => c.id === hop || c.address === hop || c.label === hop);
+        if (!isSavedHost) {
+          nodes.push({
+            id: `proxy-node-${hop}`,
+            type: 'hostNode',
+            position: { x: 420, y: bastionY },
+            data: {
+              id: `proxy-node-${hop}`,
+              hostId: `proxy-node-${hop}`,
+              label: hop.startsWith('SOCKS5:') ? hop : `⛓ Bastion: ${hop}`,
+              nodeType: 'host',
+              address: hop,
+              port: 22,
+              username: 'proxy',
+              status: 'configured',
+              tags: ['proxy-jump'],
+              color: '#f59e0b',
+            },
+          });
+          bastionY += 190;
+        }
       }
 
       // Tier 2: Target / End Hosts
@@ -534,7 +600,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             activeTunnelsCount: matchingHostTunnels.length,
             hostTunnels: matchingHostTunnels,
             hostRules: matchingHostRules,
-            jumpHops: h.jumpChain,
+            jumpHops: getEffectiveJumpHopsForHost(h, proxyProfiles),
             notesCount: notes.filter((n) => n.hostId === h.id).length,
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
@@ -581,7 +647,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
               activeTunnelsCount: matchingHostTunnels.length,
               hostTunnels: matchingHostTunnels,
               hostRules: matchingHostRules,
-              jumpHops: h.jumpChain,
+              jumpHops: getEffectiveJumpHopsForHost(h, proxyProfiles),
               notesCount: notes.filter((n) => n.hostId === h.id).length,
               onConnect: onConnectHost,
               onSplitConnect: onSplitConnectHost,
@@ -630,7 +696,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             activeTunnelsCount: matchingHostTunnels.length,
             hostTunnels: matchingHostTunnels,
             hostRules: matchingHostRules,
-            jumpHops: h.jumpChain,
+            jumpHops: getEffectiveJumpHopsForHost(h, proxyProfiles),
             notesCount: notes.filter((n) => n.hostId === h.id).length,
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
@@ -644,51 +710,60 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     }
 
     // 5. Connect Edges (Direct SSH, Jump Chains, and Active Tunnels)
+    const nodeIds = new Set(nodes.map((n) => n.id));
     for (const h of filteredHosts) {
-      if (h.jumpChain && h.jumpChain.length > 0) {
+      if (!nodeIds.has(h.id)) continue;
+      const hops = getEffectiveJumpHopsForHost(h, proxyProfiles);
+      if (hops && hops.length > 0) {
         // Multi-hop Jump Chain edges
         let prevNodeId = 'client-node';
-        h.jumpChain.forEach((hop: string, hopIdx: number) => {
-          const hopHost = hosts.find((cand) => cand.id === hop || cand.address === hop);
-          const hopNodeId = hopHost ? hopHost.id : hop;
-          edges.push({
-            id: `jump-edge-${prevNodeId}-${hopNodeId}-${h.id}`,
-            source: prevNodeId,
-            target: hopNodeId,
-            animated: true,
-            label: `Hop #${hopIdx + 1}`,
-            style: { stroke: '#f59e0b', strokeWidth: 2, strokeDasharray: '6,4' },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
-          });
-          prevNodeId = hopNodeId;
+        hops.forEach((hop: string, hopIdx: number) => {
+          const hopHost = hosts.find((cand) => cand.id === hop || cand.address === hop || cand.label === hop);
+          const hopNodeId = hopHost ? hopHost.id : `proxy-node-${hop}`;
+          if (nodeIds.has(prevNodeId) && nodeIds.has(hopNodeId)) {
+            edges.push({
+              id: `jump-edge-${prevNodeId}-${hopNodeId}-${h.id}`,
+              source: prevNodeId,
+              target: hopNodeId,
+              animated: true,
+              label: `Hop #${hopIdx + 1}`,
+              style: { stroke: '#f59e0b', strokeWidth: 2, strokeDasharray: '6,4' },
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
+            });
+            prevNodeId = hopNodeId;
+          }
         });
         // Final link to target host
-        edges.push({
-          id: `jump-target-${prevNodeId}-${h.id}`,
-          source: prevNodeId,
-          target: h.id,
-          animated: true,
-          label: 'Target',
-          style: { stroke: '#f59e0b', strokeWidth: 2.5 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
-        });
+        if (nodeIds.has(prevNodeId) && nodeIds.has(h.id)) {
+          edges.push({
+            id: `jump-target-${prevNodeId}-${h.id}`,
+            source: prevNodeId,
+            target: h.id,
+            animated: true,
+            label: 'Target',
+            style: { stroke: '#f59e0b', strokeWidth: 2.5 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
+          });
+        }
       } else {
         // Standard Direct SSH edge from Client
-        const isSessionActive = activeSessionHostIds.includes(h.id);
-        edges.push({
-          id: `edge-client-${h.id}`,
-          source: 'client-node',
-          target: h.id,
-          animated: isSessionActive,
-          style: {
-            stroke: isSessionActive ? '#2dd4bf' : 'rgba(45, 212, 191, 0.45)',
-            strokeWidth: isSessionActive ? 2.5 : 1.5,
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isSessionActive ? '#2dd4bf' : 'rgba(45, 212, 191, 0.45)',
-          },
-        });
+        if (nodeIds.has('client-node') && nodeIds.has(h.id)) {
+          const isSessionActive = activeSessionHostIds.includes(h.id);
+          edges.push({
+            id: `edge-client-${h.id}`,
+            source: 'client-node',
+            target: h.id,
+            animated: isSessionActive,
+            style: {
+              stroke: isSessionActive ? '#2dd4bf' : 'rgba(45, 212, 191, 0.45)',
+              strokeWidth: isSessionActive ? 2.5 : 1.5,
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: isSessionActive ? '#2dd4bf' : 'rgba(45, 212, 191, 0.45)',
+            },
+          });
+        }
       }
 
       // Check for Active Port Forwarding Tunnels
@@ -770,6 +845,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     onOpenNotes,
     onStartTunnel,
     onStopTunnel,
+    proxyProfiles,
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(generatedNodes);
@@ -1003,18 +1079,28 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                 <code className="inspector-val">{extractSubnetCidr(selectedHost.address)}</code>
               </div>
 
-              {selectedHost.jumpChain && selectedHost.jumpChain.length > 0 && (
-                <div className="inspector-field">
-                  <span className="inspector-label">ProxyJump Chain</span>
-                  <div className="inspector-jump-chain">
-                    {selectedHost.jumpChain.map((hop: string, i: number) => (
-                      <span key={hop} className="inspector-jump-badge">
-                        Hop {i + 1}: {hop}
-                      </span>
-                    ))}
+              {(() => {
+                const hops = getEffectiveJumpHopsForHost(selectedHost, proxyProfiles);
+                const profile = selectedHost.proxyProfileId && proxyProfiles ? proxyProfiles.find((p) => p.id === selectedHost.proxyProfileId) : null;
+                if (hops.length === 0 && !profile) return null;
+                return (
+                  <div className="inspector-field">
+                    <span className="inspector-label">
+                      {profile ? `Proxy Profile: ${profile.name} (${profile.type})` : 'ProxyJump Chain'}
+                    </span>
+                    <div className="inspector-jump-chain">
+                      {hops.map((hop: string, i: number) => {
+                        const hopHost = hosts.find((c) => c.id === hop || c.address === hop || c.label === hop);
+                        return (
+                          <span key={`${hop}-${i}`} className="inspector-jump-badge">
+                            Hop {i + 1}: {hopHost ? `${hopHost.label} (${hopHost.address})` : hop}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Cyberpunk HUD Tunnel Routing Matrix */}
               <div className="inspector-field inspector-tunnel-matrix-field">
