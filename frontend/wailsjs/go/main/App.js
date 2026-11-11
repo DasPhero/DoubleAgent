@@ -134,6 +134,14 @@ export function ExecuteSnippet(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExecuteSnippet'](arg1, arg2, arg3);
 }
 
+export function ExportEngagementFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExportEngagementFile'](arg1, arg2, arg3);
+}
+
+export function ExportEngagementPackage(arg1, arg2) {
+  return window['go']['main']['App']['ExportEngagementPackage'](arg1, arg2);
+}
+
 export function ExportProxychainsConfig() {
   return window['go']['main']['App']['ExportProxychainsConfig']();
 }
@@ -228,6 +236,14 @@ export function GetVaultSyncInfo() {
 
 export function HealthCheck() {
   return window['go']['main']['App']['HealthCheck']();
+}
+
+export function ImportEngagementFile(arg1, arg2) {
+  return window['go']['main']['App']['ImportEngagementFile'](arg1, arg2);
+}
+
+export function ImportEngagementPackage(arg1, arg2) {
+  return window['go']['main']['App']['ImportEngagementPackage'](arg1, arg2);
 }
 
 export function ImportSSHConfig(arg1) {

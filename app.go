@@ -4090,3 +4090,61 @@ func (a *App) AddEvidenceCategory(engagementID, category string) error {
 func (a *App) GetEvidenceTemplates() []core.EvidenceItem {
 	return core.DefaultEvidenceTemplates()
 }
+
+// ExportEngagementPackage serializes an engagement and all its enclosed artifacts into an exportable .daeng package (F-36).
+func (a *App) ExportEngagementPackage(engagementID string, password string) (string, error) {
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return "", errors.New("vault store not available")
+	}
+	bytes, err := st.ExportEngagementPackage(engagementID, password)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
+// ExportEngagementFile writes an exported .daeng package to disk at targetPath (F-36).
+func (a *App) ExportEngagementFile(engagementID string, password string, targetPath string) error {
+	targetPath = strings.TrimSpace(targetPath)
+	if targetPath == "" {
+		return errors.New("target path must not be empty")
+	}
+	content, err := a.ExportEngagementPackage(engagementID, password)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+	return os.WriteFile(targetPath, []byte(content), 0600)
+}
+
+// ImportEngagementPackage imports a .daeng engagement package from JSON content into the active vault (F-36).
+func (a *App) ImportEngagementPackage(packageJSON string, password string) (*core.EngagementPackage, error) {
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return nil, errors.New("vault store not available")
+	}
+	pkg, err := st.ImportEngagementPackage([]byte(packageJSON), password)
+	if err != nil {
+		return nil, err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return pkg, nil
+}
+
+// ImportEngagementFile reads and imports a .daeng engagement package from disk into the active vault (F-36).
+func (a *App) ImportEngagementFile(filePath string, password string) (*core.EngagementPackage, error) {
+	filePath = strings.TrimSpace(filePath)
+	if filePath == "" {
+		return nil, errors.New("file path must not be empty")
+	}
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read engagement file: %w", err)
+	}
+	return a.ImportEngagementPackage(string(data), password)
+}
+

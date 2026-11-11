@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppGlobalSettings,
   DEFAULT_SETTINGS,
@@ -46,6 +46,8 @@ import { RawTcpConfig, RawTcpListenerConfig, RawTcpListenerInfo, RawTcpSessionSt
 import { RawTcpModal } from './components/RawTcpModal';
 import { CredentialStoreModal } from './components/CredentialStoreModal';
 import { EvidenceVaultModal } from './components/EvidenceVaultModal';
+import { EngagementHubModal } from './components/EngagementHubModal';
+import { Engagement } from './types/pentest';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -868,6 +870,15 @@ interface WailsAppBindings {
   ListRawTcpListeners?: () => Promise<RawTcpListenerInfo[]>;
   GetRawTcpSessionStats?: (sessionId: string) => Promise<RawTcpSessionStats>;
   SetRawTcpSessionLineMode?: (sessionId: string, lineMode: boolean, lineEnding: string) => Promise<void>;
+  ListEngagements?: () => Promise<Engagement[]>;
+  GetActiveEngagement?: () => Promise<Engagement | null>;
+  SetActiveEngagement?: (id: string) => Promise<void>;
+  SaveEngagement?: (e: Engagement) => Promise<void>;
+  DeleteEngagement?: (id: string) => Promise<void>;
+  ExportEngagementPackage?: (engagementId: string, password: string) => Promise<string>;
+  ExportEngagementFile?: (engagementId: string, password: string, targetPath: string) => Promise<void>;
+  ImportEngagementPackage?: (packageJson: string, password: string) => Promise<unknown>;
+  ImportEngagementFile?: (filePath: string, password: string) => Promise<unknown>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1100,6 +1111,13 @@ export function App({
   const [showCredStoreModal, setShowCredStoreModal] = useState<boolean>(false);
   // Pentest Evidence Vault state (F-18)
   const [showEvidenceModal, setShowEvidenceModal] = useState<boolean>(false);
+  // Pentest Engagement Hub state (F-36)
+  const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
+  const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
+
+  // Host Sidebar Tag / Label filtering & editing
+  const [selectedHostTag, setSelectedHostTag] = useState<string>('all');
+  const [editingHostId, setEditingHostId] = useState<string | null>(null);
 
   // Add Group form state
   const [grpName, setGrpName] = useState<string>('');
@@ -1850,6 +1868,9 @@ export function App({
             if (api.GetVaultSyncInfo) {
               api.GetVaultSyncInfo().then(setSyncInfo).catch(() => {});
             }
+            if (api.GetActiveEngagement) {
+              api.GetActiveEngagement().then(setActiveEngagement).catch(() => {});
+            }
           }
           return;
         } catch {
@@ -1869,6 +1890,9 @@ export function App({
         }
         if (api.GetVaultSyncInfo) {
           api.GetVaultSyncInfo().then(setSyncInfo).catch(() => {});
+        }
+        if (api.GetActiveEngagement) {
+          api.GetActiveEngagement().then(setActiveEngagement).catch(() => {});
         }
         if (api.ListForwardRules) {
           const rules = await api.ListForwardRules();
@@ -2572,9 +2596,11 @@ export function App({
           .filter(Boolean)
       : undefined;
 
+    const targetHostId = editingHostId || `host-${idSuffix}`;
+
     if (api) {
       await api.SaveHost({
-        id: `host-${idSuffix}`,
+        id: targetHostId,
         label: hostLabel.trim(),
         address: hostAddr.trim(),
         port: parsedPort,
@@ -2597,32 +2623,40 @@ export function App({
       const effUser = hostUser.trim() || grp?.defaultSettings.username || 'root';
       const effInitialDir = hostInitialDir.trim() || grp?.defaultSettings.initialDir || '';
       const effSessionLogging = hostSessionLogging || Boolean(grp?.defaultSettings.sessionLogging);
-      setVaultSummary((prev) => ({
-        ...prev,
-        hosts: [
-          ...prev.hosts,
-          {
-            id: `host-${idSuffix}`,
-            label: hostLabel.trim(),
-            address: hostAddr.trim(),
-            effectivePort: effPort,
-            effectiveUser: effUser,
-            initialDir: effInitialDir,
-            keepaliveSecs: grp?.defaultSettings.keepaliveSecs || 30,
-            groupId: hostGroupId,
-            identityId,
-            tags: tagList,
-            color: hostColor,
-            favorite: false,
-            proxyProfileId: hostProxyProfileId || undefined,
-            proxyCommand: hostProxyCommand.trim() || undefined,
-            jumpChain: jumpChainList,
-            sessionLogging: effSessionLogging,
-          },
-        ],
-      }));
+      const newHostItem = {
+        id: targetHostId,
+        label: hostLabel.trim(),
+        address: hostAddr.trim(),
+        effectivePort: effPort,
+        effectiveUser: effUser,
+        initialDir: effInitialDir,
+        keepaliveSecs: grp?.defaultSettings.keepaliveSecs || 30,
+        groupId: hostGroupId,
+        identityId,
+        tags: tagList,
+        color: hostColor,
+        favorite: false,
+        proxyProfileId: hostProxyProfileId || undefined,
+        proxyCommand: hostProxyCommand.trim() || undefined,
+        jumpChain: jumpChainList,
+        sessionLogging: effSessionLogging,
+      };
+
+      setVaultSummary((prev) => {
+        const existIdx = prev.hosts.findIndex((h) => h.id === targetHostId);
+        if (existIdx >= 0) {
+          const updated = [...prev.hosts];
+          updated[existIdx] = newHostItem;
+          return { ...prev, hosts: updated };
+        }
+        return {
+          ...prev,
+          hosts: [...prev.hosts, newHostItem],
+        };
+      });
     }
 
+    setEditingHostId(null);
     setHostLabel('');
     setHostAddr('');
     setHostPort('0');
@@ -2637,6 +2671,25 @@ export function App({
     setHostProxyJump('');
     setHostSessionLogging(false);
     setShowAddHostModal(false);
+  };
+
+  const handleOpenEditHost = (h: HostSummary) => {
+    setEditingHostId(h.id);
+    setHostLabel(h.label);
+    setHostAddr(h.address);
+    setHostPort(String(h.effectivePort || 22));
+    setHostGroupId(h.groupId || '');
+    setHostUser(h.effectiveUser || '');
+    setHostPass('');
+    setHostTags((h.tags || []).join(', '));
+    setHostColor(h.color || '');
+    setHostInitialDir(h.initialDir || '');
+    setHostProxyProfileId(h.proxyProfileId || '');
+    setHostProxyCommand(h.proxyCommand || '');
+    setHostProxyJump((h.jumpChain || []).join(', '));
+    setHostSessionLogging(Boolean(h.sessionLogging));
+    setHostAuthMethod('password');
+    setShowAddHostModal(true);
   };
 
   const refreshSessionLogs = useCallback(async (): Promise<void> => {
@@ -6980,17 +7033,40 @@ export function App({
     handleToggleBroadcast,
   ]);
 
-  const filteredHosts = vaultSummary.hosts.filter((h) => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) {
-      return true;
+  // Distinct labels/tags across all saved hosts
+  const allHostTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const h of vaultSummary.hosts) {
+      if (h.tags) {
+        for (const t of h.tags) {
+          const trimmed = t.trim();
+          if (trimmed) set.add(trimmed);
+        }
+      }
     }
-    return (
-      h.label.toLowerCase().includes(q) ||
-      h.address.toLowerCase().includes(q) ||
-      h.tags.some((t) => t.toLowerCase().includes(q))
-    );
-  });
+    return Array.from(set).sort();
+  }, [vaultSummary.hosts]);
+
+  const filteredHosts = useMemo(() => {
+    return vaultSummary.hosts.filter((h) => {
+      if (selectedHostTag !== 'all') {
+        if (selectedHostTag.startsWith('grp:')) {
+          const targetGrpId = selectedHostTag.slice(4);
+          if (h.groupId !== targetGrpId) return false;
+        } else if (!h.tags || !h.tags.some((t) => t.toLowerCase() === selectedHostTag.toLowerCase())) {
+          return false;
+        }
+      }
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        h.label.toLowerCase().includes(q) ||
+        h.address.toLowerCase().includes(q) ||
+        (h.effectiveUser && h.effectiveUser.toLowerCase().includes(q)) ||
+        (h.tags && h.tags.some((t) => t.toLowerCase().includes(q)))
+      );
+    });
+  }, [vaultSummary.hosts, selectedHostTag, searchQuery]);
 
   // Pinnable Tools & Views Registry for Cyberpunk HUD Top Bar
   const pinnableRegistry: Record<
@@ -7413,9 +7489,21 @@ export function App({
               </button>
             </div>
           )}
-          {vaultLocked && (
+          {vaultLocked ? (
             <button type="button" className="btn-primary" onClick={handleOpenVaultButton}>
               {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="hud-engagement-pill-btn"
+              onClick={() => setShowEngagementHubModal(true)}
+              title="Active Pentest Engagement · Click to open Engagement Hub & Scope"
+            >
+              <span className="hud-engagement-dot">●</span>
+              <span className="hud-engagement-label">ENGAGEMENT:</span>
+              <strong className="hud-engagement-name">{activeEngagement ? activeEngagement.name : 'Default Scope'}</strong>
+              <span className="hud-engagement-caret">▾</span>
             </button>
           )}
         </div>
@@ -7552,7 +7640,7 @@ export function App({
                   onMouseEnter={() => handleMenuEnter('tools')}
                   onMouseMove={handleMenuMove}
                 >
-                  {/* Column 1: Terminals & Consoles */}
+                  {/* Column 1: Terminals & Connections */}
                   <div className="tools-dropdown-col">
                     <div className="tools-col-title">
                       <span>⚡ Terminals &amp; Consoles</span>
@@ -7566,11 +7654,32 @@ export function App({
                     {renderDropdownRow('dir-cwd', 'New in Current Directory (CWD)', '📂', () => void handleOpenTerminalDirectory('current'))}
                     {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', '⚡ root', () => void handleOpenTerminalDirectory('root'))}
 
-                    <div className="tools-sub-header">Hardware &amp; Session Actions</div>
+                    <div className="tools-sub-header">Hardware &amp; Direct Links</div>
                     {renderDropdownRow('serial', 'Serial / UART Console (COM)', '🔌 COM', () => void handleOpenSerialModal())}
+                    {renderDropdownRow(
+                      'tunnels',
+                      'Port Forwarding (-L, -R, -D)',
+                      activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} active` : '⇄ Tunnels',
+                      () => setShowPortForwardingModal(true),
+                      false,
+                      activeTunnels.length > 0
+                    )}
+                    {renderDropdownRow('network-map', 'Interactive Network Topology Map (F-37)', '🌐 Map', () => openNetworkMapTab())}
+                    {renderDropdownRow(
+                      'sftp',
+                      'SFTP File Browser',
+                      '📁 SFTP',
+                      () => {
+                        if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
+                          openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
+                        }
+                      },
+                      !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
+                    )}
 
                     {activePane && (
                       <>
+                        <div className="tools-sub-header">Session Quick Actions</div>
                         <button
                           type="button"
                           role="menuitem"
@@ -7611,12 +7720,12 @@ export function App({
                       setShowCommandPalette(true);
                     })}
                     {renderDropdownRow('totp', 'TOTP Authenticator Generator', '🔐 2FA', () => setShowTotpModal(true))}
-                    {renderDropdownRow('keychain', 'Keychain', '🔑', () => {
+                    {renderDropdownRow('keychain', 'Keychain & SSH Keys', '🔑', () => {
                       setModalError('');
                       setShowKeychainModal(true);
                     })}
 
-                    <div className="tools-sub-header">Automation &amp; Networking</div>
+                    <div className="tools-sub-header">Automation &amp; Transcripts</div>
                     {renderDropdownRow(
                       'broadcast',
                       broadcastState.enabled ? '🔴 Disarm Broadcast Mode' : '📡 Broadcast Input Mode',
@@ -7635,32 +7744,9 @@ export function App({
                       setShowSessionLogsModal(true);
                     })}
                     {renderDropdownRow('snippets', 'Command Snippets & Variables', '⚡ Snippets', () => setShowSnippetsModal(true))}
-                    {renderDropdownRow(
-                      'tunnels',
-                      'Port Forwarding (-L, -R, -D)',
-                      activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} active` : '⇄ Tunnels',
-                      () => setShowPortForwardingModal(true),
-                      false,
-                      activeTunnels.length > 0
-                    )}
-                    {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5, Command)', '🛡️ Profiles', () => setShowProxyProfilesModal(true))}
-                    {renderDropdownRow('network-map', 'Interactive Network Topology Map (F-37)', '🌐 Map', () => openNetworkMapTab())}
-                    {renderDropdownRow(
-                      'sftp',
-                      'SFTP File Browser',
-                      '📁 SFTP',
-                      () => {
-                        if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
-                          openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
-                        }
-                      },
-                      !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
-                    )}
-                    {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
-                    {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists (F-36)', '⚔️ Credentials', () => setShowCredStoreModal(true))}
-                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence Vault', () => setShowEvidenceModal(true))}
+                    {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', '🛡️ Profiles', () => setShowProxyProfilesModal(true))}
 
-                    <div className="tools-sub-header">Config Import &amp; Export</div>
+                    <div className="tools-sub-header">Config Migration</div>
                     {renderDropdownRow('ssh-config', 'Import ssh_config', '⚙️', () => {
                       setModalError('');
                       setSshConfigResult(null);
@@ -7669,7 +7755,22 @@ export function App({
                     {renderDropdownRow('import-putty-termius', 'Import PuTTY / Termius (F-30)', '📥', () => {
                       setShowImportModal(true);
                     })}
-                    {renderDropdownRow('proxychains', 'Export proxychains.conf', '⛓️ Export', () => void handleOpenProxychainsExport())}
+                  </div>
+
+                  {/* Column 3: Pentest Engagements (Dedicated Header & Column) */}
+                  <div className="tools-dropdown-col">
+                    <div className="tools-col-title">
+                      <span>⚔️ Pentest Engagements</span>
+                    </div>
+
+                    <div className="tools-sub-header">Target Assignments &amp; Evidence</div>
+                    {renderDropdownRow('engagement-hub', 'Engagement Hub & Scope (F-36)', '🎯 Scope', () => setShowEngagementHubModal(true))}
+                    {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists (F-36)', '🔑 Creds', () => setShowCredStoreModal(true))}
+                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence', () => setShowEvidenceModal(true))}
+
+                    <div className="tools-sub-header">Network Attacks &amp; Sockets</div>
+                    {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
+                    {renderDropdownRow('proxychains', 'Export proxychains.conf (F-14)', '⛓️ Export', () => void handleOpenProxychainsExport())}
                   </div>
                 </div>
               )}
@@ -7852,7 +7953,7 @@ export function App({
           ) : (
             <>
               <div className="sidebar-header">
-                <h2>Hosts &amp; Groups</h2>
+                <h2>Hosts &amp; Labels</h2>
                 {!vaultLocked && (
                   <div className="sidebar-actions">
                     <button
@@ -7865,7 +7966,19 @@ export function App({
                     <button
                       type="button"
                       className="btn-primary btn-sm"
-                      onClick={() => setShowAddHostModal(true)}
+                      onClick={() => {
+                        setEditingHostId(null);
+                        setHostLabel('');
+                        setHostAddr('');
+                        setHostPort('0');
+                        setHostGroupId('');
+                        setHostUser('');
+                        setHostPass('');
+                        setHostTags('');
+                        setHostColor('');
+                        setHostInitialDir('');
+                        setShowAddHostModal(true);
+                      }}
                     >
                       + Host
                     </button>
@@ -7875,124 +7988,88 @@ export function App({
 
               {vaultLocked ? (
                 <div className="sidebar-locked-notice">
-                  <p>Vault is locked. Unlock to view encrypted hosts, groups, and credentials.</p>
+                  <p>Vault is locked. Unlock to view encrypted hosts, labels, and credentials.</p>
                 </div>
               ) : (
                 <>
                   <input
                     className="sidebar-search"
                     aria-label="Filter Hosts"
-                    placeholder="Search hosts, IP, tags..."
+                    placeholder="Search hosts, IP, labels/tags..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                  <div className="sidebar-list">
-                    {vaultSummary.groups.map((grp) => {
-                      const groupHosts = filteredHosts.filter((h) => h.groupId === grp.id);
-                      return (
-                        <div key={grp.id} className="group-block">
-                          <div className="group-title">
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <CyberIcon name="folder" size={12} /> {grp.name}
-                            </span>
-                            <small>
-                              ({grp.defaultSettings.username || 'root'}:
-                              {grp.defaultSettings.port || 22})
-                            </small>
-                          </div>
-                          {groupHosts.map((h) => (
-                            <div
-                              key={h.id}
-                              className="host-card rack-blade-card"
-                              draggable
-                              onDoubleClick={() => void handleConnectSavedHost(h)}
-                              onDragStart={() =>
-                                startWorkspaceDrag({
-                                  type: 'host',
-                                  hostId: h.id,
-                                  label: h.label,
-                                })
-                              }
-                              onDragEnd={() => startWorkspaceDrag(null)}
-                              title={`Double-click to connect · Drag ${h.label} onto any terminal pane to split`}
-                            >
-                              <div className="host-info">
-                                <div className="host-title-row">
-                                  <span
-                                    className="host-color-dot"
-                                    style={{
-                                      backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
-                                    }}
-                                    title={`Host Color: ${getEffectiveHostColor(h.id, h.color, h.label)}`}
-                                  />
-                                  <strong>{h.label}</strong>
-                                </div>
-                                <span className="host-address-line">
-                                  {h.effectiveUser}@{h.address}:{h.effectivePort}
-                                </span>
-                                {h.initialDir && (
-                                  <span className="host-dir-line" title={`Default Directory: ${h.initialDir}`}>
-                                    <CyberIcon name="folder" size={10} /> {h.initialDir}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="host-card-actions rack-blade-actions">
-                                <button
-                                  type="button"
-                                  className="rack-action-btn rack-connect-btn"
-                                  title={`Connect to ${h.label}`}
-                                  onClick={() => void handleConnectSavedHost(h)}
-                                >
-                                  <CyberIcon name="play" size={10} />
-                                  <span className="rack-connect-label">Connect</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rack-action-btn"
-                                  title={`Open ${h.label} side-by-side in current workspace view`}
-                                  aria-label={`Split Connect ${h.label}`}
-                                  onClick={() => void handleConnectHostIntoSplit(h, 'right')}
-                                >
-                                  <CyberIcon name="split-h" size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rack-action-btn"
-                                  title={`Open SFTP file browser for ${h.label}`}
-                                  aria-label={`SFTP for ${h.label}`}
-                                  onClick={() => void handleOpenHostSftp(h)}
-                                >
-                                  <CyberIcon name="folder" size={12} />
-                                  <span className="sr-only">SFTP</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rack-action-btn"
-                                  title={`Open Notes & Docs for ${h.label}`}
-                                  aria-label={`Notes for ${h.label}`}
-                                  onClick={() => openNotesTab(h.id)}
-                                >
-                                  <CyberIcon name="note" size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rack-action-btn rack-delete-btn"
-                                  onClick={() => void handleDeleteHost(h.id)}
-                                  aria-label={`Delete ${h.label}`}
-                                  title={`Delete ${h.label}`}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
 
-                    {filteredHosts
-                      .filter((h) => !h.groupId)
-                      .map((h) => (
+                  {/* Multi-Label & Group Filter Bar */}
+                  {(allHostTags.length > 0 || vaultSummary.groups.length > 0) && (
+                    <div className="sidebar-tags-filter-bar" role="toolbar" aria-label="Filter Hosts by Label">
+                      <button
+                        type="button"
+                        className={`sidebar-tag-pill ${selectedHostTag === 'all' ? 'active' : ''}`}
+                        onClick={() => setSelectedHostTag('all')}
+                      >
+                        All ({vaultSummary.hosts.length})
+                      </button>
+                      {vaultSummary.groups.map((grp) => {
+                        const count = vaultSummary.hosts.filter((h) => h.groupId === grp.id).length;
+                        const isSelected = selectedHostTag.toLowerCase() === `grp:${grp.id}`.toLowerCase();
+                        return (
+                          <button
+                            key={grp.id}
+                            type="button"
+                            className={`sidebar-tag-pill ${isSelected ? 'active' : ''}`}
+                            onClick={() => setSelectedHostTag((prev) => (prev.toLowerCase() === `grp:${grp.id}`.toLowerCase() ? 'all' : `grp:${grp.id}`))}
+                            title={`Filter by group ${grp.name} (${count} hosts)`}
+                          >
+                            <span>📁 </span>
+                            <span>{grp.name}</span>
+                            <span style={{ opacity: 0.7, marginLeft: '3px' }}>({count})</span>
+                          </button>
+                        );
+                      })}
+                      {allHostTags.map((tag) => {
+                        const count = vaultSummary.hosts.filter(
+                          (h) => h.tags && h.tags.some((t) => t.toLowerCase() === tag.toLowerCase())
+                        ).length;
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            className={`sidebar-tag-pill ${selectedHostTag.toLowerCase() === tag.toLowerCase() ? 'active' : ''}`}
+                            onClick={() => setSelectedHostTag((prev) => (prev.toLowerCase() === tag.toLowerCase() ? 'all' : tag))}
+                            title={`Filter by label #${tag} (${count} hosts)`}
+                          >
+                            #{tag} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="sidebar-list">
+                    {filteredHosts.length === 0 ? (
+                      <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        {selectedHostTag !== 'all' ? (
+                          <>
+                            No hosts found with label <strong>#{selectedHostTag}</strong>.
+                            <br />
+                            <button
+                              type="button"
+                              className="btn-link"
+                              style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#00f0ff', cursor: 'pointer', background: 'none', border: 'none' }}
+                              onClick={() => setSelectedHostTag('all')}
+                            >
+                              Show all hosts
+                            </button>
+                          </>
+                        ) : searchQuery.trim() ? (
+                          `No hosts match "${searchQuery}".`
+                        ) : (
+                          'No saved hosts in Vault. Click + Host to create one.'
+                        )}
+                      </div>
+                    ) : (
+                      filteredHosts.map((h) => (
                         <div
                           key={h.id}
                           className="host-card rack-blade-card"
@@ -8026,6 +8103,32 @@ export function App({
                               <span className="host-dir-line" title={`Default Directory: ${h.initialDir}`}>
                                 <CyberIcon name="folder" size={10} /> {h.initialDir}
                               </span>
+                            )}
+                            {h.groupId && (() => {
+                              const grp = vaultSummary.groups.find((g) => g.id === h.groupId);
+                              return grp ? (
+                                <span className="host-group-tag" style={{ fontSize: '0.68rem', color: '#38bdf8', marginTop: '2px', display: 'inline-block' }} title={`Group: ${grp.name}`}>
+                                  <span>📁 </span>
+                                  <span>{grp.name}</span>
+                                </span>
+                              ) : null;
+                            })()}
+                            {h.tags && h.tags.length > 0 && (
+                              <div className="host-tags-list">
+                                {h.tags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="host-tag-badge"
+                                    title={`Filter by label #${tag}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedHostTag(tag);
+                                    }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </div>
                           <div className="host-card-actions rack-blade-actions">
@@ -8068,6 +8171,15 @@ export function App({
                             </button>
                             <button
                               type="button"
+                              className="rack-action-btn"
+                              title={`Edit ${h.label} configuration & labels`}
+                              aria-label={`Edit ${h.label}`}
+                              onClick={() => handleOpenEditHost(h)}
+                            >
+                              <CyberIcon name="edit" size={12} />
+                            </button>
+                            <button
+                              type="button"
                               className="rack-action-btn rack-delete-btn"
                               onClick={() => void handleDeleteHost(h.id)}
                               aria-label={`Delete ${h.label}`}
@@ -8077,7 +8189,8 @@ export function App({
                             </button>
                           </div>
                         </div>
-                      ))}
+                      ))
+                    )}
                   </div>
                 </>
               )}
@@ -9382,15 +9495,16 @@ export function App({
         <div
           className="modal-backdrop"
           role="dialog"
-          aria-label="New Host"
+          aria-label={editingHostId ? 'Edit Host' : 'New Host'}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowAddHostModal(false);
+              setEditingHostId(null);
             }
           }}
         >
           <form className="modal-card" onSubmit={(e) => void handleSaveHost(e)}>
-            <h2>New SSH Host</h2>
+            <h2>{editingHostId ? 'Edit SSH Host' : 'New SSH Host'}</h2>
             <p>Leave Port at 0 or Username empty to inherit from the selected Group.</p>
             <input
               aria-label="Host Label"
@@ -9555,12 +9669,15 @@ export function App({
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => setShowAddHostModal(false)}
+                onClick={() => {
+                  setShowAddHostModal(false);
+                  setEditingHostId(null);
+                }}
               >
                 Cancel
               </button>
               <button type="submit" className="btn-primary">
-                Save Host
+                {editingHostId ? 'Update Host' : 'Save Host'}
               </button>
             </div>
           </form>
@@ -10632,6 +10749,30 @@ export function App({
             address: h.address,
           }))}
           activeHostId={activeTab?.hostId}
+        />
+      )}
+
+      {showEngagementHubModal && (
+        <EngagementHubModal
+          isOpen={showEngagementHubModal}
+          onClose={() => {
+            setShowEngagementHubModal(false);
+            void refreshVaultState();
+          }}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+            tags: h.tags,
+          }))}
+          onOpenCredStore={() => {
+            setShowEngagementHubModal(false);
+            setShowCredStoreModal(true);
+          }}
+          onOpenEvidenceVault={() => {
+            setShowEngagementHubModal(false);
+            setShowEvidenceModal(true);
+          }}
         />
       )}
     </main>

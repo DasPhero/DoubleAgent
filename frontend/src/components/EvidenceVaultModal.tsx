@@ -122,6 +122,21 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     return m;
   }, [hosts]);
 
+  // Group templates by category (F-18)
+  const groupedTemplates = useMemo(() => {
+    const map = new Map<string, EvidenceItem[]>();
+    for (const tpl of templates) {
+      const cat = tpl.category || 'General';
+      const list = map.get(cat);
+      if (list) {
+        list.push(tpl);
+      } else {
+        map.set(cat, [tpl]);
+      }
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [templates]);
+
   // Filtered evidence items
   const filteredEvidence = useMemo(() => {
     return evidenceList.filter((item) => {
@@ -726,10 +741,14 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   <option value="" disabled>
                     ✨ Use Finding Template...
                   </option>
-                  {templates.map((tpl) => (
-                    <option key={tpl.id} value={tpl.id}>
-                      [{tpl.severity?.toUpperCase() || 'INFO'}] {tpl.title}
-                    </option>
+                  {groupedTemplates.map(([cat, tpls]) => (
+                    <optgroup key={cat} label={`📂 ${cat.toUpperCase()}`}>
+                      {tpls.map((tpl) => (
+                        <option key={tpl.id} value={tpl.id}>
+                          [{tpl.severity?.toUpperCase() || 'INFO'}] {tpl.title}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               )}

@@ -1,10 +1,37 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-18` — Evidence Vault & Findings Store — COMPLETED!
+- **Current Milestone:** `F-36`, `F-18`, `F-40`, `F-31` — Engagement Hub, Multi-Label Hosts, Credential Pool & Spray Lists, Evidence Vault, and Standalone `.daeng` Packages — COMPLETED!
 - **Next Milestone:** Wave 1 MVP+ — Save Selection Context Menu (`F-19`) & Snippet Chains (`F-16`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Pentest Engagement Hub & Standalone `.daeng` Packages (`F-36`, `F-18` / Pentest Spec Section 1, 2, 4)**:
+  - **Engagement Enclosure Architecture (`backend/core/pentest.go`, `backend/vault/pentest.go`)**:
+    - Engagements act as enclosed operational boundaries encapsulating target Hosts, Scope (CIDRs/domains), Credentials, Evidence findings, Host Notes, and custom Attack Snippets.
+    - Ensures total customer data segregation and GDPR compliance across sensitive penetration tests and red team operations.
+    - **Standalone `.daeng` Packages with Optional Password Protection**:
+      - `ExportEngagementPackage(id, password)`: Serializes all enclosed resources into an `EngagementPackage`. If a password is provided, securely encrypts the entire payload with Argon2id + XChaCha20-Poly1305; if empty, exports clean readable JSON.
+      - `ImportEngagementPackage(data, password)`: Decrypts encrypted packages (validating password), deserializes, and merges all enclosed hosts, credentials, evidence, notes, and snippets directly into the active vault.
+      - Export and import functions support both raw strings and direct filesystem files (`.daeng`).
+    - **Top Bar Active Engagement HUD Pill**:
+      - Prominently displays the active engagement name with an animated status indicator: `[🎯 ENGAGEMENT: Acme Corp ▾]`.
+      - 1-click opens `EngagementHubModal.tsx` to switch active engagements, inspect scope targets, view resource counts, or export/import `.daeng` files.
+    - **3-Column Tools Dropdown Redesign**:
+      - Restructured the crowded Tools menu into an organized 3-column cyberpunk grid with a dedicated `⚔️ Pentest Engagements` column holding Engagement Hub, Credential Pool, Evidence Vault, Raw TCP Netcat, and Proxychains export.
+- **Sidebar Multi-Label Architecture & In-Place Host Editing (`F-01`, `F-36`)**:
+  - Replaced rigid single-folder groups with multi-labels (`tags: string[]`) allowing hosts to belong to multiple tags simultaneously (e.g. `#production`, `#dmz`, `#web`, `#engagement-acme`).
+  - **Sidebar Label Filter Bar**: Horizontal scrollable pill bar showing `All (N)`, group filters (`📁 group (N)`), and dynamic tag filters (`#tag (N)`).
+  - **In-Place Host Editing**: Added `✏️ Edit` button to host rack blade cards pre-filling the modal with host address, port, identity, labels, color, initial directory, and proxy settings.
+- **Pentest Credential Pool & Spray Generator Enhancements (`F-36`, `F-40`)**:
+  - **Reordered Tabs**: Tab 1 = `🎯 Engagement & Scope`, Tab 2 = `🔑 Credential Pool`, Tab 3 = `⚡ Spray Generator & Wordlists`.
+  - **Auto-Clearing Feedback**: Confirmation alerts automatically vanish after 3.5 seconds or upon tab change.
+  - **In-Pool Credential Editing**: `✏️ Edit` button on credential table rows with inline editor.
+  - **SSH Key Insertion**: Direct paste or file picker (`.pem`, `.pub`, `.key`, `id_rsa`, `id_ed25519`).
+  - **Wordlists & Spray Formats**: Preset wordlists (Top 100, AD defaults, Common Users) plus "📂 Load Wordlist File (.txt)".
+  - **1:1 User:Pass Pairing**: True 1:1 user-to-password pairing without cartesian explosion.
+- **Evidence Vault & Categorized Templates (`F-18`)**:
+  - Added default categories for `Cloud Infrastructure` and `Artificial Intelligence / LLM`.
+  - Starter finding templates grouped by category with `<optgroup>`: AWS IMDSv1 SSRF, Public S3 bucket, LLM Prompt Injection, LLM Tool-Use RCE, Leaked API Keys.
 - **Evidence Vault & Structured Findings Store (`F-18` / Pentest Spec Line 26, 49, 56)**:
   - **Evidence Data Model & Serialization (`backend/core/pentest.go`)**:
     - `EvidenceItem`: ID, `EngagementID`, `Category`, `Title`, `Type` (`text` / `table` / `file` / `credential`), `Content` (Markdown or JSON table), `HostID` (optional host association), `Severity` (`critical`, `high`, `medium`, `low`, `info`), `CapturedAt`, `Source` (`manual`, `terminal_selection`, `nmap`, `linpeas`, `bloodhound`, `mimikatz`), `Tags`.

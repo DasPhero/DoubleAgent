@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Engagement,
   CredentialEntry,
@@ -11,6 +11,7 @@ export interface HostOption {
   id: string;
   label: string;
   address?: string;
+  tags?: string[];
 }
 
 interface CredentialStoreModalProps {
@@ -37,25 +38,77 @@ function getPentestApi(): WailsPentestApi | undefined {
   return w.go?.main?.App;
 }
 
+// Built-in starter wordlist presets
+const WORDLIST_PRESETS = {
+  topPasswords: [
+    'Password123!',
+    'Welcome123!',
+    'Winter2026!',
+    'Spring2026!',
+    'Summer2026!',
+    'Autumn2026!',
+    'Admin2026!',
+    'Company2026#',
+    'ChangeMe123!',
+    'P@ssw0rd2026',
+    'Root1234!',
+    'ServicePass2026!',
+    'SolarWinds123',
+    '12345678',
+    'qwerty1234',
+  ].join('\n'),
+  adDefaults: [
+    'Summer2026!',
+    'Summer2025!',
+    'Winter2026!',
+    'Winter2025!',
+    'Spring2026!',
+    'Autumn2026!',
+    'Welcome1!',
+    'Welcome2026!',
+    'Password1!',
+    'Company123!',
+    'ResetMe123!',
+    'Monday2026!',
+  ].join('\n'),
+  commonUsers: [
+    'administrator',
+    'admin',
+    'root',
+    'svc_backup',
+    'svc_sql',
+    'svc_scan',
+    'helpdesk',
+    'operator',
+    'guest',
+    'test',
+    'user',
+    'deploy',
+  ].join('\n'),
+};
+
 export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
   isOpen,
   onClose,
   hosts,
   activeHostId,
 }) => {
-  const [activeTab, setActiveTab] = useState<'creds' | 'spray' | 'engagements'>('creds');
+  // Reordered: Tab 1 = engagements, Tab 2 = creds, Tab 3 = spray
+  const [activeTab, setActiveTab] = useState<'engagements' | 'creds' | 'spray'>('engagements');
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [activeEngagement, setActiveEngagementState] = useState<Engagement | null>(null);
   const [credentials, setCredentials] = useState<CredentialEntry[]>([]);
   const [selectedCredIds, setSelectedCredIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [filterByActiveEngagement, setFilterByActiveEngagement] = useState<boolean>(true);
   const [revealedSecrets, setRevealedSecrets] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Add/Edit Credential form state
   const [showAddCred, setShowAddCred] = useState(false);
+  const [editingCredId, setEditingCredId] = useState<string | null>(null);
   const [credLabel, setCredLabel] = useState('');
   const [credUsername, setCredUsername] = useState('');
   const [credSecret, setCredSecret] = useState('');
@@ -66,7 +119,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
   const [credNotes, setCredNotes] = useState('');
 
   // Spray Generator state
-  const [sprayFormat, setSprayFormat] = useState<SprayFormat>('cartesian_product');
+  const [sprayFormat, setSprayFormat] = useState<SprayFormat>('userpass_colon');
   const [customUsers, setCustomUsers] = useState('');
   const [customPasswords, setCustomPasswords] = useState('');
   const [sprayDelimiter, setSprayDelimiter] = useState(':');
@@ -81,7 +134,21 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
   const [newEngLockoutWindow, setNewEngLockoutWindow] = useState(30);
   const [newEngDelay, setNewEngDelay] = useState(600);
 
-  const refreshAll = async () => {
+  // Auto-clear feedback messages after 3.5s
+  useEffect(() => {
+    if (!feedbackMsg) return;
+    const timer = setTimeout(() => {
+      setFeedbackMsg(null);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [feedbackMsg]);
+
+  // Clear feedback on tab switch
+  useEffect(() => {
+    setFeedbackMsg(null);
+  }, [activeTab]);
+
+  const refreshAll = useCallback(async () => {
     const api = getPentestApi();
     if (!api) return;
     try {
@@ -100,14 +167,14 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     } catch (err: unknown) {
       console.error('Failed to load pentest credentials:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
       void refreshAll();
       setFeedbackMsg(null);
     }
-  }, [isOpen]);
+  }, [isOpen, refreshAll]);
 
   // Trigger spray list generation whenever spray options change
   useEffect(() => {
@@ -146,11 +213,13 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     };
   }, [activeTab, sprayFormat, customUsers, customPasswords, sprayDelimiter, selectedCredIds, activeEngagement]);
 
-
   // Filtered credentials list
   const filteredCreds = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return credentials.filter((c) => {
+      if (filterByActiveEngagement && activeEngagement && c.engagementId !== activeEngagement.id) {
+        return false;
+      }
       if (selectedCategory !== 'all' && c.category !== selectedCategory) return false;
       if (!q) return true;
       return (
@@ -160,9 +229,35 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
         (c.source && c.source.toLowerCase().includes(q))
       );
     });
-  }, [credentials, searchQuery, selectedCategory]);
+  }, [credentials, searchQuery, selectedCategory, filterByActiveEngagement, activeEngagement]);
 
   if (!isOpen) return null;
+
+  const handleOpenAddCred = () => {
+    setEditingCredId(null);
+    setCredLabel('');
+    setCredUsername('');
+    setCredSecret('');
+    setCredRealm('');
+    setCredCategory('plaintext');
+    setCredHostId(activeHostId || '');
+    setCredSource('manual');
+    setCredNotes('');
+    setShowAddCred(true);
+  };
+
+  const handleEditCred = (c: CredentialEntry) => {
+    setEditingCredId(c.id);
+    setCredLabel(c.label || '');
+    setCredUsername(c.username || '');
+    setCredSecret(c.secret || '');
+    setCredRealm(c.realm || '');
+    setCredCategory(c.category || 'plaintext');
+    setCredHostId(c.hostId || '');
+    setCredSource(c.source || 'manual');
+    setCredNotes(c.notes || '');
+    setShowAddCred(true);
+  };
 
   const handleSaveCredential = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,7 +271,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
 
     try {
       const entry: CredentialEntry = {
-        id: `cred-${Date.now()}`,
+        id: editingCredId || `cred-${Date.now()}`,
         engagementId: activeEngagement?.id || '',
         category: credCategory,
         label: credLabel.trim() || credUsername.trim(),
@@ -190,12 +285,16 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
       };
       await api.SaveCredential(entry);
       setShowAddCred(false);
+      setEditingCredId(null);
       setCredLabel('');
       setCredUsername('');
       setCredSecret('');
       setCredRealm('');
       setCredNotes('');
-      setFeedbackMsg({ type: 'success', text: `Saved credential ${entry.label} to pool!` });
+      setFeedbackMsg({
+        type: 'success',
+        text: editingCredId ? `Updated credential ${entry.label}!` : `Saved credential ${entry.label} to pool!`,
+      });
       await refreshAll();
     } catch (err: unknown) {
       setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
@@ -209,6 +308,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     try {
       await api.DeleteCredential(id);
       await refreshAll();
+      setFeedbackMsg({ type: 'success', text: `Deleted credential ${label}.` });
     } catch (err: unknown) {
       setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
     }
@@ -256,6 +356,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     try {
       await api.SetActiveEngagement(id);
       await refreshAll();
+      setFeedbackMsg({ type: 'success', text: 'Active engagement updated.' });
     } catch (err: unknown) {
       setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
     }
@@ -302,6 +403,41 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     }
   };
 
+  // SSH Key file reader
+  const handleKeyFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const content = evt.target?.result as string;
+      if (content) {
+        setCredSecret(content.trim());
+        if (!credLabel.trim()) {
+          setCredLabel(file.name);
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Generic Wordlist file reader for Spray Generator
+  const handleWordlistFilePicked = (e: React.ChangeEvent<HTMLInputElement>, target: 'passwords' | 'users') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const content = evt.target?.result as string;
+      if (content) {
+        if (target === 'passwords') {
+          setCustomPasswords(content.trim());
+        } else {
+          setCustomUsers(content.trim());
+        }
+        setFeedbackMsg({ type: 'success', text: `Loaded wordlist from ${file.name}!` });
+      }
+    };
+    reader.readAsText(file);
+  };
 
   return (
     <div
@@ -314,7 +450,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
       <div
         className="cyber-dialog-card credential-store-modal-card"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '860px', width: '95%' }}
+        style={{ maxWidth: '880px', width: '95%' }}
       >
         {/* Reticles */}
         <div className="cyber-corner-reticle cyber-corner-tl" />
@@ -350,7 +486,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Selection */}
+        {/* Tab Selection — Reordered: 1. Engagements, 2. Pool, 3. Spray */}
         <div
           className="settings-tabs-header"
           style={{
@@ -363,24 +499,24 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
         >
           <button
             type="button"
+            className={`settings-tab-btn ${activeTab === 'engagements' ? 'active' : ''}`}
+            onClick={() => setActiveTab('engagements')}
+          >
+            <span>🎯 1. Engagement &amp; Scope</span>
+          </button>
+          <button
+            type="button"
             className={`settings-tab-btn ${activeTab === 'creds' ? 'active' : ''}`}
             onClick={() => setActiveTab('creds')}
           >
-            <span>🔑 Credential Pool ({credentials.length})</span>
+            <span>🔑 2. Credential Pool ({credentials.length})</span>
           </button>
           <button
             type="button"
             className={`settings-tab-btn ${activeTab === 'spray' ? 'active' : ''}`}
             onClick={() => setActiveTab('spray')}
           >
-            <span>🎯 Spray Generator &amp; Export</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-btn ${activeTab === 'engagements' ? 'active' : ''}`}
-            onClick={() => setActiveTab('engagements')}
-          >
-            <span>🛡️ Engagements &amp; Lockout Policy</span>
+            <span>⚡ 3. Spray Generator &amp; Wordlists</span>
           </button>
         </div>
 
@@ -408,18 +544,214 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                 borderRadius: '2px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.5rem',
+                justifyContent: 'space-between',
               }}
               role="alert"
             >
-              <span>{feedbackMsg.type === 'error' ? '⚠️' : '✓'}</span>
-              <span>{feedbackMsg.text}</span>
+              <span>{feedbackMsg.type === 'error' ? '⚠️ ' : '✓ '}{feedbackMsg.text}</span>
+              <button
+                type="button"
+                onClick={() => setFeedbackMsg(null)}
+                style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
             </div>
           )}
 
-          {/* TAB 1: CREDENTIAL POOL */}
+          {/* TAB 1: ENGAGEMENT & SCOPE */}
+          {activeTab === 'engagements' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="cyber-label">Active Engagement Context</span>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                  The pool and generator bind directly to the selected engagement.
+                </span>
+              </div>
+
+              {/* Engagement Cards List */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.75rem' }}>
+                {engagements.map((eng) => {
+                  const isActive = eng.id === activeEngagement?.id;
+                  return (
+                    <div
+                      key={eng.id}
+                      style={{
+                        background: isActive ? 'rgba(0, 240, 255, 0.08)' : 'rgba(5, 9, 16, 0.75)',
+                        border: `1px solid ${isActive ? '#00f0ff' : 'rgba(0, 240, 255, 0.2)'}`,
+                        borderRadius: '2px',
+                        padding: '0.85rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.45rem',
+                        position: 'relative',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <span style={{ fontWeight: 700, color: isActive ? '#00f0ff' : '#f1f5f9', fontSize: '0.86rem' }}>
+                          {eng.name}
+                        </span>
+                        {isActive && (
+                          <span
+                            style={{
+                              background: '#00f0ff',
+                              color: '#02050a',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              padding: '1px 5px',
+                              borderRadius: '2px',
+                            }}
+                          >
+                            ACTIVE
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                        Scope: {eng.scope || '(none specified)'}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>
+                        Max Attempts: {eng.lockoutPolicy.maxAttemptsPerUser} / {eng.lockoutPolicy.lockoutWindowMinutes}min
+                      </div>
+                      <div style={{ marginTop: 'auto', paddingTop: '0.4rem', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                        {!isActive && (
+                          <button
+                            type="button"
+                            className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                            onClick={() => void handleSetActiveEngagement(eng.id)}
+                          >
+                            Set Active
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Create Engagement Form */}
+              <form
+                onSubmit={handleSaveEngagement}
+                style={{
+                  background: 'rgba(5, 9, 16, 0.85)',
+                  border: '1px solid rgba(0, 240, 255, 0.3)',
+                  padding: '1rem',
+                  borderRadius: '2px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  marginTop: '0.5rem',
+                }}
+              >
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f0ff' }}>
+                  /// CREATE NEW CUSTOMER ENGAGEMENT
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label className="cyber-label">Customer / Assignment Name *</label>
+                    <input
+                      type="text"
+                      className="cyber-hud-input"
+                      placeholder="Acme Corp External Penetration Test"
+                      value={newEngName}
+                      onChange={(e) => setNewEngName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="cyber-label">Timeframe / Window</label>
+                    <input
+                      type="text"
+                      className="cyber-hud-input"
+                      placeholder="Nov 10 - Nov 20, 2026"
+                      value={newEngTimeframe}
+                      onChange={(e) => setNewEngTimeframe(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="cyber-label">Authorized Scope (CIDRs, IPs, Hostnames)</label>
+                  <textarea
+                    className="cyber-hud-input"
+                    rows={2}
+                    placeholder="192.168.1.0/24, 10.10.10.0/24, auth.acme.corp"
+                    value={newEngScope}
+                    onChange={(e) => setNewEngScope(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label className="cyber-label">Max Attempts / User</label>
+                    <input
+                      type="number"
+                      className="cyber-hud-input"
+                      value={newEngMaxAttempts}
+                      onChange={(e) => setNewEngMaxAttempts(parseInt(e.target.value, 10) || 3)}
+                      min={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="cyber-label">Lockout Window (min)</label>
+                    <input
+                      type="number"
+                      className="cyber-hud-input"
+                      value={newEngLockoutWindow}
+                      onChange={(e) => setNewEngLockoutWindow(parseInt(e.target.value, 10) || 30)}
+                      min={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="cyber-label">Delay Between Sprays (sec)</label>
+                    <input
+                      type="number"
+                      className="cyber-hud-input"
+                      value={newEngDelay}
+                      onChange={(e) => setNewEngDelay(parseInt(e.target.value, 10) || 600)}
+                      min={0}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+                  <button type="submit" className="cyber-btn cyber-btn-primary">
+                    ✓ Create Engagement
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 2: CREDENTIAL POOL */}
           {activeTab === 'creds' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Scope & Context Bar */}
+              <div
+                style={{
+                  background: 'rgba(5, 12, 24, 0.75)',
+                  border: '1px solid rgba(0, 240, 255, 0.2)',
+                  padding: '0.65rem 0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderRadius: '2px',
+                  fontSize: '0.78rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: '#00f0ff', fontWeight: 700 }}>🎯 BOUND ENGAGEMENT:</span>
+                  <span style={{ color: '#f1f5f9', fontWeight: 600 }}>
+                    {activeEngagement?.name || 'All Engagements (Unfiltered)'}
+                  </span>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', color: '#94a3b8' }}>
+                  <input
+                    type="checkbox"
+                    checked={filterByActiveEngagement}
+                    onChange={(e) => setFilterByActiveEngagement(e.target.checked)}
+                    style={{ accentColor: '#00f0ff', cursor: 'pointer' }}
+                  />
+                  <span>Filter by active engagement</span>
+                </label>
+              </div>
+
               {/* Toolbar */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', flex: 1, minWidth: '240px' }}>
@@ -448,14 +780,14 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                   <button
                     type="button"
                     className="cyber-btn cyber-btn-primary"
-                    onClick={() => setShowAddCred(!showAddCred)}
+                    onClick={handleOpenAddCred}
                   >
-                    <span>{showAddCred ? 'Cancel' : '+ Add Credential'}</span>
+                    <span>+ Add Credential</span>
                   </button>
                 </div>
               </div>
 
-              {/* Add Credential Form Inline */}
+              {/* Add/Edit Credential Form Inline */}
               {showAddCred && (
                 <form
                   onSubmit={handleSaveCredential}
@@ -470,7 +802,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                   }}
                 >
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
-                    REGISTER NEW CREDENTIAL
+                    {editingCredId ? '/// EDIT CREDENTIAL' : '/// REGISTER NEW CREDENTIAL'}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '0.75rem' }}>
                     <div>
@@ -485,15 +817,28 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="cyber-label">Password / Secret / Hash</label>
-                      <input
-                        type="text"
-                        className="cyber-hud-input"
-                        placeholder="Winter2026! or aad3b435..."
-                        value={credSecret}
-                        onChange={(e) => setCredSecret(e.target.value)}
-                        required
-                      />
+                      <label className="cyber-label">
+                        {credCategory === 'ssh_key' ? 'SSH Key / Private Key Data' : 'Password / Secret / Hash'}
+                      </label>
+                      {credCategory === 'ssh_key' ? (
+                        <textarea
+                          className="cyber-export-textarea"
+                          rows={3}
+                          placeholder="Paste PEM / OpenSSH private key or pick file below..."
+                          value={credSecret}
+                          onChange={(e) => setCredSecret(e.target.value)}
+                          required
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          className="cyber-hud-input"
+                          placeholder="Winter2026! or aad3b435..."
+                          value={credSecret}
+                          onChange={(e) => setCredSecret(e.target.value)}
+                          required
+                        />
+                      )}
                     </div>
                     <div>
                       <label className="cyber-label">Category</label>
@@ -511,6 +856,19 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       </select>
                     </div>
                   </div>
+
+                  {/* SSH Key File Selector Helper */}
+                  {credCategory === 'ssh_key' && (
+                    <div style={{ background: 'rgba(0, 240, 255, 0.05)', padding: '0.5rem', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>📂 Load Key File:</span>
+                      <input
+                        type="file"
+                        accept=".pem,.pub,.key,.id_rsa,.id_ed25519,.ppk,text/plain"
+                        onChange={handleKeyFilePicked}
+                        style={{ fontSize: '0.75rem', color: '#cbd5e1' }}
+                      />
+                    </div>
+                  )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: '0.75rem' }}>
                     <div>
@@ -589,13 +947,13 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       Cancel
                     </button>
                     <button type="submit" className="cyber-btn cyber-btn-primary">
-                      ✓ Save Credential
+                      ✓ {editingCredId ? 'Update Credential' : 'Save Credential'}
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* Credential Table */}
+              {/* Credential Table with Edit and Delete */}
               <div style={{ border: '1px solid rgba(0, 240, 255, 0.2)', borderRadius: '2px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                   <thead>
@@ -603,7 +961,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       <th style={{ padding: '8px', width: '36px', textAlign: 'center' }}>
                         <input
                           type="checkbox"
-                          checked={selectedCredIds.size === credentials.length && credentials.length > 0}
+                          checked={selectedCredIds.size === filteredCreds.length && filteredCreds.length > 0}
                           onChange={(e) => selectAllCreds(e.target.checked)}
                           style={{ accentColor: '#00f0ff', cursor: 'pointer' }}
                         />
@@ -611,15 +969,15 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       <th style={{ padding: '8px', textAlign: 'left', color: '#94a3b8' }}>USER &amp; REALM</th>
                       <th style={{ padding: '8px', textAlign: 'left', color: '#94a3b8' }}>SECRET / HASH</th>
                       <th style={{ padding: '8px', textAlign: 'left', color: '#94a3b8', width: '90px' }}>TYPE</th>
-                      <th style={{ padding: '8px', textAlign: 'left', color: '#94a3b8', width: '100px' }}>SOURCE</th>
-                      <th style={{ padding: '8px', textAlign: 'right', color: '#94a3b8', width: '90px' }}>ACTIONS</th>
+                      <th style={{ padding: '8px', textAlign: 'left', color: '#94a3b8', width: '90px' }}>SOURCE</th>
+                      <th style={{ padding: '8px', textAlign: 'right', color: '#94a3b8', width: '130px' }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCreds.length === 0 ? (
                       <tr>
                         <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
-                          No credentials found. Add one above or capture from active sessions.
+                          No credentials found for this scope. Add one above or capture from active sessions.
                         </td>
                       </tr>
                     ) : (
@@ -652,7 +1010,11 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                             <td style={{ padding: '8px', fontFamily: 'JetBrains Mono, monospace' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ color: isRevealed ? '#00f0ff' : '#94a3b8' }}>
-                                  {isRevealed ? c.secret : '••••••••••••'}
+                                  {isRevealed
+                                    ? c.secret.length > 36
+                                      ? `${c.secret.slice(0, 36)}...`
+                                      : c.secret
+                                    : '••••••••••••'}
                                 </span>
                                 <button
                                   type="button"
@@ -662,13 +1024,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                                     else next.add(c.id);
                                     setRevealedSecrets(next);
                                   }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    color: '#64748b',
-                                  }}
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#64748b' }}
                                   title={isRevealed ? 'Hide secret' : 'Show secret'}
                                 >
                                   {isRevealed ? '🙈' : '👁️'}
@@ -676,13 +1032,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleCopyToClipboard(c.secret, `sec-${c.id}`)}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    color: copiedId === `sec-${c.id}` ? '#10b981' : '#64748b',
-                                  }}
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '11px', color: copiedId === `sec-${c.id}` ? '#10b981' : '#64748b' }}
                                   title="Copy secret"
                                 >
                                   {copiedId === `sec-${c.id}` ? '✓' : '📋'}
@@ -710,11 +1060,21 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                             <td style={{ padding: '8px', textAlign: 'right' }}>
                               <button
                                 type="button"
+                                className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                                style={{ fontSize: '0.68rem', padding: '2px 6px', marginRight: '4px' }}
+                                onClick={() => handleEditCred(c)}
+                                title="Edit credential"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
                                 className="btn-danger btn-sm"
                                 style={{ fontSize: '0.68rem', padding: '2px 6px' }}
                                 onClick={() => handleDeleteCred(c.id, c.label || c.username)}
+                                title="Delete credential"
                               >
-                                Delete
+                                ✕
                               </button>
                             </td>
                           </tr>
@@ -727,10 +1087,10 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: SPRAY GENERATOR & EXPORT */}
+          {/* TAB 3: SPRAY GENERATOR & WORDLISTS */}
           {activeTab === 'spray' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-              {/* Lockout Policy Alert / Gauge */}
+              {/* Lockout Warning Bar */}
               {sprayResult?.warning && (
                 <div
                   style={{
@@ -767,36 +1127,39 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                 </div>
               )}
 
-              {/* Format Selectors */}
+              {/* Format Selectors with Clear Distinction */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <span className="cyber-label">Spray List Output Format (F-36)</span>
+                <span className="cyber-label">Spray Generator Mode &amp; Output Format</span>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
                   <button
                     type="button"
-                    className={`hud-preset-pill ${sprayFormat === 'cartesian_product' ? 'active' : ''}`}
-                    onClick={() => setSprayFormat('cartesian_product')}
+                    className={`hud-preset-pill ${sprayFormat === 'userpass_colon' ? 'active' : ''}`}
+                    onClick={() => setSprayFormat('userpass_colon')}
                     style={{ padding: '6px 10px', textAlign: 'left' }}
+                    title="Pairs users directly 1:1 with corresponding passwords without cross-multiplying."
                   >
-                    <strong>Cartesian Product</strong>
-                    <div style={{ fontSize: '10px', opacity: 0.8 }}>All Users × All Passwords</div>
+                    <strong>1:1 User:Pass Pairs</strong>
+                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Direct Match (No Multiplication)</div>
                   </button>
                   <button
                     type="button"
                     className={`hud-preset-pill ${sprayFormat === 'spray_password_first' ? 'active' : ''}`}
                     onClick={() => setSprayFormat('spray_password_first')}
                     style={{ padding: '6px 10px', textAlign: 'left' }}
+                    title="Tests 1 password across all accounts, then pauses. Evades Active Directory lockout."
                   >
                     <strong>1 Password Across Users</strong>
-                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Kerbrute / NetExec Spray</div>
+                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Password-First (Evades Lockout)</div>
                   </button>
                   <button
                     type="button"
-                    className={`hud-preset-pill ${sprayFormat === 'userpass_colon' ? 'active' : ''}`}
-                    onClick={() => setSprayFormat('userpass_colon')}
+                    className={`hud-preset-pill ${sprayFormat === 'cartesian_product' ? 'active' : ''}`}
+                    onClick={() => setSprayFormat('cartesian_product')}
                     style={{ padding: '6px 10px', textAlign: 'left' }}
+                    title="Tests every password on user 1, then user 2. Rapidly triggers lockout."
                   >
-                    <strong>User:Pass Pairs</strong>
-                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Hydra / Basic Auth</div>
+                    <strong>Cartesian Product</strong>
+                    <div style={{ fontSize: '10px', opacity: 0.8 }}>All Users × All Passwords</div>
                   </button>
                   <button
                     type="button"
@@ -805,7 +1168,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                     style={{ padding: '6px 10px', textAlign: 'left' }}
                   >
                     <strong>Usernames Only</strong>
-                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Unique account list</div>
+                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Unique target accounts</div>
                   </button>
                   <button
                     type="button"
@@ -814,9 +1177,10 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                     style={{ padding: '6px 10px', textAlign: 'left' }}
                   >
                     <strong>Passwords Only</strong>
-                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Unique wordlist</div>
+                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Extracted / candidate words</div>
                   </button>
                 </div>
+
                 {(sprayFormat === 'userpass_colon' ||
                   sprayFormat === 'cartesian_product' ||
                   sprayFormat === 'spray_password_first') && (
@@ -831,27 +1195,103 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       onChange={(e) => setSprayDelimiter(e.target.value)}
                       style={{ width: '45px', padding: '2px 6px', textAlign: 'center' }}
                     />
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      (colon ':' for Hydra/BasicAuth, tab '\t', or comma ',')
+                    </span>
                   </div>
                 )}
+              </div>
+
+              {/* Wordlist Presets & Load File Bar */}
+              <div
+                style={{
+                  background: 'rgba(5, 12, 22, 0.75)',
+                  border: '1px solid rgba(0, 240, 255, 0.15)',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#00f0ff', fontWeight: 700 }}>WORDLIST PRESETS:</span>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    onClick={() => setCustomPasswords(WORDLIST_PRESETS.topPasswords)}
+                  >
+                    Top Passwords
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    onClick={() => setCustomPasswords(WORDLIST_PRESETS.adDefaults)}
+                  >
+                    AD Seasonal Defaults
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    onClick={() => setCustomUsers(WORDLIST_PRESETS.commonUsers)}
+                  >
+                    Common Users
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <label
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    style={{ cursor: 'pointer', margin: 0 }}
+                  >
+                    📂 Load Wordlist (.txt)
+                    <input
+                      type="file"
+                      accept=".txt,.lst,.wordlist"
+                      onChange={(e) => handleWordlistFilePicked(e, 'passwords')}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
               </div>
 
               {/* Paste extra user/passwords */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label className="cyber-label">Extra Candidate Usernames (1 per line)</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                    <label className="cyber-label" style={{ margin: 0 }}>Candidate Usernames (1 per line)</label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomUsers('')}
+                      style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '10px', cursor: 'pointer' }}
+                    >
+                      Clear
+                    </button>
+                  </div>
                   <textarea
                     className="cyber-export-textarea"
-                    rows={3}
+                    rows={4}
                     placeholder="guest&#10;svc_scan&#10;operator"
                     value={customUsers}
                     onChange={(e) => setCustomUsers(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="cyber-label">Extra Candidate Passwords / Hashes (1 per line)</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                    <label className="cyber-label" style={{ margin: 0 }}>Candidate Passwords / Hashes (1 per line)</label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomPasswords('')}
+                      style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '10px', cursor: 'pointer' }}
+                    >
+                      Clear
+                    </button>
+                  </div>
                   <textarea
                     className="cyber-export-textarea"
-                    rows={3}
+                    rows={4}
                     placeholder="Spring2026!&#10;Company2026#&#10;Welcome1"
                     value={customPasswords}
                     onChange={(e) => setCustomPasswords(e.target.value)}
@@ -891,159 +1331,6 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                   style={{ background: '#02050a' }}
                 />
               </div>
-            </div>
-          )}
-
-          {/* TAB 3: ENGAGEMENT & LOCKOUT POLICY */}
-          {activeTab === 'engagements' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="cyber-label">CONFIGURED ENGAGEMENTS ({engagements.length})</span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {engagements.map((e) => (
-                  <div
-                    key={e.id}
-                    style={{
-                      background: e.isActive ? 'rgba(0, 240, 255, 0.08)' : 'rgba(10, 16, 28, 0.85)',
-                      border: `1px solid ${e.isActive ? '#00f0ff' : 'rgba(255, 255, 255, 0.1)'}`,
-                      padding: '0.75rem 1rem',
-                      borderRadius: '2px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.86rem' }}>{e.name}</span>
-                        {e.isActive && (
-                          <span
-                            style={{
-                              background: '#10b981',
-                              color: '#040914',
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                              padding: '1px 5px',
-                              borderRadius: '2px',
-                            }}
-                          >
-                            ACTIVE
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px' }}>
-                        Scope: {e.scope || 'All'} | Timeframe: {e.timeframe || 'Active'} | Lockout Policy: Max{' '}
-                        {e.lockoutPolicy?.maxAttemptsPerUser || 3} attempts per {e.lockoutPolicy?.lockoutWindowMinutes || 30}m
-                      </div>
-                    </div>
-                    <div>
-                      {!e.isActive && (
-                        <button
-                          type="button"
-                          className="cyber-btn cyber-btn-secondary cyber-btn-sm"
-                          onClick={() => void handleSetActiveEngagement(e.id)}
-                        >
-                          Set Active
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* New Engagement Form */}
-              <form
-                onSubmit={handleSaveEngagement}
-                style={{
-                  background: 'rgba(5, 9, 16, 0.8)',
-                  border: '1px solid rgba(0, 240, 255, 0.25)',
-                  padding: '1rem',
-                  borderRadius: '2px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
-                  marginTop: '0.5rem',
-                }}
-              >
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f0ff' }}>
-                  CREATE NEW ENGAGEMENT &amp; LOCKOUT POLICY (F-40)
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div>
-                    <label className="cyber-label">Engagement Name</label>
-                    <input
-                      type="text"
-                      className="cyber-hud-input"
-                      placeholder="e.g. Corp Internal Pentest Q4"
-                      value={newEngName}
-                      onChange={(e) => setNewEngName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="cyber-label">Scope / Subnets</label>
-                    <input
-                      type="text"
-                      className="cyber-hud-input"
-                      placeholder="10.10.10.0/24, dc01.corp.local"
-                      value={newEngScope}
-                      onChange={(e) => setNewEngScope(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 110px', gap: '0.75rem' }}>
-                  <div>
-                    <label className="cyber-label">Timeframe</label>
-                    <input
-                      type="text"
-                      className="cyber-hud-input"
-                      placeholder="Nov 10 - Nov 24, 2026"
-                      value={newEngTimeframe}
-                      onChange={(e) => setNewEngTimeframe(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="cyber-label">Max Attempts</label>
-                    <input
-                      type="number"
-                      className="cyber-hud-input"
-                      value={newEngMaxAttempts}
-                      onChange={(e) => setNewEngMaxAttempts(parseInt(e.target.value, 10) || 1)}
-                      min={1}
-                      max={20}
-                    />
-                  </div>
-                  <div>
-                    <label className="cyber-label">Window (min)</label>
-                    <input
-                      type="number"
-                      className="cyber-hud-input"
-                      value={newEngLockoutWindow}
-                      onChange={(e) => setNewEngLockoutWindow(parseInt(e.target.value, 10) || 1)}
-                      min={1}
-                    />
-                  </div>
-                  <div>
-                    <label className="cyber-label">Delay (sec)</label>
-                    <input
-                      type="number"
-                      className="cyber-hud-input"
-                      value={newEngDelay}
-                      onChange={(e) => setNewEngDelay(parseInt(e.target.value, 10) || 0)}
-                      min={0}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.4rem' }}>
-                  <button type="submit" className="cyber-btn cyber-btn-primary">
-                    + Register Engagement
-                  </button>
-                </div>
-              </form>
             </div>
           )}
         </div>

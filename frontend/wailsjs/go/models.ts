@@ -337,6 +337,116 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class SnippetVariable {
+	    name: string;
+	    defaultValue?: string;
+	    description?: string;
+	    secretRef?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnippetVariable(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.defaultValue = source["defaultValue"];
+	        this.description = source["description"];
+	        this.secretRef = source["secretRef"];
+	    }
+	}
+	export class Snippet {
+	    id: string;
+	    name: string;
+	    description?: string;
+	    body: string;
+	    variables?: SnippetVariable[];
+	    tags?: string[];
+	    confirmBeforeRun: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Snippet(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.body = source["body"];
+	        this.variables = this.convertValues(source["variables"], SnippetVariable);
+	        this.tags = source["tags"];
+	        this.confirmBeforeRun = source["confirmBeforeRun"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class NotePage {
+	    id: string;
+	    hostId?: string;
+	    parentId?: string;
+	    isFolder: boolean;
+	    title: string;
+	    type: string;
+	    body: string;
+	    order: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new NotePage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.hostId = source["hostId"];
+	        this.parentId = source["parentId"];
+	        this.isFolder = source["isFolder"];
+	        this.title = source["title"];
+	        this.type = source["type"];
+	        this.body = source["body"];
+	        this.order = source["order"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class EvidenceItem {
 	    id: string;
 	    engagementId: string;
@@ -388,6 +498,99 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class HostRecord {
+	    id: string;
+	    label: string;
+	    address: string;
+	    port: number;
+	    groupId?: string;
+	    identityId?: string;
+	    initialDir?: string;
+	    tags?: string[];
+	    color?: string;
+	    favorite?: boolean;
+	    jumpChain?: string[];
+	    forwardRuleIds?: string[];
+	    proxyProfileId?: string;
+	    proxyCommand?: string;
+	    sessionLogging?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostRecord(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.address = source["address"];
+	        this.port = source["port"];
+	        this.groupId = source["groupId"];
+	        this.identityId = source["identityId"];
+	        this.initialDir = source["initialDir"];
+	        this.tags = source["tags"];
+	        this.color = source["color"];
+	        this.favorite = source["favorite"];
+	        this.jumpChain = source["jumpChain"];
+	        this.forwardRuleIds = source["forwardRuleIds"];
+	        this.proxyProfileId = source["proxyProfileId"];
+	        this.proxyCommand = source["proxyCommand"];
+	        this.sessionLogging = source["sessionLogging"];
+	    }
+	}
+	export class EngagementPackage {
+	    version: number;
+	    encrypted: boolean;
+	    salt?: string;
+	    nonce?: string;
+	    ciphertext?: string;
+	    engagement: Engagement;
+	    hosts?: HostRecord[];
+	    credentials?: CredentialEntry[];
+	    evidence?: EvidenceItem[];
+	    notes?: NotePage[];
+	    snippets?: Snippet[];
+	    wordlists?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new EngagementPackage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.encrypted = source["encrypted"];
+	        this.salt = source["salt"];
+	        this.nonce = source["nonce"];
+	        this.ciphertext = source["ciphertext"];
+	        this.engagement = this.convertValues(source["engagement"], Engagement);
+	        this.hosts = this.convertValues(source["hosts"], HostRecord);
+	        this.credentials = this.convertValues(source["credentials"], CredentialEntry);
+	        this.evidence = this.convertValues(source["evidence"], EvidenceItem);
+	        this.notes = this.convertValues(source["notes"], NotePage);
+	        this.snippets = this.convertValues(source["snippets"], Snippet);
+	        this.wordlists = source["wordlists"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class FileItem {
 	    name: string;
 	    path: string;
@@ -536,46 +739,7 @@ export namespace core {
 		    return a;
 		}
 	}
-	export class HostRecord {
-	    id: string;
-	    label: string;
-	    address: string;
-	    port: number;
-	    groupId?: string;
-	    identityId?: string;
-	    initialDir?: string;
-	    tags?: string[];
-	    color?: string;
-	    favorite?: boolean;
-	    jumpChain?: string[];
-	    forwardRuleIds?: string[];
-	    proxyProfileId?: string;
-	    proxyCommand?: string;
-	    sessionLogging?: boolean;
 	
-	    static createFrom(source: any = {}) {
-	        return new HostRecord(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.label = source["label"];
-	        this.address = source["address"];
-	        this.port = source["port"];
-	        this.groupId = source["groupId"];
-	        this.identityId = source["identityId"];
-	        this.initialDir = source["initialDir"];
-	        this.tags = source["tags"];
-	        this.color = source["color"];
-	        this.favorite = source["favorite"];
-	        this.jumpChain = source["jumpChain"];
-	        this.forwardRuleIds = source["forwardRuleIds"];
-	        this.proxyProfileId = source["proxyProfileId"];
-	        this.proxyCommand = source["proxyCommand"];
-	        this.sessionLogging = source["sessionLogging"];
-	    }
-	}
 	
 	
 	export class IdentityRecord {
@@ -787,56 +951,7 @@ export namespace core {
 	
 	
 	
-	export class NotePage {
-	    id: string;
-	    hostId?: string;
-	    parentId?: string;
-	    isFolder: boolean;
-	    title: string;
-	    type: string;
-	    body: string;
-	    order: number;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    updatedAt: any;
 	
-	    static createFrom(source: any = {}) {
-	        return new NotePage(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.hostId = source["hostId"];
-	        this.parentId = source["parentId"];
-	        this.isFolder = source["isFolder"];
-	        this.title = source["title"];
-	        this.type = source["type"];
-	        this.body = source["body"];
-	        this.order = source["order"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.updatedAt = this.convertValues(source["updatedAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class NotePageSummary {
 	    id: string;
 	    hostId?: string;
@@ -1453,66 +1568,7 @@ export namespace core {
 	        this.lineCount = source["lineCount"];
 	    }
 	}
-	export class SnippetVariable {
-	    name: string;
-	    defaultValue?: string;
-	    description?: string;
-	    secretRef?: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new SnippetVariable(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.defaultValue = source["defaultValue"];
-	        this.description = source["description"];
-	        this.secretRef = source["secretRef"];
-	    }
-	}
-	export class Snippet {
-	    id: string;
-	    name: string;
-	    description?: string;
-	    body: string;
-	    variables?: SnippetVariable[];
-	    tags?: string[];
-	    confirmBeforeRun: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new Snippet(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.description = source["description"];
-	        this.body = source["body"];
-	        this.variables = this.convertValues(source["variables"], SnippetVariable);
-	        this.tags = source["tags"];
-	        this.confirmBeforeRun = source["confirmBeforeRun"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class SnippetContext {
 	    hostId?: string;
 	    hostLabel?: string;

@@ -2258,7 +2258,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       render(<App initialLocked={false} />);
 
       // Wait for vault to load hosts and groups in sidebar
-      expect(await screen.findByText('Infrastructure')).toBeInTheDocument();
+      expect((await screen.findAllByText('Infrastructure')).length).toBeGreaterThan(0);
 
       // 1. Open Tools dropdown and launch Network Topology Map tab
       const toolsMenuBtn = await screen.findByRole('button', { name: /Tools/i });
@@ -2916,12 +2916,14 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // 2. Verify modal opened
       expect(await screen.findByText(/CREDENTIAL STORE & SPRAY LISTS/i)).toBeInTheDocument();
 
-      // 3. Verify credentials listed in table
+      // 3. Switch to Credential Pool tab and verify credentials listed in table
+      const poolTabBtn = screen.getByRole('button', { name: /Credential Pool/i });
+      fireEvent.click(poolTabBtn);
       expect(await screen.findByText('CORP.LOCAL\\da_admin')).toBeInTheDocument();
       expect(screen.getByText('CORP.LOCAL\\svc_sql')).toBeInTheDocument();
 
       // 4. Switch to Spray Generator tab
-      const sprayTabBtn = screen.getByRole('button', { name: /Spray Generator & Export/i });
+      const sprayTabBtn = screen.getByRole('button', { name: /Spray Generator/i });
       fireEvent.click(sprayTabBtn);
 
       // Verify generated output and lockout warning rendered
@@ -2929,7 +2931,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(screen.getByText(/Lockout warning: 2 attempts approaches threshold/i)).toBeInTheDocument();
 
       // 5. Switch to Engagements tab
-      const engTabBtn = screen.getByRole('button', { name: /Engagements & Lockout Policy/i });
+      const engTabBtn = screen.getByRole('button', { name: /Engagement & Scope/i });
       fireEvent.click(engTabBtn);
       expect(await screen.findByText('Bank Audit 2026')).toBeInTheDocument();
 

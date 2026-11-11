@@ -69,6 +69,10 @@ export function ExecuteImport(arg1:core.ImportExecuteOptions):Promise<core.Impor
 
 export function ExecuteSnippet(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
 
+export function ExportEngagementFile(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function ExportEngagementPackage(arg1:string,arg2:string):Promise<string>;
+
 export function ExportProxychainsConfig():Promise<string>;
 
 export function ExportSessionLog(arg1:string,arg2:string):Promise<void>;
@@ -116,6 +120,10 @@ export function GetVaultSummary():Promise<core.VaultSummary>;
 export function GetVaultSyncInfo():Promise<core.VaultSyncInfo>;
 
 export function HealthCheck():Promise<core.AppStatus>;
+
+export function ImportEngagementFile(arg1:string,arg2:string):Promise<core.EngagementPackage>;
+
+export function ImportEngagementPackage(arg1:string,arg2:string):Promise<core.EngagementPackage>;
 
 export function ImportSSHConfig(arg1:string):Promise<core.SSHConfigParseResult>;
 
