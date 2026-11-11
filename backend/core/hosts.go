@@ -44,6 +44,7 @@ type HostSummary struct {
 	Color          string   `json:"color"`
 	Favorite       bool     `json:"favorite"`
 	SessionLogging bool     `json:"sessionLogging"`
+	EngagementID   string   `json:"engagementId,omitempty"`
 }
 
 // IdentitySummary is a non-secret view of a saved identity exposed to the frontend UI (Golden Rule 2).
@@ -301,6 +302,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 			Color:          h.Color,
 			Favorite:       h.Favorite,
 			SessionLogging: sessionLogging,
+			EngagementID:   h.EngagementID,
 		})
 	}
 

@@ -18,3 +18,4 @@ DoubleAgent requires SSH connectivity supporting password authentication, public
 
 - Pure Go compilation with zero CGo dependencies.
 - `backend/core` remains completely independent of transport libraries and is verified by `TestM0_0_CoreBoundaryNoForbiddenImports`.
+

@@ -57,6 +57,32 @@ const WORDLIST_PRESETS = {
     '12345678',
     'qwerty1234',
   ].join('\n'),
+  rockyouSample: [
+    '123456',
+    'password',
+    '12345678',
+    'qwerty',
+    '123456789',
+    '12345',
+    '1234',
+    '111111',
+    '1234567',
+    'dragon',
+    'welcome',
+    'football',
+    'monkey',
+    'princess',
+    'shadow',
+    'master',
+    'michael',
+    'computer',
+    'iloveyou',
+    'access',
+    'superman',
+    'password1',
+    'secret',
+    'admin',
+  ].join('\n'),
   adDefaults: [
     'Summer2026!',
     'Summer2025!',
@@ -93,18 +119,24 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
   hosts,
   activeHostId,
 }) => {
-  // Reordered: Tab 1 = engagements, Tab 2 = creds, Tab 3 = spray
-  const [activeTab, setActiveTab] = useState<'engagements' | 'creds' | 'spray'>('engagements');
+  // Tabs: 1 = creds, 2 = spray
+  const [activeTab, setActiveTab] = useState<'creds' | 'spray'>('creds');
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [activeEngagement, setActiveEngagementState] = useState<Engagement | null>(null);
+  const [selectedEngagementId, setSelectedEngagementId] = useState<string>('');
   const [credentials, setCredentials] = useState<CredentialEntry[]>([]);
   const [selectedCredIds, setSelectedCredIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [filterByActiveEngagement, setFilterByActiveEngagement] = useState<boolean>(true);
   const [revealedSecrets, setRevealedSecrets] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Defensive Lockout Policy State (editable in spray tab)
+  const [policyMaxAttempts, setPolicyMaxAttempts] = useState(3);
+  const [policyLockoutWindow, setPolicyLockoutWindow] = useState(30);
+  const [policyDelay, setPolicyDelay] = useState(600);
+  const [policyWarningThreshold, setPolicyWarningThreshold] = useState(66);
 
   // Add/Edit Credential form state
   const [showAddCred, setShowAddCred] = useState(false);
@@ -125,14 +157,6 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
   const [sprayDelimiter, setSprayDelimiter] = useState(':');
   const [sprayResult, setSprayResult] = useState<SprayExportResult | null>(null);
   const [isGeneratingSpray, setIsGeneratingSpray] = useState(false);
-
-  // Engagement form state
-  const [newEngName, setNewEngName] = useState('');
-  const [newEngScope, setNewEngScope] = useState('');
-  const [newEngTimeframe, setNewEngTimeframe] = useState('');
-  const [newEngMaxAttempts, setNewEngMaxAttempts] = useState(3);
-  const [newEngLockoutWindow, setNewEngLockoutWindow] = useState(30);
-  const [newEngDelay, setNewEngDelay] = useState(600);
 
   // Auto-clear feedback messages after 3.5s
   useEffect(() => {
@@ -159,6 +183,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
       if (api.GetActiveEngagement) {
         const act = await api.GetActiveEngagement();
         setActiveEngagementState(act || null);
+        setSelectedEngagementId(act?.id || '');
       }
       if (api.ListCredentials) {
         const creds = await api.ListCredentials('', '');
@@ -176,6 +201,62 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     }
   }, [isOpen, refreshAll]);
 
+  // Sync lockout policy fields when selectedEngagementId changes
+  useEffect(() => {
+    const currentEng = engagements.find((e) => e.id === selectedEngagementId);
+    if (currentEng?.lockoutPolicy) {
+      setPolicyMaxAttempts(currentEng.lockoutPolicy.maxAttemptsPerUser ?? 3);
+      setPolicyLockoutWindow(currentEng.lockoutPolicy.lockoutWindowMinutes ?? 30);
+      setPolicyDelay(currentEng.lockoutPolicy.enforceDelaySeconds ?? 600);
+      setPolicyWarningThreshold(currentEng.lockoutPolicy.warningThresholdPercent ?? 66);
+    }
+  }, [selectedEngagementId, engagements]);
+
+  const handleEngagementChange = async (newId: string) => {
+    setSelectedEngagementId(newId);
+    setSelectedCredIds(new Set());
+    const api = getPentestApi();
+    if (api?.SetActiveEngagement) {
+      try {
+        await api.SetActiveEngagement(newId || 'none');
+        if (api.GetActiveEngagement) {
+          const act = await api.GetActiveEngagement();
+          setActiveEngagementState(act || null);
+        }
+      } catch (err: unknown) {
+        console.error('Failed to update active engagement:', err);
+      }
+    }
+  };
+
+  const handleSaveLockoutPolicy = async () => {
+    if (!selectedEngagementId) {
+      setFeedbackMsg({ type: 'error', text: 'Select an engagement to persist lockout policy.' });
+      return;
+    }
+    const currentEng = engagements.find((e) => e.id === selectedEngagementId);
+    if (!currentEng) return;
+    const api = getPentestApi();
+    if (!api?.SaveEngagement) return;
+    try {
+      const updated: Engagement = {
+        ...currentEng,
+        lockoutPolicy: {
+          maxAttemptsPerUser: policyMaxAttempts,
+          lockoutWindowMinutes: policyLockoutWindow,
+          enforceDelaySeconds: policyDelay,
+          warningThresholdPercent: policyWarningThreshold,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      await api.SaveEngagement(updated);
+      setFeedbackMsg({ type: 'success', text: `Saved defensive lockout policy for ${updated.name}!` });
+      await refreshAll();
+    } catch (err: unknown) {
+      setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
   // Trigger spray list generation whenever spray options change
   useEffect(() => {
     if (activeTab !== 'spray') return;
@@ -188,7 +269,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     const credIdsArray = selectedCredIds.size > 0 ? Array.from(selectedCredIds) : [];
     api
       .ExportSprayList({
-        engagementId: activeEngagement?.id || '',
+        engagementId: selectedEngagementId,
         credentialIds: credIdsArray,
         format: sprayFormat,
         customUserList: customUsers,
@@ -211,14 +292,18 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [activeTab, sprayFormat, customUsers, customPasswords, sprayDelimiter, selectedCredIds, activeEngagement]);
+  }, [activeTab, sprayFormat, customUsers, customPasswords, sprayDelimiter, selectedCredIds, selectedEngagementId]);
 
-  // Filtered credentials list
+  // Filtered credentials list — strict encapsulation
   const filteredCreds = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return credentials.filter((c) => {
-      if (filterByActiveEngagement && activeEngagement && c.engagementId !== activeEngagement.id) {
-        return false;
+      if (!selectedEngagementId) {
+        // Casual / No Engagement: show only unattached global credentials
+        if (c.engagementId) return false;
+      } else {
+        // Customer Engagement: strictly show ONLY credentials tagged for this engagement
+        if (c.engagementId !== selectedEngagementId) return false;
       }
       if (selectedCategory !== 'all' && c.category !== selectedCategory) return false;
       if (!q) return true;
@@ -229,7 +314,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
         (c.source && c.source.toLowerCase().includes(q))
       );
     });
-  }, [credentials, searchQuery, selectedCategory, filterByActiveEngagement, activeEngagement]);
+  }, [credentials, searchQuery, selectedCategory, selectedEngagementId]);
 
   if (!isOpen) return null;
 
@@ -272,7 +357,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
     try {
       const entry: CredentialEntry = {
         id: editingCredId || `cred-${Date.now()}`,
-        engagementId: activeEngagement?.id || '',
+        engagementId: selectedEngagementId || '',
         category: credCategory,
         label: credLabel.trim() || credUsername.trim(),
         username: credUsername.trim(),
@@ -309,54 +394,6 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
       await api.DeleteCredential(id);
       await refreshAll();
       setFeedbackMsg({ type: 'success', text: `Deleted credential ${label}.` });
-    } catch (err: unknown) {
-      setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
-    }
-  };
-
-  const handleSaveEngagement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const api = getPentestApi();
-    if (!api?.SaveEngagement) return;
-    if (!newEngName.trim()) {
-      setFeedbackMsg({ type: 'error', text: 'Engagement name is required.' });
-      return;
-    }
-
-    try {
-      const newEng: Engagement = {
-        id: `eng-${Date.now()}`,
-        name: newEngName.trim(),
-        scope: newEngScope.trim(),
-        timeframe: newEngTimeframe.trim(),
-        lockoutPolicy: {
-          maxAttemptsPerUser: newEngMaxAttempts,
-          lockoutWindowMinutes: newEngLockoutWindow,
-          enforceDelaySeconds: newEngDelay,
-          warningThresholdPercent: 66,
-        },
-        isActive: engagements.length === 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      await api.SaveEngagement(newEng);
-      setNewEngName('');
-      setNewEngScope('');
-      setNewEngTimeframe('');
-      setFeedbackMsg({ type: 'success', text: `Created engagement ${newEng.name}!` });
-      await refreshAll();
-    } catch (err: unknown) {
-      setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
-    }
-  };
-
-  const handleSetActiveEngagement = async (id: string) => {
-    const api = getPentestApi();
-    if (!api?.SetActiveEngagement) return;
-    try {
-      await api.SetActiveEngagement(id);
-      await refreshAll();
-      setFeedbackMsg({ type: 'success', text: 'Active engagement updated.' });
     } catch (err: unknown) {
       setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
     }
@@ -468,11 +505,6 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 PENTEST MODULE // ENGAGEMENT POOL &amp; LOCKOUT GUARD
-                {activeEngagement && (
-                  <span style={{ marginLeft: '8px', color: '#10b981', fontWeight: 700 }}>
-                    [ENGAGEMENT: {activeEngagement.name.toUpperCase()}]
-                  </span>
-                )}
               </div>
             </div>
           </div>
@@ -486,7 +518,45 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Selection — Reordered: 1. Engagements, 2. Pool, 3. Spray */}
+        {/* Target Engagement Selector Bar */}
+        <div
+          style={{
+            background: 'rgba(5, 12, 24, 0.95)',
+            borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+            padding: '0.65rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <span style={{ fontSize: '0.76rem', color: '#00f0ff', fontWeight: 700, letterSpacing: '0.04em' }}>
+              🎯 TARGET ENGAGEMENT:
+            </span>
+            <select
+              className="cyber-hud-select"
+              value={selectedEngagementId}
+              onChange={(e) => void handleEngagementChange(e.target.value)}
+              style={{ fontSize: '0.76rem', height: '28px', minWidth: '240px', borderColor: 'rgba(0, 240, 255, 0.4)' }}
+            >
+              <option value="">🌐 No Engagement (Casual / Global Pool)</option>
+              {engagements.map((eng) => (
+                <option key={eng.id} value={eng.id}>
+                  🎯 {eng.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: selectedEngagementId ? '#10b981' : '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>
+            {selectedEngagementId
+              ? `[ENCAPSULATED: ${engagements.find((e) => e.id === selectedEngagementId)?.name.toUpperCase()}]`
+              : '[CASUAL MODE: GLOBAL UNATTACHED POOL]'}
+          </div>
+        </div>
+
+        {/* Tab Selection — 2 Tabs: 1. Pool, 2. Spray */}
         <div
           className="settings-tabs-header"
           style={{
@@ -499,24 +569,17 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
         >
           <button
             type="button"
-            className={`settings-tab-btn ${activeTab === 'engagements' ? 'active' : ''}`}
-            onClick={() => setActiveTab('engagements')}
-          >
-            <span>🎯 1. Engagement &amp; Scope</span>
-          </button>
-          <button
-            type="button"
             className={`settings-tab-btn ${activeTab === 'creds' ? 'active' : ''}`}
             onClick={() => setActiveTab('creds')}
           >
-            <span>🔑 2. Credential Pool ({credentials.length})</span>
+            <span>🔑 1. Credential Pool ({filteredCreds.length})</span>
           </button>
           <button
             type="button"
             className={`settings-tab-btn ${activeTab === 'spray' ? 'active' : ''}`}
             onClick={() => setActiveTab('spray')}
           >
-            <span>⚡ 3. Spray Generator &amp; Wordlists</span>
+            <span>⚡ 2. Spray Generator &amp; Wordlists</span>
           </button>
         </div>
 
@@ -559,170 +622,10 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
             </div>
           )}
 
-          {/* TAB 1: ENGAGEMENT & SCOPE */}
-          {activeTab === 'engagements' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="cyber-label">Active Engagement Context</span>
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                  The pool and generator bind directly to the selected engagement.
-                </span>
-              </div>
-
-              {/* Engagement Cards List */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.75rem' }}>
-                {engagements.map((eng) => {
-                  const isActive = eng.id === activeEngagement?.id;
-                  return (
-                    <div
-                      key={eng.id}
-                      style={{
-                        background: isActive ? 'rgba(0, 240, 255, 0.08)' : 'rgba(5, 9, 16, 0.75)',
-                        border: `1px solid ${isActive ? '#00f0ff' : 'rgba(0, 240, 255, 0.2)'}`,
-                        borderRadius: '2px',
-                        padding: '0.85rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.45rem',
-                        position: 'relative',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <span style={{ fontWeight: 700, color: isActive ? '#00f0ff' : '#f1f5f9', fontSize: '0.86rem' }}>
-                          {eng.name}
-                        </span>
-                        {isActive && (
-                          <span
-                            style={{
-                              background: '#00f0ff',
-                              color: '#02050a',
-                              fontSize: '0.62rem',
-                              fontWeight: 800,
-                              padding: '1px 5px',
-                              borderRadius: '2px',
-                            }}
-                          >
-                            ACTIVE
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                        Scope: {eng.scope || '(none specified)'}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'JetBrains Mono, monospace' }}>
-                        Max Attempts: {eng.lockoutPolicy.maxAttemptsPerUser} / {eng.lockoutPolicy.lockoutWindowMinutes}min
-                      </div>
-                      <div style={{ marginTop: 'auto', paddingTop: '0.4rem', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
-                        {!isActive && (
-                          <button
-                            type="button"
-                            className="cyber-btn cyber-btn-secondary cyber-btn-sm"
-                            onClick={() => void handleSetActiveEngagement(eng.id)}
-                          >
-                            Set Active
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Create Engagement Form */}
-              <form
-                onSubmit={handleSaveEngagement}
-                style={{
-                  background: 'rgba(5, 9, 16, 0.85)',
-                  border: '1px solid rgba(0, 240, 255, 0.3)',
-                  padding: '1rem',
-                  borderRadius: '2px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
-                  marginTop: '0.5rem',
-                }}
-              >
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f0ff' }}>
-                  /// CREATE NEW CUSTOMER ENGAGEMENT
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div>
-                    <label className="cyber-label">Customer / Assignment Name *</label>
-                    <input
-                      type="text"
-                      className="cyber-hud-input"
-                      placeholder="Acme Corp External Penetration Test"
-                      value={newEngName}
-                      onChange={(e) => setNewEngName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="cyber-label">Timeframe / Window</label>
-                    <input
-                      type="text"
-                      className="cyber-hud-input"
-                      placeholder="Nov 10 - Nov 20, 2026"
-                      value={newEngTimeframe}
-                      onChange={(e) => setNewEngTimeframe(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="cyber-label">Authorized Scope (CIDRs, IPs, Hostnames)</label>
-                  <textarea
-                    className="cyber-hud-input"
-                    rows={2}
-                    placeholder="192.168.1.0/24, 10.10.10.0/24, auth.acme.corp"
-                    value={newEngScope}
-                    onChange={(e) => setNewEngScope(e.target.value)}
-                  />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                  <div>
-                    <label className="cyber-label">Max Attempts / User</label>
-                    <input
-                      type="number"
-                      className="cyber-hud-input"
-                      value={newEngMaxAttempts}
-                      onChange={(e) => setNewEngMaxAttempts(parseInt(e.target.value, 10) || 3)}
-                      min={1}
-                    />
-                  </div>
-                  <div>
-                    <label className="cyber-label">Lockout Window (min)</label>
-                    <input
-                      type="number"
-                      className="cyber-hud-input"
-                      value={newEngLockoutWindow}
-                      onChange={(e) => setNewEngLockoutWindow(parseInt(e.target.value, 10) || 30)}
-                      min={1}
-                    />
-                  </div>
-                  <div>
-                    <label className="cyber-label">Delay Between Sprays (sec)</label>
-                    <input
-                      type="number"
-                      className="cyber-hud-input"
-                      value={newEngDelay}
-                      onChange={(e) => setNewEngDelay(parseInt(e.target.value, 10) || 600)}
-                      min={0}
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-                  <button type="submit" className="cyber-btn cyber-btn-primary">
-                    ✓ Create Engagement
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* TAB 2: CREDENTIAL POOL */}
+          {/* TAB 1: CREDENTIAL POOL */}
           {activeTab === 'creds' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {/* Scope & Context Bar */}
+              {/* Context Summary Bar */}
               <div
                 style={{
                   background: 'rgba(5, 12, 24, 0.75)',
@@ -736,20 +639,16 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ color: '#00f0ff', fontWeight: 700 }}>🎯 BOUND ENGAGEMENT:</span>
+                  <span style={{ color: '#00f0ff', fontWeight: 700 }}>POOL SCOPE:</span>
                   <span style={{ color: '#f1f5f9', fontWeight: 600 }}>
-                    {activeEngagement?.name || 'All Engagements (Unfiltered)'}
+                    {selectedEngagementId
+                      ? `Enclosed to ${engagements.find((e) => e.id === selectedEngagementId)?.name || selectedEngagementId}`
+                      : 'Casual / Global Pool (No Engagement)'}
                   </span>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', color: '#94a3b8' }}>
-                  <input
-                    type="checkbox"
-                    checked={filterByActiveEngagement}
-                    onChange={(e) => setFilterByActiveEngagement(e.target.checked)}
-                    style={{ accentColor: '#00f0ff', cursor: 'pointer' }}
-                  />
-                  <span>Filter by active engagement</span>
-                </label>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                  Showing {filteredCreds.length} credentials
+                </div>
               </div>
 
               {/* Toolbar */}
@@ -1087,9 +986,92 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: SPRAY GENERATOR & WORDLISTS */}
+          {/* TAB 2: SPRAY GENERATOR & WORDLISTS */}
           {activeTab === 'spray' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              {/* Defensive Lockout Policy Configuration */}
+              <div
+                style={{
+                  background: 'rgba(5, 12, 24, 0.85)',
+                  border: '1px solid rgba(0, 240, 255, 0.25)',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '2px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
+                      🛡️ DEFENSIVE LOCKOUT POLICY &amp; SPRAY GUARD (F-40)
+                    </span>
+                    {selectedEngagementId ? (
+                      <span style={{ fontSize: '0.68rem', color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>
+                        [{engagements.find((e) => e.id === selectedEngagementId)?.name}]
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>
+                        [Casual / Temporary Policy]
+                      </span>
+                    )}
+                  </div>
+                  {selectedEngagementId && (
+                    <button
+                      type="button"
+                      className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                      onClick={() => void handleSaveLockoutPolicy()}
+                    >
+                      💾 Save Policy to Engagement
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.65rem' }}>
+                  <div>
+                    <label className="cyber-label">Max Attempts / User</label>
+                    <input
+                      type="number"
+                      className="cyber-hud-input"
+                      value={policyMaxAttempts}
+                      onChange={(e) => setPolicyMaxAttempts(parseInt(e.target.value, 10) || 3)}
+                      min={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="cyber-label">Lockout Window (min)</label>
+                    <input
+                      type="number"
+                      className="cyber-hud-input"
+                      value={policyLockoutWindow}
+                      onChange={(e) => setPolicyLockoutWindow(parseInt(e.target.value, 10) || 30)}
+                      min={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="cyber-label">Delay Between Sprays (sec)</label>
+                    <input
+                      type="number"
+                      className="cyber-hud-input"
+                      value={policyDelay}
+                      onChange={(e) => setPolicyDelay(parseInt(e.target.value, 10) || 600)}
+                      min={0}
+                    />
+                  </div>
+                  <div>
+                    <label className="cyber-label">Warning Threshold (%)</label>
+                    <input
+                      type="number"
+                      className="cyber-hud-input"
+                      value={policyWarningThreshold}
+                      onChange={(e) => setPolicyWarningThreshold(parseInt(e.target.value, 10) || 66)}
+                      min={10}
+                      max={100}
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Lockout Warning Bar */}
               {sprayResult?.warning && (
                 <div
@@ -1139,7 +1121,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                     title="Pairs users directly 1:1 with corresponding passwords without cross-multiplying."
                   >
                     <strong>1:1 User:Pass Pairs</strong>
-                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Direct Match (No Multiplication)</div>
+                    <div style={{ fontSize: '10px', opacity: 0.8 }}>Direct Match (Credential Stuffing)</div>
                   </button>
                   <button
                     type="button"
@@ -1231,6 +1213,13 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                     onClick={() => setCustomPasswords(WORDLIST_PRESETS.adDefaults)}
                   >
                     AD Seasonal Defaults
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    onClick={() => setCustomPasswords(WORDLIST_PRESETS.rockyouSample)}
+                  >
+                    RockYou Sample
                   </button>
                   <button
                     type="button"

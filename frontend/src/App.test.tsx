@@ -2930,10 +2930,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(await screen.findByText(/LOCKOUT GUARD WARNING \(F-40\)/i)).toBeInTheDocument();
       expect(screen.getByText(/Lockout warning: 2 attempts approaches threshold/i)).toBeInTheDocument();
 
-      // 5. Switch to Engagements tab
-      const engTabBtn = screen.getByRole('button', { name: /Engagement & Scope/i });
-      fireEvent.click(engTabBtn);
-      expect(await screen.findByText('Bank Audit 2026')).toBeInTheDocument();
+      // 5. Verify defensive lockout policy and wordlist preset rendered in Spray Generator
+      expect(screen.getByText(/DEFENSIVE LOCKOUT POLICY & SPRAY GUARD \(F-40\)/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /RockYou Sample/i })).toBeInTheDocument();
 
       // 6. Close modal
       const closeBtn = screen.getByRole('button', { name: /Close dialog/i });
@@ -3039,6 +3038,133 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // 5. Close modal
       const closeBtn = screen.getByRole('button', { name: /Close dialog/i });
       fireEvent.click(closeBtn);
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
+
+  it('supports Top Bar Engagement switcher, New Engagement Modal, and Host-to-Engagement scope encapsulation (F-36)', async () => {
+    const mockEngagements = [
+      {
+        id: 'eng-corp-1',
+        name: 'Megacorp Security Audit',
+        scope: '10.50.0.0/16, corp.internal',
+        timeframe: 'Nov 2026',
+        lockoutPolicy: {
+          maxAttemptsPerUser: 4,
+          lockoutWindowMinutes: 25,
+          enforceDelaySeconds: 300,
+          warningThresholdPercent: 75,
+        },
+        isActive: true,
+        createdAt: '2026-11-10T12:00:00Z',
+        updatedAt: '2026-11-10T12:00:00Z',
+      },
+    ];
+
+    const mockVault = {
+      groups: [],
+      hosts: [
+        {
+          id: 'host-corp-1',
+          label: 'DC01 Primary Domain Controller',
+          address: '10.50.1.10',
+          effectivePort: 22,
+          effectiveUser: 'Administrator',
+          tags: ['ad', 'windows'],
+          color: '#ef4444',
+          favorite: false,
+          keepaliveSecs: 30,
+          groupId: '',
+          identityId: '',
+          engagementId: 'eng-corp-1',
+        },
+        {
+          id: 'host-global-1',
+          label: 'Personal Raspberry Pi',
+          address: '192.168.1.50',
+          effectivePort: 22,
+          effectiveUser: 'pi',
+          tags: ['lab'],
+          color: '#10b981',
+          favorite: false,
+          keepaliveSecs: 30,
+          groupId: '',
+          identityId: '',
+          engagementId: '',
+        },
+      ],
+      keys: [],
+      identities: [],
+      proxyProfiles: [],
+      snippets: [],
+      totpRecords: [],
+    };
+
+    const saveEngagementSpy = vi.fn().mockResolvedValue(undefined);
+    const setActiveEngagementSpy = vi.fn().mockResolvedValue(undefined);
+    const assignHostSpy = vi.fn().mockResolvedValue(undefined);
+
+    try {
+      (window as unknown as { go: unknown }).go = {
+        main: {
+          App: {
+            HealthCheck: vi.fn().mockResolvedValue({
+              vaultLocked: false,
+              vaultInitialized: true,
+              passwordless: false,
+              quickUnlockReady: false,
+            }),
+            GetVaultSummary: vi.fn().mockResolvedValue(mockVault),
+            ListEngagements: vi.fn().mockResolvedValue(mockEngagements),
+            GetActiveEngagement: vi.fn().mockResolvedValue(mockEngagements[0]),
+            SetActiveEngagement: setActiveEngagementSpy,
+            SaveEngagement: saveEngagementSpy,
+            AssignHostToEngagement: assignHostSpy,
+          },
+        },
+      };
+
+      render(<App />);
+
+      // 1. Verify Top Bar controls exist
+      const engagementSelect = await screen.findByRole('combobox', { name: /Select Active Engagement/i });
+      expect(engagementSelect).toBeInTheDocument();
+      const engElements = await screen.findAllByText(/Megacorp Security Audit/i);
+      expect(engElements.length).toBeGreaterThanOrEqual(2);
+
+      const newEngBtn = screen.getByRole('button', { name: /\+ New Engagement/i });
+      expect(newEngBtn).toBeInTheDocument();
+
+      const engToolsMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
+      expect(engToolsMenuBtn).toBeInTheDocument();
+
+      // 2. Open Engagement Tools dropdown and verify actions
+      fireEvent.click(engToolsMenuBtn);
+      expect(screen.getByText(/Target Scope & Hub \(F-36\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Export \.daeng Package \(F-36\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Edit Scope & Lockout Policy/i)).toBeInTheDocument();
+
+      // 3. Open New Engagement Modal
+      fireEvent.click(newEngBtn);
+      expect(await screen.findByText(/New Pentest Engagement/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Acme Corp External Penetration Test/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Target subnets, IPs, hostnames/i)).toBeInTheDocument();
+
+      // Close New Engagement modal
+      const cancelBtn = screen.getByRole('button', { name: /Cancel/i });
+      fireEvent.click(cancelBtn);
+
+      // 4. Verify Host Sidebar Strict Encapsulation:
+      // With active engagement and scope filter on, in-scope DC01 is visible
+      expect(await screen.findByText('DC01 Primary Domain Controller')).toBeInTheDocument();
+      // Global host should be encapsulated and not shown in active customer engagement
+      expect(screen.queryByText('Personal Raspberry Pi')).not.toBeInTheDocument();
+
+      // Toggle to All Vault Hosts
+      const toggleScopeBtn = screen.getByRole('button', { name: /In-Scope Only/i });
+      fireEvent.click(toggleScopeBtn);
+      expect(await screen.findByText('Personal Raspberry Pi')).toBeInTheDocument();
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }

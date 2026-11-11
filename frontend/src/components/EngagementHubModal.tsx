@@ -6,6 +6,7 @@ export interface HostOption {
   label: string;
   address?: string;
   tags?: string[];
+  engagementId?: string;
 }
 
 interface EngagementHubModalProps {
@@ -14,6 +15,8 @@ interface EngagementHubModalProps {
   hosts: HostOption[];
   onOpenCredStore?: () => void;
   onOpenEvidenceVault?: () => void;
+  onEditEngagement?: (eng: Engagement) => void;
+  onRefreshVault?: () => Promise<void>;
 }
 
 interface WailsEngagementApi {
@@ -41,6 +44,8 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
   hosts,
   onOpenCredStore,
   onOpenEvidenceVault,
+  onEditEngagement,
+  onRefreshVault,
 }) => {
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
@@ -106,19 +111,22 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
     }
   }, [isOpen, refreshAll]);
 
-  // Compute enclosed artifact counts for the active engagement
-  const enclosedArtifacts = useMemo(() => {
-    if (!activeEngagement) {
-      return { hostsCount: 0, credsCount: 0, evidenceCount: 0 };
-    }
+  // In-scope hosts matching engagementId, tags, or scope CIDR
+  const inScopeHostsList = useMemo(() => {
+    if (!activeEngagement) return [];
     const engId = activeEngagement.id;
     const engName = activeEngagement.name.toLowerCase();
-
-    // Hosts in scope (matching tags, IP, or scope address)
-    const inScopeHosts = hosts.filter((h) => {
+    return hosts.filter((h) => {
+      if (h.engagementId && h.engagementId === engId) {
+        return true;
+      }
       if (h.tags) {
         for (const t of h.tags) {
-          if (t.toLowerCase() === engId.toLowerCase() || t.toLowerCase() === engName || t.toLowerCase() === `engagement-${engId.toLowerCase()}`) {
+          if (
+            t.toLowerCase() === engId.toLowerCase() ||
+            t.toLowerCase() === engName ||
+            t.toLowerCase() === `engagement-${engId.toLowerCase()}`
+          ) {
             return true;
           }
         }
@@ -131,16 +139,43 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
       }
       return false;
     });
+  }, [activeEngagement, hosts]);
 
+  const unassignedHosts = useMemo(() => {
+    if (!activeEngagement) return [];
+    return hosts.filter((h) => !h.engagementId || h.engagementId !== activeEngagement.id);
+  }, [activeEngagement, hosts]);
+
+  const handleAssignHost = async (hostId: string, engId: string) => {
+    const api = (window as unknown as { go?: { main?: { App?: { AssignHostToEngagement?: (h: string, e: string) => Promise<void> } } } }).go?.main?.App;
+    if (api?.AssignHostToEngagement) {
+      try {
+        await api.AssignHostToEngagement(hostId, engId);
+        if (onRefreshVault) {
+          await onRefreshVault();
+        }
+        await refreshAll();
+      } catch (err) {
+        console.error('Failed to assign host to engagement:', err);
+      }
+    }
+  };
+
+  // Compute enclosed artifact counts for the active engagement
+  const enclosedArtifacts = useMemo(() => {
+    if (!activeEngagement) {
+      return { hostsCount: 0, credsCount: 0, evidenceCount: 0 };
+    }
+    const engId = activeEngagement.id;
     const scopedCreds = credentials.filter((c) => c.engagementId === engId);
     const scopedEv = evidenceList.filter((e) => e.engagementId === engId);
 
     return {
-      hostsCount: inScopeHosts.length,
+      hostsCount: inScopeHostsList.length,
       credsCount: scopedCreds.length,
       evidenceCount: scopedEv.length,
     };
-  }, [activeEngagement, hosts, credentials, evidenceList]);
+  }, [activeEngagement, inScopeHostsList, credentials, evidenceList]);
 
   if (!isOpen) return null;
 
@@ -528,14 +563,29 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     ID: {activeEngagement.id} {activeEngagement.timeframe ? `· ⏱️ ${activeEngagement.timeframe}` : ''}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn-danger btn-sm"
-                  onClick={() => void handleDeleteEngagement(activeEngagement.id, activeEngagement.name)}
-                  style={{ fontSize: '0.7rem' }}
-                >
-                  🗑️ Delete Engagement
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  {onEditEngagement && (
+                    <button
+                      type="button"
+                      className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                      onClick={() => {
+                        onClose();
+                        onEditEngagement(activeEngagement);
+                      }}
+                      style={{ fontSize: '0.72rem' }}
+                    >
+                      ✏️ Edit Scope &amp; Settings
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-danger btn-sm"
+                    onClick={() => void handleDeleteEngagement(activeEngagement.id, activeEngagement.name)}
+                    style={{ fontSize: '0.7rem' }}
+                  >
+                    🗑️ Delete Engagement
+                  </button>
+                </div>
               </div>
 
               {/* Scope Box */}
@@ -555,6 +605,97 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 >
                   {activeEngagement.scope || 'No specific target scope specified.'}
                 </div>
+              </div>
+
+              {/* Enclosed In-Scope Hosts Section */}
+              <div
+                style={{
+                  background: 'rgba(10, 18, 32, 0.65)',
+                  border: '1px solid rgba(0, 240, 255, 0.2)',
+                  padding: '0.85rem',
+                  borderRadius: '2px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
+                    🖥️ ENCLOSED IN-SCOPE HOSTS ({inScopeHostsList.length})
+                  </span>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                    Strict customer encapsulation (F-36)
+                  </span>
+                </div>
+
+                {inScopeHostsList.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+                    {inScopeHostsList.map((h) => (
+                      <div
+                        key={h.id}
+                        style={{
+                          background: 'rgba(0, 240, 255, 0.08)',
+                          border: '1px solid rgba(0, 240, 255, 0.35)',
+                          borderRadius: '2px',
+                          padding: '4px 8px',
+                          fontSize: '0.74rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{h.label}</span>
+                        <span style={{ color: '#38bdf8', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.68rem' }}>
+                          {h.address || 'no-ip'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void handleAssignHost(h.id, '')}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#f87171',
+                            cursor: 'pointer',
+                            padding: '0 2px',
+                            fontSize: '0.75rem',
+                          }}
+                          title="Detach host from this engagement"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic' }}>
+                    No hosts linked to this engagement yet. Select one below to link it.
+                  </div>
+                )}
+
+                {/* Link Host Dropdown */}
+                {unassignedHosts.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>+ Link Existing Host:</span>
+                    <select
+                      className="cyber-hud-select"
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          void handleAssignHost(e.target.value, activeEngagement.id);
+                          e.target.value = '';
+                        }
+                      }}
+                      style={{ fontSize: '0.72rem', height: '26px', minWidth: '220px' }}
+                    >
+                      <option value="" disabled>Select host from vault...</option>
+                      {unassignedHosts.map((uh) => (
+                        <option key={uh.id} value={uh.id}>
+                          {uh.label} ({uh.address || 'no-ip'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Enclosed Artifacts Counter Grid */}
@@ -775,3 +916,4 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
     </div>
   );
 };
+

@@ -1,10 +1,28 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-36`, `F-18`, `F-40`, `F-31` — Engagement Hub, Multi-Label Hosts, Credential Pool & Spray Lists, Evidence Vault, and Standalone `.daeng` Packages — COMPLETED!
+- **Current Milestone:** `F-36`, `F-18`, `F-40`, `F-31` — Top-Bar Engagement Controls, Host-Engagement Linking, Dedicated Scope/Creation Modal, and Strict Customer Data Encapsulation — COMPLETED!
 - **Next Milestone:** Wave 1 MVP+ — Save Selection Context Menu (`F-19`) & Snippet Chains (`F-16`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Top-Bar Engagement Control Cluster & Strict Customer Encapsulation (`F-36`, `F-18`, `F-40`)**:
+  - **Top Bar Control Group**:
+    - Placed directly in the header navigation menu bar after the cyber `//` divider: `[🎯 Engagement Dropdown ▾] [+ New Engagement] [⚔️ Engagement ▾]`.
+    - **Engagement Selector Dropdown**: Seamlessly toggle between active engagements or switch to `🌐 No Engagement (Casual)` mode.
+    - **`+ New Engagement` Button**: Launches the dedicated `NewEngagementModal` to configure engagement name, in-scope CIDRs/domains/IPs, timeframe, client notes, and lockout defaults.
+    - **`⚔️ Engagement ▾` Menu**: Fast access to Scope & Target Hub, Credential Pool, Evidence Findings, In-scope Hosts, Export `.daeng`, and Edit Scope.
+  - **Strict Customer Isolation & Casual Mode**:
+    - Default state is `No Engagement` (casual operation): tools and views operate strictly on global data (`engagementId == ""`).
+    - When an engagement is selected, views strictly encapsulate all enclosed assets: hosts, credentials, and evidence findings belonging to other clients or global pools are segregated and hidden.
+    - Spray generator and evidence exports only draw from the active customer's encapsulated pool.
+  - **Host-to-Engagement Linking & Scope Filtering**:
+    - `HostRecord` and `HostSummary` include `EngagementID string`.
+    - In-place assignment: Host create/edit modal provides an engagement picker.
+    - Quick linking: `EngagementHubModal` includes an In-Scope Hosts drawer with 1-click `+ Link Existing Host` dropdown and detach (`✕`) buttons.
+    - Sidebar filter: Toggle `[🎯 In-Scope Only | 🌐 All Vault Hosts]` when an engagement is active, with engagement badges displayed directly on host rack cards.
+  - **Dedicated `NewEngagementModal` Component (`frontend/src/components/NewEngagementModal.tsx`)**:
+    - Standalone Cyberpunk HUD modal for creating or editing pentest engagements.
+    - Captures Scope CIDRs, test timeframe, and defensive lockout policy thresholds.
 - **Pentest Engagement Hub & Standalone `.daeng` Packages (`F-36`, `F-18` / Pentest Spec Section 1, 2, 4)**:
   - **Engagement Enclosure Architecture (`backend/core/pentest.go`, `backend/vault/pentest.go`)**:
     - Engagements act as enclosed operational boundaries encapsulating target Hosts, Scope (CIDRs/domains), Credentials, Evidence findings, Host Notes, and custom Attack Snippets.

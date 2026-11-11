@@ -46,6 +46,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
   const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [templates, setTemplates] = useState<EvidenceItem[]>([]);
+  const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [activeEngagement, setActiveEngagementState] = useState<Engagement | null>(null);
 
   // Filters
@@ -83,6 +84,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     const api = getEvidenceApi();
     if (!api) return;
     try {
+      if (api.ListEngagements) {
+        const engs = await api.ListEngagements();
+        setEngagements(engs || []);
+      }
       let activeId = '';
       if (api.GetActiveEngagement) {
         const act = await api.GetActiveEngagement();
@@ -137,12 +142,16 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [templates]);
 
-  // Filtered evidence items
+  // Filtered evidence items — strict encapsulation
   const filteredEvidence = useMemo(() => {
     return evidenceList.filter((item) => {
-      // Engagement filter: only show items belonging to active engagement if defined
-      if (activeEngagement && item.engagementId && item.engagementId !== activeEngagement.id) {
-        return false;
+      // Engagement encapsulation
+      if (!activeEngagement) {
+        // Casual / No Engagement: strictly show global unattached findings
+        if (item.engagementId) return false;
+      } else {
+        // Customer Engagement: strictly show findings belonging to active engagement
+        if (item.engagementId !== activeEngagement.id) return false;
       }
       // Category filter
       if (selectedCategory !== 'all' && item.category !== selectedCategory) {
@@ -176,12 +185,14 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     });
   }, [evidenceList, activeEngagement, selectedCategory, selectedHostId, selectedSeverity, searchQuery]);
 
-  // Counts per category
+  // Counts per category — strict encapsulation
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const item of evidenceList) {
-      if (activeEngagement && item.engagementId && item.engagementId !== activeEngagement.id) {
-        continue;
+      if (!activeEngagement) {
+        if (item.engagementId) continue;
+      } else {
+        if (item.engagementId !== activeEngagement.id) continue;
       }
       counts.set(item.category, (counts.get(item.category) || 0) + 1);
     }
@@ -279,7 +290,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
     const item: EvidenceItem = {
       id: editId || `evi-${Date.now()}`,
-      engagementId: activeEngagement?.id || 'eng-default',
+      engagementId: activeEngagement?.id || '',
       category: editCategory,
       title: editTitle.trim(),
       type: editType,
@@ -503,31 +514,48 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
         {/* Modal Header */}
         <div className="dialog-header">
-          <div className="dialog-title">
+          <div className="dialog-title" style={{ flex: 1, marginRight: '1rem' }}>
             <span className="cyber-hazard-stripes">///</span>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <h3 id="evidence-dialog-title" style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
                   🛡️ Evidence Vault &amp; Findings (F-18)
                 </h3>
-                {activeEngagement && (
-                  <span
-                    style={{
-                      background: 'rgba(0, 240, 255, 0.12)',
-                      border: '1px solid rgba(0, 240, 255, 0.4)',
-                      color: '#38bdf8',
-                      padding: '2px 8px',
-                      fontSize: '0.72rem',
-                      fontFamily: 'JetBrains Mono, monospace',
-                      borderRadius: '2px',
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#00f0ff', fontWeight: 700 }}>TARGET ENGAGEMENT:</span>
+                  <select
+                    className="cyber-hud-select"
+                    value={activeEngagement?.id || ''}
+                    onChange={async (e) => {
+                      const newId = e.target.value;
+                      const appApi = (window as unknown as { go?: { main?: { App?: { SetActiveEngagement: (id: string) => Promise<void> } } } }).go?.main?.App;
+                      if (appApi?.SetActiveEngagement) {
+                        try {
+                          await appApi.SetActiveEngagement(newId || 'none');
+                          await refreshAll();
+                        } catch (err) {
+                          console.error('Failed to change engagement:', err);
+                        }
+                      }
                     }}
+                    style={{ fontSize: '0.74rem', height: '26px', minWidth: '220px', borderColor: 'rgba(0, 240, 255, 0.4)' }}
                   >
-                    🎯 {activeEngagement.name}
+                    <option value="">🌐 No Engagement (Casual / Global)</option>
+                    {engagements.map((eng) => (
+                      <option key={eng.id} value={eng.id}>
+                        🎯 {eng.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                SEC-PENTEST // ENGAGEMENT-SCOPED FINDINGS, POCS &amp; STRUCTURED EVIDENCE
+                {activeEngagement && (
+                  <span style={{ marginLeft: '8px', color: '#10b981', fontWeight: 700 }}>
+                    [ENCAPSULATED: {activeEngagement.name.toUpperCase()}]
                   </span>
                 )}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
-                SEC-PENTEST // ENGAGEMENT-SCOPED FINDINGS, POCS &amp; STRUCTURED EVIDENCE
               </div>
             </div>
           </div>

@@ -47,6 +47,7 @@ import { RawTcpModal } from './components/RawTcpModal';
 import { CredentialStoreModal } from './components/CredentialStoreModal';
 import { EvidenceVaultModal } from './components/EvidenceVaultModal';
 import { EngagementHubModal } from './components/EngagementHubModal';
+import { NewEngagementModal } from './components/NewEngagementModal';
 import { Engagement } from './types/pentest';
 import {
   CustomShortcutItem,
@@ -133,6 +134,7 @@ interface HostSummary {
   proxyCommand?: string;
   jumpChain?: string[];
   sessionLogging?: boolean;
+  engagementId?: string;
 }
 
 interface IdentitySummary {
@@ -873,6 +875,7 @@ interface WailsAppBindings {
   ListEngagements?: () => Promise<Engagement[]>;
   GetActiveEngagement?: () => Promise<Engagement | null>;
   SetActiveEngagement?: (id: string) => Promise<void>;
+  AssignHostToEngagement?: (hostId: string, engagementId: string) => Promise<void>;
   SaveEngagement?: (e: Engagement) => Promise<void>;
   DeleteEngagement?: (id: string) => Promise<void>;
   ExportEngagementPackage?: (engagementId: string, password: string) => Promise<string>;
@@ -1114,6 +1117,10 @@ export function App({
   // Pentest Engagement Hub state (F-36)
   const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
+  const [engagementsList, setEngagementsList] = useState<Engagement[]>([]);
+  const [showNewEngagementModal, setShowNewEngagementModal] = useState<boolean>(false);
+  const [editingEngagement, setEditingEngagement] = useState<Engagement | null>(null);
+  const [filterByEngagementScope, setFilterByEngagementScope] = useState<boolean>(true);
 
   // Host Sidebar Tag / Label filtering & editing
   const [selectedHostTag, setSelectedHostTag] = useState<string>('all');
@@ -1145,6 +1152,7 @@ export function App({
   const [hostProxyCommand, setHostProxyCommand] = useState<string>('');
   const [hostProxyJump, setHostProxyJump] = useState<string>('');
   const [hostSessionLogging, setHostSessionLogging] = useState<boolean>(false);
+  const [hostEngagementId, setHostEngagementId] = useState<string>('');
 
   const [address, setAddress] = useState<string>('');
   const [port, setPort] = useState<string>('22');
@@ -1868,6 +1876,9 @@ export function App({
             if (api.GetVaultSyncInfo) {
               api.GetVaultSyncInfo().then(setSyncInfo).catch(() => {});
             }
+            if (api.ListEngagements) {
+              api.ListEngagements().then(setEngagementsList).catch(() => {});
+            }
             if (api.GetActiveEngagement) {
               api.GetActiveEngagement().then(setActiveEngagement).catch(() => {});
             }
@@ -1890,6 +1901,9 @@ export function App({
         }
         if (api.GetVaultSyncInfo) {
           api.GetVaultSyncInfo().then(setSyncInfo).catch(() => {});
+        }
+        if (api.ListEngagements) {
+          api.ListEngagements().then(setEngagementsList).catch(() => {});
         }
         if (api.GetActiveEngagement) {
           api.GetActiveEngagement().then(setActiveEngagement).catch(() => {});
@@ -2614,6 +2628,7 @@ export function App({
         proxyCommand: hostProxyCommand.trim() || undefined,
         jumpChain: jumpChainList,
         sessionLogging: hostSessionLogging ? true : undefined,
+        engagementId: hostEngagementId || undefined,
       });
       await refreshVaultState();
     } else {
@@ -2640,6 +2655,7 @@ export function App({
         proxyCommand: hostProxyCommand.trim() || undefined,
         jumpChain: jumpChainList,
         sessionLogging: effSessionLogging,
+        engagementId: hostEngagementId || undefined,
       };
 
       setVaultSummary((prev) => {
@@ -2670,6 +2686,7 @@ export function App({
     setHostProxyCommand('');
     setHostProxyJump('');
     setHostSessionLogging(false);
+    setHostEngagementId('');
     setShowAddHostModal(false);
   };
 
@@ -2688,6 +2705,7 @@ export function App({
     setHostProxyCommand(h.proxyCommand || '');
     setHostProxyJump((h.jumpChain || []).join(', '));
     setHostSessionLogging(Boolean(h.sessionLogging));
+    setHostEngagementId(h.engagementId || '');
     setHostAuthMethod('password');
     setShowAddHostModal(true);
   };
@@ -3148,6 +3166,48 @@ export function App({
       }
     }
     setShowProxychainsExportModal(true);
+  };
+
+  const handleSelectEngagement = async (engagementId: string) => {
+    const api = getWailsBindings();
+    if (!api?.SetActiveEngagement) return;
+    try {
+      await api.SetActiveEngagement(engagementId || 'none');
+      if (api.GetActiveEngagement) {
+        const act = await api.GetActiveEngagement();
+        setActiveEngagement(act || null);
+      }
+      if (api.ListEngagements) {
+        const list = await api.ListEngagements();
+        setEngagementsList(list || []);
+      }
+      await refreshVaultState();
+    } catch (err) {
+      console.error('Failed to switch engagement:', err);
+    }
+  };
+
+  const handleSaveEngagement = async (eng: Engagement) => {
+    const api = getWailsBindings();
+    if (!api?.SaveEngagement) return;
+    try {
+      await api.SaveEngagement(eng);
+      if (api.SetActiveEngagement) {
+        await api.SetActiveEngagement(eng.id);
+      }
+      if (api.GetActiveEngagement) {
+        const act = await api.GetActiveEngagement();
+        setActiveEngagement(act || null);
+      }
+      if (api.ListEngagements) {
+        const list = await api.ListEngagements();
+        setEngagementsList(list || []);
+      }
+      await refreshVaultState();
+      setStatusMessage(`Saved engagement "${eng.name}".`);
+    } catch (err: unknown) {
+      console.error('Failed to save engagement:', err);
+    }
   };
 
   const handleGenerateProxychainsConfig = async (opts: ProxychainsExportOptions): Promise<string> => {
@@ -7049,6 +7109,13 @@ export function App({
 
   const filteredHosts = useMemo(() => {
     return vaultSummary.hosts.filter((h) => {
+      if (filterByEngagementScope) {
+        if (activeEngagement) {
+          if (h.engagementId !== activeEngagement.id) return false;
+        } else {
+          if (h.engagementId) return false;
+        }
+      }
       if (selectedHostTag !== 'all') {
         if (selectedHostTag.startsWith('grp:')) {
           const targetGrpId = selectedHostTag.slice(4);
@@ -7066,7 +7133,7 @@ export function App({
         (h.tags && h.tags.some((t) => t.toLowerCase().includes(q)))
       );
     });
-  }, [vaultSummary.hosts, selectedHostTag, searchQuery]);
+  }, [vaultSummary.hosts, activeEngagement, filterByEngagementScope, selectedHostTag, searchQuery]);
 
   // Pinnable Tools & Views Registry for Cyberpunk HUD Top Bar
   const pinnableRegistry: Record<
@@ -7489,21 +7556,9 @@ export function App({
               </button>
             </div>
           )}
-          {vaultLocked ? (
+          {vaultLocked && (
             <button type="button" className="btn-primary" onClick={handleOpenVaultButton}>
               {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="hud-engagement-pill-btn"
-              onClick={() => setShowEngagementHubModal(true)}
-              title="Active Pentest Engagement · Click to open Engagement Hub & Scope"
-            >
-              <span className="hud-engagement-dot">●</span>
-              <span className="hud-engagement-label">ENGAGEMENT:</span>
-              <strong className="hud-engagement-name">{activeEngagement ? activeEngagement.name : 'Default Scope'}</strong>
-              <span className="hud-engagement-caret">▾</span>
             </button>
           )}
         </div>
@@ -7847,6 +7902,109 @@ export function App({
               <span className="cyber-glitch-slashes">//</span>
             </div>
 
+            {/* Engagement Controls: Dropdown + New Engagement + Engagement Tools */}
+            <div className="nav-engagement-controls-cluster" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {/* Engagement Selector Dropdown */}
+              <div className="nav-menu-container">
+                <select
+                  aria-label="Select Active Engagement"
+                  className="cyber-hud-select nav-engagement-select"
+                  value={activeEngagement?.id || ''}
+                  onChange={(e) => void handleSelectEngagement(e.target.value)}
+                  style={{
+                    height: '24px',
+                    fontSize: '0.72rem',
+                    padding: '1px 6px',
+                    border: '1px solid rgba(0, 240, 255, 0.4)',
+                    background: 'rgba(5, 12, 22, 0.9)',
+                    color: activeEngagement ? '#00f0ff' : '#94a3b8',
+                    fontWeight: 600,
+                  }}
+                  title="Switch between Encapsulated Pentest Engagements or Casual Mode"
+                >
+                  <option value="">🌐 No Engagement (Casual)</option>
+                  {engagementsList.map((eng) => (
+                    <option key={eng.id} value={eng.id}>
+                      🎯 {eng.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* + New Engagement Button */}
+              <button
+                type="button"
+                className="nav-menu-trigger nav-engagement-btn"
+                onClick={() => {
+                  setEditingEngagement(null);
+                  setShowNewEngagementModal(true);
+                }}
+                style={{ fontSize: '0.74rem', padding: '2px 8px', color: '#38bdf8' }}
+                title="Create a new encapsulated target engagement"
+              >
+                <span>+ New Engagement</span>
+              </button>
+
+              {/* Engagement Specific Tools Menu */}
+              <div
+                className="nav-menu-container"
+                onMouseEnter={() => handleMenuEnter('engagement-tools')}
+                onMouseMove={handleMenuMove}
+                onMouseLeave={handleMenuLeave}
+              >
+                <button
+                  type="button"
+                  className={`nav-menu-trigger ${activeDropdownMenu === 'engagement-tools' ? 'active' : ''}`}
+                  aria-haspopup="true"
+                  aria-expanded={activeDropdownMenu === 'engagement-tools'}
+                  onClick={() =>
+                    setActiveDropdownMenu((prev) => (prev === 'engagement-tools' ? null : 'engagement-tools'))
+                  }
+                  style={{ fontSize: '0.74rem', padding: '2px 8px' }}
+                >
+                  <span>⚔️ Engagement</span>
+                  <span style={{ fontSize: '0.65rem' }}>▾</span>
+                </button>
+                {activeDropdownMenu === 'engagement-tools' && (
+                  <div
+                    className="nav-dropdown-menu"
+                    role="menu"
+                    aria-label="Engagement Specific Tools Menu"
+                    onMouseEnter={() => handleMenuEnter('engagement-tools')}
+                    onMouseMove={handleMenuMove}
+                  >
+                    <div className="tools-sub-header">
+                      {activeEngagement ? `🎯 ${activeEngagement.name}` : '🌐 Casual / Global Mode'}
+                    </div>
+                    {renderDropdownRow('eng-scope', 'Target Scope & Hub (F-36)', '🎯 Scope', () => setShowEngagementHubModal(true))}
+                    {renderDropdownRow('eng-creds', 'Credential Pool & Spray Lists (F-36)', '🔑 Creds', () => setShowCredStoreModal(true))}
+                    {renderDropdownRow('eng-evidence', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence', () => setShowEvidenceModal(true))}
+                    <div className="nav-dropdown-divider" />
+                    {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', '📦 Export', () => {
+                      setShowEngagementHubModal(true);
+                    })}
+                    {renderDropdownRow('eng-import', 'Import .daeng Package (F-36)', '📥 Import', () => {
+                      setShowEngagementHubModal(true);
+                    })}
+                    {activeEngagement && (
+                      <>
+                        <div className="nav-dropdown-divider" />
+                        {renderDropdownRow('eng-edit', 'Edit Scope & Lockout Policy', '✏️ Edit', () => {
+                          setEditingEngagement(activeEngagement);
+                          setShowNewEngagementModal(true);
+                        })}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Cyberpunk delimiter before Pinned Tools */}
+            <div className="nav-cyber-divider" aria-hidden="true">
+              <span className="cyber-glitch-slashes">//</span>
+            </div>
+
             {/* Pinned Quick-Tool Buttons */}
             {pinnedQuickTools.map((toolId, index) => {
               const item = pinnableRegistry[toolId];
@@ -8000,6 +8158,38 @@ export function App({
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
 
+                  {/* Engagement Scope Filter Toggle */}
+                  {activeEngagement ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.6rem 0.35rem 0.6rem', fontSize: '0.72rem' }}>
+                      <span style={{ color: '#00f0ff', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={activeEngagement.name}>
+                        🎯 {activeEngagement.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                        style={{ fontSize: '0.66rem', padding: '1px 6px' }}
+                        onClick={() => setFilterByEngagementScope((prev) => !prev)}
+                        title={filterByEngagementScope ? 'Showing only in-scope hosts for this engagement' : 'Showing all hosts in vault'}
+                      >
+                        {filterByEngagementScope ? '🎯 In-Scope Only' : '🌐 All Vault Hosts'}
+                      </button>
+                    </div>
+                  ) : (
+                    engagementsList.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.6rem 0.35rem 0.6rem', fontSize: '0.72rem' }}>
+                        <span style={{ color: '#94a3b8' }}>🌐 Casual Mode (Global Hosts)</span>
+                        <button
+                          type="button"
+                          className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                          style={{ fontSize: '0.66rem', padding: '1px 6px' }}
+                          onClick={() => setFilterByEngagementScope((prev) => !prev)}
+                        >
+                          {filterByEngagementScope ? 'Casual Only' : 'All Hosts'}
+                        </button>
+                      </div>
+                    )
+                  )}
+
                   {/* Multi-Label & Group Filter Bar */}
                   {(allHostTags.length > 0 || vaultSummary.groups.length > 0) && (
                     <div className="sidebar-tags-filter-bar" role="toolbar" aria-label="Filter Hosts by Label">
@@ -8095,6 +8285,23 @@ export function App({
                                 title={`Host Color: ${getEffectiveHostColor(h.id, h.color, h.label)}`}
                               />
                               <strong>{h.label}</strong>
+                              {h.engagementId && (
+                                <span
+                                  style={{
+                                    background: 'rgba(0, 240, 255, 0.12)',
+                                    border: '1px solid rgba(0, 240, 255, 0.35)',
+                                    color: '#38bdf8',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 700,
+                                    padding: '1px 5px',
+                                    borderRadius: '2px',
+                                    marginLeft: 'auto',
+                                  }}
+                                  title={`Bound to engagement: ${engagementsList.find((e) => e.id === h.engagementId)?.name || h.engagementId}`}
+                                >
+                                  🎯 {engagementsList.find((e) => e.id === h.engagementId)?.name || 'ENGAGED'}
+                                </span>
+                              )}
                             </div>
                             <span className="host-address-line">
                               {h.effectiveUser}@{h.address}:{h.effectivePort}
@@ -9521,6 +9728,24 @@ export function App({
               onChange={(e) => setHostAddr(e.target.value)}
               required
             />
+            <div style={{ marginBottom: '6px' }}>
+              <label style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>
+                Pentest Engagement Scope
+              </label>
+              <select
+                aria-label="Host Engagement"
+                value={hostEngagementId}
+                onChange={(e) => setHostEngagementId(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">🌐 No Engagement (Casual / Global Host)</option>
+                {engagementsList.map((eng) => (
+                  <option key={eng.id} value={eng.id}>
+                    🎯 {eng.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <select
               aria-label="Host Group"
               value={hostGroupId}
@@ -10764,6 +10989,7 @@ export function App({
             label: h.label,
             address: h.address,
             tags: h.tags,
+            engagementId: h.engagementId,
           }))}
           onOpenCredStore={() => {
             setShowEngagementHubModal(false);
@@ -10772,6 +10998,23 @@ export function App({
           onOpenEvidenceVault={() => {
             setShowEngagementHubModal(false);
             setShowEvidenceModal(true);
+          }}
+          onEditEngagement={(eng) => {
+            setEditingEngagement(eng);
+            setShowNewEngagementModal(true);
+          }}
+          onRefreshVault={refreshVaultState}
+        />
+      )}
+
+      {showNewEngagementModal && (
+        <NewEngagementModal
+          isOpen={showNewEngagementModal}
+          existingEngagement={editingEngagement}
+          onSave={handleSaveEngagement}
+          onClose={() => {
+            setShowNewEngagementModal(false);
+            setEditingEngagement(null);
           }}
         />
       )}

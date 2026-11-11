@@ -1886,6 +1886,43 @@ func TestApp_PentestEngagementsAndCredentials_F36_F40(t *testing.T) {
 	if err != nil || len(afterCreds) != 1 {
 		t.Fatalf("expected 1 credential after delete, got %d", len(afterCreds))
 	}
+
+	// 6. Test Host Assignment to Engagement
+	host := core.HostRecord{
+		ID:      "host-target-1",
+		Label:   "Target Server",
+		Address: "10.0.0.50",
+		Port:    22,
+	}
+	if err := app.SaveHost(host); err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+	if err := app.AssignHostToEngagement("host-target-1", "eng-corp-1"); err != nil {
+		t.Fatalf("AssignHostToEngagement failed: %v", err)
+	}
+	summary, err := app.GetVaultSummary()
+	if err != nil {
+		t.Fatalf("GetVaultSummary failed: %v", err)
+	}
+	var foundHost *core.HostSummary
+	for _, h := range summary.Hosts {
+		if h.ID == "host-target-1" {
+			foundHost = &h
+			break
+		}
+	}
+	if foundHost == nil || foundHost.EngagementID != "eng-corp-1" {
+		t.Fatalf("expected host assigned to eng-corp-1, got %+v", foundHost)
+	}
+
+	// 7. Test Clearing Active Engagement ("none")
+	if err := app.SetActiveEngagement("none"); err != nil {
+		t.Fatalf("SetActiveEngagement none failed: %v", err)
+	}
+	activeEngAfter, err := app.GetActiveEngagement()
+	if err != nil || activeEngAfter != nil {
+		t.Fatalf("expected nil active engagement after clearing, got %+v", activeEngAfter)
+	}
 }
 
 func TestApp_PentestEvidence_F18(t *testing.T) {

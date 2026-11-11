@@ -3708,7 +3708,11 @@ func (a *App) GetActiveEngagement() (*core.Engagement, error) {
 }
 
 // SetActiveEngagement sets the specified engagement as active (F-36).
+// Passing "" or "none" clears active engagement and enters casual/global mode.
 func (a *App) SetActiveEngagement(id string) error {
+	if id == "none" {
+		id = ""
+	}
 	a.vaultStore.Touch()
 	payload, err := a.vaultStore.GetPayload()
 	if err != nil {
@@ -3716,7 +3720,7 @@ func (a *App) SetActiveEngagement(id string) error {
 	}
 	found := false
 	for i := range payload.Engagements {
-		if payload.Engagements[i].ID == id {
+		if id != "" && payload.Engagements[i].ID == id {
 			payload.Engagements[i].IsActive = true
 			found = true
 		} else {
@@ -3725,6 +3729,31 @@ func (a *App) SetActiveEngagement(id string) error {
 	}
 	if !found && id != "" {
 		return fmt.Errorf("engagement %q not found", id)
+	}
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// AssignHostToEngagement associates or dissociates a host with an engagement (F-36).
+func (a *App) AssignHostToEngagement(hostID, engagementID string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+	found := false
+	for i := range payload.Hosts {
+		if payload.Hosts[i].ID == hostID {
+			payload.Hosts[i].EngagementID = strings.TrimSpace(engagementID)
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("host %q not found", hostID)
 	}
 	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
 		return err

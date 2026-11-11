@@ -322,6 +322,7 @@ type HostRecord struct {
 	ProxyProfileID string   `json:"proxyProfileId,omitempty"`
 	ProxyCommand   string   `json:"proxyCommand,omitempty"`
 	SessionLogging *bool    `json:"sessionLogging,omitempty"`
+	EngagementID   string   `json:"engagementId,omitempty"`
 }
 
 // GroupDefaults holds inheritable connection settings for a host group (F-01, F-10, F-14, F-21).
