@@ -755,6 +755,7 @@ interface WailsAppBindings {
     proxyCommand?: string;
     jumpChain?: string[];
     sessionLogging?: boolean;
+    engagementId?: string;
   }) => Promise<void>;
   DeleteHost: (hostId: string) => Promise<void>;
   GenerateSSHKey?: (label: string, keyType: string, passphrase: string) => Promise<SshKeySummary>;
@@ -1038,7 +1039,7 @@ export function App({
   const [, setRxDataTicks] = useState<number>(0);
   const menuCloseTimerRef = useRef<number | null>(null);
 
-  const handleMenuEnter = (menu: 'vault' | 'tools' | 'view'): void => {
+  const handleMenuEnter = (menu: 'vault' | 'tools' | 'view' | 'engagement-tools'): void => {
     if (menuCloseTimerRef.current !== null) {
       window.clearTimeout(menuCloseTimerRef.current);
       menuCloseTimerRef.current = null;
@@ -1186,7 +1187,7 @@ export function App({
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
   // Top Bar Dropdowns & Tab Groups state (F-09)
-  const [activeDropdownMenu, setActiveDropdownMenu] = useState<'vault' | 'tools' | 'view' | null>(
+  const [activeDropdownMenu, setActiveDropdownMenu] = useState<'vault' | 'tools' | 'view' | 'engagement-tools' | null>(
     null
   );
   const [groupTabsByHost, setGroupTabsByHost] = useState<boolean>(false);

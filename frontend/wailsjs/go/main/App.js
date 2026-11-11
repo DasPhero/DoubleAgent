@@ -6,6 +6,10 @@ export function AddEvidenceCategory(arg1, arg2) {
   return window['go']['main']['App']['AddEvidenceCategory'](arg1, arg2);
 }
 
+export function AssignHostToEngagement(arg1, arg2) {
+  return window['go']['main']['App']['AssignHostToEngagement'](arg1, arg2);
+}
+
 export function AutoDetectSerial(arg1) {
   return window['go']['main']['App']['AutoDetectSerial'](arg1);
 }

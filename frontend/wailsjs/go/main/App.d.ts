@@ -5,6 +5,8 @@ import {data} from '../models';
 
 export function AddEvidenceCategory(arg1:string,arg2:string):Promise<void>;
 
+export function AssignHostToEngagement(arg1:string,arg2:string):Promise<void>;
+
 export function AutoDetectSerial(arg1:string):Promise<core.SerialAutoDetectResult>;
 
 export function BroadcastInput(arg1:Array<string>,arg2:string):Promise<void>;

@@ -59,6 +59,7 @@ export namespace core {
 	    color: string;
 	    favorite: boolean;
 	    sessionLogging: boolean;
+	    engagementId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new HostSummary(source);
@@ -82,6 +83,7 @@ export namespace core {
 	        this.color = source["color"];
 	        this.favorite = source["favorite"];
 	        this.sessionLogging = source["sessionLogging"];
+	        this.engagementId = source["engagementId"];
 	    }
 	}
 	export class HostSearchResult {
@@ -514,6 +516,7 @@ export namespace core {
 	    proxyProfileId?: string;
 	    proxyCommand?: string;
 	    sessionLogging?: boolean;
+	    engagementId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new HostRecord(source);
@@ -536,6 +539,7 @@ export namespace core {
 	        this.proxyProfileId = source["proxyProfileId"];
 	        this.proxyCommand = source["proxyCommand"];
 	        this.sessionLogging = source["sessionLogging"];
+	        this.engagementId = source["engagementId"];
 	    }
 	}
 	export class EngagementPackage {
