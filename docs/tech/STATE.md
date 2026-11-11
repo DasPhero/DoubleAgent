@@ -1,10 +1,41 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-01`, `F-14`, `F-18`, `F-23`, `F-37` — Modal Corner Reticle Pinning Architecture, Settings Cyberpunk HUD Overhaul, Network Topology Proxy Jump Visualization, and Unified HUD Modals — COMPLETED!
-- **Next Milestone:** Wave 1 MVP+ — Save Selection Context Menu (`F-19`) & Snippet Chains (`F-16`)
+- **Current Milestone:** `F-19` — Terminal Selection Quick Save to Vault (`Auswahl speichern`) — COMPLETED!
+- **Next Milestone:** Wave 1 MVP+ — Snippet Chains (`F-16`) / Engagement PDF/HTML Reporting (`F-41`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Terminal Selection Quick Save to Vault (`F-19` / Pentest Module Line 27, 49-50, 58)**:
+  - **Terminal Selection Context Menu (`TerminalContextMenu.tsx`)**:
+    - Floating Cyberpunk HUD context menu triggered on right-click over any highlighted selection inside an active xterm.js terminal session.
+    - Viewport boundary clamping: uses `Math.min`/`Math.max` with window inner width/height to ensure the menu never clips out of the viewport.
+    - Options: `📋 Copy Selection` (`Ctrl+C`), `🔑 Save as Credential...`, `🛡️ Save as Evidence Finding...`, `⚡ Execute in Terminal`, and `✕ Dismiss` (`Esc`).
+    - Dismisses automatically on Escape or click outside.
+    - If right-click occurs without an active text selection, default clipboard paste behavior is preserved without disruption.
+  - **Smart Heuristic Credential Parser (`parseCredentialSelection`)**:
+    - `parseCredentialSelection` helper function intelligently detects and parses:
+      - `user:password` and `DOMAIN\user:pass` strings, auto-populating username and password fields.
+      - 32-hex (NTLM, MD5) and 64-hex (SHA-256) password candidates into `hash` category.
+      - SSH private and public keys (`-----BEGIN ...`, `ssh-ed25519`, `ssh-rsa`, `PuTTY-User-Key-File`) into `ssh_key` category.
+      - API keys, JWTs, and bearer tokens (`ey...`, `ghp_`, `glpat-`, `AKIA`, `Bearer `) into `api_key` category.
+      - Default plaintext passwords into `plaintext` category.
+  - **Direct Host and Engagement Association (Spec Line 27, 50)**:
+    - Added `findHostForSessionId(sessionId, tabs)` to trace the active terminal pane or tab back to its host ID.
+    - Auto-preselects the host in both `SaveSelectionCredModal` and `SaveSelectionEvidenceModal`.
+    - If the host or current workspace is attached to an active Pentest Engagement (`activeEngagementId`), the engagement scope is automatically mapped.
+  - **Save Selection as Credential (`SaveSelectionCredModal.tsx`)**:
+    - HUD dialog featuring clipped corners, corner reticles, telemetry bar displaying source terminal and target host, username, password/secret, category selector, realm, tags, and notes.
+    - Submits securely via `SaveCredential` into the encrypted vault and shows a HUD confirmation toast.
+  - **Save Selection as Evidence Finding (`SaveSelectionEvidenceModal.tsx`)**:
+    - HUD dialog for turning terminal excerpts (command outputs, proof-of-concept logs, error traces) directly into finding evidence.
+    - Captures evidence title, severity rating (`critical`, `high`, `medium`, `low`, `info`), category (`Credentials`, `Privilege Escalation`, etc.), captured excerpt, and tags.
+    - Submits securely via `SaveEvidence` into the encrypted vault and shows a HUD confirmation toast.
+  - **Rigorous Pinning & Responsive Scrolling Compliance**:
+    - Implemented strict pinned architecture with outer `.cyber-dialog-card` (`position: relative; display: flex; flex-direction: column; overflow: hidden;`), pinned header with hazard stripes, inner scrollable `form.dialog-body` (`overflow-y: auto; flex: 1;`), and pinned `.dialog-footer`.
+  - **Verification & Test Coverage**:
+    - 8 dedicated unit tests in `SaveSelectionModals.test.tsx` testing heuristic parsing, context menu events, modal form filling, host association, and async vault saving.
+    - Full test suite passing (40 Vitest frontend tests across 3 suites, 0 ESLint warnings, all Go backend tests passing).
+    - `wails build` compiled standalone executable at `build/bin/DoubleAgent.exe`.
 - **Modal Corner Reticle Pinning Architecture & Scrolling Fix**:
   - Resolved the defect where modal corner reticles (`.cyber-corner-reticle`) detached and scrolled up across dialog content (e.g., hovering over "HOST COLOR TAG" in the Host Modal).
   - Enforced a strict modal container architecture across all dialogs:

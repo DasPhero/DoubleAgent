@@ -9528,6 +9528,147 @@ button:hover .cyber-svg-icon {
   justify-content: flex-end;
 }
 
+/* -------------------------------------------------------------
+   Terminal Selection Context Menu (F-19)
+   ------------------------------------------------------------- */
+.terminal-hud-context-menu {
+  background: rgba(5, 12, 22, 0.96) !important;
+  border: 1px solid rgba(0, 240, 255, 0.4) !important;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 240, 255, 0.25) !important;
+  border-radius: 4px;
+  padding: 6px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  backdrop-filter: blur(12px);
+  user-select: none;
+  animation: contextMenuFadeIn 0.1s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.terminal-hud-context-menu .menu-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+  margin-bottom: 4px;
+  font-size: 0.68rem;
+  color: #00f0ff;
+  letter-spacing: 0.05em;
+}
+
+.terminal-hud-context-menu .menu-preview-row {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-hud-context-menu .preview-label {
+  color: #64748b;
+  font-size: 0.65rem;
+  margin-right: 4px;
+}
+
+.terminal-hud-context-menu .menu-host-badge {
+  font-size: 0.68rem;
+  color: #38bdf8;
+  padding: 2px 8px;
+  margin-bottom: 6px;
+}
+
+.terminal-hud-context-menu .menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.terminal-hud-context-menu .menu-item-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #f1f5f9;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-family: inherit;
+  transition: all 0.12s ease;
+  text-align: left;
+}
+
+.terminal-hud-context-menu .menu-item-btn:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+}
+
+.terminal-hud-context-menu .item-icon {
+  margin-right: 8px;
+  font-size: 0.85rem;
+}
+
+.terminal-hud-context-menu .item-label {
+  flex: 1;
+}
+
+.terminal-hud-context-menu .item-shortcut,
+.terminal-hud-context-menu .item-tag {
+  font-size: 0.65rem;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.terminal-hud-context-menu .highlight-cred:hover {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+
+.terminal-hud-context-menu .highlight-ev:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #34d399;
+}
+
+.terminal-hud-context-menu .menu-divider {
+  height: 1px;
+  background: rgba(0, 240, 255, 0.15);
+  margin: 4px 0;
+}
+
+.terminal-hud-context-menu .dismiss-btn {
+  color: #94a3b8;
+}
+
+.terminal-hud-context-menu .dismiss-btn:hover {
+  background: rgba(244, 63, 94, 0.15);
+  border-color: #f43f5e;
+  color: #f43f5e;
+}
+
+
 
 
 

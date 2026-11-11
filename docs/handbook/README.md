@@ -6,9 +6,29 @@ Welcome to the DoubleAgent user handbook.
 
 DoubleAgent is a cross-platform (Windows and Linux) native SSH client featuring an encrypted local vault, tabbed and split-pane terminals, SFTP file transfers, port forwarding, TOTP generation, and per-host notes.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-36`, `F-37`, & `F-40`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-36`, `F-37`, & `F-40`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Terminal Selection Quick Save to Vault (`F-19` / Pentest Module Wave 1)**:
+  - **Right-Click Cyberpunk HUD Context Menu**:
+    - Highlight any text in an active terminal session and right-click to open the floating HUD Context Menu.
+    - Options include: `📋 Copy Selection` (`Ctrl+C`), `🔑 Save as Credential...`, `🛡️ Save as Evidence Finding...`, `⚡ Execute in Terminal`, and `✕ Dismiss` (`Esc`).
+    - Smart viewport boundary clamping prevents the context menu from escaping screen borders or overflowing outside the window.
+  - **Smart Heuristic Credential Ingestion (`parseCredentialSelection`)**:
+    - Automatically analyzes the highlighted selection and infers credential type and structure:
+      - **`user:password` & `DOMAIN\user:pass`**: Automatically splits into distinct Username and Secret fields.
+      - **Hash Detection**: Recognizes 32-character hexadecimal strings (MD5, NTLM) and 64-character strings (SHA-256) and categorizes them as `hash`.
+      - **SSH Private / Public Keys**: Detects `-----BEGIN ...`, `ssh-ed25519`, `ssh-rsa`, and PuTTY keys and categorizes them as `ssh_key`.
+      - **API Tokens & JWTs**: Detects `ey...` (JWT), `ghp_` (GitHub), `glpat-` (GitLab), `AKIA` (AWS Access Key), and `Bearer ` authorization tokens.
+      - **Plaintext Secret**: Defaults single-line tokens or passwords to `plaintext`.
+  - **Automatic Host & Engagement Association**:
+    - Resolves the target host directly from the active session ID, tab, or split-pane.
+    - If the host belongs to an active Pentest Engagement, the engagement scope is automatically preselected in the save modal.
+  - **Save as Evidence Finding**:
+    - Instant 1-click conversion of terminal command output, logs, or PoC snippets into an Evidence Finding entry.
+    - Pre-populates the excerpt into the finding content field, assigns default category (e.g. `Credentials`, `Privilege Escalation`), and lets operators pick severity rating (`Critical`, `High`, `Medium`, `Low`, `Info`).
+  - **Secure Vault Encryption**:
+    - Saves directly to the encrypted vault through bound Go methods `SaveCredential` and `SaveEvidence` with HUD confirmation toasts. All secret data remains within the Go process boundary.
 - **Evidence Vault & Structured Findings Store (`F-18` / Pentest Module Wave 1)**:
   - **Engagement-Scoped Evidence Vault**:
     - Centralized repository for penetration testing findings, proof-of-concept exploits, discovered vulnerability details, reconnaissance artifacts, and session notes.

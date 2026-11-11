@@ -48,7 +48,12 @@ import { CredentialStoreModal } from './components/CredentialStoreModal';
 import { EvidenceVaultModal } from './components/EvidenceVaultModal';
 import { EngagementHubModal } from './components/EngagementHubModal';
 import { NewEngagementModal } from './components/NewEngagementModal';
-import { Engagement } from './types/pentest';
+import { Engagement, CredentialEntry, EvidenceItem } from './types/pentest';
+import { TerminalContextMenu } from './components/TerminalContextMenu';
+import {
+  SaveSelectionCredModal,
+  SaveSelectionEvidenceModal,
+} from './components/SaveSelectionModals';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -357,6 +362,17 @@ export function findPane(node: WorkspaceNode | null, paneId: string): PaneItem |
     }
   }
   return null;
+}
+
+export function findHostForSessionId(sessionId: string, tabs: TabItem[]): string | undefined {
+  for (const t of tabs) {
+    const panes = collectPanes(t.rootNode);
+    const matched = panes.find((p) => p.sessionId === sessionId);
+    if (matched) {
+      return matched.hostId || t.hostId;
+    }
+  }
+  return undefined;
 }
 
 export function findPaneNode(
@@ -885,6 +901,10 @@ interface WailsAppBindings {
   ExportEngagementFile?: (engagementId: string, password: string, targetPath: string) => Promise<void>;
   ImportEngagementPackage?: (packageJson: string, password: string) => Promise<unknown>;
   ImportEngagementFile?: (filePath: string, password: string) => Promise<unknown>;
+  SaveCredential?: (c: CredentialEntry) => Promise<void>;
+  ListCredentials?: (engagementId: string, hostId: string) => Promise<CredentialEntry[]>;
+  SaveEvidence?: (item: EvidenceItem) => Promise<void>;
+  ListEvidence?: (engagementId: string, hostId: string) => Promise<EvidenceItem[]>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1123,6 +1143,25 @@ export function App({
   const [showNewEngagementModal, setShowNewEngagementModal] = useState<boolean>(false);
   const [editingEngagement, setEditingEngagement] = useState<Engagement | null>(null);
   const [filterByEngagementScope, setFilterByEngagementScope] = useState<boolean>(true);
+
+  // Terminal Selection Context Menu & Quick Save State (F-19)
+  const [terminalContextMenu, setTerminalContextMenu] = useState<{
+    x: number;
+    y: number;
+    sessionId: string;
+    selectedText: string;
+    hostId?: string;
+  } | null>(null);
+  const [saveSelectionCredModal, setSaveSelectionCredModal] = useState<{
+    isOpen: boolean;
+    selectedText: string;
+    hostId?: string;
+  } | null>(null);
+  const [saveSelectionEvidenceModal, setSaveSelectionEvidenceModal] = useState<{
+    isOpen: boolean;
+    selectedText: string;
+    hostId?: string;
+  } | null>(null);
 
   // Host Sidebar Tag / Label filtering & editing
   const [selectedHostTag, setSelectedHostTag] = useState<string>('all');
@@ -3190,6 +3229,41 @@ export function App({
     } catch (err: unknown) {
       console.error('Failed to save engagement:', err);
     }
+  };
+
+  const handleTerminalSelectionContextMenu = (
+    e: MouseEvent,
+    sessionId: string,
+    selectedText: string
+  ) => {
+    const targetHostId = findHostForSessionId(sessionId, tabs);
+    setTerminalContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      sessionId,
+      selectedText,
+      hostId: targetHostId,
+    });
+  };
+
+  const handleSaveSelectionCredential = async (cred: CredentialEntry) => {
+    const api = getWailsBindings();
+    if (api?.SaveCredential) {
+      await api.SaveCredential(cred);
+    }
+    const matchedHost = vaultSummary.hosts.find((h) => h.id === cred.hostId);
+    const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
+    setStatusMessage(`Saved credential "${cred.label}"${hostNote} to vault (F-19).`);
+  };
+
+  const handleSaveSelectionEvidence = async (ev: EvidenceItem) => {
+    const api = getWailsBindings();
+    if (api?.SaveEvidence) {
+      await api.SaveEvidence(ev);
+    }
+    const matchedHost = vaultSummary.hosts.find((h) => h.id === ev.hostId);
+    const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
+    setStatusMessage(`Saved evidence finding "${ev.title}"${hostNote} to vault (F-19).`);
   };
 
   const handleGenerateProxychainsConfig = async (opts: ProxychainsExportOptions): Promise<string> => {
@@ -6509,6 +6583,7 @@ export function App({
             settings={globalSettings}
             onFontSizeChange={handleFontSizeChange}
             onToggleSearch={togglePaneSearch}
+            onSelectionContextMenu={handleTerminalSelectionContextMenu}
             isRawTcp={node.isRawTcp}
             rawTcpHost={node.rawTcpHost}
             rawTcpPort={node.rawTcpPort}
@@ -11308,6 +11383,84 @@ export function App({
             setShowNewEngagementModal(false);
             setEditingEngagement(null);
           }}
+        />
+      )}
+
+      {/* Terminal Selection Context Menu & Quick Save Modals (F-19) */}
+      {terminalContextMenu && (
+        <TerminalContextMenu
+          x={terminalContextMenu.x}
+          y={terminalContextMenu.y}
+          sessionId={terminalContextMenu.sessionId}
+          selectedText={terminalContextMenu.selectedText}
+          hostLabel={(() => {
+            const h = vaultSummary.hosts.find((cand) => cand.id === terminalContextMenu.hostId);
+            return h ? `${h.label} (${h.address})` : undefined;
+          })()}
+          onCopy={() => {
+            if (navigator.clipboard?.writeText) {
+              void navigator.clipboard.writeText(terminalContextMenu.selectedText);
+              setStatusMessage('Selection copied to clipboard.');
+            }
+          }}
+          onSaveAsCredential={() => {
+            setSaveSelectionCredModal({
+              isOpen: true,
+              selectedText: terminalContextMenu.selectedText,
+              hostId: terminalContextMenu.hostId,
+            });
+          }}
+          onSaveAsEvidence={() => {
+            setSaveSelectionEvidenceModal({
+              isOpen: true,
+              selectedText: terminalContextMenu.selectedText,
+              hostId: terminalContextMenu.hostId,
+            });
+          }}
+          onRunInTerminal={() => {
+            handleTerminalInput(terminalContextMenu.sessionId, terminalContextMenu.selectedText + '\n');
+          }}
+          onClose={() => setTerminalContextMenu(null)}
+        />
+      )}
+
+      {saveSelectionCredModal?.isOpen && (
+        <SaveSelectionCredModal
+          isOpen={saveSelectionCredModal.isOpen}
+          selectedText={saveSelectionCredModal.selectedText}
+          initialHostId={saveSelectionCredModal.hostId}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+          }))}
+          initialEngagementId={activeEngagement?.id}
+          engagements={engagementsList.map((e) => ({
+            id: e.id,
+            name: e.name,
+          }))}
+          onSave={handleSaveSelectionCredential}
+          onClose={() => setSaveSelectionCredModal(null)}
+        />
+      )}
+
+      {saveSelectionEvidenceModal?.isOpen && (
+        <SaveSelectionEvidenceModal
+          isOpen={saveSelectionEvidenceModal.isOpen}
+          selectedText={saveSelectionEvidenceModal.selectedText}
+          initialHostId={saveSelectionEvidenceModal.hostId}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+          }))}
+          initialEngagementId={activeEngagement?.id}
+          engagements={engagementsList.map((e) => ({
+            id: e.id,
+            name: e.name,
+          }))}
+          onSave={handleSaveSelectionEvidence}
+          onClose={() => setSaveSelectionEvidenceModal(null)}
         />
       )}
     </main>

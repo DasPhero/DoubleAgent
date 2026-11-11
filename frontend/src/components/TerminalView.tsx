@@ -333,6 +333,7 @@ export interface TerminalViewProps {
   onFontSizeChange?: (sessionId: string, newSize: number) => void;
   onToggleSearch?: (sessionId: string) => void;
   onCwdChange?: (sessionId: string, cwd: string) => void;
+  onSelectionContextMenu?: (e: MouseEvent, sessionId: string, selectedText: string) => void;
   isRawTcp?: boolean;
   rawTcpHost?: string;
   rawTcpPort?: number;
@@ -350,6 +351,7 @@ export function TerminalView({
   onFontSizeChange,
   onToggleSearch,
   onCwdChange,
+  onSelectionContextMenu,
   isRawTcp,
   rawTcpHost,
   rawTcpPort,
@@ -377,6 +379,8 @@ export function TerminalView({
   onToggleSearchRef.current = onToggleSearch;
   const onCwdChangeRef = useRef(onCwdChange);
   onCwdChangeRef.current = onCwdChange;
+  const onSelectionContextMenuRef = useRef(onSelectionContextMenu);
+  onSelectionContextMenuRef.current = onSelectionContextMenu;
   const registerWriterRef = useRef(registerWriter);
   registerWriterRef.current = registerWriter;
   const registerFocuserRef = useRef(registerFocuser);
@@ -543,13 +547,17 @@ export function TerminalView({
         // Ignore parser registration errors in mock environments
       }
 
-      // Right-click: Copy selection if text is selected, or Paste from clipboard if nothing is selected
+      // Right-click: Open Selection Context Menu (F-19) if text is selected, or Paste from clipboard if nothing is selected
       wrapper.addEventListener('contextmenu', (ev: MouseEvent) => {
         ev.preventDefault();
         if (term.hasSelection()) {
           const sel = term.getSelection();
-          if (sel && navigator.clipboard?.writeText) {
-            void navigator.clipboard.writeText(sel);
+          if (sel && sel.trim().length > 0) {
+            if (onSelectionContextMenuRef.current) {
+              onSelectionContextMenuRef.current(ev, sessionId, sel);
+            } else if (navigator.clipboard?.writeText) {
+              void navigator.clipboard.writeText(sel);
+            }
           }
         } else {
           if (navigator.clipboard?.readText) {
