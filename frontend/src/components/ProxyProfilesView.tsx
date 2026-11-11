@@ -165,65 +165,59 @@ export function ProxyProfilesView({
 
   return (
     <div
-      className="modal-backdrop"
+      className="modal-backdrop cyber-modal-overlay"
       style={{ zIndex: 100010 }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="card proxy-profiles-view"
+        className="cyber-dialog-card proxy-profiles-view"
         style={{
-          width: '920px',
+          width: '940px',
           maxWidth: '96vw',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.7)',
-          border: '1px solid var(--accent)',
           padding: 0,
           overflow: 'hidden',
         }}
       >
+        {/* Reticles */}
+        <div className="cyber-corner-reticle cyber-corner-tl" />
+        <div className="cyber-corner-reticle cyber-corner-tr" />
+        <div className="cyber-corner-reticle cyber-corner-bl" />
+        <div className="cyber-corner-reticle cyber-corner-br" />
+
         {/* Header */}
-        <div
-          style={{
-            padding: '16px 24px',
-            borderBottom: '1px solid var(--border-color)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'var(--bg-secondary)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.4rem' }}>🛡️</span>
+        <div className="dialog-header">
+          <div className="dialog-title">
+            <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-bright)' }}>
-                Proxy Profiles
-              </h2>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Manage ProxyJump bastion chains, ProxyCommand process streaming, and SOCKS5 proxies
-              </p>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                <span>🛡️ </span>
+                <span>Proxy Profiles</span>
+              </h3>
+              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                VAULT-PROXIES // JUMP CHAINS · SOCKS5 (WITH AUTH) · COMMAND
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               type="button"
-              className="btn btn-secondary"
+              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
               onClick={onOpenProxychainsExport}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}
             >
-              <span>⛓️</span>
-              <span>Export proxychains.conf</span>
+              ⛓️ Export proxychains.conf
             </button>
             <button
-              className="btn btn-secondary"
+              type="button"
+              className="cyber-btn-close"
               onClick={onClose}
               aria-label="Close"
-              style={{ padding: '4px 10px', fontSize: '0.9rem' }}
             >
-              ✕
+              ×
             </button>
           </div>
         </div>
@@ -238,7 +232,7 @@ export function ProxyProfilesView({
             {!showAddForm && (
               <button
                 type="button"
-                className="btn btn-primary"
+                className="cyber-btn cyber-btn-primary"
                 onClick={() => {
                   resetForm();
                   setShowAddForm(true);
@@ -269,7 +263,7 @@ export function ProxyProfilesView({
                 </h3>
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="cyber-btn cyber-btn-secondary"
                   onClick={resetForm}
                   style={{ padding: '2px 8px', fontSize: '0.8rem' }}
                 >
@@ -378,7 +372,7 @@ export function ProxyProfilesView({
                           <div style={{ display: 'flex', gap: '4px' }}>
                             <button
                               type="button"
-                              className="btn btn-secondary"
+                              className="cyber-btn cyber-btn-secondary"
                               onClick={() => handleMoveJumpHop(idx, 'up')}
                               disabled={idx === 0}
                               style={{ padding: '2px 6px', fontSize: '0.75rem' }}
@@ -387,7 +381,7 @@ export function ProxyProfilesView({
                             </button>
                             <button
                               type="button"
-                              className="btn btn-secondary"
+                              className="cyber-btn cyber-btn-secondary"
                               onClick={() => handleMoveJumpHop(idx, 'down')}
                               disabled={idx === jumpHostIds.length - 1}
                               style={{ padding: '2px 6px', fontSize: '0.75rem' }}
@@ -396,7 +390,7 @@ export function ProxyProfilesView({
                             </button>
                             <button
                               type="button"
-                              className="btn btn-secondary"
+                              className="cyber-btn cyber-btn-secondary"
                               onClick={() => handleRemoveJumpHop(idx)}
                               style={{ padding: '2px 6px', fontSize: '0.75rem', color: '#f87171' }}
                             >
@@ -455,7 +449,7 @@ export function ProxyProfilesView({
                         />
                         <button
                           type="button"
-                          className="btn btn-secondary"
+                          className="cyber-btn cyber-btn-secondary"
                           onClick={handleAddCustomJumpHop}
                           style={{ padding: '6px 12px', fontSize: '0.8rem' }}
                         >
@@ -545,7 +539,7 @@ export function ProxyProfilesView({
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="cyber-btn cyber-btn-secondary"
                   onClick={resetForm}
                   style={{ padding: '8px 16px' }}
                 >
@@ -553,7 +547,7 @@ export function ProxyProfilesView({
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="cyber-btn cyber-btn-primary"
                   disabled={saving}
                   style={{ padding: '8px 20px' }}
                 >
@@ -583,7 +577,7 @@ export function ProxyProfilesView({
               </p>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="cyber-btn cyber-btn-primary"
                 onClick={() => {
                   resetForm();
                   setShowAddForm(true);
@@ -674,7 +668,7 @@ export function ProxyProfilesView({
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '10px' }}>
                       <button
                         type="button"
-                        className="btn btn-secondary"
+                        className="cyber-btn cyber-btn-secondary"
                         onClick={() => handleStartEdit(p)}
                         style={{ padding: '4px 12px', fontSize: '0.8rem' }}
                       >
@@ -682,7 +676,7 @@ export function ProxyProfilesView({
                       </button>
                       <button
                         type="button"
-                        className="btn btn-secondary"
+                        className="cyber-btn cyber-btn-secondary"
                         onClick={() => handleDelete(p.id)}
                         style={{ padding: '4px 10px', fontSize: '0.8rem', color: '#f87171' }}
                       >

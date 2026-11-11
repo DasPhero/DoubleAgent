@@ -202,6 +202,14 @@ export function GetEvidenceTemplates() {
   return window['go']['main']['App']['GetEvidenceTemplates']();
 }
 
+export function GetHostPassword(arg1) {
+  return window['go']['main']['App']['GetHostPassword'](arg1);
+}
+
+export function GetIdentityPassword(arg1) {
+  return window['go']['main']['App']['GetIdentityPassword'](arg1);
+}
+
 export function GetLiveSessionIDs() {
   return window['go']['main']['App']['GetLiveSessionIDs']();
 }

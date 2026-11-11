@@ -2036,3 +2036,54 @@ func TestApp_PentestEvidence_F18(t *testing.T) {
 		t.Fatalf("expected 1 remaining evidence item, got %+v", remaining)
 	}
 }
+
+func TestApp_GetHostPassword_F01(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_get_pw.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, _ string, _ ...interface{}) {})
+
+	// 1. Save identity with password
+	ident := core.IdentityRecord{
+		ID:         "id-prod-secret",
+		Label:      "Prod Admin Identity",
+		Username:   "sysadmin",
+		AuthMethod: core.AuthPassword,
+		Password:   "VerySecretPassword456!",
+	}
+	if err := app.SaveIdentity(ident); err != nil {
+		t.Fatalf("SaveIdentity failed: %v", err)
+	}
+
+	// 2. Save host linking to that identity
+	host := core.HostRecord{
+		ID:         "host-prod-server",
+		Label:      "Production Host",
+		Address:    "192.168.1.100",
+		Port:       22,
+		IdentityID: "id-prod-secret",
+	}
+	if err := app.SaveHost(host); err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+
+	// 3. Fetch password via GetHostPassword
+	pw, err := app.GetHostPassword("host-prod-server")
+	if err != nil {
+		t.Fatalf("GetHostPassword failed: %v", err)
+	}
+	if pw != "VerySecretPassword456!" {
+		t.Fatalf("expected 'VerySecretPassword456!', got %q", pw)
+	}
+
+	// 4. Fetch password via GetIdentityPassword
+	identPw, err := app.GetIdentityPassword("id-prod-secret")
+	if err != nil {
+		t.Fatalf("GetIdentityPassword failed: %v", err)
+	}
+	if identPw != "VerySecretPassword456!" {
+		t.Fatalf("expected 'VerySecretPassword456!', got %q", identPw)
+	}
+}

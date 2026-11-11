@@ -324,11 +324,16 @@ export function SettingsView({
           : undefined
       }
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem', paddingBottom: '0.6rem', borderBottom: '1px solid rgba(0, 240, 255, 0.25)' }}>
         <div>
-          <h2 style={{ margin: '0 0 0.25rem 0' }}>Global Settings &amp; Preferences</h2>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Customize terminal appearance, default fonts, vault security, and custom keyboard shortcuts.
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="cyber-hazard-stripes">///</span>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+              ⚙️ Global Settings &amp; Preferences (F-18, F-29)
+            </h2>
+          </div>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.76rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>
+            SYSTEM CONFIGURATION // THEMES · VAULT SECURITY · CLOUD SYNC · MIGRATION
           </p>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>

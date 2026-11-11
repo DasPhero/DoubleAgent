@@ -201,20 +201,20 @@ export const NotesView: React.FC<NotesViewProps> = ({
   return (
     <div className="notes-view-container" role="region" aria-label="Host Notes and Documentation">
       {/* Top Header */}
-      <div className="notes-header">
+      <div className="notes-header" style={{ background: 'rgba(7, 13, 24, 0.95)', borderBottom: '1px solid rgba(0, 240, 255, 0.3)' }}>
         <div className="notes-header-left">
           <button
             type="button"
-            className="notes-tool-btn"
+            className="notes-tool-btn cyber-btn cyber-btn-secondary cyber-btn-sm"
             style={{ flex: 'none', padding: '0.25rem 0.55rem', marginRight: '0.35rem' }}
             onClick={() => setIsSidebarCollapsed((prev) => !prev)}
             title={isSidebarCollapsed ? 'Show Notes List' : 'Hide Notes List (Full-Width Editor)'}
           >
             {isSidebarCollapsed ? '📁 Show List' : '◀ Hide List'}
           </button>
-          <span className="notes-header-icon">📝</span>
-          <h2 className="notes-header-title">Host Notes & Documentation</h2>
-          <span className="notes-count-badge">{filteredNotes.length} items</span>
+          <span className="cyber-hazard-stripes" style={{ marginRight: '6px' }}>///</span>
+          <h2 className="notes-header-title" style={{ color: '#00f0ff', letterSpacing: '0.04em' }}>📝 Host Notes &amp; Documentation (F-17)</h2>
+          <span className="notes-count-badge" style={{ background: 'rgba(0, 240, 255, 0.15)', color: '#00f0ff', border: '1px solid rgba(0, 240, 255, 0.4)' }}>{filteredNotes.length} items</span>
         </div>
         <div className="notes-header-right">
           {onOpenAsTab && (

@@ -1,10 +1,33 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-36`, `F-18`, `F-40`, `F-31` — Top-Bar Engagement Controls, Host-Engagement Linking, Dedicated Scope/Creation Modal, and Strict Customer Data Encapsulation — COMPLETED!
+- **Current Milestone:** `F-01`, `F-14`, `F-23`, `F-15`, `F-21`, `F-17` — Host Password Retrieval & Persistence Bugfix, Serial/UART Layout Fix, and Universal Cyberpunk HUD Modal Overhaul — COMPLETED!
 - **Next Milestone:** Wave 1 MVP+ — Save Selection Context Menu (`F-19`) & Snippet Chains (`F-16`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Host Password Retrieval, Persistence Bugfix & Reveal Toggle (`F-01`)**:
+  - Implemented `GetHostPassword(hostID string) (string, error)` and `GetIdentityPassword(identityID string) (string, error)` in `app.go` to securely fetch decrypted passwords from the active vault.
+  - Resolved the password overwrite bug where editing a host without typing a new password generated an arbitrary identity ID and overwrote the password with an empty string, breaking SSH connections.
+  - The frontend now reuses `editingIdentityId` and populates the existing password in the edit input.
+  - Added an interactive reveal/hide toggle (`👁 / 🔒`) for inspecting or masking passwords directly in the host dialog.
+- **Proxy Authentication & Bastion Management (`F-14`)**:
+  - Added direct 1-click shortcut button `🛡️ Manage Proxy Profiles (SOCKS5 Auth)` in the Host modal to open `ProxyProfilesView`.
+  - Added contextual HUD telemetry tips explaining ProxyJump (`[user@]bastion[:port]`), authenticated SOCKS5 via saved Proxy Profiles, and ProxyCommand commands with inline auth.
+- **Serial / UART Console Bug Fix & Overflow Elimination (`F-23`)**:
+  - Fixed HTML nesting defect where `<label>` wrapped the port row, hardware telemetry card, and auto-detect button, causing layout breakage and squashed controls.
+  - Restructured into a clean 2-column responsive grid (`form-grid-2col`) with `min-width: 0` for Baud Rate and Line Ending selectors.
+- **Universal Cyberpunk HUD Style Across All Modals & Views**:
+  - Upgraded all remaining views into the Cyberpunk HUD design system with clipped corners (`cyber-dialog-card`), corner reticles (`cyber-corner-reticle`), hazard stripes (`///`), cyan headings, and monospace telemetry subtitles:
+    - **Host Create / Edit Modal** (`App.tsx`)
+    - **Serial / UART Console** (`App.tsx`)
+    - **Command Palette & Quick Connect** (`App.tsx`)
+    - **SSH Keychain Manager** (`App.tsx`)
+    - **Export proxychains.conf** (`ProxychainsExportModal.tsx`)
+    - **Proxy & Bastion Profiles** (`ProxyProfilesView.tsx`)
+    - **Command Snippets Manager** (`SnippetsManagerModal.tsx`)
+    - **Session Logs & Recordings** (`SessionLogsModal.tsx`)
+    - **Host Notes & Documentation** (`NotesView.tsx`)
+    - **Global Settings & Preferences** (`SettingsView.tsx`)
 - **Top-Bar Engagement Control Cluster & Strict Customer Encapsulation (`F-36`, `F-18`, `F-40`)**:
   - **Top Bar Control Group**:
     - Placed directly in the header navigation menu bar after the cyber `//` divider: `[🎯 Engagement Dropdown ▾] [+ New Engagement] [⚔️ Engagement ▾]`.

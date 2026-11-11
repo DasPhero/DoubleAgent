@@ -135,7 +135,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
 
   return (
     <div
-      className="modal-backdrop"
+      className="modal-backdrop cyber-modal-overlay"
       role="dialog"
       aria-label="Session Logs & Recordings"
       onClick={(e) => {
@@ -144,21 +144,28 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
         }
       }}
     >
-      <div className="modal-card session-logs-modal-card">
-        <div className="session-logs-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>⏺</span>
+      <div className="cyber-dialog-card session-logs-modal-card" style={{ maxWidth: '880px', width: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="cyber-corner-reticle cyber-corner-tl" />
+        <div className="cyber-corner-reticle cyber-corner-tr" />
+        <div className="cyber-corner-reticle cyber-corner-bl" />
+        <div className="cyber-corner-reticle cyber-corner-br" />
+
+        <div className="dialog-header">
+          <div className="dialog-title">
+            <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h2 style={{ margin: 0 }}>Session Logs &amp; Transcripts</h2>
-              <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                Per-session timestamped transcripts · Password prompts &amp; 2FA inputs are automatically redacted
-              </p>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                ⏺ Session Logs &amp; Transcripts (F-21)
+              </h3>
+              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                AUDIT-TELEMETRY // TIMESTAMPED RECORDINGS &amp; PASSWORD-ECHO REDACTED
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <button
               type="button"
-              className="btn-secondary btn-sm"
+              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
               onClick={() => void onRefreshLogs()}
               aria-label="Refresh Session Logs"
             >
@@ -166,11 +173,11 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
             </button>
             <button
               type="button"
-              className="btn-secondary btn-sm"
+              className="cyber-btn-close"
               onClick={onClose}
               aria-label="Close Session Logs"
             >
-              ✕ Close
+              ×
             </button>
           </div>
         </div>
@@ -267,14 +274,14 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
                     )}
                     <button
                       type="button"
-                      className="btn-secondary btn-sm"
+                      className="cyber-btn cyber-btn-secondary btn-sm"
                       onClick={() => void handleCopyContent()}
                     >
                       📋 Copy
                     </button>
                     <button
                       type="button"
-                      className="btn-secondary btn-sm"
+                      className="cyber-btn cyber-btn-secondary btn-sm"
                       onClick={handleDownloadFile}
                     >
                       ⬇ Download .log
@@ -302,7 +309,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
                     />
                     <button
                       type="button"
-                      className="btn-primary btn-sm"
+                      className="cyber-btn cyber-btn-primary btn-sm"
                       disabled={!exportPath.trim()}
                       onClick={() => void handleSaveToPath()}
                     >

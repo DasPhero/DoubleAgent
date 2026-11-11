@@ -758,6 +758,8 @@ interface WailsAppBindings {
     engagementId?: string;
   }) => Promise<void>;
   DeleteHost: (hostId: string) => Promise<void>;
+  GetHostPassword?: (hostId: string) => Promise<string>;
+  GetIdentityPassword?: (identityId: string) => Promise<string>;
   GenerateSSHKey?: (label: string, keyType: string, passphrase: string) => Promise<SshKeySummary>;
   ImportSSHKey?: (label: string, rawPrivateKey: string, passphrase: string) => Promise<SshKeySummary>;
   DeleteSSHKey?: (keyId: string) => Promise<void>;
@@ -1125,6 +1127,8 @@ export function App({
   // Host Sidebar Tag / Label filtering & editing
   const [selectedHostTag, setSelectedHostTag] = useState<string>('all');
   const [editingHostId, setEditingHostId] = useState<string | null>(null);
+  const [editingIdentityId, setEditingIdentityId] = useState<string>('');
+  const [showHostPass, setShowHostPass] = useState<boolean>(false);
 
   // Add Host form state
   const [hostLabel, setHostLabel] = useState<string>('');
@@ -2542,11 +2546,15 @@ export function App({
   const handleSaveHost = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     const idSuffix = Date.now();
-    let identityId = '';
+    const targetHostId = editingHostId || `host-${idSuffix}`;
+    let identityId = editingIdentityId;
     const api = getWailsBindings();
 
-    if (hostUser.trim() || hostPass || hostAuthMethod !== 'password') {
+    if (!identityId && (hostUser.trim() || hostPass || hostAuthMethod !== 'password')) {
       identityId = `id-${idSuffix}`;
+    }
+
+    if (identityId && (hostUser.trim() || hostPass || hostAuthMethod !== 'password')) {
       if (api) {
         await api.SaveIdentity({
           id: identityId,
@@ -2570,8 +2578,6 @@ export function App({
           .map((s) => s.trim())
           .filter(Boolean)
       : undefined;
-
-    const targetHostId = editingHostId || `host-${idSuffix}`;
 
     if (api) {
       await api.SaveHost({
@@ -2634,6 +2640,8 @@ export function App({
     }
 
     setEditingHostId(null);
+    setEditingIdentityId('');
+    setShowHostPass(false);
     setHostLabel('');
     setHostAddr('');
     setHostPort('0');
@@ -2653,6 +2661,8 @@ export function App({
 
   const handleOpenEditHost = (h: HostSummary) => {
     setEditingHostId(h.id);
+    setEditingIdentityId(h.identityId || '');
+    setShowHostPass(false);
     setHostLabel(h.label);
     setHostAddr(h.address);
     setHostPort(String(h.effectivePort || 22));
@@ -2669,6 +2679,17 @@ export function App({
     setHostEngagementId(h.engagementId || '');
     setHostAuthMethod('password');
     setShowAddHostModal(true);
+
+    const api = getWailsBindings();
+    if (api?.GetHostPassword) {
+      api.GetHostPassword(h.id).then((pw) => {
+        if (pw) {
+          setHostPass(pw);
+        }
+      }).catch(() => {
+        // vault may be locked or password not saved
+      });
+    }
   };
 
   const refreshSessionLogs = useCallback(async (): Promise<void> => {
@@ -9171,7 +9192,7 @@ export function App({
 
       {showCommandPalette && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="Command Palette"
           onClick={(e) => {
@@ -9180,14 +9201,43 @@ export function App({
             }
           }}
         >
-          <div className="modal-card palette-card">
-            <h2>Command Palette &amp; Quick Connect</h2>
+          <div className="cyber-dialog-card palette-card" style={{ maxWidth: '680px', width: '94vw', maxHeight: '88vh', overflowY: 'auto' }}>
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
+
+            {/* Header */}
+            <div className="dialog-header">
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    ⚡ Command Palette &amp; Quick Connect
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    FUZZY-ROUTER // HOSTS · NOTES · SCRIPTS · NETCAT · RAW TCP
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="cyber-btn-close"
+                onClick={() => setShowCommandPalette(false)}
+                aria-label="Close dialog"
+              >
+                ×
+              </button>
+            </div>
+            <div className="dialog-body" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <p>
               Fuzzy search saved hosts by <strong>Name</strong>, <strong>Address</strong>, or{' '}
               <strong>Tags</strong>, or type <code>user@host:port</code> to connect directly.
             </p>
             <input
               aria-label="Command Palette Input"
+              className="cyber-hud-input"
               placeholder="Search hosts, tags, or type user@host:port..."
               value={paletteQuery}
               onChange={(e) => setPaletteQuery(e.target.value)}
@@ -9474,14 +9524,15 @@ export function App({
               })()}
             </div>
 
-            <div className="modal-actions">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button
                 type="button"
-                className="btn-secondary"
+                className="cyber-btn cyber-btn-secondary"
                 onClick={() => setShowCommandPalette(false)}
               >
                 Close (Esc)
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -9489,197 +9540,319 @@ export function App({
 
       {showAddHostModal && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label={editingHostId ? 'Edit Host' : 'New Host'}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowAddHostModal(false);
               setEditingHostId(null);
+              setEditingIdentityId('');
+              setShowHostPass(false);
             }
           }}
         >
-          <form className="modal-card" onSubmit={(e) => void handleSaveHost(e)}>
-            <h2>{editingHostId ? 'Edit SSH Host' : 'New SSH Host'}</h2>
-            <p>Configure SSH connection address, credentials, port, and labels.</p>
-            <input
-              aria-label="Host Label"
-              placeholder="Label (e.g. Bastion EU)"
-              value={hostLabel}
-              onChange={(e) => setHostLabel(e.target.value)}
-              required
-              autoFocus
-            />
-            <input
-              aria-label="Host IP or Hostname"
-              placeholder="Address / IP (e.g. 10.10.1.50)"
-              value={hostAddr}
-              onChange={(e) => setHostAddr(e.target.value)}
-              required
-            />
-            <div style={{ marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>
-                Pentest Engagement Scope
-              </label>
-              <select
-                aria-label="Host Engagement"
-                value={hostEngagementId}
-                onChange={(e) => setHostEngagementId(e.target.value)}
-                style={{ width: '100%' }}
-              >
-                <option value="">🌐 No Engagement (Casual / Global Host)</option>
-                {engagementsList.map((eng) => (
-                  <option key={eng.id} value={eng.id}>
-                    🎯 {eng.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <input
-              aria-label="Host Port"
-              placeholder="Port (default: 22)"
-              value={hostPort}
-              onChange={(e) => setHostPort(e.target.value)}
-            />
-            <input
-              aria-label="Host Username"
-              placeholder="Username (e.g. root, ubuntu, admin)"
-              value={hostUser}
-              onChange={(e) => setHostUser(e.target.value)}
-            />
-            <select
-              aria-label="Host Auth Method"
-              value={hostAuthMethod}
-              onChange={(e) => setHostAuthMethod(e.target.value)}
-            >
-              <option value="password">Password (Vault Encrypted)</option>
-              <option value="key">SSH Key from Keychain</option>
-              <option value="agent">Windows OpenSSH Agent / Pageant</option>
-            </select>
-            {hostAuthMethod === 'password' && (
-              <input
-                aria-label="Host Password"
-                type="password"
-                placeholder="Password (stored encrypted in Vault)"
-                value={hostPass}
-                onChange={(e) => setHostPass(e.target.value)}
-              />
-            )}
-            {hostAuthMethod === 'key' && (
-              <select
-                aria-label="Host SSH Key"
-                value={hostKeyId}
-                onChange={(e) => setHostKeyId(e.target.value)}
-              >
-                <option value="">Select Key from Keychain...</option>
-                {(vaultSummary.keys || []).map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.label} ({k.type} · {k.fingerprint})
-                  </option>
-                ))}
-              </select>
-            )}
-            <input
-              aria-label="Host Tags"
-              placeholder="Tags (comma-separated, e.g. prod, linux)"
-              value={hostTags}
-              onChange={(e) => setHostTags(e.target.value)}
-            />
-            <input
-              aria-label="Host Initial Directory"
-              placeholder="Initial Directory (e.g. /var/www or C:\Projects, optional)"
-              value={hostInitialDir}
-              onChange={(e) => setHostInitialDir(e.target.value)}
-            />
-            <div style={{ margin: '8px 0', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-bright)', marginBottom: '6px', display: 'block' }}>
-                Proxy &amp; Bastion Settings
-              </label>
-              <select
-                aria-label="Host Proxy Profile"
-                value={hostProxyProfileId}
-                onChange={(e) => setHostProxyProfileId(e.target.value)}
-                style={{ width: '100%', marginBottom: '8px' }}
-              >
-                <option value="">Direct Connection (or Inherit Group Proxy)</option>
-                {(vaultSummary.proxyProfiles || []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    Use Proxy Profile: {p.name} ({p.type})
-                  </option>
-                ))}
-              </select>
-              {!hostProxyProfileId && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <input
-                    aria-label="Host Custom ProxyJump"
-                    placeholder="Custom ProxyJump (e.g. bastion.corp.net:2222)"
-                    value={hostProxyJump}
-                    onChange={(e) => setHostProxyJump(e.target.value)}
-                  />
-                  <input
-                    aria-label="Host Custom ProxyCommand"
-                    placeholder="Custom ProxyCommand (e.g. ssh -W %h:%p bastion)"
-                    value={hostProxyCommand}
-                    onChange={(e) => setHostProxyCommand(e.target.value)}
-                  />
+          <form
+            className="cyber-dialog-card host-modal-card"
+            onSubmit={(e) => void handleSaveHost(e)}
+            style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
+
+            {/* Header */}
+            <div className="dialog-header">
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    {editingHostId ? '⚙️ Edit SSH Host' : '➕ New SSH Host'}
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    VAULT-TARGET // SECURE HOST CONFIGURATION (F-01)
+                  </div>
                 </div>
-              )}
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: '0.78rem',
-                  color: 'var(--text-muted)',
-                  marginBottom: '0.2rem',
-                  display: 'block',
-                }}
-              >
-                Host Color Tag
-              </label>
-              <div className="color-picker-row" aria-label="Host Color Swatches">
-                <button
-                  type="button"
-                  className={`color-swatch-btn color-swatch-auto ${!hostColor ? 'selected' : ''}`}
-                  title="Auto (deterministic color based on host name)"
-                  aria-label="Color Auto"
-                  onClick={() => setHostColor('')}
-                />
-                {HOST_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`color-swatch-btn ${hostColor === c ? 'selected' : ''}`}
-                    style={{ backgroundColor: c }}
-                    title={c}
-                    aria-label={`Color ${c}`}
-                    onClick={() => setHostColor(c)}
-                  />
-                ))}
               </div>
-            </div>
-            <label className="checkbox-label" style={{ marginTop: '0.35rem' }}>
-              <input
-                type="checkbox"
-                aria-label="Enable Host Session Logging"
-                checked={hostSessionLogging}
-                onChange={(e) => setHostSessionLogging(e.target.checked)}
-              />
-              Enable Session Logging for this Host
-            </label>
-            <div className="modal-actions">
               <button
                 type="button"
-                className="btn-secondary"
+                className="cyber-btn-close"
                 onClick={() => {
                   setShowAddHostModal(false);
                   setEditingHostId(null);
+                  setEditingIdentityId('');
+                  setShowHostPass(false);
                 }}
+                aria-label="Close dialog"
               >
-                Cancel
+                ×
               </button>
-              <button type="submit" className="btn-primary">
-                {editingHostId ? 'Update Host' : 'Save Host'}
-              </button>
+            </div>
+
+            <div className="dialog-body" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label className="cyber-label">Host Label</label>
+                <input
+                  aria-label="Host Label"
+                  placeholder="Label (e.g. Bastion EU)"
+                  value={hostLabel}
+                  onChange={(e) => setHostLabel(e.target.value)}
+                  className="cyber-hud-input"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="cyber-label">Host IP or Hostname</label>
+                <input
+                  aria-label="Host IP or Hostname"
+                  placeholder="Address / IP (e.g. 10.10.1.50)"
+                  value={hostAddr}
+                  onChange={(e) => setHostAddr(e.target.value)}
+                  className="cyber-hud-input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="cyber-label">Pentest Engagement Scope</label>
+                <select
+                  aria-label="Host Engagement"
+                  value={hostEngagementId}
+                  onChange={(e) => setHostEngagementId(e.target.value)}
+                  className="cyber-hud-select"
+                  style={{ width: '100%' }}
+                >
+                  <option value="">🌐 No Engagement (Casual / Global Host)</option>
+                  {engagementsList.map((eng) => (
+                    <option key={eng.id} value={eng.id}>
+                      🎯 {eng.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.65rem' }}>
+                <div>
+                  <label className="cyber-label">Port</label>
+                  <input
+                    aria-label="Host Port"
+                    placeholder="22"
+                    value={hostPort}
+                    onChange={(e) => setHostPort(e.target.value)}
+                    className="cyber-hud-input"
+                  />
+                </div>
+                <div>
+                  <label className="cyber-label">Username</label>
+                  <input
+                    aria-label="Host Username"
+                    placeholder="Username (e.g. root, ubuntu, admin)"
+                    value={hostUser}
+                    onChange={(e) => setHostUser(e.target.value)}
+                    className="cyber-hud-input"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="cyber-label">Authentication Method</label>
+                <select
+                  aria-label="Host Auth Method"
+                  value={hostAuthMethod}
+                  onChange={(e) => setHostAuthMethod(e.target.value)}
+                  className="cyber-hud-select"
+                >
+                  <option value="password">Password (Vault Encrypted)</option>
+                  <option value="key">SSH Key from Keychain</option>
+                  <option value="agent">Windows OpenSSH Agent / Pageant</option>
+                </select>
+              </div>
+
+              {hostAuthMethod === 'password' && (
+                <div>
+                  <label className="cyber-label">Host Password</label>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      aria-label="Host Password"
+                      type={showHostPass ? 'text' : 'password'}
+                      placeholder="Password (stored encrypted in Vault)"
+                      value={hostPass}
+                      onChange={(e) => setHostPass(e.target.value)}
+                      className="cyber-hud-input"
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="cyber-btn cyber-btn-secondary"
+                      onClick={() => setShowHostPass((prev) => !prev)}
+                      title={showHostPass ? 'Hide Password' : 'Show Password'}
+                      aria-label={showHostPass ? 'Hide Password' : 'Show Password'}
+                      style={{ padding: '0.4rem 0.75rem', height: '34px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+                    >
+                      {showHostPass ? '🔒 Hide' : '👁 Show'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {hostAuthMethod === 'key' && (
+                <div>
+                  <label className="cyber-label">SSH Key</label>
+                  <select
+                    aria-label="Host SSH Key"
+                    value={hostKeyId}
+                    onChange={(e) => setHostKeyId(e.target.value)}
+                    className="cyber-hud-select"
+                  >
+                    <option value="">Select Key from Keychain...</option>
+                    {(vaultSummary.keys || []).map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.label} ({k.type} · {k.fingerprint})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="cyber-label">Labels &amp; Tags</label>
+                <input
+                  aria-label="Host Tags"
+                  placeholder="Tags (comma-separated, e.g. prod, linux, dmz)"
+                  value={hostTags}
+                  onChange={(e) => setHostTags(e.target.value)}
+                  className="cyber-hud-input"
+                />
+              </div>
+
+              <div>
+                <label className="cyber-label">Initial Directory (Optional)</label>
+                <input
+                  aria-label="Host Initial Directory"
+                  placeholder="Initial Directory (e.g. /var/www or C:\Projects)"
+                  value={hostInitialDir}
+                  onChange={(e) => setHostInitialDir(e.target.value)}
+                  className="cyber-hud-input"
+                />
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(0, 240, 255, 0.2)', paddingTop: '10px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label className="cyber-label" style={{ margin: 0 }}>
+                    Proxy &amp; Bastion Settings
+                  </label>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    onClick={() => {
+                      setShowAddHostModal(false);
+                      setShowProxyProfilesModal(true);
+                    }}
+                    title="Open Proxy Profiles to configure authenticated SOCKS5 proxies"
+                  >
+                    🛡️ Manage Proxy Profiles (SOCKS5 Auth)
+                  </button>
+                </div>
+
+                <select
+                  aria-label="Host Proxy Profile"
+                  value={hostProxyProfileId}
+                  onChange={(e) => setHostProxyProfileId(e.target.value)}
+                  className="cyber-hud-select"
+                  style={{ width: '100%', marginBottom: '8px' }}
+                >
+                  <option value="">Direct Connection</option>
+                  {(vaultSummary.proxyProfiles || []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      Use Proxy Profile: {p.name} ({p.type})
+                    </option>
+                  ))}
+                </select>
+
+                {!hostProxyProfileId && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', background: 'rgba(0, 240, 255, 0.05)', padding: '6px 10px', borderLeft: '2px solid #00f0ff' }}>
+                      💡 <strong>Tip:</strong> For authenticated SOCKS5 proxies, use <em>Manage Proxy Profiles</em> above (credentials stored encrypted in vault). Custom ProxyJump format: <code>[user@]bastion[:port]</code>. Custom ProxyCommand supports inline auth flags (e.g. <code>ncat --proxy-auth user:pass --proxy-type socks5 proxy:1080 %h %p</code>).
+                    </div>
+                    <div>
+                      <label className="cyber-label">Custom ProxyJump (Bastion Chain)</label>
+                      <input
+                        aria-label="Host Custom ProxyJump"
+                        placeholder="Custom ProxyJump (e.g. bastion.corp.net:2222 or jump1,jump2)"
+                        value={hostProxyJump}
+                        onChange={(e) => setHostProxyJump(e.target.value)}
+                        className="cyber-hud-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="cyber-label">Custom ProxyCommand</label>
+                      <input
+                        aria-label="Host Custom ProxyCommand"
+                        placeholder="Custom ProxyCommand (e.g. ssh -W %h:%p bastion or ncat --proxy-auth user:pass ...)"
+                        value={hostProxyCommand}
+                        onChange={(e) => setHostProxyCommand(e.target.value)}
+                        className="cyber-hud-input"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="cyber-label">Host Color Tag</label>
+                <div className="color-picker-row" aria-label="Host Color Swatches">
+                  <button
+                    type="button"
+                    className={`color-swatch-btn color-swatch-auto ${!hostColor ? 'selected' : ''}`}
+                    title="Auto (deterministic color based on host name)"
+                    aria-label="Color Auto"
+                    onClick={() => setHostColor('')}
+                  />
+                  {HOST_PALETTE.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`color-swatch-btn ${hostColor === c ? 'selected' : ''}`}
+                      style={{ backgroundColor: c }}
+                      title={c}
+                      aria-label={`Color ${c}`}
+                      onClick={() => setHostColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <label className="checkbox-label" style={{ marginTop: '0.2rem' }}>
+                <input
+                  type="checkbox"
+                  aria-label="Enable Host Session Logging"
+                  checked={hostSessionLogging}
+                  onChange={(e) => setHostSessionLogging(e.target.checked)}
+                />
+                Enable Session Logging for this Host
+              </label>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  onClick={() => {
+                    setShowAddHostModal(false);
+                    setEditingHostId(null);
+                    setEditingIdentityId('');
+                    setShowHostPass(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="cyber-btn cyber-btn-primary">
+                  {editingHostId ? 'Update Host' : 'Save Host'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -9687,7 +9860,7 @@ export function App({
 
       {showKeychainModal && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="SSH Keychain"
           onClick={(e) => {
@@ -9696,95 +9869,142 @@ export function App({
             }
           }}
         >
-          <div className="modal-card palette-card">
-            <h2>SSH Keychain</h2>
-            <p>
-              Generate <strong>Ed25519</strong> / <strong>RSA</strong> keys or import{' '}
-              <strong>OpenSSH</strong> and <strong>PuTTY .ppk</strong> private keys into the encrypted Vault.
-            </p>
+          <div className="cyber-dialog-card keychain-modal-card" style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflowY: 'auto' }}>
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
 
-            <form onSubmit={(e) => void handleGenerateKey(e)} className="sidebar-list">
-              <input
-                aria-label="Key Label"
-                placeholder="Key Label (e.g. Work Laptop Ed25519)"
-                value={keyLabel}
-                onChange={(e) => setKeyLabel(e.target.value)}
-                required
-              />
-              <select
-                aria-label="Key Algorithm"
-                value={keyType}
-                onChange={(e) => setKeyType(e.target.value)}
-              >
-                <option value="ed25519">Ed25519 (Recommended)</option>
-                <option value="rsa">RSA-3072</option>
-              </select>
-              <input
-                aria-label="Key Passphrase"
-                type="password"
-                placeholder="Optional Key Passphrase"
-                value={keyPassphrase}
-                onChange={(e) => setKeyPassphrase(e.target.value)}
-              />
-              <textarea
-                aria-label="Import Private Key Content"
-                placeholder="Or paste OpenSSH PEM / PuTTY .ppk private key here to import..."
-                value={importKeyRaw}
-                onChange={(e) => setImportKeyRaw(e.target.value)}
-              />
-              <div className="modal-actions">
-                {importKeyRaw.trim() ? (
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={(e) => void handleImportKey(e)}
-                  >
-                    Import Key (.ppk / OpenSSH)
-                  </button>
-                ) : (
-                  <button type="submit" className="btn-primary">
-                    Generate Keypair
-                  </button>
-                )}
-              </div>
-            </form>
-
-            {modalError && <div className="error-banner">{modalError}</div>}
-
-            <div className="palette-results" aria-label="Saved SSH Keys">
-              {(vaultSummary.keys || []).length === 0 ? (
-                <p>No SSH keys stored in Vault yet.</p>
-              ) : (
-                (vaultSummary.keys || []).map((k) => (
-                  <div key={k.id} className="host-card">
-                    <div className="host-info">
-                      <strong>
-                        {k.label} ({k.type})
-                      </strong>
-                      <span>{k.fingerprint}</span>
-                    </div>
-                    <div className="host-card-actions">
-                      <button
-                        type="button"
-                        className="btn-secondary btn-sm"
-                        onClick={() => void handleCopyPublicKey(k.publicKey, k.label)}
-                      >
-                        Copy Public Key
-                      </button>
-                    </div>
+            {/* Header */}
+            <div className="dialog-header">
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    🔑 SSH Keychain Manager
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    VAULT-CRYPTO // ED25519 · RSA-3072 · OPENSSH · PUTTY PPK
                   </div>
-                ))
-              )}
-            </div>
-
-            <div className="modal-actions">
+                </div>
+              </div>
               <button
                 type="button"
-                className="btn-secondary"
+                className="cyber-btn-close"
                 onClick={() => setShowKeychainModal(false)}
+                aria-label="Close dialog"
               >
-                Close
+                ×
               </button>
+            </div>
+
+            <div className="dialog-body" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <form onSubmit={(e) => void handleGenerateKey(e)} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div>
+                  <label className="cyber-label">Key Label</label>
+                  <input
+                    aria-label="Key Label"
+                    className="cyber-hud-input"
+                    placeholder="Key Label (e.g. Work Laptop Ed25519)"
+                    value={keyLabel}
+                    onChange={(e) => setKeyLabel(e.target.value)}
+                    required
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                  <div>
+                    <label className="cyber-label">Algorithm</label>
+                    <select
+                      aria-label="Key Algorithm"
+                      className="cyber-hud-select"
+                      value={keyType}
+                      onChange={(e) => setKeyType(e.target.value)}
+                    >
+                      <option value="ed25519">Ed25519 (Recommended)</option>
+                      <option value="rsa">RSA-3072</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="cyber-label">Passphrase (Optional)</label>
+                    <input
+                      aria-label="Key Passphrase"
+                      className="cyber-hud-input"
+                      type="password"
+                      placeholder="Optional Key Passphrase"
+                      value={keyPassphrase}
+                      onChange={(e) => setKeyPassphrase(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="cyber-label">Import Existing Private Key (.ppk / OpenSSH PEM)</label>
+                  <textarea
+                    aria-label="Import Private Key Content"
+                    className="cyber-hud-input font-mono"
+                    style={{ minHeight: '80px', resize: 'vertical' }}
+                    placeholder="Or paste OpenSSH PEM / PuTTY .ppk private key here to import..."
+                    value={importKeyRaw}
+                    onChange={(e) => setImportKeyRaw(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.2rem' }}>
+                  {importKeyRaw.trim() ? (
+                    <button
+                      type="button"
+                      className="cyber-btn cyber-btn-primary"
+                      onClick={(e) => void handleImportKey(e)}
+                    >
+                      Import Key (.ppk / OpenSSH)
+                    </button>
+                  ) : (
+                    <button type="submit" className="cyber-btn cyber-btn-primary">
+                      Generate Keypair
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              {modalError && <div className="status-banner error">{modalError}</div>}
+
+              <div style={{ borderTop: '1px solid rgba(0, 240, 255, 0.2)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+                <label className="cyber-label" style={{ marginBottom: '0.5rem' }}>Stored Keys in Encrypted Vault</label>
+                <div className="palette-results" aria-label="Saved SSH Keys" style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {(vaultSummary.keys || []).length === 0 ? (
+                    <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>No SSH keys stored in Vault yet.</p>
+                  ) : (
+                    (vaultSummary.keys || []).map((k) => (
+                      <div key={k.id} className="cyber-rule-card" style={{ padding: '0.6rem 0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <strong style={{ color: '#00f0ff', fontSize: '0.85rem' }}>
+                              {k.label} ({k.type})
+                            </strong>
+                            <div style={{ color: '#94a3b8', fontSize: '0.72rem', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{k.fingerprint}</div>
+                          </div>
+                          <button
+                            type="button"
+                            className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                            onClick={() => void handleCopyPublicKey(k.publicKey, k.label)}
+                          >
+                            Copy Public Key
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  onClick={() => setShowKeychainModal(false)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -10129,7 +10349,7 @@ export function App({
       )}
       {showSerialModal && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop cyber-modal-overlay"
           role="dialog"
           aria-label="Serial Connection"
           onClick={(e) => {
@@ -10138,18 +10358,51 @@ export function App({
             }
           }}
         >
-          <div className="modal-card">
-            <h2>Serial / UART Console Connection</h2>
-            <form onSubmit={(e) => void handleConnectSerial(e)}>
+          <div
+            className="cyber-dialog-card serial-modal-card"
+            style={{ maxWidth: '640px', width: '94vw', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            {/* Reticles */}
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
+
+            {/* Header */}
+            <div className="dialog-header">
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    <span>⚡ </span>
+                    <span>Serial / UART Console Connection</span>
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    HARDWARE-LINK // COM &amp; USB-UART SERIAL TELEMETRY
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="cyber-btn-close"
+                onClick={() => setShowSerialModal(false)}
+                aria-label="Close dialog"
+              >
+                ×
+              </button>
+            </div>
+            <form className="dialog-body" onSubmit={(e) => void handleConnectSerial(e)} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {modalError && <p className="status-banner error">{modalError}</p>}
 
-              <label htmlFor="serial-port-select">
-                Port / Device
-                <div className="serial-port-row">
+              <div>
+                <label className="cyber-label" htmlFor="serial-port-select">Port / Device</label>
+                <div className="serial-port-row" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   {serialPorts.length > 0 ? (
                     <select
                       id="serial-port-select"
                       aria-label="Serial Port Select"
+                      className="cyber-hud-select"
+                      style={{ flex: 1 }}
                       value={serialConfig.port}
                       onChange={(e) =>
                         setSerialConfig((prev) => ({ ...prev, port: e.target.value }))
@@ -10183,6 +10436,8 @@ export function App({
                       id="serial-port-select"
                       aria-label="Serial Port Name"
                       type="text"
+                      className="cyber-hud-input"
+                      style={{ flex: 1 }}
                       placeholder="e.g. COM1 or /dev/ttyUSB0"
                       value={serialConfig.port}
                       onChange={(e) =>
@@ -10193,93 +10448,97 @@ export function App({
                   )}
                   <button
                     type="button"
-                    className="serial-refresh-btn"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                     onClick={() => void handleRefreshSerialPorts()}
                     title="Refresh detected serial ports"
                     disabled={serialLoading}
+                    style={{ whiteSpace: 'nowrap' }}
                   >
                     {serialLoading ? '...' : '🔄 Refresh'}
                   </button>
                 </div>
+              </div>
 
-                {(() => {
-                  const selectedPortInfo = serialPorts.find((p) => p.port === serialConfig.port);
-                  if (selectedPortInfo) {
-                    return (
-                      <div className="serial-hardware-card">
-                        <div className="serial-hw-header">
-                          <span
-                            className={`serial-hw-badge ${
-                              selectedPortInfo.isConnected ? 'connected' : 'offline'
-                            }`}
-                          >
-                            {selectedPortInfo.isConnected
-                              ? '● Connected & Active'
-                              : '○ Offline / No Device'}
-                          </span>
-                          <span className="serial-hw-type">
-                            {selectedPortInfo.deviceType || 'Serial Port'}
-                          </span>
+              {(() => {
+                const selectedPortInfo = serialPorts.find((p) => p.port === serialConfig.port);
+                if (selectedPortInfo) {
+                  return (
+                    <div className="serial-hardware-card" style={{ background: 'rgba(5, 9, 16, 0.9)', border: '1px solid rgba(0, 240, 255, 0.25)', padding: '0.65rem 0.85rem' }}>
+                      <div className="serial-hw-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <span
+                          className={`serial-hw-badge ${
+                            selectedPortInfo.isConnected ? 'connected' : 'offline'
+                          }`}
+                        >
+                          {selectedPortInfo.isConnected
+                            ? '● Connected & Active'
+                            : '○ Offline / No Device'}
+                        </span>
+                        <span className="serial-hw-type" style={{ fontSize: '0.72rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>
+                          {selectedPortInfo.deviceType || 'Serial Port'}
+                        </span>
+                      </div>
+                      <div className="serial-hw-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.74rem' }}>
+                        <div className="serial-hw-row">
+                          <span className="serial-hw-label" style={{ color: '#94a3b8', marginRight: '6px' }}>Hardware:</span>
+                          <span className="serial-hw-val" style={{ color: '#f1f5f9' }}>{selectedPortInfo.description}</span>
                         </div>
-                        <div className="serial-hw-body">
+                        {selectedPortInfo.manufacturer && (
                           <div className="serial-hw-row">
-                            <span className="serial-hw-label">Hardware:</span>
-                            <span className="serial-hw-val">{selectedPortInfo.description}</span>
+                            <span className="serial-hw-label" style={{ color: '#94a3b8', marginRight: '6px' }}>Vendor:</span>
+                            <span className="serial-hw-val" style={{ color: '#f1f5f9' }}>
+                              {selectedPortInfo.manufacturer}
+                            </span>
                           </div>
-                          {selectedPortInfo.manufacturer && (
-                            <div className="serial-hw-row">
-                              <span className="serial-hw-label">Vendor:</span>
-                              <span className="serial-hw-val">
-                                {selectedPortInfo.manufacturer}
-                              </span>
-                            </div>
-                          )}
-                          {selectedPortInfo.hardwareId && (
-                            <div className="serial-hw-row">
-                              <span className="serial-hw-label">Hardware ID:</span>
-                              <span className="serial-hw-val font-mono">
-                                {selectedPortInfo.hardwareId}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                        )}
+                        {selectedPortInfo.hardwareId && (
+                          <div className="serial-hw-row">
+                            <span className="serial-hw-label" style={{ color: '#94a3b8', marginRight: '6px' }}>Hardware ID:</span>
+                            <span className="serial-hw-val font-mono" style={{ color: '#00f0ff' }}>
+                              {selectedPortInfo.hardwareId}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    );
-                  }
-                  if (serialPorts.length === 0) {
-                    return (
-                      <div className="serial-no-ports-banner">
-                        ℹ No active hardware detected. Connect your USB-UART adapter (FTDI, CP210x, CH340), Arduino, ESP32, or Raspberry Pi Pico, and click <strong>🔄 Refresh</strong>.
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
+                    </div>
+                  );
+                }
+                if (serialPorts.length === 0) {
+                  return (
+                    <div className="serial-no-ports-banner" style={{ background: 'rgba(0, 240, 255, 0.05)', border: '1px solid rgba(0, 240, 255, 0.2)', padding: '0.6rem 0.85rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                      ℹ No active hardware detected. Connect your USB-UART adapter (FTDI, CP210x, CH340), Arduino, ESP32, or Raspberry Pi Pico, and click <strong>🔄 Refresh</strong>.
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="serial-autodetect-btn"
-                    onClick={() => void handleAutoDetectSerial()}
-                    title="Probe and auto-detect COM port and baud rate"
-                    disabled={serialDetecting}
-                  >
-                    {serialDetecting ? 'Probing...' : '⚡ Auto Detect Port & Baud'}
-                  </button>
-                  {serialDetectResult && (
-                    <span className="serial-autodetect-badge">
-                      {serialDetectResult.message} ({serialDetectResult.confidence})
-                    </span>
-                  )}
-                </div>
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                  onClick={() => void handleAutoDetectSerial()}
+                  title="Probe and auto-detect COM port and baud rate"
+                  disabled={serialDetecting}
+                >
+                  {serialDetecting ? 'Probing...' : '⚡ Auto Detect Port & Baud'}
+                </button>
+                {serialDetectResult && (
+                  <span className="serial-autodetect-badge" style={{ fontSize: '0.72rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', border: '1px solid #10b981' }}>
+                    {serialDetectResult.message} ({serialDetectResult.confidence})
+                  </span>
+                )}
+              </div>
 
-              <div className="form-grid-2col">
-                <label htmlFor="serial-baud-rate">
-                  Baud Rate
+              <div className="form-grid-2col" style={{ width: '100%', boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div style={{ minWidth: 0 }}>
+                  <label className="cyber-label" htmlFor="serial-baud-rate">
+                    Baud Rate
+                  </label>
                   <select
                     id="serial-baud-rate"
                     aria-label="Baud Rate"
+                    className="cyber-hud-select"
                     value={serialConfig.baudRate}
                     onChange={(e) =>
                       setSerialConfig((prev) => ({
@@ -10296,13 +10555,16 @@ export function App({
                       )
                     )}
                   </select>
-                </label>
+                </div>
 
-                <label htmlFor="serial-line-ending">
-                  Line Ending
+                <div style={{ minWidth: 0 }}>
+                  <label className="cyber-label" htmlFor="serial-line-ending">
+                    Line Ending
+                  </label>
                   <select
                     id="serial-line-ending"
                     aria-label="Line Ending"
+                    className="cyber-hud-select"
                     value={serialConfig.lineEnding}
                     onChange={(e) =>
                       setSerialConfig((prev) => ({ ...prev, lineEnding: e.target.value }))
@@ -10312,26 +10574,30 @@ export function App({
                     <option value="lf">LF (\n)</option>
                     <option value="cr">CR (\r)</option>
                   </select>
-                </label>
+                </div>
               </div>
 
               <button
                 type="button"
                 className="advanced-toggle-btn"
                 onClick={() => setShowSerialAdvanced((prev) => !prev)}
+                style={{ color: '#00f0ff', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 0' }}
               >
                 <span>{showSerialAdvanced ? '▼' : '►'}</span>
                 <span>Advanced Parameters (Data Bits, Parity, Stop Bits, Flow Control)</span>
               </button>
 
               {showSerialAdvanced && (
-                <div className="advanced-serial-panel">
-                  <div className="form-grid-3col">
-                    <label htmlFor="serial-data-bits">
-                      Data Bits
+                <div className="advanced-serial-panel" style={{ background: 'rgba(5, 9, 16, 0.6)', border: '1px solid rgba(0, 240, 255, 0.2)', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <div className="form-grid-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                    <div>
+                      <label className="cyber-label" htmlFor="serial-data-bits">
+                        Data Bits
+                      </label>
                       <select
                         id="serial-data-bits"
                         aria-label="Data Bits"
+                        className="cyber-hud-select"
                         value={serialConfig.dataBits}
                         onChange={(e) =>
                           setSerialConfig((prev) => ({
@@ -10340,18 +10606,21 @@ export function App({
                           }))
                         }
                       >
-                        <option value={8}>8 bits (standard)</option>
+                        <option value={8}>8 bits</option>
                         <option value={7}>7 bits</option>
                         <option value={6}>6 bits</option>
                         <option value={5}>5 bits</option>
                       </select>
-                    </label>
+                    </div>
 
-                    <label htmlFor="serial-parity">
-                      Parity
+                    <div>
+                      <label className="cyber-label" htmlFor="serial-parity">
+                        Parity
+                      </label>
                       <select
                         id="serial-parity"
                         aria-label="Parity"
+                        className="cyber-hud-select"
                         value={serialConfig.parity}
                         onChange={(e) =>
                           setSerialConfig((prev) => ({
@@ -10360,19 +10629,22 @@ export function App({
                           }))
                         }
                       >
-                        <option value="none">None (N)</option>
-                        <option value="odd">Odd (O)</option>
-                        <option value="even">Even (E)</option>
-                        <option value="mark">Mark (M)</option>
-                        <option value="space">Space (S)</option>
+                        <option value="none">None</option>
+                        <option value="odd">Odd</option>
+                        <option value="even">Even</option>
+                        <option value="mark">Mark</option>
+                        <option value="space">Space</option>
                       </select>
-                    </label>
+                    </div>
 
-                    <label htmlFor="serial-stop-bits">
-                      Stop Bits
+                    <div>
+                      <label className="cyber-label" htmlFor="serial-stop-bits">
+                        Stop Bits
+                      </label>
                       <select
                         id="serial-stop-bits"
                         aria-label="Stop Bits"
+                        className="cyber-hud-select"
                         value={serialConfig.stopBits}
                         onChange={(e) =>
                           setSerialConfig((prev) => ({
@@ -10385,14 +10657,17 @@ export function App({
                         <option value="1.5">1.5 stop bits</option>
                         <option value="2">2 stop bits</option>
                       </select>
-                    </label>
+                    </div>
                   </div>
 
-                  <label htmlFor="serial-flow-control">
-                    Flow Control
+                  <div>
+                    <label className="cyber-label" htmlFor="serial-flow-control">
+                      Flow Control
+                    </label>
                     <select
                       id="serial-flow-control"
                       aria-label="Flow Control"
+                      className="cyber-hud-select"
                       value={serialConfig.flowControl}
                       onChange={(e) =>
                         setSerialConfig((prev) => ({
@@ -10405,10 +10680,10 @@ export function App({
                       <option value="hardware">Hardware (RTS / CTS)</option>
                       <option value="software">Software (XON / XOFF)</option>
                     </select>
-                  </label>
+                  </div>
 
-                  <div className="checkbox-row">
-                    <label className="checkbox-label">
+                  <div className="checkbox-row" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '4px' }}>
+                    <label className="checkbox-label" style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
                       <input
                         type="checkbox"
                         checked={serialConfig.dtr}
@@ -10419,7 +10694,7 @@ export function App({
                       Initial DTR ON
                     </label>
 
-                    <label className="checkbox-label">
+                    <label className="checkbox-label" style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
                       <input
                         type="checkbox"
                         checked={serialConfig.rts}
@@ -10430,7 +10705,7 @@ export function App({
                       Initial RTS ON
                     </label>
 
-                    <label className="checkbox-label">
+                    <label className="checkbox-label" style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
                       <input
                         type="checkbox"
                         checked={serialConfig.localEcho}
@@ -10444,15 +10719,15 @@ export function App({
                 </div>
               )}
 
-              <div className="modal-actions" style={{ marginTop: '0.8rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.65rem' }}>
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="cyber-btn cyber-btn-secondary"
                   onClick={() => setShowSerialModal(false)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="cyber-btn cyber-btn-primary">
                   Connect Serial
                 </button>
               </div>

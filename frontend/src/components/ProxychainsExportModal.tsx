@@ -127,55 +127,50 @@ export function ProxychainsExportModal({
 
   return (
     <div
-      className="modal-backdrop"
+      className="modal-backdrop cyber-modal-overlay"
       style={{ zIndex: 100020 }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="card proxychains-modal"
+        className="cyber-dialog-card proxychains-modal"
         style={{
-          width: '940px',
+          width: '960px',
           maxWidth: '96vw',
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.7)',
-          border: '1px solid var(--accent)',
           padding: 0,
           overflow: 'hidden',
         }}
       >
+        {/* Reticles */}
+        <div className="cyber-corner-reticle cyber-corner-tl" />
+        <div className="cyber-corner-reticle cyber-corner-tr" />
+        <div className="cyber-corner-reticle cyber-corner-bl" />
+        <div className="cyber-corner-reticle cyber-corner-br" />
+
         {/* Header */}
-        <div
-          style={{
-            padding: '16px 24px',
-            borderBottom: '1px solid var(--border-color)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'var(--bg-secondary)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.4rem' }}>⛓️</span>
+        <div className="dialog-header">
+          <div className="dialog-title">
+            <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-bright)' }}>
-                Export proxychains.conf
-              </h2>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                RFC-compliant configuration for proxychains and proxychains-ng
-              </p>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                ⛓️ Export proxychains.conf (F-14)
+              </h3>
+              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                CHAIN-ROUTER // RFC-COMPLIANT CONFIGURATION FOR PROXYCHAINS-NG
+              </div>
             </div>
           </div>
           <button
-            className="btn btn-secondary"
+            type="button"
+            className="cyber-btn-close"
             onClick={onClose}
-            aria-label="Close"
-            style={{ padding: '4px 10px', fontSize: '0.9rem' }}
+            aria-label="Close dialog"
           >
-            ✕
+            ×
           </button>
         </div>
 
@@ -330,7 +325,7 @@ export function ProxychainsExportModal({
                           <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                             <button
                               type="button"
-                              className="btn btn-secondary"
+                              className="cyber-btn cyber-btn-secondary"
                               onClick={() => handleRemoveProxy(idx)}
                               style={{ padding: '2px 6px', fontSize: '0.75rem', color: '#f87171' }}
                               title="Remove Hop"
@@ -406,7 +401,7 @@ export function ProxychainsExportModal({
                 />
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="cyber-btn cyber-btn-primary"
                   style={{ padding: '4px 10px', fontSize: '0.8rem' }}
                 >
                   Add
@@ -480,7 +475,7 @@ export function ProxychainsExportModal({
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="cyber-btn cyber-btn-primary"
                   onClick={handleCopyToClipboard}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
@@ -488,7 +483,7 @@ export function ProxychainsExportModal({
                 </button>
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="cyber-btn cyber-btn-secondary"
                   onClick={handleDownloadFile}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
@@ -499,7 +494,7 @@ export function ProxychainsExportModal({
               {onSaveToFile && (
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="cyber-btn cyber-btn-secondary"
                   onClick={handleSaveToDisk}
                   disabled={isSaving}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}

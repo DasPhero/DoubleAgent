@@ -175,45 +175,53 @@ export function SnippetsManagerModal({
 
   const cardContent = (
       <div
-        className={`modal-card snippets-manager-card ${isDocked ? 'is-docked-widget' : ''}`}
+        className={`${isDocked ? 'is-docked-widget modal-card' : 'cyber-dialog-card'} snippets-manager-card`}
         role={isDocked ? 'region' : undefined}
         aria-label={isDocked ? 'Docked Command Snippets' : undefined}
+        style={{ maxWidth: isDocked ? undefined : '780px', width: isDocked ? undefined : '94vw', maxHeight: isDocked ? undefined : '88vh', overflowY: 'auto' }}
       >
-        {/* Header */}
         {!isDocked && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.2rem' }}>⚡</span>
-              <div>
-                <h2 style={{ margin: 0 }}>Command Snippets</h2>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  Reusable commands with variable injection (<code>{'{{HOST}}'}</code>, <code>{'{{USER}}'}</code>, <code>{'{{PORT}}'}</code>, <code>{'{{CWD}}'}</code>, custom parameters).
-                </span>
+          <>
+            <div className="cyber-corner-reticle cyber-corner-tl" />
+            <div className="cyber-corner-reticle cyber-corner-tr" />
+            <div className="cyber-corner-reticle cyber-corner-bl" />
+            <div className="cyber-corner-reticle cyber-corner-br" />
+            <div className="dialog-header" style={{ margin: '-1rem -1rem 1rem -1rem' }}>
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    <span>⚡ </span>
+                    <span>Command Snippets</span>
+                  </h3>
+                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                    {"DYNAMIC-SNIPPETS // INJECT {{HOST}} {{USER}} {{PORT}}"}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              {onDockToView && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                {onDockToView && (
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    onClick={onDockToView}
+                    aria-label="Dock Snippets to View"
+                    title="Dock Command Snippets as a split panel inside the current workspace view"
+                  >
+                    📌 Dock
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="btn-secondary btn-sm"
-                  onClick={onDockToView}
-                  aria-label="Dock Snippets to View"
-                  title="Dock Command Snippets as a split panel inside the current workspace view"
+                  className="cyber-btn-close"
+                  onClick={onClose}
+                  aria-label="Close"
                 >
-                  📌 Dock to View
+                  ×
                 </button>
-              )}
-              <button
-                type="button"
-                className="tab-close-btn"
-                onClick={onClose}
-                aria-label="Close"
-                style={{ fontSize: '1.2rem', padding: '0 0.4rem' }}
-              >
-                ×
-              </button>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {error && <div className="error-banner">{error}</div>}
@@ -244,7 +252,7 @@ export function SnippetsManagerModal({
                   ))}
                 </select>
               )}
-              <button type="button" className="btn-primary" onClick={startNew}>
+              <button type="button" className="cyber-btn cyber-btn-primary" onClick={startNew}>
                 + New Snippet
               </button>
             </div>
@@ -270,7 +278,7 @@ export function SnippetsManagerModal({
                       <div style={{ display: 'flex', gap: '0.35rem' }}>
                         <button
                           type="button"
-                          className="btn-primary btn-sm"
+                          className="cyber-btn cyber-btn-primary btn-sm"
                           onClick={() => {
                             if (!isDocked) {
                               onClose();
@@ -283,7 +291,7 @@ export function SnippetsManagerModal({
                         </button>
                         <button
                           type="button"
-                          className="btn-secondary btn-sm"
+                          className="cyber-btn cyber-btn-secondary btn-sm"
                           onClick={() => startEdit(s)}
                           title="Edit snippet"
                         >
@@ -330,7 +338,7 @@ export function SnippetsManagerModal({
               </h3>
               <button
                 type="button"
-                className="btn-secondary btn-sm"
+                className="cyber-btn cyber-btn-secondary btn-sm"
                 onClick={() => setEditingSnippet(null)}
               >
                 Back to List
@@ -443,13 +451,13 @@ export function SnippetsManagerModal({
             <div className="modal-actions" style={{ marginTop: '0.8rem' }}>
               <button
                 type="button"
-                className="btn-secondary"
+                className="cyber-btn cyber-btn-secondary"
                 onClick={() => setEditingSnippet(null)}
                 disabled={saving}
               >
                 Cancel
               </button>
-              <button type="submit" className="btn-primary" disabled={saving}>
+              <button type="submit" className="cyber-btn cyber-btn-primary" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Snippet'}
               </button>
             </div>
@@ -464,7 +472,7 @@ export function SnippetsManagerModal({
 
   return (
     <div
-      className="modal-backdrop"
+      className="modal-backdrop cyber-modal-overlay"
       role="dialog"
       aria-label="Snippets Manager"
       onClick={(e) => {

@@ -103,6 +103,10 @@ export function GetEvidenceCategories(arg1:string):Promise<Array<string>>;
 
 export function GetEvidenceTemplates():Promise<Array<core.EvidenceItem>>;
 
+export function GetHostPassword(arg1:string):Promise<string>;
+
+export function GetIdentityPassword(arg1:string):Promise<string>;
+
 export function GetLiveSessionIDs():Promise<Array<string>>;
 
 export function GetNote(arg1:string):Promise<core.NotePage>;

@@ -375,6 +375,35 @@ func (a *App) SaveIdentity(identity core.IdentityRecord) error {
 	return a.vaultStore.SavePayload(a.ctx, payload)
 }
 
+// GetHostPassword returns the decrypted password for a saved host from the active vault (when unlocked).
+func (a *App) GetHostPassword(hostID string) (string, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return "", err
+	}
+	resolved, err := core.ResolveEffectiveHost(hostID, payload)
+	if err != nil {
+		return "", err
+	}
+	return resolved.Auth.Password, nil
+}
+
+// GetIdentityPassword returns the decrypted password for an identity ID from the active vault.
+func (a *App) GetIdentityPassword(identityID string) (string, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return "", err
+	}
+	for _, id := range payload.Identities {
+		if id.ID == identityID {
+			return id.Password, nil
+		}
+	}
+	return "", errors.New("identity not found")
+}
+
 // SaveHost creates or updates a host in the encrypted vault (F-01).
 func (a *App) SaveHost(host core.HostRecord) error {
 	if host.ID == "" || host.Label == "" || host.Address == "" {
