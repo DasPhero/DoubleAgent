@@ -242,6 +242,10 @@ export function GetSessionLogStatus(arg1) {
   return window['go']['main']['App']['GetSessionLogStatus'](arg1);
 }
 
+export function GetShellStabilizePresets() {
+  return window['go']['main']['App']['GetShellStabilizePresets']();
+}
+
 export function GetSnippetContext(arg1) {
   return window['go']['main']['App']['GetSnippetContext'](arg1);
 }
@@ -520,6 +524,10 @@ export function SetSerialRTS(arg1, arg2) {
 
 export function SetWorkspaceStore(arg1) {
   return window['go']['main']['App']['SetWorkspaceStore'](arg1);
+}
+
+export function StabilizeShell(arg1) {
+  return window['go']['main']['App']['StabilizeShell'](arg1);
 }
 
 export function StartForwardTunnel(arg1, arg2) {

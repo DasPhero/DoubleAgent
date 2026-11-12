@@ -30,6 +30,12 @@ Highlighting text in any terminal session displays four quick-save targets:
 ## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-36`, `F-37`, & `F-40`)
 
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **One-Click Shell Stabilization & PTY Upgrade (`F-34` / Pentest Module Wave 1)**:
+  - Click **`🐚 Stabilize`** in the terminal command strip to upgrade any raw/dumb shell (such as an incoming reverse shell from the Raw TCP Listener or a nested `nc` session) into a full interactive PTY terminal.
+  - **Session Topology Auto-Detection**:
+    - **Direct Raw Socket / Listener (`direct`)**: Automatically used for Raw TCP reverse shell tabs (`F-31`) or Serial/UART (`F-23`). Disables line-buffering so `Tab`, `Ctrl+C`, and arrow keys stream immediately, spawns a PTY (`python3`, `python`, `script`, or `perl`), and syncs `TERM=xterm-256color` + exact xterm.js `rows`/`cols`.
+    - **Nested Netcat in SSH (`nested_nc`)**: Used when catching a shell inside `nc` on a jump host (e.g. Kali). Spawns the remote PTY, backgrounds `nc` (`Ctrl+Z`), configures `stty raw -echo; fg`, and sets remote `stty rows/cols`.
+    - **Windows `ConPtyShell` (`windows_conpty`)**: Generates and executes `Invoke-ConPtyShell` with your callback `LHOST`/`LPORT` and live terminal dimensions.
 - **Terminal Selection Quick Save to Vault (`F-19` / Pentest Module Wave 1)**:
   - **Right-Click Cyberpunk HUD Context Menu**:
     - Highlight any text in an active terminal session and right-click to open the floating HUD Context Menu.

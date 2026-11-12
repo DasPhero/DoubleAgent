@@ -1,10 +1,27 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-18` / `F-19` — Pentest Triad Overhaul: Findings, Evidence & Notes with Terminal Quick Save — COMPLETED!
-- **Next Milestone:** Wave 1 MVP+ — Snippet Chains (`F-16`) / Engagement PDF/HTML Reporting (`F-41`)
+- **Current Milestone:** `F-34` — One-Click Shell Stabilization & PTY Upgrade — COMPLETED!
+- **Next Milestone:** Wave 1 MVP+ — Nmap XML Import (`F-39`) / Snippet Chains (`F-16`) / Payload Generator (`F-33`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Shell Stabilization & PTY Upgrade (`F-34` / Pentest Spec Line 30)**:
+  - **Backend Sequence Builder (`backend/core/shell_stabilize.go`)**:
+    - Supports `python3` (`pty.spawn`), `python` (`pty.spawn`), `script -qc /dev/null`, `perl exec`, and `Windows ConPtyShell`.
+    - Supports 3 topology modes:
+      - `direct`: For DoubleAgent's built-in Raw TCP reverse shell listener (`F-31`) or Serial/UART (`F-23`). Automatically disables line-buffering on Raw TCP sessions so interactive keys (`Tab`, `Ctrl+C`, arrows) stream immediately, spawns PTY, and syncs `TERM=xterm-256color` + `stty rows <R> cols <C>`.
+      - `nested_nc`: For reverse shells caught inside `nc`/`rlwrap` inside an SSH session. Spawns PTY, sends `Ctrl+Z` (`\x1a`), runs `stty raw -echo; fg`, and syncs `TERM` and terminal dimensions.
+      - `windows_conpty`: Generates PowerShell `Invoke-ConPtyShell` command with current `rows`/`cols`, `LHOST`, and `LPORT`.
+    - Sanitizes user-supplied `shellPath`, `term`, and `lhost` values against command injection.
+    - Unit tests in `backend/core/shell_stabilize_test.go` (`TestShellStabilize_BuildSteps_F34`).
+  - **Wails Bindings (`app.go`)**:
+    - Bound methods: `GetShellStabilizePresets`, `StabilizeShell`.
+    - Unit test in `app_test.go` (`TestApp_ShellStabilize_F34`).
+  - **Frontend Cyberpunk HUD Modal & Command Strip Trigger (`ShellStabilizeModal.tsx`, `TerminalView.tsx`, `App.tsx`)**:
+    - Exported `getTerminalDimensions(sessionId)` from `TerminalView.tsx` to read live xterm.js `cols` & `rows`.
+    - Added `🐚 Stabilize` button in the terminal HUD command strip.
+    - Auto-detects Raw TCP vs SSH session to preselect `direct` vs `nested_nc` mode, previews the exact step-by-step sequence, and supports 1-click Copy Commands or `⚡ Stabilize Shell Now`.
+    - Unit tests in `frontend/src/components/ShellStabilizeModal.test.tsx`.
 - **Formal Triad Architecture: Findings vs. Evidence vs. Notes (`F-18`, `F-19`)**:
   - **Findings (`FindingItem`)**: High-level security vulnerabilities, misconfigurations, and risk exposures with severity rating (`critical`, `high`, `medium`, `low`, `info`), lifecycle status (`draft`, `confirmed`, `reported`, `remediated`), CVE/CVSS scores, structured description narrative, impact analysis, and remediation advice. A finding links to multiple supporting evidences (`evidenceIds: string[]`) and killchain notes (`noteIds: string[]`).
   - **Evidence Artifacts (`EvidenceItem`)**: Raw forensic proof, console dumps, exploit outputs, hash extractions, or structured network tables. Every evidence item features an `inReport: boolean` flag allowing operators to keep internal vault verification proof separate from client-facing deliverables.

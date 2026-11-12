@@ -1649,6 +1649,54 @@ export namespace core {
 	        this.lineCount = source["lineCount"];
 	    }
 	}
+	export class ShellStabilizePreset {
+	    id: string;
+	    name: string;
+	    os: string;
+	    description: string;
+	    command: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ShellStabilizePreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.os = source["os"];
+	        this.description = source["description"];
+	        this.command = source["command"];
+	    }
+	}
+	export class ShellStabilizeRequest {
+	    sessionId: string;
+	    method: string;
+	    mode: string;
+	    shellPath: string;
+	    term: string;
+	    cols: number;
+	    rows: number;
+	    lhost?: string;
+	    lport?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ShellStabilizeRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.method = source["method"];
+	        this.mode = source["mode"];
+	        this.shellPath = source["shellPath"];
+	        this.term = source["term"];
+	        this.cols = source["cols"];
+	        this.rows = source["rows"];
+	        this.lhost = source["lhost"];
+	        this.lport = source["lport"];
+	    }
+	}
 	
 	export class SnippetContext {
 	    hostId?: string;

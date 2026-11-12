@@ -1475,6 +1475,60 @@ func (a *App) SetRawTcpSessionLineMode(sessionID string, lineMode bool, lineEndi
 	return nil
 }
 
+// GetShellStabilizePresets returns built-in F-34 shell stabilization presets.
+func (a *App) GetShellStabilizePresets() []core.ShellStabilizePreset {
+	return core.DefaultShellStabilizePresets()
+}
+
+// StabilizeShell upgrades a raw shell session into a fully interactive PTY terminal (F-34).
+func (a *App) StabilizeShell(req core.ShellStabilizeRequest) error {
+	a.vaultStore.Touch()
+
+	steps, err := core.BuildShellStabilizeSteps(req)
+	if err != nil {
+		return err
+	}
+
+	a.mu.Lock()
+	locSess, isLocal := a.localSessions[req.SessionID]
+	serPort, isSerial := a.serialSessions[req.SessionID]
+	rawSess, isRawTcp := a.rawTcpSessions[req.SessionID]
+	streams, isSSH := a.activeStreams[req.SessionID]
+	a.mu.Unlock()
+
+	exists := (isLocal && locSess != nil) ||
+		(isSerial && serPort != nil) ||
+		(isRawTcp && rawSess != nil) ||
+		(isSSH && streams != nil && streams.Stdin != nil)
+	if !exists {
+		return core.ErrSessionNotFound
+	}
+
+	// For Raw TCP reverse shell tabs, disable line-buffering so interactive PTY keys stream immediately.
+	if isRawTcp && rawSess != nil {
+		rawSess.SetLineMode(false)
+		rawSess.SetLineEnding("\n")
+	}
+
+	go func() {
+		for _, step := range steps {
+			if step.DelayMs > 0 {
+				time.Sleep(time.Duration(step.DelayMs) * time.Millisecond)
+			}
+			if writeErr := a.WriteTerminal(req.SessionID, step.Data); writeErr != nil {
+				return
+			}
+		}
+		a.emit(a.ctx, "shell:stabilized", map[string]any{
+			"sessionId": req.SessionID,
+			"method":    req.Method,
+			"mode":      req.Mode,
+		})
+	}()
+
+	return nil
+}
+
 // WriteTerminal writes user keystrokes from xterm.js into the active SSH, local shell, serial port, or raw TCP socket (F-07, F-23, F-31).
 func (a *App) WriteTerminal(sessionID string, data string) error {
 	a.vaultStore.Touch()

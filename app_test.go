@@ -2087,3 +2087,86 @@ func TestApp_GetHostPassword_F01(t *testing.T) {
 		t.Fatalf("expected 'VerySecretPassword456!', got %q", identPw)
 	}
 }
+
+func TestApp_ShellStabilize_F34(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_shell_stabilize.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+	fake := newFakeSshTransport()
+	var app *App
+	app = NewAppWithDependencies(fake, nil, store, func(_ context.Context, event string, data ...interface{}) {
+		if event == "ssh:hostkey-prompt" && len(data) > 0 {
+			if info, ok := data[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+	app.ctx = context.Background()
+
+	presets := app.GetShellStabilizePresets()
+	if len(presets) < 5 {
+		t.Fatalf("expected >= 5 presets, got %d", len(presets))
+	}
+
+	// Verify unknown session fails cleanly
+	err := app.StabilizeShell(core.ShellStabilizeRequest{
+		SessionID: "non-existent",
+		Method:    core.StabilizeMethodPython3,
+		Mode:      core.StabilizeModeDirect,
+	})
+	if err == nil {
+		t.Fatal("expected error for non-existent session")
+	}
+
+	// Connect an active SSH session
+	sessionID, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "10.0.0.10",
+		Port:     22,
+		Username: "pentester",
+		Password: "pw",
+		Size:     core.TerminalSize{Cols: 120, Rows: 36},
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH failed: %v", err)
+	}
+
+	// Stabilize in direct mode
+	err = app.StabilizeShell(core.ShellStabilizeRequest{
+		SessionID: sessionID,
+		Method:    core.StabilizeMethodPython3,
+		Mode:      core.StabilizeModeDirect,
+		ShellPath: "/bin/bash",
+		Term:      "xterm-256color",
+		Cols:      120,
+		Rows:      36,
+	})
+	if err != nil {
+		t.Fatalf("StabilizeShell failed: %v", err)
+	}
+
+	// Wait for the async timed steps to finish writing to stdinBuf
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		fake.mu.Lock()
+		written := fake.stdinBuf.String()
+		fake.mu.Unlock()
+		if strings.Contains(written, "stty rows 36 cols 120") {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	fake.mu.Lock()
+	written := fake.stdinBuf.String()
+	fake.mu.Unlock()
+	if !strings.Contains(written, `python3 -c 'import pty; pty.spawn("/bin/bash")'`) {
+		t.Fatalf("expected python3 pty spawn command in stdin, got: %q", written)
+	}
+	if !strings.Contains(written, "stty rows 36 cols 120") {
+		t.Fatalf("expected stty resize command in stdin, got: %q", written)
+	}
+}

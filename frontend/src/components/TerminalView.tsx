@@ -167,6 +167,14 @@ export function setSessionCwd(sessionId: string, cwd: string): void {
   }
 }
 
+export function getTerminalDimensions(sessionId: string): { cols: number; rows: number } {
+  const entry = terminalPool.get(sessionId);
+  if (entry?.term) {
+    return { cols: entry.term.cols || 120, rows: entry.term.rows || 32 };
+  }
+  return { cols: 120, rows: 32 };
+}
+
 export function parseOsc7Url(url: string): string | null {
   try {
     let clean = url.trim();

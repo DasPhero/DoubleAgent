@@ -123,6 +123,8 @@ export function GetRemoteEditContent(arg1:string):Promise<string>;
 
 export function GetSessionLogStatus(arg1:string):Promise<core.SessionLogStatus>;
 
+export function GetShellStabilizePresets():Promise<Array<core.ShellStabilizePreset>>;
+
 export function GetSnippetContext(arg1:string):Promise<core.SnippetContext>;
 
 export function GetTotpCode(arg1:string):Promise<core.TotpCodeResponse>;
@@ -262,6 +264,8 @@ export function SetSerialDTR(arg1:string,arg2:boolean):Promise<void>;
 export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetWorkspaceStore(arg1:data.WorkspaceStore):Promise<void>;
+
+export function StabilizeShell(arg1:core.ShellStabilizeRequest):Promise<void>;
 
 export function StartForwardTunnel(arg1:string,arg2:string):Promise<string>;
 

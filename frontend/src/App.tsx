@@ -8,6 +8,7 @@ import {
   clearTerminalSearch,
   disposeTerminal,
   getSessionCwd,
+  getTerminalDimensions,
   resetTerminalFontSize,
   searchTerminalNext,
   searchTerminalPrevious,
@@ -56,6 +57,7 @@ import {
   SaveSelectionNoteModal,
   SaveSelectionFindingModal,
 } from './components/SaveSelectionModals';
+import { ShellStabilizeModal, ShellStabilizeRequest } from './components/ShellStabilizeModal';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -893,6 +895,8 @@ interface WailsAppBindings {
   ListRawTcpListeners?: () => Promise<RawTcpListenerInfo[]>;
   GetRawTcpSessionStats?: (sessionId: string) => Promise<RawTcpSessionStats>;
   SetRawTcpSessionLineMode?: (sessionId: string, lineMode: boolean, lineEnding: string) => Promise<void>;
+  StabilizeShell?: (req: ShellStabilizeRequest) => Promise<void>;
+  GetShellStabilizePresets?: () => Promise<unknown[]>;
   ListEngagements?: () => Promise<Engagement[]>;
   GetActiveEngagement?: () => Promise<Engagement | null>;
   SetActiveEngagement?: (id: string) => Promise<void>;
@@ -1178,6 +1182,14 @@ export function App({
     isOpen: boolean;
     selectedText: string;
     hostId?: string;
+  } | null>(null);
+  const [shellStabilizeModal, setShellStabilizeModal] = useState<{
+    isOpen: boolean;
+    sessionId: string;
+    sessionTitle: string;
+    isRawTcp: boolean;
+    cols: number;
+    rows: number;
   } | null>(null);
 
   // Host Sidebar Tag / Label filtering & editing
@@ -3309,6 +3321,35 @@ export function App({
     const matchedHost = vaultSummary.hosts.find((h) => h.id === finding.hostId);
     const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
     setStatusMessage(`Created security finding "${finding.title}"${hostNote} with attached evidence (F-18).`);
+  };
+
+  const handleOpenShellStabilize = () => {
+    if (!activePane?.sessionId) {
+      setStatusMessage('No active terminal session to stabilize.');
+      return;
+    }
+    const dims = getTerminalDimensions(activePane.sessionId);
+    const isRawTcp =
+      activePane.sessionId.startsWith('rawtcp-') ||
+      activePane.sessionId.startsWith('tcp-') ||
+      (activePane.title || '').includes('Raw TCP') ||
+      (activePane.title || '').includes('RevShell');
+    setShellStabilizeModal({
+      isOpen: true,
+      sessionId: activePane.sessionId,
+      sessionTitle: activePane.title || activePane.sessionId,
+      isRawTcp: Boolean(isRawTcp),
+      cols: dims.cols,
+      rows: dims.rows,
+    });
+  };
+
+  const handleRunShellStabilize = async (req: ShellStabilizeRequest) => {
+    const api = getWailsBindings();
+    if (api?.StabilizeShell) {
+      await api.StabilizeShell(req);
+    }
+    setStatusMessage(`Injected F-34 PTY stabilization (${req.method} / ${req.mode}) into ${req.sessionId}.`);
   };
 
   const handleGenerateProxychainsConfig = async (opts: ProxychainsExportOptions): Promise<string> => {
@@ -9054,6 +9095,17 @@ export function App({
                       <CyberIcon name="totp" size={12} />
                       <span>2FA</span>
                     </button>
+                    <button
+                      type="button"
+                      className="hud-seg-btn"
+                      aria-label="Stabilize Shell (F-34)"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={handleOpenShellStabilize}
+                      title="Upgrade raw/dumb shell to a full interactive PTY terminal (F-34)"
+                    >
+                      <span aria-hidden="true">🐚</span>
+                      <span>Stabilize</span>
+                    </button>
                   </div>
 
                   <button
@@ -11560,6 +11612,19 @@ export function App({
           }))}
           onSave={handleSaveSelectionFinding}
           onClose={() => setSaveSelectionFindingModal(null)}
+        />
+      )}
+
+      {shellStabilizeModal?.isOpen && (
+        <ShellStabilizeModal
+          isOpen={shellStabilizeModal.isOpen}
+          sessionId={shellStabilizeModal.sessionId}
+          sessionTitle={shellStabilizeModal.sessionTitle}
+          isRawTcp={shellStabilizeModal.isRawTcp}
+          initialCols={shellStabilizeModal.cols}
+          initialRows={shellStabilizeModal.rows}
+          onStabilize={handleRunShellStabilize}
+          onClose={() => setShellStabilizeModal(null)}
         />
       )}
     </main>
