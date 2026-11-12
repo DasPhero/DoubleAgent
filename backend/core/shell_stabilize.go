@@ -41,8 +41,9 @@ type ShellStabilizeRequest struct {
 	Term      string               `json:"term"`      // e.g. xterm-256color
 	Cols      uint16               `json:"cols"`
 	Rows      uint16               `json:"rows"`
-	LHost     string               `json:"lhost,omitempty"`
-	LPort     int                  `json:"lport,omitempty"`
+	LHost         string               `json:"lhost,omitempty"`
+	LPort         int                  `json:"lport,omitempty"`
+	ResetTerminal bool                 `json:"resetTerminal,omitempty"`
 }
 
 // ShellStabilizePreset describes a pre-configured F-34 stabilization method for the UI.
@@ -169,17 +170,21 @@ func BuildShellStabilizeSteps(req ShellStabilizeRequest) ([]ShellStabilizeStep, 
 	envResizeCmd := fmt.Sprintf("export TERM=%s SHELL=%s; stty rows %d cols %d\n", term, shell, rows, cols)
 
 	if req.Mode == StabilizeModeNestedNc {
-		return []ShellStabilizeStep{
+		steps := []ShellStabilizeStep{
 			{Data: spawnCmd, DelayMs: 0},
 			// Ctrl+Z (0x1a) to background netcat in the outer SSH shell
 			{Data: "\x1a", DelayMs: 450},
 			// Set local outer PTY to raw -echo and bring nc back to foreground
 			{Data: "stty raw -echo; fg\n", DelayMs: 350},
-			// Press Enter to get prompt back
-			{Data: "\n", DelayMs: 250},
-			// Sync TERM and dimensions on the remote PTY
-			{Data: envResizeCmd, DelayMs: 250},
-		}, nil
+		}
+		if req.ResetTerminal {
+			steps = append(steps, ShellStabilizeStep{Data: "reset\n", DelayMs: 350})
+		}
+		// Press Enter to get prompt back
+		steps = append(steps, ShellStabilizeStep{Data: "\n", DelayMs: 250})
+		// Sync TERM and dimensions on the remote PTY
+		steps = append(steps, ShellStabilizeStep{Data: envResizeCmd, DelayMs: 250})
+		return steps, nil
 	}
 
 	// Default: StabilizeModeDirect (DoubleAgent owns the raw socket/PTY directly)

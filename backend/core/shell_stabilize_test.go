@@ -63,6 +63,23 @@ func TestShellStabilize_BuildSteps_F34(t *testing.T) {
 		t.Errorf("expected stty rows 30 cols 100 in step 4, got %q", stepsNc[4].Data)
 	}
 
+	// 3b. Nested Netcat mode with ResetTerminal
+	stepsReset, err := BuildShellStabilizeSteps(ShellStabilizeRequest{
+		SessionID:     "sess-ssh-2",
+		Method:        StabilizeMethodPython3,
+		Mode:          StabilizeModeNestedNc,
+		ResetTerminal: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(stepsReset) != 6 {
+		t.Fatalf("expected 6 steps when ResetTerminal is enabled, got %d", len(stepsReset))
+	}
+	if stepsReset[3].Data != "reset\n" {
+		t.Errorf("expected 'reset\\n' at step 3, got %q", stepsReset[3].Data)
+	}
+
 	// 4. Windows ConPtyShell mode
 	stepsWin, err := BuildShellStabilizeSteps(ShellStabilizeRequest{
 		SessionID: "sess-win-1",

