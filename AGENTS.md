@@ -51,6 +51,9 @@ after the Core stands. Until then, take features only from the Core spec.
 7. **Integration tests run against a Dockerized OpenSSH server** (password, key, 2FA, jump
    host). No live external hosts in CI.
 8. **English-only UI.** No non-English strings in the product.
+9. **No emojis in the UI.** Strictly require cyberpunk-styled vector SVGs via `CyberIcon.tsx`.
+   Never use Unicode emojis in buttons, badges, tabs, headers, dialogs, or terminal
+   toolbars. All icons must be crisp vector graphics matching the dark HUD aesthetic.
 
 ## Walking skeleton — a runnable binary first, and after every phase
 

@@ -5098,13 +5098,14 @@ body,
   right: 0;
   bottom: 0;
   width: 380px;
-  background-color: #0f172a !important;
-  border-left: 1px solid var(--border-subtle);
-  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.85);
+  background-color: rgba(4, 9, 18, 0.98) !important;
+  border-left: 1px solid rgba(0, 240, 255, 0.35) !important;
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.9), 0 0 15px rgba(0, 240, 255, 0.08);
   z-index: 50;
   display: flex;
   flex-direction: column;
   animation: slideInRight 0.2s ease-out;
+  backdrop-filter: blur(10px);
 }
 
 @keyframes slideInRight {
@@ -5121,8 +5122,8 @@ body,
   justify-content: space-between;
   align-items: center;
   padding: 0.6rem 0.8rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(0, 240, 255, 0.06);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.25);
 }
 
 .drawer-title-box {
@@ -5141,16 +5142,19 @@ body,
 }
 
 .drawer-sub {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
+  color: #64748b;
+  letter-spacing: 0.08em;
+  font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 .drawer-host-name {
   font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 700;
+  color: #00f0ff;
+  letter-spacing: 0.03em;
+  font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 .drawer-actions {
@@ -5178,13 +5182,24 @@ body,
   padding: 0.2rem;
 }
 
-.drawer-notes-tabs {
+.drawer-notes-selector-bar {
   display: flex;
-  gap: 0.25rem;
-  padding: 0.4rem 0.6rem;
-  background: rgba(0, 0, 0, 0.1);
-  border-bottom: 1px solid var(--border-subtle);
-  overflow-x: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(0, 240, 255, 0.04);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.drawer-notes-dropdown {
+  flex: 1;
+  height: 28px;
+  font-size: 0.76rem;
+  background: rgba(2, 6, 12, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #38bdf8;
+  border-radius: 2px;
 }
 
 .drawer-tab-pill {
@@ -5229,12 +5244,15 @@ body,
   gap: 0.5rem;
   margin-bottom: 0.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
 }
 
 .drawer-note-heading {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #00f0ff;
+  letter-spacing: 0.03em;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5243,12 +5261,12 @@ body,
 
 .drawer-edit-title {
   flex: 1;
-  background: var(--bg-input, #161b22);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-  border-radius: 4px;
-  padding: 0.25rem 0.45rem;
-  font-size: 0.85rem;
+  background: rgba(2, 6, 12, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #f1f5f9;
+  border-radius: 2px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.82rem;
 }
 
 .drawer-save-btn {
@@ -5295,13 +5313,13 @@ body,
 .drawer-textarea {
   flex: 1;
   min-height: 280px;
-  background: var(--bg-input, #161b22);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  color: var(--text-main);
+  background: rgba(2, 6, 12, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 2px;
+  color: #e2e8f0;
   padding: 0.75rem;
-  font-family: var(--font-family-mono, monospace);
-  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.8rem;
   line-height: 1.5;
   resize: vertical;
 }
@@ -5316,18 +5334,20 @@ body,
   align-items: center;
   justify-content: center;
   flex: 1;
-  color: var(--text-muted);
+  color: #64748b;
   font-size: 0.82rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 .drawer-create-btn {
   margin-top: 0.5rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border-subtle);
-  color: var(--accent);
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  color: #00f0ff;
   padding: 0.35rem 0.75rem;
-  border-radius: 4px;
+  border-radius: 2px;
   cursor: pointer;
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.76rem;
 }
 

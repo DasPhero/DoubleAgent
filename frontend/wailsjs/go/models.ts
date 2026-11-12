@@ -465,6 +465,8 @@ export namespace core {
 	    remediation?: string;
 	    cve?: string;
 	    cvss?: string;
+	    cvssVector?: string;
+	    mitreAttack?: string;
 	    evidenceIds?: string[];
 	    noteIds?: string[];
 	    // Go type: time
@@ -492,6 +494,8 @@ export namespace core {
 	        this.remediation = source["remediation"];
 	        this.cve = source["cve"];
 	        this.cvss = source["cvss"];
+	        this.cvssVector = source["cvssVector"];
+	        this.mitreAttack = source["mitreAttack"];
 	        this.evidenceIds = source["evidenceIds"];
 	        this.noteIds = source["noteIds"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
@@ -1679,6 +1683,7 @@ export namespace core {
 	    rows: number;
 	    lhost?: string;
 	    lport?: number;
+	    resetTerminal?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ShellStabilizeRequest(source);
@@ -1695,6 +1700,7 @@ export namespace core {
 	        this.rows = source["rows"];
 	        this.lhost = source["lhost"];
 	        this.lport = source["lport"];
+	        this.resetTerminal = source["resetTerminal"];
 	    }
 	}
 	

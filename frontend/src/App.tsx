@@ -9103,7 +9103,7 @@ export function App({
                       onClick={handleOpenShellStabilize}
                       title="Upgrade raw/dumb shell to a full interactive PTY terminal (F-34)"
                     >
-                      <span aria-hidden="true">🐚</span>
+                      <CyberIcon name="stabilize" size={12} />
                       <span>Stabilize</span>
                     </button>
                   </div>

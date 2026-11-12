@@ -1149,6 +1149,8 @@ export function SaveSelectionFindingModal({
   const [title, setTitle] = useState<string>('');
   const [category, setCategory] = useState<string>('Vulnerabilities');
   const [severity, setSeverity] = useState<EvidenceSeverity>('high');
+  const [cve, setCve] = useState<string>('');
+  const [mitreAttack, setMitreAttack] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [remediation, setRemediation] = useState<string>('');
   const [evidenceContent, setEvidenceContent] = useState<string>('');
@@ -1223,6 +1225,8 @@ export function SaveSelectionFindingModal({
         affectedHosts: hostId ? [hostId] : undefined,
         description: description.trim(),
         remediation: remediation.trim() || undefined,
+        cve: cve.trim() || undefined,
+        mitreAttack: mitreAttack.trim() || undefined,
         evidenceIds: [evidenceId],
         createdAt: now,
         updatedAt: now,
@@ -1424,12 +1428,40 @@ export function SaveSelectionFindingModal({
                   value={severity}
                   onChange={(e) => setSeverity(e.target.value as EvidenceSeverity)}
                 >
-                  <option value="critical">🔴 Critical Severity</option>
-                  <option value="high">🟠 High Severity</option>
-                  <option value="medium">🟡 Medium Severity</option>
-                  <option value="low">🟢 Low Severity</option>
-                  <option value="info">🔵 Informational</option>
+                  <option value="critical">Critical Severity</option>
+                  <option value="high">High Severity</option>
+                  <option value="medium">Medium Severity</option>
+                  <option value="low">Low Severity</option>
+                  <option value="info">Informational</option>
                 </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label className="cyber-label" htmlFor="find-cve">
+                  CVE Identifier (Optional)
+                </label>
+                <input
+                  id="find-cve"
+                  className="cyber-hud-input font-mono"
+                  placeholder="e.g. CVE-2023-38606"
+                  value={cve}
+                  onChange={(e) => setCve(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="cyber-label" htmlFor="find-mitre">
+                  MITRE ATT&amp;CK Technique (Optional)
+                </label>
+                <input
+                  id="find-mitre"
+                  className="cyber-hud-input font-mono"
+                  placeholder="e.g. T1003.001 - LSASS Memory"
+                  value={mitreAttack}
+                  onChange={(e) => setMitreAttack(e.target.value)}
+                />
               </div>
             </div>
 

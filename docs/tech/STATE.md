@@ -1,10 +1,25 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-34` — One-Click Shell Stabilization & PTY Upgrade — COMPLETED!
-- **Next Milestone:** Wave 1 MVP+ — Nmap XML Import (`F-39`) / Snippet Chains (`F-16`) / Payload Generator (`F-33`)
+- **Current Milestone:** `F-34` — One-Click Shell Stabilization & PTY Upgrade + `F-18`/`F-19` Pentest Findings & Evidence Architecture — COMPLETED!
+- **Next Milestone:** WinRM Client (`F-41`) / Nmap XML Import (`F-39`) / Snippet Chains (`F-16`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Strict No-Emoji UI Rule & Cyberpunk Vector Graphics System (`Golden Rule 9`)**:
+  - Golden Rule 9 codified in `AGENTS.md`: Strict prohibition of Unicode emojis in UI controls, tabs, toolbars, dialogs, badges, and buttons.
+  - Replaced all ad-hoc emojis across the application with crisp monochrome SVG vector paths via `<CyberIcon name="..." />` (`stabilize`, `calculator`, `target`, `trash`, `save`, `plus`, etc.).
+  - Preserves consistent, razor-sharp styling on both Windows (DirectWrite) and Linux (FreeType) without OS emoji fallback artifacts.
+- **Notes Sidebar & Pinned Drawer Cyberpunk HUD Upgrade (`F-17`)**:
+  - Replaced the horizontal tabs pill bar (which produced ugly, cramped horizontal scrollbars on multi-note hosts) with a responsive Cyberpunk HUD dropdown selector (`<select className="cyber-hud-select drawer-notes-dropdown font-mono">`) and a `+ New` button.
+  - Pinned and split notes drawers styled with dark HUD backdrop (`rgba(4, 9, 18, 0.98)`), cyan border glow (`rgba(0, 240, 255, 0.35)`), corner reticles (`.cyber-corner-reticle`), hazard stripes `///`, and monospace typography.
+- **CVSS v3.1 Calculator & MITRE ATT&CK Framework Integration (`F-18`, `F-19`)**:
+  - Implemented the full FIRST.org CVSS v3.1 mathematical scoring engine directly in the frontend (`computeCvssV31`): calculates base score from AV, AC, PR, UI, S, C, I, A metrics, accurately models non-linear Scope Changed impact, and generates standard vector strings (e.g. `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`).
+  - Added interactive CVSS v3.1 Calculator modal drawer in `EvidenceVaultModal.tsx` toggled via `[ Calculator ]`.
+  - Added CVE identifier field (e.g. `CVE-2023-38606`) to finding creation/editing modals and quick-save context modals.
+  - Added MITRE ATT&CK technique mapping with preset dropdown of high-frequency adversary techniques (PowerShell `T1059.001`, WinRM `T1021.006`, OS Credential Dumping: LSASS `T1003.001`, Kerberoasting `T1558.003`, Pass the Hash `T1550.002`, Unquoted Service Path `T1574.009`, Sudo Caching `T1548.003`, etc.).
+  - Findings display CVE, CVSS score badge (colored by severity), vector string, and MITRE ATT&CK tags in both UI cards and markdown assessment report export.
+- **Specification Extension: WinRM / PowerShell Remoting Client (`F-41`)**:
+  - Added `F-41` to `docs/DoubleAgent — Pentest-Modul (Spec).md` and `docs/SPEC.md`. Direct WinRM management over HTTP (5985) and HTTPS (5986), supporting NTLM, Kerberos, and Pass-the-Hash authentication with Evil-WinRM parity, command execution, and file transfer.
 - **Shell Stabilization & PTY Upgrade (`F-34` / Pentest Spec Line 30)**:
   - **Backend Sequence Builder (`backend/core/shell_stabilize.go`)**:
     - Supports `python3` (`pty.spawn`), `python` (`pty.spawn`), `script -qc /dev/null`, `perl exec`, and `Windows ConPtyShell`.

@@ -139,6 +139,7 @@ Jedes Feature hat ein prüfbares Akzeptanzkriterium; der Coding Agent darf ein F
 | F-30 | Import PuTTY / Termius | v1 | Import von PuTTY (Registry / .reg / Sessions) und Termius (JSON / CSV); Hosts, Keys, Gruppen, Tunnel übernommen |
 | F-31 | Raw TCP Socket & Listener | v1 | Raw-TCP-Client mit Line-Buffering & Local-Echo (HTTP/Redis/SMTP); Inbound-TCP-Listener zum Fangen von Reverse Shells mit automatischem Terminal-Tab |
 | F-37 | Netzwerkkarte | v1 | Hosts, Subnetze und konfigurierte Tunnel/Jumps als Graph (react-flow); Visualisierung |
+| F-41 | WinRM Client (PowerShell Remoting) | v1 | WinRM Management für Windows Hosts (Port 5985/5986, NTLM/Kerberos/Pass-the-Hash, Evil-WinRM Parität) |
 
 Spezialisierte Zusatzfunktionen stehen in einem separaten [Zusatzmodul](https://claude.ai/artifact/LjwimF4gRBxm7oi19EGTi3) mit eigener Spec.
 

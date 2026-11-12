@@ -9,6 +9,79 @@ import {
   TableEvidenceContent,
 } from '../types/pentest';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { CyberIcon } from './CyberIcon';
+
+export const COMMON_MITRE_TECHNIQUES = [
+  'T1059.001 - Command and Scripting Interpreter: PowerShell',
+  'T1059.004 - Command and Scripting Interpreter: Unix Shell',
+  'T1003.001 - OS Credential Dumping: LSASS Memory',
+  'T1003.002 - OS Credential Dumping: Security Account Manager (SAM)',
+  'T1078.002 - Valid Accounts: Domain Accounts',
+  'T1078.003 - Valid Accounts: Local Accounts',
+  'T1021.002 - Remote Services: SMB/Windows Admin Shares',
+  'T1021.004 - Remote Services: SSH',
+  'T1021.006 - Remote Services: Windows Remote Management (WinRM)',
+  'T1558.003 - Steal or Forge Kerberos Tickets: Kerberoasting',
+  'T1558.004 - Steal or Forge Kerberos Tickets: AS-REP Roasting',
+  'T1574.009 - Hijack Execution Flow: Path Interception by Unquoted Path',
+  'T1548.003 - Abuse Elevation Control Mechanism: Sudo and Sudo Caching',
+  'T1190 - Exploit Public-Facing Application',
+  'T1552.005 - Unsecured Credentials: Cloud Instance Metadata API',
+  'T1046 - Network Service Discovery',
+  'T1110.003 - Brute Force: Password Spraying',
+  'T1068 - Exploitation for Privilege Escalation',
+];
+
+export interface CvssV31Input {
+  av: 'N' | 'A' | 'L' | 'P';
+  ac: 'L' | 'H';
+  pr: 'N' | 'L' | 'H';
+  ui: 'N' | 'R';
+  s: 'U' | 'C';
+  c: 'H' | 'L' | 'N';
+  i: 'H' | 'L' | 'N';
+  a: 'H' | 'L' | 'N';
+}
+
+export function computeCvssV31(m: CvssV31Input): { score: number; vector: string; severity: EvidenceSeverity } {
+  const avWeights = { N: 0.85, A: 0.62, L: 0.55, P: 0.2 };
+  const acWeights = { L: 0.77, H: 0.44 };
+  const prWeightsU = { N: 0.85, L: 0.62, H: 0.27 };
+  const prWeightsC = { N: 0.85, L: 0.68, H: 0.50 };
+  const uiWeights = { N: 0.85, R: 0.62 };
+  const impactWeights = { H: 0.56, L: 0.22, N: 0.0 };
+
+  const prWeight = m.s === 'U' ? prWeightsU[m.pr] : prWeightsC[m.pr];
+  const exploitability = 8.22 * avWeights[m.av] * acWeights[m.ac] * prWeight * uiWeights[m.ui];
+
+  const iss = 1.0 - (1.0 - impactWeights[m.c]) * (1.0 - impactWeights[m.i]) * (1.0 - impactWeights[m.a]);
+  let impact = 0;
+  if (m.s === 'U') {
+    impact = 6.42 * iss;
+  } else {
+    impact = 7.52 * (iss - 0.029) - 3.25 * Math.pow(iss - 0.02, 15);
+  }
+
+  let rawScore = 0;
+  if (impact <= 0) {
+    rawScore = 0;
+  } else if (m.s === 'U') {
+    rawScore = Math.min(impact + exploitability, 10);
+  } else {
+    rawScore = Math.min(1.08 * (impact + exploitability), 10);
+  }
+
+  const score = Math.round((Math.ceil(rawScore * 10) / 10) * 10) / 10;
+  const vector = `CVSS:3.1/AV:${m.av}/AC:${m.ac}/PR:${m.pr}/UI:${m.ui}/S:${m.s}/C:${m.c}/I:${m.i}/A:${m.a}`;
+
+  let severity: EvidenceSeverity = 'info';
+  if (score >= 9.0) severity = 'critical';
+  else if (score >= 7.0) severity = 'high';
+  else if (score >= 4.0) severity = 'medium';
+  else if (score > 0) severity = 'low';
+
+  return { score, vector, severity };
+}
 
 export interface HostOption {
   id: string;
@@ -82,6 +155,21 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
   const [findEditSeverity, setFindEditSeverity] = useState<EvidenceSeverity>('high');
   const [findEditStatus, setFindEditStatus] = useState<FindingStatus>('draft');
   const [findEditHostId, setFindEditHostId] = useState<string>(activeHostId || '');
+  const [findEditCve, setFindEditCve] = useState('');
+  const [findEditCvss, setFindEditCvss] = useState('');
+  const [findEditCvssVector, setFindEditCvssVector] = useState('');
+  const [findEditMitreAttack, setFindEditMitreAttack] = useState('');
+  const [showCvssCalculator, setShowCvssCalculator] = useState(false);
+  const [cvssParams, setCvssParams] = useState<CvssV31Input>({
+    av: 'N',
+    ac: 'L',
+    pr: 'N',
+    ui: 'N',
+    s: 'U',
+    c: 'H',
+    i: 'H',
+    a: 'H',
+  });
   const [findEditDescription, setFindEditDescription] = useState('');
   const [findEditImpact, setFindEditImpact] = useState('');
   const [findEditRemediation, setFindEditRemediation] = useState('');
@@ -264,6 +352,11 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       setFindEditSeverity(presetTemplate.severity || 'high');
       setFindEditStatus('draft');
       setFindEditHostId(activeHostId || '');
+      setFindEditCve(presetTemplate.cve || '');
+      setFindEditCvss(presetTemplate.cvss || '');
+      setFindEditCvssVector(presetTemplate.cvssVector || '');
+      setFindEditMitreAttack(presetTemplate.mitreAttack || '');
+      setShowCvssCalculator(false);
       setFindEditDescription(presetTemplate.description);
       setFindEditImpact(presetTemplate.impact || '');
       setFindEditRemediation(presetTemplate.remediation || '');
@@ -276,6 +369,11 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       setFindEditSeverity('high');
       setFindEditStatus('draft');
       setFindEditHostId(activeHostId || '');
+      setFindEditCve('');
+      setFindEditCvss('');
+      setFindEditCvssVector('');
+      setFindEditMitreAttack('');
+      setShowCvssCalculator(false);
       setFindEditDescription('');
       setFindEditImpact('');
       setFindEditRemediation('');
@@ -293,6 +391,11 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     setFindEditSeverity(f.severity);
     setFindEditStatus(f.status || 'draft');
     setFindEditHostId(f.hostId || '');
+    setFindEditCve(f.cve || '');
+    setFindEditCvss(f.cvss || '');
+    setFindEditCvssVector(f.cvssVector || '');
+    setFindEditMitreAttack(f.mitreAttack || '');
+    setShowCvssCalculator(false);
     setFindEditDescription(f.description);
     setFindEditImpact(f.impact || '');
     setFindEditRemediation(f.remediation || '');
@@ -331,6 +434,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       description: findEditDescription.trim(),
       impact: findEditImpact.trim() || undefined,
       remediation: findEditRemediation.trim() || undefined,
+      cve: findEditCve.trim() || undefined,
+      cvss: findEditCvss.trim() || undefined,
+      cvssVector: findEditCvssVector.trim() || undefined,
+      mitreAttack: findEditMitreAttack.trim() || undefined,
       evidenceIds: findEditEvidenceIds,
       createdAt: now,
       updatedAt: now,
@@ -639,7 +746,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       lines.push(`- **Status:** ${finding.status.toUpperCase()}`);
       lines.push(`- **Target Host:** ${hostLabel}`);
       if (finding.cve) lines.push(`- **CVE:** ${finding.cve}`);
-      if (finding.cvss) lines.push(`- **CVSS Score:** ${finding.cvss}`);
+      if (finding.cvss) lines.push(`- **CVSS Score:** ${finding.cvss}${finding.cvssVector ? ` (${finding.cvssVector})` : ''}`);
+      if (finding.mitreAttack) lines.push(`- **MITRE ATT&CK:** ${finding.mitreAttack}`);
       if (finding.tags && finding.tags.length > 0) lines.push(`- **Tags:** \`${finding.tags.join('`, `')}\``);
       lines.push(``);
 
@@ -1039,9 +1147,24 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                             <span style={{ fontSize: '0.72rem', color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: '2px' }}>
                               {finding.category}
                             </span>
+                            {finding.cve && (
+                              <span style={{ fontSize: '0.68rem', color: '#a5f3fc', background: 'rgba(0, 240, 255, 0.1)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>
+                                {finding.cve}
+                              </span>
+                            )}
+                            {finding.cvss && (
+                              <span style={{ fontSize: '0.68rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>
+                                CVSS {finding.cvss}
+                              </span>
+                            )}
+                            {finding.mitreAttack && (
+                              <span style={{ fontSize: '0.68rem', color: '#e879f9', background: 'rgba(232, 121, 249, 0.1)', border: '1px solid rgba(232, 121, 249, 0.3)', padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>
+                                ATT&amp;CK {finding.mitreAttack.split(' - ')[0]}
+                              </span>
+                            )}
                             {hostObj && (
-                              <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '2px' }}>
-                                🖥️ {hostObj.label}
+                              <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <CyberIcon name="terminal" size={10} /> {hostObj.label}
                               </span>
                             )}
                             <span
@@ -1052,9 +1175,12 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                                 padding: '1px 6px',
                                 background: linkedEvCount > 0 ? 'rgba(0, 240, 255, 0.08)' : 'transparent',
                                 fontFamily: 'JetBrains Mono, monospace',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
                               }}
                             >
-                              🛡️ {linkedEvCount} {linkedEvCount === 1 ? 'Evidence' : 'Evidences'}
+                              <CyberIcon name="shield" size={10} /> {linkedEvCount} {linkedEvCount === 1 ? 'Evidence' : 'Evidences'}
                             </span>
                           </div>
 
@@ -1062,18 +1188,18 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                             <button
                               type="button"
                               className="cyber-btn"
-                              style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+                              style={{ padding: '2px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '3px' }}
                               onClick={() => openEditFinding(finding)}
                             >
-                              ✏️ Edit Finding
+                              <CyberIcon name="edit" size={11} /> Edit Finding
                             </button>
                             <button
                               type="button"
                               className="cyber-btn"
-                              style={{ padding: '2px 8px', fontSize: '0.72rem', color: '#ef4444' }}
+                              style={{ padding: '2px 8px', fontSize: '0.72rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '3px' }}
                               onClick={() => handleDeleteFinding(finding.id, finding.title)}
                             >
-                              ✕
+                              <CyberIcon name="trash" size={11} /> Delete
                             </button>
                           </div>
                         </div>
@@ -1194,6 +1320,289 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     </select>
                   </div>
                 </div>
+
+                {/* CVE, MITRE ATT&CK & CVSS Calculator Row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.6fr 1.3fr', gap: '0.75rem' }}>
+                  <div>
+                    <label className="cyber-label" htmlFor="find-edit-cve">CVE Identifier</label>
+                    <input
+                      id="find-edit-cve"
+                      type="text"
+                      className="cyber-hud-input font-mono"
+                      placeholder="e.g. CVE-2023-38606"
+                      value={findEditCve}
+                      onChange={(e) => setFindEditCve(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="cyber-label" htmlFor="find-edit-mitre">MITRE ATT&amp;CK Technique</label>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <input
+                        id="find-edit-mitre"
+                        type="text"
+                        className="cyber-hud-input font-mono"
+                        placeholder="e.g. T1003.001 - LSASS Memory"
+                        value={findEditMitreAttack}
+                        onChange={(e) => setFindEditMitreAttack(e.target.value)}
+                        style={{ flex: 1, minWidth: 0 }}
+                      />
+                      <select
+                        className="cyber-hud-select font-mono"
+                        style={{ width: '135px', fontSize: '0.72rem' }}
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) setFindEditMitreAttack(e.target.value);
+                        }}
+                        title="Quick-pick standard MITRE ATT&CK technique"
+                      >
+                        <option value="">Presets...</option>
+                        {COMMON_MITRE_TECHNIQUES.map((tech) => (
+                          <option key={tech} value={tech}>
+                            {tech}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                      <label className="cyber-label" htmlFor="find-edit-cvss" style={{ margin: 0 }}>CVSS v3.1</label>
+                      <button
+                        type="button"
+                        className="cyber-btn cyber-btn-sm cyber-btn-secondary"
+                        style={{ fontSize: '0.68rem', padding: '1px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                        onClick={() => setShowCvssCalculator((prev) => !prev)}
+                        title="Toggle CVSS v3.1 Base Score Calculator"
+                      >
+                        <CyberIcon name="calculator" size={10} /> {showCvssCalculator ? 'Close Calc' : 'Calculator'}
+                      </button>
+                    </div>
+                    <input
+                      id="find-edit-cvss"
+                      type="text"
+                      className="cyber-hud-input font-mono"
+                      placeholder="e.g. 7.8 (or use calc)"
+                      value={findEditCvss}
+                      onChange={(e) => setFindEditCvss(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Collapsible CVSS v3.1 Interactive Calculator */}
+                {showCvssCalculator && (
+                  <div
+                    style={{
+                      background: 'rgba(2, 6, 12, 0.95)',
+                      border: '1px solid #00f0ff',
+                      padding: '0.85rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.65rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 240, 255, 0.25)', paddingBottom: '0.4rem' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#00f0ff', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CyberIcon name="calculator" size={12} /> FIRST.org CVSS v3.1 BASE SCORE CALCULATOR
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>
+                          VECTOR: <code style={{ color: '#38bdf8' }}>{findEditCvssVector || computeCvssV31(cvssParams).vector}</code>
+                        </span>
+                        <span
+                          style={{
+                            background: getSeverityBadgeColor(computeCvssV31(cvssParams).severity).bg,
+                            border: `1px solid ${getSeverityBadgeColor(computeCvssV31(cvssParams).severity).border}`,
+                            color: getSeverityBadgeColor(computeCvssV31(cvssParams).severity).text,
+                            padding: '1px 8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            fontFamily: 'JetBrains Mono, monospace',
+                          }}
+                        >
+                          {computeCvssV31(cvssParams).score} ({computeCvssV31(cvssParams).severity.toUpperCase()})
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                      {/* Attack Vector */}
+                      <div>
+                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Attack Vector (AV)</label>
+                        <select
+                          className="cyber-hud-select font-mono"
+                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          value={cvssParams.av}
+                          onChange={(e) => {
+                            const next = { ...cvssParams, av: e.target.value as CvssV31Input['av'] };
+                            setCvssParams(next);
+                            const res = computeCvssV31(next);
+                            setFindEditCvss(res.score.toString());
+                            setFindEditCvssVector(res.vector);
+                            setFindEditSeverity(res.severity);
+                          }}
+                        >
+                          <option value="N">Network (N: 0.85)</option>
+                          <option value="A">Adjacent (A: 0.62)</option>
+                          <option value="L">Local (L: 0.55)</option>
+                          <option value="P">Physical (P: 0.20)</option>
+                        </select>
+                      </div>
+
+                      {/* Attack Complexity */}
+                      <div>
+                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Attack Complexity (AC)</label>
+                        <select
+                          className="cyber-hud-select font-mono"
+                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          value={cvssParams.ac}
+                          onChange={(e) => {
+                            const next = { ...cvssParams, ac: e.target.value as CvssV31Input['ac'] };
+                            setCvssParams(next);
+                            const res = computeCvssV31(next);
+                            setFindEditCvss(res.score.toString());
+                            setFindEditCvssVector(res.vector);
+                            setFindEditSeverity(res.severity);
+                          }}
+                        >
+                          <option value="L">Low (L: 0.77)</option>
+                          <option value="H">High (H: 0.44)</option>
+                        </select>
+                      </div>
+
+                      {/* Privileges Required */}
+                      <div>
+                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Privileges Required (PR)</label>
+                        <select
+                          className="cyber-hud-select font-mono"
+                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          value={cvssParams.pr}
+                          onChange={(e) => {
+                            const next = { ...cvssParams, pr: e.target.value as CvssV31Input['pr'] };
+                            setCvssParams(next);
+                            const res = computeCvssV31(next);
+                            setFindEditCvss(res.score.toString());
+                            setFindEditCvssVector(res.vector);
+                            setFindEditSeverity(res.severity);
+                          }}
+                        >
+                          <option value="N">None (N)</option>
+                          <option value="L">Low (L)</option>
+                          <option value="H">High (H)</option>
+                        </select>
+                      </div>
+
+                      {/* User Interaction */}
+                      <div>
+                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>User Interaction (UI)</label>
+                        <select
+                          className="cyber-hud-select font-mono"
+                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          value={cvssParams.ui}
+                          onChange={(e) => {
+                            const next = { ...cvssParams, ui: e.target.value as CvssV31Input['ui'] };
+                            setCvssParams(next);
+                            const res = computeCvssV31(next);
+                            setFindEditCvss(res.score.toString());
+                            setFindEditCvssVector(res.vector);
+                            setFindEditSeverity(res.severity);
+                          }}
+                        >
+                          <option value="N">None (N: 0.85)</option>
+                          <option value="R">Required (R: 0.62)</option>
+                        </select>
+                      </div>
+
+                      {/* Scope */}
+                      <div>
+                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Scope (S)</label>
+                        <select
+                          className="cyber-hud-select font-mono"
+                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          value={cvssParams.s}
+                          onChange={(e) => {
+                            const next = { ...cvssParams, s: e.target.value as CvssV31Input['s'] };
+                            setCvssParams(next);
+                            const res = computeCvssV31(next);
+                            setFindEditCvss(res.score.toString());
+                            setFindEditCvssVector(res.vector);
+                            setFindEditSeverity(res.severity);
+                          }}
+                        >
+                          <option value="U">Unchanged (U)</option>
+                          <option value="C">Changed (C)</option>
+                        </select>
+                      </div>
+
+                      {/* Confidentiality */}
+                      <div>
+                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Confidentiality (C)</label>
+                        <select
+                          className="cyber-hud-select font-mono"
+                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          value={cvssParams.c}
+                          onChange={(e) => {
+                            const next = { ...cvssParams, c: e.target.value as CvssV31Input['c'] };
+                            setCvssParams(next);
+                            const res = computeCvssV31(next);
+                            setFindEditCvss(res.score.toString());
+                            setFindEditCvssVector(res.vector);
+                            setFindEditSeverity(res.severity);
+                          }}
+                        >
+                          <option value="H">High (H: 0.56)</option>
+                          <option value="L">Low (L: 0.22)</option>
+                          <option value="N">None (N: 0)</option>
+                        </select>
+                      </div>
+
+                      {/* Integrity */}
+                      <div>
+                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Integrity (I)</label>
+                        <select
+                          className="cyber-hud-select font-mono"
+                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          value={cvssParams.i}
+                          onChange={(e) => {
+                            const next = { ...cvssParams, i: e.target.value as CvssV31Input['i'] };
+                            setCvssParams(next);
+                            const res = computeCvssV31(next);
+                            setFindEditCvss(res.score.toString());
+                            setFindEditCvssVector(res.vector);
+                            setFindEditSeverity(res.severity);
+                          }}
+                        >
+                          <option value="H">High (H: 0.56)</option>
+                          <option value="L">Low (L: 0.22)</option>
+                          <option value="N">None (N: 0)</option>
+                        </select>
+                      </div>
+
+                      {/* Availability */}
+                      <div>
+                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Availability (A)</label>
+                        <select
+                          className="cyber-hud-select font-mono"
+                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          value={cvssParams.a}
+                          onChange={(e) => {
+                            const next = { ...cvssParams, a: e.target.value as CvssV31Input['a'] };
+                            setCvssParams(next);
+                            const res = computeCvssV31(next);
+                            setFindEditCvss(res.score.toString());
+                            setFindEditCvssVector(res.vector);
+                            setFindEditSeverity(res.severity);
+                          }}
+                        >
+                          <option value="H">High (H: 0.56)</option>
+                          <option value="L">Low (L: 0.22)</option>
+                          <option value="N">None (N: 0)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="cyber-label">Description / Narrative (Markdown)</label>

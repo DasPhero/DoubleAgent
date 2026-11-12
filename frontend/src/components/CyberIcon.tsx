@@ -38,7 +38,11 @@ export type CyberIconName =
   | 'network'
   | 'map'
   | 'edit'
-  | 'save';
+  | 'save'
+  | 'stabilize'
+  | 'trash'
+  | 'calculator'
+  | 'target';
 
 export interface CyberIconProps {
   name: CyberIconName;
@@ -358,6 +362,50 @@ export const CyberIcon: React.FC<CyberIconProps> = ({
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
           <polyline points="17 21 17 13 7 13 7 21" />
           <polyline points="7 3 7 8 15 8" />
+        </svg>
+      );
+    case 'stabilize':
+      return (
+        <svg {...commonProps}>
+          <polyline points="4 17 10 11 4 5" />
+          <line x1="12" y1="19" x2="20" y2="19" />
+          <path d="m14 5 3 3-3 3" />
+          <line x1="17" y1="8" x2="11" y2="8" />
+        </svg>
+      );
+    case 'trash':
+      return (
+        <svg {...commonProps}>
+          <path d="M3 6h18" />
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      );
+    case 'calculator':
+      return (
+        <svg {...commonProps}>
+          <rect x="4" y="2" width="16" height="20" rx="2" />
+          <line x1="8" y1="6" x2="16" y2="6" />
+          <line x1="16" y1="14" x2="16" y2="18" />
+          <path d="M8 10h.01" />
+          <path d="M12 10h.01" />
+          <path d="M16 10h.01" />
+          <path d="M8 14h.01" />
+          <path d="M12 14h.01" />
+          <path d="M8 18h.01" />
+          <path d="M12 18h.01" />
+        </svg>
+      );
+    case 'target':
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="22" y1="12" x2="18" y2="12" />
+          <line x1="6" y1="12" x2="2" y2="12" />
+          <line x1="12" y1="6" x2="12" y2="2" />
+          <line x1="12" y1="22" x2="12" y2="18" />
         </svg>
       );
   }

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { CyberIcon } from './CyberIcon';
 
 export type ShellStabilizeMethod = 'python3' | 'python' | 'script' | 'perl' | 'conptyshell';
 export type ShellStabilizeMode = 'direct' | 'nested_nc' | 'windows_conpty';
@@ -171,8 +172,8 @@ export function ShellStabilizeModal({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                🐚 Shell Stabilization &amp; PTY Upgrade (F-34)
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <CyberIcon name="stabilize" size={16} /> Shell Stabilization &amp; PTY Upgrade (F-34)
               </h3>
               <div
                 style={{
@@ -255,7 +256,7 @@ export function ShellStabilizeModal({
                     setMethod('python3');
                   }}
                 >
-                  🐧 Linux / Unix Target (PTY / stty)
+                  POSIX / Linux Target (PTY / stty)
                 </button>
                 <button
                   type="button"
@@ -267,7 +268,7 @@ export function ShellStabilizeModal({
                     setMethod('conptyshell');
                   }}
                 >
-                  🪟 Windows Target (ConPTY / PseudoConsole)
+                  Windows Target (ConPTY / PseudoConsole)
                 </button>
               </div>
             </div>
@@ -302,8 +303,8 @@ export function ShellStabilizeModal({
                       setMode(nextMode);
                     }}
                   >
-                    <option value="direct">⚡ Direct Raw Socket / Listener (No Ctrl+Z)</option>
-                    <option value="nested_nc">🔄 Nested Netcat in SSH (Ctrl+Z + stty raw -echo; fg)</option>
+                    <option value="direct">Direct Raw Socket / Listener (No Ctrl+Z)</option>
+                    <option value="nested_nc">Nested Netcat in SSH (Ctrl+Z + stty raw -echo; fg)</option>
                   </select>
                 </div>
 
@@ -320,10 +321,10 @@ export function ShellStabilizeModal({
                       setMethod(nextMethod);
                     }}
                   >
-                    <option value="python3">🐍 Python 3 (pty.spawn)</option>
-                    <option value="python">🐍 Python 2 (pty.spawn)</option>
-                    <option value="script">📜 script -qc /dev/null</option>
-                    <option value="perl">🐪 Perl exec</option>
+                    <option value="python3">Python 3 (pty.spawn)</option>
+                    <option value="python">Python 2 (pty.spawn)</option>
+                    <option value="script">script -qc /dev/null</option>
+                    <option value="perl">Perl exec</option>
                   </select>
                 </div>
               </div>
@@ -471,10 +472,11 @@ export function ShellStabilizeModal({
                 <button
                   type="button"
                   className="cyber-btn"
-                  style={{ padding: '2px 8px', fontSize: '0.7rem' }}
+                  style={{ padding: '2px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   onClick={() => void handleCopySequence()}
                 >
-                  {copied ? '✓ Copied' : '📋 Copy Commands'}
+                  <CyberIcon name="save" size={11} />
+                  <span>{copied ? 'Copied' : 'Copy Commands'}</span>
                 </button>
               </div>
               <div
@@ -514,8 +516,10 @@ export function ShellStabilizeModal({
               type="submit"
               className="cyber-btn cyber-btn-primary"
               disabled={isRunning}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}
             >
-              {isRunning ? 'Stabilizing...' : '⚡ Stabilize Shell Now'}
+              <CyberIcon name="stabilize" size={13} />
+              <span>{isRunning ? 'Stabilizing...' : 'Stabilize Shell Now'}</span>
             </button>
           </div>
         </form>

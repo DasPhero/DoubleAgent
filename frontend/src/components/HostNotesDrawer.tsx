@@ -111,7 +111,13 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
       className={`host-notes-drawer ${isPinned ? 'is-pinned' : 'open'}`}
       role="complementary"
       aria-label="Host Documentation Drawer"
+      style={{ position: 'relative' }}
     >
+      <div className="cyber-corner-reticle cyber-corner-tl" />
+      <div className="cyber-corner-reticle cyber-corner-tr" />
+      <div className="cyber-corner-reticle cyber-corner-bl" />
+      <div className="cyber-corner-reticle cyber-corner-br" />
+
       {/* Drawer Header */}
       <div
         className="drawer-header"
@@ -127,7 +133,8 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
               <CyberIcon name="grip" size={12} />
             </span>
           )}
-          <span className="drawer-icon" style={{ color: 'var(--accent-glow)', display: 'inline-flex' }}>
+          <span className="cyber-hazard-stripes" style={{ marginRight: '2px' }}>///</span>
+          <span className="drawer-icon" style={{ color: '#00f0ff', display: 'inline-flex' }}>
             <CyberIcon name="note" size={14} />
           </span>
           <div className="drawer-titles">
@@ -141,10 +148,11 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
           {!isPinned && onPinSplit && (
             <button
               type="button"
-              className="drawer-action-btn"
+              className="cyber-btn cyber-btn-sm cyber-btn-secondary"
               onClick={onPinSplit}
               title="Pin notes as a horizontal split view alongside terminal"
               aria-label="Pin Notes as Split View"
+              style={{ fontSize: '0.68rem', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}
             >
               <CyberIcon name="pin" size={11} /> Pin Split
             </button>
@@ -152,43 +160,63 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
           {onOpenFullNotes && (
             <button
               type="button"
-              className="drawer-action-btn"
+              className="cyber-btn cyber-btn-sm cyber-btn-secondary"
               onClick={onOpenFullNotes}
               title="Open full notes editor in workspace tab"
               aria-label="Open Full Notes"
+              style={{ fontSize: '0.68rem', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}
             >
               <CyberIcon name="undock" size={11} /> Full View
             </button>
           )}
           <button
             type="button"
-            className="drawer-close-btn"
+            className="cyber-btn-close"
             onClick={onClose}
             title={isPinned ? 'Close Pinned Notes' : 'Close Notes Drawer'}
             aria-label={isPinned ? 'Close Notes Pane' : 'Close Notes Drawer'}
           >
-            ✕
+            ×
           </button>
         </div>
       </div>
 
-      {/* Note Selector Tabs */}
-      <div className="drawer-notes-tabs">
-        {hostNotes.map((n) => (
-          <button
-            key={n.id}
-            type="button"
-            className={`drawer-tab-pill ${selectedNoteId === n.id ? 'active' : ''}`}
-            onClick={() => {
-              setSelectedNoteId(n.id);
+      {/* Note Selector Dropdown */}
+      <div className="drawer-notes-selector-bar">
+        <div className="drawer-selector-left" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: 1, minWidth: 0 }}>
+          <label className="cyber-label-sm" htmlFor="host-note-dropdown" style={{ margin: 0, fontSize: '0.68rem', color: '#94a3b8' }}>
+            NOTE:
+          </label>
+          <select
+            id="host-note-dropdown"
+            className="cyber-hud-select drawer-notes-dropdown font-mono"
+            aria-label="Select note"
+            value={selectedNoteId || ''}
+            onChange={(e) => {
+              setSelectedNoteId(e.target.value);
               setIsEditing(false);
             }}
           >
-            <CyberIcon name={n.isFolder ? 'folder' : 'note'} size={11} /> {n.title}
-          </button>
-        ))}
-        <button type="button" className="drawer-tab-pill add-tab-btn" onClick={handleCreate} title="New Note">
-          + Add
+            {hostNotes.length === 0 ? (
+              <option value="">(No notes available)</option>
+            ) : (
+              hostNotes.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.isFolder ? '[FOLDER] ' : ''}{n.title}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+        <button
+          type="button"
+          className="cyber-btn cyber-btn-sm cyber-btn-secondary"
+          onClick={handleCreate}
+          title="Create New Note"
+          aria-label="New Note"
+          style={{ fontSize: '0.7rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}
+        >
+          <CyberIcon name="plus" size={11} /> New
         </button>
       </div>
 
@@ -202,32 +230,49 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
                   <input
                     type="text"
                     aria-label="Edit note title"
-                    className="drawer-edit-title"
+                    className="cyber-hud-input drawer-edit-title font-mono"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
                   />
-                  <button type="button" className="drawer-save-btn" onClick={() => void handleSave()}>
-                    💾 Save
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-sm cyber-btn-primary"
+                    onClick={() => void handleSave()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem' }}
+                  >
+                    <CyberIcon name="save" size={11} /> Save
                   </button>
-                  <button type="button" className="drawer-cancel-btn" onClick={() => setIsEditing(false)}>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-sm cyber-btn-secondary"
+                    onClick={() => setIsEditing(false)}
+                    style={{ fontSize: '0.7rem' }}
+                  >
                     Cancel
                   </button>
                 </>
               ) : (
                 <>
-                  <h3 className="drawer-note-heading">{selectedNote.title}</h3>
-                  <button type="button" className="drawer-edit-btn" onClick={() => setIsEditing(true)}>
-                    ✏️ Edit
+                  <h3 className="drawer-note-heading font-mono">{selectedNote.title}</h3>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-sm cyber-btn-secondary"
+                    onClick={() => setIsEditing(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem' }}
+                  >
+                    <CyberIcon name="edit" size={11} /> Edit
                   </button>
                   <button
                     type="button"
-                    className="drawer-delete-btn"
+                    className="cyber-btn cyber-btn-sm cyber-btn-danger"
                     onClick={() => {
                       void onDeleteNote(selectedNote.id);
                     }}
                     title="Delete Note"
+                    aria-label="Delete Note"
+                    style={{ padding: '3px 6px' }}
                   >
-                    🗑️
+                    <CyberIcon name="trash" size={11} />
                   </button>
                 </>
               )}
@@ -236,7 +281,7 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
             {isEditing ? (
               <textarea
                 aria-label="Edit note body"
-                className="drawer-textarea"
+                className="cyber-hud-input drawer-textarea font-mono"
                 value={editBody}
                 onChange={(e) => setEditBody(e.target.value)}
                 placeholder="Markdown notes..."
@@ -254,8 +299,13 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
         ) : (
           <div className="drawer-empty-state">
             <p>No notes for this host yet.</p>
-            <button type="button" className="drawer-create-btn" onClick={handleCreate}>
-              + Create First Note
+            <button
+              type="button"
+              className="cyber-btn cyber-btn-primary"
+              onClick={handleCreate}
+              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <CyberIcon name="plus" size={12} /> Create First Note
             </button>
           </div>
         )}

@@ -1701,7 +1701,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       });
     }
 
-    fireEvent.click(screen.getByRole('button', { name: /💾 Save Note/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Save Note/i }));
 
     // Verify safe Markdown preview renders heading and literal HTML text without injecting an <img> tag
     expect(screen.getByRole('heading', { name: 'BGP Peering' })).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { NotePage, NoteHostOption } from '../types/note';
 import { MarkdownRenderer, toggleMarkdownTaskAtIndex } from './MarkdownRenderer';
+import { CyberIcon } from './CyberIcon';
 
 interface NotesViewProps {
   notes: NotePage[];
@@ -206,36 +207,39 @@ export const NotesView: React.FC<NotesViewProps> = ({
           <button
             type="button"
             className="notes-tool-btn cyber-btn cyber-btn-secondary cyber-btn-sm"
-            style={{ flex: 'none', padding: '0.25rem 0.55rem', marginRight: '0.35rem' }}
+            style={{ flex: 'none', padding: '0.25rem 0.55rem', marginRight: '0.35rem', display: 'flex', alignItems: 'center', gap: '4px' }}
             onClick={() => setIsSidebarCollapsed((prev) => !prev)}
             title={isSidebarCollapsed ? 'Show Notes List' : 'Hide Notes List (Full-Width Editor)'}
           >
-            {isSidebarCollapsed ? '📁 Show List' : '◀ Hide List'}
+            <CyberIcon name={isSidebarCollapsed ? 'chevron-right' : 'chevron-left'} size={12} />
+            <span>{isSidebarCollapsed ? 'Show List' : 'Hide List'}</span>
           </button>
           <span className="cyber-hazard-stripes" style={{ marginRight: '6px' }}>///</span>
-          <h2 className="notes-header-title" style={{ color: '#00f0ff', letterSpacing: '0.04em' }}>📝 Host Notes &amp; Documentation (F-17)</h2>
+          <h2 className="notes-header-title" style={{ color: '#00f0ff', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <CyberIcon name="note" size={16} /> Host Notes &amp; Documentation (F-17)
+          </h2>
           <span className="notes-count-badge" style={{ background: 'rgba(0, 240, 255, 0.15)', color: '#00f0ff', border: '1px solid rgba(0, 240, 255, 0.4)' }}>{filteredNotes.length} items</span>
         </div>
         <div className="notes-header-right">
           {onOpenAsTab && (
             <button
               type="button"
-              className="notes-tool-btn"
+              className="notes-tool-btn cyber-btn cyber-btn-sm cyber-btn-secondary"
               onClick={onOpenAsTab}
               title="Open as full workspace tab"
             >
-              ⤢ Tab View
+              <CyberIcon name="undock" size={12} /> Tab View
             </button>
           )}
           {onClose && (
             <button
               type="button"
-              className="notes-close-btn"
+              className="cyber-btn-close"
               onClick={onClose}
               title="Close Notes"
               aria-label="Close Notes"
             >
-              ✕
+              ×
             </button>
           )}
         </div>
@@ -250,16 +254,16 @@ export const NotesView: React.FC<NotesViewProps> = ({
             <select
               id="host-filter-select"
               aria-label="Filter notes by host"
-              className="notes-filter-select"
+              className="notes-filter-select cyber-hud-select font-mono"
               value={selectedHostFilter}
               onChange={(e) => setSelectedHostFilter(e.target.value)}
             >
-              <option value="all">🌐 All Notes</option>
-              <option value="global">📁 Global Workspace Notes</option>
+              <option value="all">All Notes</option>
+              <option value="global">Global Workspace Notes</option>
               <optgroup label="Saved Hosts">
                 {hosts.map((h) => (
                   <option key={h.id} value={h.id}>
-                    🖥️ {h.label || h.address}
+                    {h.label || h.address}
                   </option>
                 ))}
               </optgroup>
@@ -271,7 +275,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
             <input
               type="text"
               aria-label="Search notes"
-              className="notes-search-input"
+              className="notes-search-input cyber-hud-input font-mono"
               placeholder="Search notes (titles & text)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -283,7 +287,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
                 onClick={() => setSearchQuery('')}
                 title="Clear search"
               >
-                ✕
+                ×
               </button>
             )}
           </div>
@@ -292,19 +296,21 @@ export const NotesView: React.FC<NotesViewProps> = ({
           <div className="notes-tree-toolbar">
             <button
               type="button"
-              className="notes-tool-btn"
+              className="cyber-btn cyber-btn-sm cyber-btn-secondary"
               onClick={() => void handleCreateNew(false)}
               title="Add Note"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', fontSize: '0.72rem' }}
             >
-              + Note
+              <CyberIcon name="plus" size={11} /> + Note
             </button>
             <button
               type="button"
-              className="notes-tool-btn"
+              className="cyber-btn cyber-btn-sm cyber-btn-secondary"
               onClick={() => void handleCreateNew(true)}
               title="Add Folder"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', fontSize: '0.72rem' }}
             >
-              + Folder
+              <CyberIcon name="folder" size={11} /> + Folder
             </button>
           </div>
 
@@ -360,7 +366,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
                     <option value="">(Root Level)</option>
                     {availableFolders.map((f) => (
                       <option key={f.id} value={f.id}>
-                        📁 {f.title}
+                        [FOLDER] {f.title}
                       </option>
                     ))}
                   </select>
@@ -394,20 +400,24 @@ export const NotesView: React.FC<NotesViewProps> = ({
 
                   <button
                     type="button"
-                    className="note-save-btn"
+                    className="cyber-btn cyber-btn-sm cyber-btn-primary"
                     onClick={() => void handleSave()}
                     disabled={isSaving}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
-                    {isSaving ? 'Saving...' : '💾 Save Note'}
+                    <CyberIcon name="save" size={12} />
+                    <span>{isSaving ? 'Saving...' : 'Save Note'}</span>
                   </button>
 
                   <button
                     type="button"
-                    className="note-delete-btn"
+                    className="cyber-btn cyber-btn-sm cyber-btn-danger"
                     onClick={() => void handleDelete()}
                     title="Delete Note"
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
-                    🗑️ Delete
+                    <CyberIcon name="trash" size={12} />
+                    <span>Delete</span>
                   </button>
 
                   {saveStatus && <span className="note-save-status">{saveStatus}</span>}
@@ -425,25 +435,27 @@ export const NotesView: React.FC<NotesViewProps> = ({
                   <button type="button" onClick={() => insertFormatting('```bash\n', '\n```')} title="Code Block">```</button>
                   <button type="button" onClick={() => insertFormatting('- ')} title="Bullet List">• List</button>
                   <button type="button" onClick={() => insertFormatting('1. ')} title="Numbered List">1. List</button>
-                  <button type="button" onClick={() => insertFormatting('- [ ] ')} title="Task Checkbox">☑ Task</button>
-                  <button type="button" onClick={() => insertFormatting('| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n')} title="Table">⊞ Table</button>
-                  <button type="button" onClick={() => insertFormatting('[', '](https://)')} title="Link">🔗 Link</button>
+                  <button type="button" onClick={() => insertFormatting('- [ ] ')} title="Task Checkbox">[ ] Task</button>
+                  <button type="button" onClick={() => insertFormatting('| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n')} title="Table">Table</button>
+                  <button type="button" onClick={() => insertFormatting('[', '](https://)')} title="Link">Link</button>
                 </div>
               )}
 
               {/* Editor / Preview Content Split */}
               {editIsFolder ? (
                 <div className="note-folder-view">
-                  <span className="folder-icon">📁</span>
+                  <span className="folder-icon" style={{ display: 'inline-flex', color: '#00f0ff' }}>
+                    <CyberIcon name="folder" size={28} />
+                  </span>
                   <h3>Folder: {editTitle}</h3>
                   <p>Organize subpages inside this folder using the left tree.</p>
                   <button
                     type="button"
-                    className="note-save-btn"
-                    style={{ marginTop: '0.75rem' }}
+                    className="cyber-btn cyber-btn-primary"
+                    style={{ marginTop: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                     onClick={() => void handleCreateNew(false, selectedNote.id)}
                   >
-                    + Add Subpage in "{editTitle}"
+                    <CyberIcon name="plus" size={12} /> Add Subpage in "{editTitle}"
                   </button>
                 </div>
               ) : (
@@ -475,7 +487,9 @@ export const NotesView: React.FC<NotesViewProps> = ({
             </div>
           ) : (
             <div className="note-empty-selection">
-              <span className="empty-icon">📖</span>
+              <span className="empty-icon" style={{ display: 'inline-flex', color: '#00f0ff' }}>
+                <CyberIcon name="note" size={32} />
+              </span>
               <h3>Select a note or folder</h3>
               <p>Choose an item from the left navigation tree, or create a new note.</p>
             </div>
@@ -498,9 +512,11 @@ export const NotesView: React.FC<NotesViewProps> = ({
           role="button"
           tabIndex={0}
         >
-          <span className="node-icon">{note.isFolder ? '📁' : '📄'}</span>
-          <span className="node-title">{note.title}</span>
-          {host && <span className="node-host-badge">{host.label || host.address}</span>}
+          <span className="node-icon" style={{ display: 'inline-flex', color: note.isFolder ? '#38bdf8' : '#00f0ff' }}>
+            <CyberIcon name={note.isFolder ? 'folder' : 'note'} size={13} />
+          </span>
+          <span className="node-title font-mono">{note.title}</span>
+          {host && <span className="node-host-badge font-mono">{host.label || host.address}</span>}
         </div>
         {children.length > 0 && (
           <div className="tree-children">
