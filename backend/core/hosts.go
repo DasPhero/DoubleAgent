@@ -75,6 +75,7 @@ type VaultSummary struct {
 	Keys          []SshKeySummary       `json:"keys"`
 	ProxyProfiles []ProxyProfileSummary `json:"proxyProfiles"`
 	Snippets      []Snippet             `json:"snippets"`
+	SnippetChains []SnippetChain        `json:"snippetChains"`
 	TotpRecords   []TotpSummary         `json:"totpRecords"`
 	Notes         []NotePageSummary     `json:"notes"`
 }
@@ -311,6 +312,11 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		snippets = []Snippet{}
 	}
 
+	chains := payload.SnippetChains
+	if chains == nil {
+		chains = []SnippetChain{}
+	}
+
 	totpSummaries := make([]TotpSummary, 0, len(payload.TotpRecords))
 	for _, tr := range payload.TotpRecords {
 		alg := tr.Algorithm
@@ -349,6 +355,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		Keys:          keys,
 		ProxyProfiles: proxySummaries,
 		Snippets:      snippets,
+		SnippetChains: chains,
 		TotpRecords:   totpSummaries,
 		Notes:         noteSummaries,
 	}

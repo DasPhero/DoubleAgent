@@ -2892,6 +2892,241 @@ func (a *App) ExecuteSnippet(sessionID string, snippetID string, userValues map[
 	return a.WriteTerminal(sessionID, resolvedCmd+"\n")
 }
 
+// SaveSnippetChain saves or updates a multi-stage snippet chain in the vault (Spec F-16).
+func (a *App) SaveSnippetChain(chain core.SnippetChain) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	if chain.ID == "" {
+		chain.ID = fmt.Sprintf("chain-%d", time.Now().UnixNano())
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	if chain.CreatedAt == "" {
+		chain.CreatedAt = now
+	}
+	chain.UpdatedAt = now
+
+	for i := range chain.Steps {
+		if chain.Steps[i].ID == "" {
+			chain.Steps[i].ID = fmt.Sprintf("step-%d-%d", time.Now().UnixNano(), i+1)
+		}
+	}
+
+	if err := core.ValidateSnippetChain(chain); err != nil {
+		return err
+	}
+
+	if payload.SnippetChains == nil {
+		payload.SnippetChains = []core.SnippetChain{}
+	}
+
+	updated := false
+	for i := range payload.SnippetChains {
+		if payload.SnippetChains[i].ID == chain.ID {
+			payload.SnippetChains[i] = chain
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		payload.SnippetChains = append(payload.SnippetChains, chain)
+	}
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	return nil
+}
+
+// DeleteSnippetChain deletes a snippet chain by ID from the vault (F-16).
+func (a *App) DeleteSnippetChain(chainID string) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	filtered := make([]core.SnippetChain, 0, len(payload.SnippetChains))
+	for _, c := range payload.SnippetChains {
+		if c.ID != chainID {
+			filtered = append(filtered, c)
+		}
+	}
+	payload.SnippetChains = filtered
+
+	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	return nil
+}
+
+// ListSnippetChains returns all custom and built-in snippet chains filtered by hostID (F-16).
+func (a *App) ListSnippetChains(hostID string) ([]core.SnippetChain, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	// Start with built-in presets
+	presets := core.GetBuiltinSnippetChains()
+	chainMap := make(map[string]core.SnippetChain, len(presets)+len(payload.SnippetChains))
+	for _, p := range presets {
+		chainMap[p.ID] = p
+	}
+
+	// Overlay user vault chains (can override or add)
+	for _, c := range payload.SnippetChains {
+		chainMap[c.ID] = c
+	}
+
+	allChains := make([]core.SnippetChain, 0, len(chainMap))
+	for _, c := range chainMap {
+		allChains = append(allChains, c)
+	}
+
+	// Look up host OS if hostID is given
+	targetOS := ""
+	if hostID != "" {
+		for _, h := range payload.Hosts {
+			if h.ID == hostID {
+				for _, t := range h.Tags {
+					tLower := strings.ToLower(t)
+					if tLower == "linux" || tLower == "windows" {
+						targetOS = tLower
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+
+	return core.FilterSnippetChains(allChains, hostID, targetOS), nil
+}
+
+// GetSnippetChainVariables returns the unique extracted variables across all steps of a chain (F-16).
+func (a *App) GetSnippetChainVariables(chainID string) ([]core.SnippetVariable, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	var targetChain *core.SnippetChain
+	for _, c := range payload.SnippetChains {
+		if c.ID == chainID {
+			targetChain = &c
+			break
+		}
+	}
+	if targetChain == nil {
+		for _, p := range core.GetBuiltinSnippetChains() {
+			if p.ID == chainID {
+				targetChain = &p
+				break
+			}
+		}
+	}
+	if targetChain == nil {
+		return nil, fmt.Errorf("snippet chain %q not found", chainID)
+	}
+
+	return core.ExtractChainVariables(*targetChain), nil
+}
+
+// ResolveSnippetChainStep resolves the command template for a specific step index in a chain (F-16).
+func (a *App) ResolveSnippetChainStep(chainID string, stepIndex int, sessionID string, userValues map[string]string) (string, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return "", err
+	}
+
+	var targetChain *core.SnippetChain
+	for _, c := range payload.SnippetChains {
+		if c.ID == chainID {
+			targetChain = &c
+			break
+		}
+	}
+	if targetChain == nil {
+		for _, p := range core.GetBuiltinSnippetChains() {
+			if p.ID == chainID {
+				targetChain = &p
+				break
+			}
+		}
+	}
+	if targetChain == nil {
+		return "", fmt.Errorf("snippet chain %q not found", chainID)
+	}
+
+	if stepIndex < 0 || stepIndex >= len(targetChain.Steps) {
+		return "", fmt.Errorf("step index %d out of bounds (chain has %d steps)", stepIndex, len(targetChain.Steps))
+	}
+
+	step := targetChain.Steps[stepIndex]
+	snipCtx := a.GetSnippetContext(sessionID)
+
+	secretResolver := func(ref string) (string, error) {
+		a.mu.Lock()
+		cachedPW := a.sessionPasswords[sessionID]
+		a.mu.Unlock()
+
+		if ref == "session_password" {
+			if cachedPW != "" {
+				return cachedPW, nil
+			}
+			return "", errors.New("no cached session password available")
+		}
+
+		for _, id := range payload.Identities {
+			if id.ID == ref || strings.EqualFold(id.Label, ref) {
+				if id.Password != "" {
+					return id.Password, nil
+				}
+			}
+		}
+		for _, c := range payload.Credentials {
+			if c.ID == ref || strings.EqualFold(c.Label, ref) {
+				if c.Secret != "" {
+					return c.Secret, nil
+				}
+			}
+		}
+		return "", fmt.Errorf("secret reference %q not found in vault", ref)
+	}
+
+	snippetLookup := func(snippetID string) (*core.Snippet, error) {
+		for _, s := range payload.Snippets {
+			if s.ID == snippetID {
+				return &s, nil
+			}
+		}
+		return nil, nil
+	}
+
+	return core.ResolveChainStep(step, snipCtx, userValues, secretResolver, snippetLookup)
+}
+
+// ExecuteSnippetChainStep resolves and writes a step's command directly into the active session stdin (F-16).
+func (a *App) ExecuteSnippetChainStep(sessionID string, chainID string, stepIndex int, userValues map[string]string) error {
+	a.vaultStore.Touch()
+
+	resolvedCmd, err := a.ResolveSnippetChainStep(chainID, stepIndex, sessionID, userValues)
+	if err != nil {
+		return err
+	}
+
+	return a.WriteTerminal(sessionID, resolvedCmd+"\n")
+}
+
 // SaveTotpRecord creates or updates a TOTP secret in the encrypted vault (F-20).
 // Secret seeds remain inside the Go process (Golden Rule 2, Threat Model Line 155).
 func (a *App) SaveTotpRecord(record core.TotpRecord) error {

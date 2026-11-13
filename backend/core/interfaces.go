@@ -401,6 +401,34 @@ type SnippetContext struct {
 	CustomVars map[string]string `json:"customVars,omitempty"`
 }
 
+// SnippetChainStep represents a single sequential command stage in an automated or interactive attack chain (Spec F-16).
+type SnippetChainStep struct {
+	ID               string `json:"id"`
+	Title            string `json:"title"`
+	Description      string `json:"description,omitempty"`
+	SnippetID        string `json:"snippetId,omitempty"` // optional reference to an existing Snippet
+	Command          string `json:"command"`            // shell command template with {{VAR}} support
+	ConfirmBeforeRun bool   `json:"confirmBeforeRun"`   // default: true (Spec F-16 Akzeptanzkriterium)
+	DelayMs          int    `json:"delayMs,omitempty"`  // execution delay in milliseconds before/after step
+	StopOnError      bool   `json:"stopOnError"`        // halt the chain if this step fails (default: true)
+}
+
+// SnippetChain represents a multi-stage command execution sequence scoped to a host or global (Spec F-16).
+type SnippetChain struct {
+	ID                   string             `json:"id"`
+	Name                 string             `json:"name"`
+	Description          string             `json:"description,omitempty"`
+	HostID               string             `json:"hostId,omitempty"`   // host association: empty means global/all hosts
+	TargetOS             string             `json:"targetOs,omitempty"` // "any", "linux", "windows"
+	Category             string             `json:"category,omitempty"` // e.g. "PrivEsc", "Pivot", "Stabilization", "Recon"
+	Steps                []SnippetChainStep `json:"steps"`
+	StopOnError          bool               `json:"stopOnError"`          // abort chain on any error (default: true)
+	AutoRunWithoutPrompt bool               `json:"autoRunWithoutPrompt"` // "ohne Nachfrage" - strictly false by default, conscious opt-in per chain
+	Tags                 []string           `json:"tags,omitempty"`
+	CreatedAt            string             `json:"createdAt,omitempty"`
+	UpdatedAt            string             `json:"updatedAt,omitempty"`
+}
+
 // TotpRecord represents a time-based one-time password secret stored in the encrypted vault (Spec Section 8, F-20).
 // The Secret seed never leaves the Go process (Golden Rule 2, Threat Model Line 155).
 type TotpRecord struct {
@@ -506,6 +534,7 @@ type VaultPayload struct {
 	ForwardRules  []ForwardRule     `json:"forwardRules,omitempty"`
 	ProxyProfiles []ProxyProfile    `json:"proxyProfiles,omitempty"`
 	Snippets      []Snippet         `json:"snippets,omitempty"`
+	SnippetChains []SnippetChain    `json:"snippetChains,omitempty"`
 	TotpRecords   []TotpRecord      `json:"totpRecords,omitempty"`
 	Notes         []NotePage        `json:"notes,omitempty"`
 	Engagements   []Engagement      `json:"engagements,omitempty"`

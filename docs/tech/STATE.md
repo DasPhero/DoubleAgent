@@ -1,10 +1,36 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-39` — Nmap XML Ingest (Alive Checks & Port Scans) — COMPLETED!
+- **Current Milestone:** `F-16` — Snippet Chains per Host — COMPLETED!
 - **Next Milestone:** Comprehensive Presets Library (`M-PRESETS`) / Multi-Theme Cyberpunk Visual Designs (`M-THEMES`) / WinRM Client (`F-41`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Multi-Stage Snippet Chains per Host (`F-16` / Pentest Spec Line 25, 51, 69)**:
+  - **Data Models & Encrypted Vault Persistence (`backend/core/interfaces.go`, `chains.go`, `hosts.go`, `pentest.go`)**:
+    - `SnippetChainStep`: ordered step stages with `ID`, `Title`, `Description`, `SnippetID` (optional snippet reference), `Command` template with `{{VAR}}` support, `ConfirmBeforeRun` (defaults to `true`), `DelayMs` (custom inter-step pause), and `StopOnError` (defaults to `true`).
+    - `SnippetChain`: multi-stage execution entity with `ID`, `Name`, `Description`, `HostID` (host scoping; empty means global), `TargetOS` (`"any"`, `"linux"`, `"windows"`), `Category` (`PrivEsc`, `Stabilization`, `Recon`, `Pivot`), `Steps []SnippetChainStep`, `StopOnError` (`true`), and `AutoRunWithoutPrompt` (`false` by default; Spec Decision D).
+    - Hardened secret validation: enforces that secrets are passed via `{{SECRET:credential_id}}` or `{{PASSWORD}}` references and rejects hardcoded plaintext credentials (Spec Section 4).
+    - Deduplicated variable extraction across all steps in a chain via `ExtractChainVariables`.
+    - Included in `VaultPayload`, `VaultSummary`, and `.daeng` `EngagementPackage` import/export.
+  - **Built-in Pentest Chain Presets (`core.GetBuiltinSnippetChains()`, M-PRESETS)**:
+    - *Linux: Reverse Shell PTY Upgrade & Stabilization* (4-step sequence: PTY spawn via Python, background shell Ctrl+Z, attacker `stty raw -echo; fg`, target reset and `stty rows {{ROWS}} cols {{COLS}}`).
+    - *Linux: Fast Privilege Escalation & Capabilities Check* (4-step sequence: `sudo -l`, SUID/SGID search, binary capabilities `getcap`, crontab & writable roots).
+    - *Windows: Token Privileges & Service Recon* (4-step sequence: `whoami /all`, unquoted service paths via wmic, AlwaysInstallElevated registry check, netstat internal listeners).
+    - *Network: Subnet & Pivot Route Inspection* (3-step multi-platform sequence: interfaces/CIDRs, ARP/neighbor cache, routing tables).
+  - **Wails Go Backend Bindings (`app.go`)**:
+    - `SaveSnippetChain(chain core.SnippetChain) error`: Validates and saves chain to vault, emitting `vault:updated`.
+    - `DeleteSnippetChain(chainID string) error`: Deletes custom chain from vault.
+    - `ListSnippetChains(hostID string) ([]core.SnippetChain, error)`: Merges user vault chains with built-in presets and filters by host scoping and target OS.
+    - `GetSnippetChainVariables(chainID string) ([]core.SnippetVariable, error)`: Aggregates unique variables across all chain steps.
+    - `ResolveSnippetChainStep(chainID string, stepIndex int, sessionID string, userValues map[string]string) (string, error)`: Resolves variables and secrets for a specific step in an active session.
+    - `ExecuteSnippetChainStep(sessionID string, chainID string, stepIndex int, userValues map[string]string) error`: Resolves command and injects it into session stdin.
+    - Unit and integration tests in `backend/core/chains_test.go` (5 tests passing) and `app_test.go` (`TestApp_SnippetChains_F16` passing).
+  - **Cyberpunk HUD Frontend Modals & Runner (`SnippetChainsModal.tsx`, `SnippetChainRunnerModal.tsx`, `App.tsx`)**:
+    - *Snippet Chains Manager Modal*: Filter by OS (`ALL`, `LINUX`, `WINDOWS`) and Host scope; search by title/category/command; collapsible step-by-step breakdown; visual step reorder (`▲`/`▼`); dangerous mode warning on `AutoRunWithoutPrompt` toggle.
+    - *Interactive Step Runner Modal*: Stepper progress bar with neon status chips (`COMPLETED` in green, `ACTIVE` in cyan, `SKIPPED` in yellow, `FAILED` in red); pre-execution variable resolution form; command preview in terminal monospace card; `[ Execute Step ]`, `[ Skip Step ]`, and `[ Abort Chain ]` controls.
+    - Integrated into Terminal Toolbar (`[ Chains ]` button next to `Stabilize` and `Snippets`), Tools Menu (`Tools ▾ > Snippet Chains & Exploits (F-16)`), Engagement Menu (`Engagement ▾ > Snippet Chains (F-16)`), and Command Palette (`Ctrl+K`).
+    - Vector SVG graphics via `<CyberIcon name="chain" />` and `<CyberIcon name="skip" />` adhering to Golden Rule 9.
+    - Dedicated Vitest tests in `SnippetChainsModal.test.tsx` (5 tests passing); full suite of 55 tests passing.
 - **Nmap XML Recon Ingest & Port Findings (`F-39` / Pentest Spec Line 32)**:
   - **Backend Parser & Scan Classifier (`backend/core/nmap.go`)**:
     - Complete XML unmarshaling of Nmap `-oX` output schema (scanner, args, runstats, addresses, hostnames, ports, services, scripts, and OS matches).

@@ -61,6 +61,8 @@ export function DeleteSessionLog(arg1:string):Promise<void>;
 
 export function DeleteSnippet(arg1:string):Promise<void>;
 
+export function DeleteSnippetChain(arg1:string):Promise<void>;
+
 export function DeleteTotpRecord(arg1:string):Promise<void>;
 
 export function DisconnectSession(arg1:string):Promise<void>;
@@ -72,6 +74,8 @@ export function EnableQuickUnlock():Promise<void>;
 export function ExecuteImport(arg1:core.ImportExecuteOptions):Promise<core.ImportExecuteResult>;
 
 export function ExecuteSnippet(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
+
+export function ExecuteSnippetChainStep(arg1:string,arg2:string,arg3:number,arg4:Record<string, string>):Promise<void>;
 
 export function ExportEngagementFile(arg1:string,arg2:string,arg3:string):Promise<void>;
 
@@ -124,6 +128,8 @@ export function GetRemoteEditContent(arg1:string):Promise<string>;
 export function GetSessionLogStatus(arg1:string):Promise<core.SessionLogStatus>;
 
 export function GetShellStabilizePresets():Promise<Array<core.ShellStabilizePreset>>;
+
+export function GetSnippetChainVariables(arg1:string):Promise<Array<core.SnippetVariable>>;
 
 export function GetSnippetContext(arg1:string):Promise<core.SnippetContext>;
 
@@ -181,6 +187,8 @@ export function ListSerialPorts():Promise<Array<core.SerialPortInfo>>;
 
 export function ListSessionLogs():Promise<Array<core.SessionLogRecord>>;
 
+export function ListSnippetChains(arg1:string):Promise<Array<core.SnippetChain>>;
+
 export function ListSnippets():Promise<Array<core.Snippet>>;
 
 export function ListTotpRecords():Promise<Array<core.TotpSummary>>;
@@ -213,6 +221,8 @@ export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void
 
 export function ResolveHostKeyPrompt(arg1:string,arg2:number,arg3:boolean):Promise<void>;
 
+export function ResolveSnippetChainStep(arg1:string,arg2:number,arg3:string,arg4:Record<string, string>):Promise<string>;
+
 export function ResolveSnippetTemplate(arg1:string,arg2:string,arg3:Record<string, string>):Promise<string>;
 
 export function ResolveVaultConflicts(arg1:Record<string, string>,arg2:boolean):Promise<void>;
@@ -242,6 +252,8 @@ export function SaveProxychainsFile(arg1:string,arg2:string):Promise<void>;
 export function SaveRemoteEditContent(arg1:string,arg2:string,arg3:boolean):Promise<core.RemoteEditResult>;
 
 export function SaveSnippet(arg1:core.Snippet):Promise<void>;
+
+export function SaveSnippetChain(arg1:core.SnippetChain):Promise<void>;
 
 export function SaveTotpRecord(arg1:core.TotpRecord):Promise<void>;
 

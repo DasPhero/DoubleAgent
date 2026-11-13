@@ -2187,7 +2187,8 @@ func TestApp_NmapImport_F39(t *testing.T) {
 	if err := store.Initialize(context.Background(), ""); err != nil {
 		t.Fatalf("store.Initialize failed: %v", err)
 	}
-	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	fake := newFakeSshTransport()
+	app := NewAppWithDependencies(fake, nil, store, nil)
 	app.ctx = context.Background()
 
 	rawXML := `<?xml version="1.0" encoding="UTF-8"?>
@@ -2264,3 +2265,147 @@ func TestApp_NmapImport_F39(t *testing.T) {
 		t.Errorf("expected host label vulnbox.local, got %s", summary.Hosts[0].Label)
 	}
 }
+
+func TestApp_SnippetChains_F16(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_chains.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	fake := newFakeSshTransport()
+	app := NewAppWithDependencies(fake, nil, store, nil)
+	app.ctx = context.Background()
+
+	// 1. Check default ListSnippetChains includes built-in presets
+	chains, err := app.ListSnippetChains("")
+	if err != nil {
+		t.Fatalf("ListSnippetChains failed: %v", err)
+	}
+	if len(chains) < 4 {
+		t.Fatalf("expected at least 4 built-in preset chains, got %d", len(chains))
+	}
+
+	// 2. Save a new custom snippet chain with 2 steps
+	customChain := core.SnippetChain{
+		ID:          "custom-chain-recon",
+		Name:        "Custom Host Recon & Pivot Chain",
+		Description: "Multi-stage enumeration for internal pivot setup",
+		HostID:      "host-test-1",
+		TargetOS:    "linux",
+		Category:    "Recon",
+		StopOnError: true,
+		Steps: []core.SnippetChainStep{
+			{
+				ID:               "step-c1",
+				Title:            "Inspect IP",
+				Command:          "ip a | grep {{INTERFACE=eth0}}",
+				ConfirmBeforeRun: true,
+				DelayMs:          300,
+			},
+			{
+				ID:               "step-c2",
+				Title:            "Scan Subnet",
+				Command:          "nmap -sn {{SUBNET=192.168.1.0/24}}",
+				ConfirmBeforeRun: true,
+				DelayMs:          500,
+			},
+		},
+	}
+
+	if err := app.SaveSnippetChain(customChain); err != nil {
+		t.Fatalf("SaveSnippetChain failed: %v", err)
+	}
+
+	// 3. Verify filtered list by hostID
+	hostChains, err := app.ListSnippetChains("host-test-1")
+	if err != nil {
+		t.Fatalf("ListSnippetChains(host-test-1) failed: %v", err)
+	}
+	foundCustom := false
+	for _, c := range hostChains {
+		if c.ID == "custom-chain-recon" {
+			foundCustom = true
+			if len(c.Steps) != 2 {
+				t.Errorf("expected 2 steps in custom chain, got %d", len(c.Steps))
+			}
+			break
+		}
+	}
+	if !foundCustom {
+		t.Fatalf("expected custom-chain-recon in hostChains")
+	}
+
+	// 4. Extract chain variables
+	chainVars, err := app.GetSnippetChainVariables("custom-chain-recon")
+	if err != nil {
+		t.Fatalf("GetSnippetChainVariables failed: %v", err)
+	}
+	if len(chainVars) != 2 {
+		t.Fatalf("expected 2 chain variables (INTERFACE, SUBNET), got %d: %+v", len(chainVars), chainVars)
+	}
+
+	// 5. Connect fake SSH session to test step resolution & execution
+	promptCh := make(chan core.HostKeyInfo, 1)
+	app.emit = func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				promptCh <- info
+			}
+		}
+	}
+	go func() {
+		info := <-promptCh
+		_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+	}()
+
+	sessionID, err := app.ConnectSSH(core.ConnectRequest{
+		Address:  "192.168.1.100",
+		Port:     22,
+		Username: "pentester",
+		Password: "testpassword",
+		Size:     core.TerminalSize{Cols: 80, Rows: 24},
+	})
+	if err != nil {
+		t.Fatalf("ConnectSSH failed: %v", err)
+	}
+
+	userVals := map[string]string{
+		"INTERFACE": "ens33",
+		"SUBNET":    "10.0.0.0/24",
+	}
+
+	// Resolve Step 0
+	resolvedStep0, err := app.ResolveSnippetChainStep("custom-chain-recon", 0, sessionID, userVals)
+	if err != nil {
+		t.Fatalf("ResolveSnippetChainStep step 0 failed: %v", err)
+	}
+	if resolvedStep0 != "ip a | grep ens33" {
+		t.Errorf("expected 'ip a | grep ens33', got: %q", resolvedStep0)
+	}
+
+	// Execute Step 0 into terminal
+	if err := app.ExecuteSnippetChainStep(sessionID, "custom-chain-recon", 0, userVals); err != nil {
+		t.Fatalf("ExecuteSnippetChainStep step 0 failed: %v", err)
+	}
+	if !strings.Contains(fake.stdinBuf.String(), "ip a | grep ens33\n") {
+		t.Fatalf("expected command written to session, got: %q", fake.stdinBuf.String())
+	}
+
+	// 6. Delete custom chain
+	if err := app.DeleteSnippetChain("custom-chain-recon"); err != nil {
+		t.Fatalf("DeleteSnippetChain failed: %v", err)
+	}
+
+	// Verify it's no longer present in vault
+	summary, err := app.GetVaultSummary()
+	if err != nil {
+		t.Fatalf("GetVaultSummary failed: %v", err)
+	}
+	for _, c := range summary.SnippetChains {
+		if c.ID == "custom-chain-recon" {
+			t.Errorf("deleted chain still found in vault summary")
+		}
+	}
+}
+

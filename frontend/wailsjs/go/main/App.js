@@ -118,6 +118,10 @@ export function DeleteSnippet(arg1) {
   return window['go']['main']['App']['DeleteSnippet'](arg1);
 }
 
+export function DeleteSnippetChain(arg1) {
+  return window['go']['main']['App']['DeleteSnippetChain'](arg1);
+}
+
 export function DeleteTotpRecord(arg1) {
   return window['go']['main']['App']['DeleteTotpRecord'](arg1);
 }
@@ -140,6 +144,10 @@ export function ExecuteImport(arg1) {
 
 export function ExecuteSnippet(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExecuteSnippet'](arg1, arg2, arg3);
+}
+
+export function ExecuteSnippetChainStep(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ExecuteSnippetChainStep'](arg1, arg2, arg3, arg4);
 }
 
 export function ExportEngagementFile(arg1, arg2, arg3) {
@@ -244,6 +252,10 @@ export function GetSessionLogStatus(arg1) {
 
 export function GetShellStabilizePresets() {
   return window['go']['main']['App']['GetShellStabilizePresets']();
+}
+
+export function GetSnippetChainVariables(arg1) {
+  return window['go']['main']['App']['GetSnippetChainVariables'](arg1);
 }
 
 export function GetSnippetContext(arg1) {
@@ -358,6 +370,10 @@ export function ListSessionLogs() {
   return window['go']['main']['App']['ListSessionLogs']();
 }
 
+export function ListSnippetChains(arg1) {
+  return window['go']['main']['App']['ListSnippetChains'](arg1);
+}
+
 export function ListSnippets() {
   return window['go']['main']['App']['ListSnippets']();
 }
@@ -422,6 +438,10 @@ export function ResolveHostKeyPrompt(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveHostKeyPrompt'](arg1, arg2, arg3);
 }
 
+export function ResolveSnippetChainStep(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ResolveSnippetChainStep'](arg1, arg2, arg3, arg4);
+}
+
 export function ResolveSnippetTemplate(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveSnippetTemplate'](arg1, arg2, arg3);
 }
@@ -480,6 +500,10 @@ export function SaveRemoteEditContent(arg1, arg2, arg3) {
 
 export function SaveSnippet(arg1) {
   return window['go']['main']['App']['SaveSnippet'](arg1);
+}
+
+export function SaveSnippetChain(arg1) {
+  return window['go']['main']['App']['SaveSnippetChain'](arg1);
 }
 
 export function SaveTotpRecord(arg1) {

@@ -1,0 +1,741 @@
+import React, { useState, useMemo } from 'react';
+import { SnippetChain, SnippetChainStep } from '../types/snippet';
+import { CyberIcon } from './CyberIcon';
+
+export interface SnippetChainsModalProps {
+  chains: SnippetChain[];
+  hosts?: Array<{ id: string; label: string; address: string }>;
+  activeSessionId?: string | null;
+  activeHostId?: string | null;
+  onSaveChain: (chain: SnippetChain) => Promise<void>;
+  onDeleteChain: (chainId: string) => Promise<void>;
+  onRunChain: (chain: SnippetChain) => void;
+  onClose: () => void;
+}
+
+export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
+  chains,
+  hosts = [],
+  activeSessionId,
+  activeHostId,
+  onSaveChain,
+  onDeleteChain,
+  onRunChain,
+  onClose,
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [osFilter, setOsFilter] = useState<'all' | 'linux' | 'windows'>('all');
+  const [hostFilter, setHostFilter] = useState<string>(activeHostId || 'all');
+  const [expandedChainId, setExpandedChainId] = useState<string | null>(null);
+
+  const [editingChain, setEditingChain] = useState<SnippetChain | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  // Start new chain
+  const startNewChain = () => {
+    setEditingChain({
+      id: '',
+      name: '',
+      description: '',
+      category: 'PrivEsc',
+      targetOs: 'any',
+      hostId: activeHostId || '',
+      stopOnError: true,
+      autoRunWithoutPrompt: false,
+      tags: [],
+      steps: [
+        {
+          id: `step-${Date.now()}-1`,
+          title: 'Step 1',
+          description: '',
+          command: '',
+          confirmBeforeRun: true,
+          delayMs: 300,
+          stopOnError: true,
+        },
+      ],
+    });
+    setError('');
+  };
+
+  const startEditChain = (chain: SnippetChain) => {
+    // Deep clone to allow safe editing
+    setEditingChain(JSON.parse(JSON.stringify(chain)));
+    setError('');
+  };
+
+  // Step manipulation in edit form
+  const handleAddStep = () => {
+    if (!editingChain) return;
+    const nextIdx = editingChain.steps.length + 1;
+    const newStep: SnippetChainStep = {
+      id: `step-${Date.now()}-${nextIdx}`,
+      title: `Step ${nextIdx}`,
+      description: '',
+      command: '',
+      confirmBeforeRun: true,
+      delayMs: 300,
+      stopOnError: true,
+    };
+    setEditingChain({
+      ...editingChain,
+      steps: [...editingChain.steps, newStep],
+    });
+  };
+
+  const handleRemoveStep = (idx: number) => {
+    if (!editingChain) return;
+    if (editingChain.steps.length <= 1) {
+      setError('A snippet chain must contain at least one step.');
+      return;
+    }
+    const updated = editingChain.steps.filter((_, i) => i !== idx);
+    setEditingChain({ ...editingChain, steps: updated });
+  };
+
+  const handleMoveStep = (idx: number, direction: 'up' | 'down') => {
+    if (!editingChain) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= editingChain.steps.length) return;
+
+    const updated = [...editingChain.steps];
+    const temp = updated[idx];
+    updated[idx] = updated[targetIdx];
+    updated[targetIdx] = temp;
+    setEditingChain({ ...editingChain, steps: updated });
+  };
+
+  const handleStepChange = (idx: number, field: keyof SnippetChainStep, value: unknown) => {
+    if (!editingChain) return;
+    const updated = [...editingChain.steps];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setEditingChain({ ...editingChain, steps: updated });
+  };
+
+  const insertVariableIntoStep = (stepIdx: number, placeholder: string) => {
+    if (!editingChain) return;
+    const currentCmd = editingChain.steps[stepIdx].command || '';
+    handleStepChange(stepIdx, 'command', currentCmd + placeholder);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingChain) return;
+
+    if (!editingChain.name.trim()) {
+      setError('Snippet chain name is required.');
+      return;
+    }
+    if (editingChain.steps.length === 0) {
+      setError('At least one step is required.');
+      return;
+    }
+    for (let i = 0; i < editingChain.steps.length; i++) {
+      const s = editingChain.steps[i];
+      if (!s.command.trim() && !s.snippetId) {
+        setError(`Step ${i + 1} (${s.title || 'Untitled'}) must specify a shell command.`);
+        return;
+      }
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await onSaveChain(editingChain);
+      setEditingChain(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save snippet chain');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Filtered chains
+  const filteredChains = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return chains.filter((c) => {
+      // OS filter
+      if (osFilter !== 'all') {
+        const cOS = (c.targetOs || 'any').toLowerCase();
+        if (cOS !== 'any' && cOS !== osFilter) return false;
+      }
+      // Host filter
+      if (hostFilter !== 'all') {
+        if (c.hostId && c.hostId !== hostFilter) return false;
+      }
+      // Text search
+      if (q) {
+        const matchName = c.name.toLowerCase().includes(q);
+        const matchDesc = (c.description || '').toLowerCase().includes(q);
+        const matchCat = (c.category || '').toLowerCase().includes(q);
+        const matchStep = c.steps.some((s) => s.title.toLowerCase().includes(q) || s.command.toLowerCase().includes(q));
+        if (!matchName && !matchDesc && !matchCat && !matchStep) return false;
+      }
+      return true;
+    });
+  }, [chains, osFilter, hostFilter, searchQuery]);
+
+  return (
+    <div className="cyber-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Snippet Chains Manager">
+      <div
+        className="cyber-modal-card cyber-hud-card"
+        style={{ width: '920px', maxWidth: '96vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cyber-corner-reticle cyber-corner-tl" />
+        <div className="cyber-corner-reticle cyber-corner-tr" />
+        <div className="cyber-corner-reticle cyber-corner-bl" />
+        <div className="cyber-corner-reticle cyber-corner-br" />
+
+        {/* Modal Header */}
+        <div className="cyber-modal-header" style={{ padding: '0.85rem 1.25rem', borderBottom: '1px solid rgba(0, 240, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <span style={{ color: 'var(--color-primary-cyan, #00f0ff)' }}>
+              <CyberIcon name="chain" size={18} />
+            </span>
+            <div>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-primary-cyan, #00f0ff)' }}>
+                SNIPPET CHAINS // MULTI-STAGE SEQUENCES (F-16)
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                Multi-step exploit, privesc & pivot chains with step-by-step confirmation and host scoping
+              </div>
+            </div>
+          </div>
+          <button type="button" className="cyber-hud-btn btn-sm" onClick={onClose} aria-label="Close Modal">
+            <CyberIcon name="close" size={14} />
+          </button>
+        </div>
+
+        {/* Body Container */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
+          {error && (
+            <div style={{ padding: '0.65rem 0.85rem', marginBottom: '1rem', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#fca5a5', borderRadius: '4px', fontSize: '0.82rem' }}>
+              {error}
+            </div>
+          )}
+
+          {!editingChain ? (
+            /* Chain List View */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Controls bar */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', flex: 1, minWidth: '300px' }}>
+                  <input
+                    type="text"
+                    className="cyber-hud-input"
+                    placeholder="Search chains by name, category, or command..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ flex: 1, minWidth: '180px' }}
+                  />
+                  <select
+                    className="cyber-hud-select"
+                    value={osFilter}
+                    onChange={(e) => setOsFilter(e.target.value as 'all' | 'linux' | 'windows')}
+                    style={{ width: '130px' }}
+                  >
+                    <option value="all">OS: All Platforms</option>
+                    <option value="linux">OS: Linux</option>
+                    <option value="windows">OS: Windows</option>
+                  </select>
+                  {hosts.length > 0 && (
+                    <select
+                      className="cyber-hud-select"
+                      value={hostFilter}
+                      onChange={(e) => setHostFilter(e.target.value)}
+                      style={{ width: '150px' }}
+                    >
+                      <option value="all">Host: All Hosts</option>
+                      {hosts.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          Host: {h.label || h.address}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="cyber-hud-btn btn-primary"
+                  onClick={startNewChain}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.85rem' }}
+                >
+                  <CyberIcon name="plus" size={13} />
+                  <span>+ New Chain</span>
+                </button>
+              </div>
+
+              {/* List Grid */}
+              {filteredChains.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b', border: '1px dashed rgba(0, 240, 255, 0.2)', borderRadius: '6px' }}>
+                  <CyberIcon name="chain" size={32} />
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.88rem' }}>No snippet chains found matching filters.</p>
+                  <button type="button" className="cyber-hud-btn btn-sm" onClick={startNewChain} style={{ marginTop: '0.75rem' }}>
+                    Create First Snippet Chain
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {filteredChains.map((chain) => {
+                    const isExpanded = expandedChainId === chain.id;
+                    const hostObj = hosts.find((h) => h.id === chain.hostId);
+                    const isBuiltin = chain.id.startsWith('builtin-chain-');
+
+                    return (
+                      <div
+                        key={chain.id}
+                        className="cyber-card"
+                        style={{
+                          backgroundColor: 'rgba(10, 20, 35, 0.75)',
+                          border: isExpanded ? '1px solid rgba(0, 240, 255, 0.6)' : '1px solid rgba(0, 240, 255, 0.25)',
+                          borderRadius: '4px',
+                          padding: '0.85rem 1rem',
+                          transition: 'border-color 0.15s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#f8fafc' }}>
+                                {chain.name}
+                              </span>
+                              {chain.category && (
+                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'rgba(0, 240, 255, 0.12)', color: 'var(--color-primary-cyan, #00f0ff)', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
+                                  {chain.category}
+                                </span>
+                              )}
+                              <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'rgba(148, 163, 184, 0.12)', color: '#cbd5e1', border: '1px solid rgba(148, 163, 184, 0.3)' }}>
+                                {chain.targetOs ? chain.targetOs.toUpperCase() : 'ANY OS'}
+                              </span>
+                              {chain.hostId ? (
+                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                                  HOST: {hostObj ? hostObj.label : chain.hostId}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'rgba(100, 116, 139, 0.15)', color: '#94a3b8' }}>
+                                  GLOBAL
+                                </span>
+                              )}
+                              <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                                {chain.steps.length} {chain.steps.length === 1 ? 'STEP' : 'STEPS'}
+                              </span>
+                              {chain.autoRunWithoutPrompt && (
+                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid #ef4444', fontWeight: 600 }}>
+                                  NO-PROMPT AUTO
+                                </span>
+                              )}
+                            </div>
+                            {chain.description && (
+                              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+                                {chain.description}
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <button
+                              type="button"
+                              className="cyber-hud-btn btn-sm btn-primary"
+                              onClick={() => onRunChain(chain)}
+                              title={activeSessionId ? 'Run this chain in active terminal' : 'Open chain runner'}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                            >
+                              <CyberIcon name="play" size={12} />
+                              <span>Run</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="cyber-hud-btn btn-sm"
+                              onClick={() => setExpandedChainId(isExpanded ? null : chain.id)}
+                              title="Toggle step preview"
+                            >
+                              <CyberIcon name={isExpanded ? 'chevron-down' : 'chevron-right'} size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="cyber-hud-btn btn-sm"
+                              onClick={() => startEditChain(chain)}
+                              title="Edit chain"
+                            >
+                              <CyberIcon name="edit" size={12} />
+                            </button>
+                            {!isBuiltin && (
+                              <button
+                                type="button"
+                                className="cyber-hud-btn btn-sm btn-danger"
+                                onClick={() => {
+                                  if (window.confirm(`Delete chain "${chain.name}"?`)) {
+                                    void onDeleteChain(chain.id);
+                                  }
+                                }}
+                                title="Delete chain"
+                              >
+                                <CyberIcon name="trash" size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Collapsible Steps Preview */}
+                        {isExpanded && (
+                          <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px dashed rgba(0, 240, 255, 0.2)' }}>
+                            <div style={{ fontSize: '0.72rem', letterSpacing: '0.05em', color: 'var(--color-primary-cyan, #00f0ff)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                              CHAIN STEP BREAKDOWN:
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                              {chain.steps.map((st, sidx) => (
+                                <div
+                                  key={st.id || sidx}
+                                  style={{
+                                    backgroundColor: 'rgba(4, 9, 18, 0.85)',
+                                    border: '1px solid rgba(0, 240, 255, 0.15)',
+                                    borderRadius: '3px',
+                                    padding: '0.5rem 0.75rem',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#e2e8f0' }}>
+                                      {sidx + 1}. {st.title}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.68rem', color: '#64748b' }}>
+                                      <span>Delay: {st.delayMs || 0}ms</span>
+                                      <span>Confirm: {st.confirmBeforeRun ? 'YES' : 'NO'}</span>
+                                      <span>StopOnError: {st.stopOnError ? 'YES' : 'NO'}</span>
+                                    </div>
+                                  </div>
+                                  {st.description && (
+                                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
+                                      {st.description}
+                                    </div>
+                                  )}
+                                  <pre
+                                    style={{
+                                      margin: 0,
+                                      padding: '0.35rem 0.5rem',
+                                      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                                      border: '1px solid rgba(0, 240, 255, 0.1)',
+                                      borderRadius: '2px',
+                                      color: '#a7f3d0',
+                                      fontSize: '0.74rem',
+                                      fontFamily: 'var(--font-mono, monospace)',
+                                      overflowX: 'auto',
+                                      whiteSpace: 'pre-wrap',
+                                    }}
+                                  >
+                                    {st.command || `[References Snippet ID: ${st.snippetId}]`}
+                                  </pre>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Chain Edit / Create Form */
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(0, 240, 255, 0.2)' }}>
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--color-primary-cyan, #00f0ff)' }}>
+                  {editingChain.id ? `EDIT CHAIN: ${editingChain.name}` : 'CREATE NEW SNIPPET CHAIN'}
+                </span>
+                <button
+                  type="button"
+                  className="cyber-hud-btn btn-sm"
+                  onClick={() => setEditingChain(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+
+              {/* Basic Metadata Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
+                <div>
+                  <label className="cyber-hud-label" style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                    Chain Name *
+                  </label>
+                  <input
+                    type="text"
+                    className="cyber-hud-input"
+                    value={editingChain.name}
+                    onChange={(e) => setEditingChain({ ...editingChain, name: e.target.value })}
+                    placeholder="e.g. Linux Reverse Shell Stabilization"
+                    style={{ width: '100%' }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="cyber-hud-label" style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    className="cyber-hud-input"
+                    value={editingChain.category || ''}
+                    onChange={(e) => setEditingChain({ ...editingChain, category: e.target.value })}
+                    placeholder="e.g. PrivEsc, Pivot, Stabilization"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="cyber-hud-label" style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                    Target Operating System
+                  </label>
+                  <select
+                    className="cyber-hud-select"
+                    value={editingChain.targetOs || 'any'}
+                    onChange={(e) => setEditingChain({ ...editingChain, targetOs: e.target.value })}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="any">Multi-Platform (Any OS)</option>
+                    <option value="linux">Linux</option>
+                    <option value="windows">Windows</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="cyber-hud-label" style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                    Host Scope
+                  </label>
+                  <select
+                    className="cyber-hud-select"
+                    value={editingChain.hostId || ''}
+                    onChange={(e) => setEditingChain({ ...editingChain, hostId: e.target.value })}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">Global (All Hosts)</option>
+                    {hosts.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.label} ({h.address})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="cyber-hud-label" style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                  Description / Documentation
+                </label>
+                <input
+                  type="text"
+                  className="cyber-hud-input"
+                  value={editingChain.description || ''}
+                  onChange={(e) => setEditingChain({ ...editingChain, description: e.target.value })}
+                  placeholder="Explain the killchain stage or execution sequence..."
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              {/* Safety & Execution Policy Flags */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'rgba(0, 0, 0, 0.4)', border: '1px solid rgba(0, 240, 255, 0.2)', borderRadius: '4px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', color: '#e2e8f0' }}>
+                  <input
+                    type="checkbox"
+                    checked={editingChain.stopOnError}
+                    onChange={(e) => setEditingChain({ ...editingChain, stopOnError: e.target.checked })}
+                  />
+                  <span><strong>Global Stop on Error:</strong> Abort remaining chain steps if any step fails or exits non-zero</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', color: editingChain.autoRunWithoutPrompt ? '#fca5a5' : '#cbd5e1' }}>
+                  <input
+                    type="checkbox"
+                    checked={editingChain.autoRunWithoutPrompt}
+                    onChange={(e) => setEditingChain({ ...editingChain, autoRunWithoutPrompt: e.target.checked })}
+                  />
+                  <span><strong>Automatic Execution Without Prompts ("ohne Nachfrage"):</strong> Run entire sequence sequentially without manual confirmation per step</span>
+                </label>
+
+                {editingChain.autoRunWithoutPrompt && (
+                  <div style={{ fontSize: '0.74rem', color: '#f87171', padding: '0.4rem 0.6rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '3px' }}>
+                    WARNING: Unprompted automated chains may execute destructive actions or trigger EDR detections if run against the wrong host. Step confirmation is recommended.
+                  </div>
+                )}
+              </div>
+
+              {/* Steps Editor */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--color-primary-cyan, #00f0ff)' }}>
+                    ORDERED CHAIN STEPS ({editingChain.steps.length})
+                  </span>
+                  <button
+                    type="button"
+                    className="cyber-hud-btn btn-sm"
+                    onClick={handleAddStep}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <CyberIcon name="plus" size={12} />
+                    <span>+ Add Step</span>
+                  </button>
+                </div>
+
+                {editingChain.steps.map((step, idx) => (
+                  <div
+                    key={step.id || idx}
+                    style={{
+                      backgroundColor: 'rgba(6, 14, 26, 0.9)',
+                      border: '1px solid rgba(0, 240, 255, 0.25)',
+                      borderRadius: '4px',
+                      padding: '0.85rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.65rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary-cyan, #00f0ff)', width: '22px' }}>
+                          #{idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          className="cyber-hud-input"
+                          value={step.title}
+                          onChange={(e) => handleStepChange(idx, 'title', e.target.value)}
+                          placeholder={`Step ${idx + 1} Title`}
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <button
+                          type="button"
+                          className="cyber-hud-btn btn-sm"
+                          disabled={idx === 0}
+                          onClick={() => handleMoveStep(idx, 'up')}
+                          title="Move step up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className="cyber-hud-btn btn-sm"
+                          disabled={idx === editingChain.steps.length - 1}
+                          onClick={() => handleMoveStep(idx, 'down')}
+                          title="Move step down"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          type="button"
+                          className="cyber-hud-btn btn-sm btn-danger"
+                          onClick={() => handleRemoveStep(idx)}
+                          title="Remove step"
+                        >
+                          <CyberIcon name="trash" size={12} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                        <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Shell Command Template *</label>
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          {['{{HOST}}', '{{PORT}}', '{{USER}}', '{{CWD}}', '{{SECRET:id}}'].map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              className="cyber-hud-btn btn-sm"
+                              style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }}
+                              onClick={() => insertVariableIntoStep(idx, v)}
+                              title={`Insert ${v} into command`}
+                            >
+                              + {v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <textarea
+                        className="cyber-hud-input"
+                        value={step.command}
+                        onChange={(e) => handleStepChange(idx, 'command', e.target.value)}
+                        placeholder={"e.g. sudo -l || python3 -c 'import pty; pty.spawn(\"/bin/bash\")'"}
+                        rows={3}
+                        style={{ width: '100%', fontFamily: 'var(--font-mono, monospace)', fontSize: '0.8rem' }}
+                        required
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#cbd5e1' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={step.confirmBeforeRun}
+                          onChange={(e) => handleStepChange(idx, 'confirmBeforeRun', e.target.checked)}
+                        />
+                        <span>Confirm Before Run (Spec Default)</span>
+                      </label>
+
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={step.stopOnError}
+                          onChange={(e) => handleStepChange(idx, 'stopOnError', e.target.checked)}
+                        />
+                        <span>Stop on Error</span>
+                      </label>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span>Delay:</span>
+                        <input
+                          type="number"
+                          className="cyber-hud-input"
+                          value={step.delayMs || 0}
+                          onChange={(e) => handleStepChange(idx, 'delayMs', parseInt(e.target.value, 10) || 0)}
+                          style={{ width: '70px', padding: '0.2rem 0.4rem', height: '26px' }}
+                          min={0}
+                          step={100}
+                        />
+                        <span>ms</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="cyber-hud-btn"
+                  onClick={handleAddStep}
+                  style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <CyberIcon name="plus" size={13} />
+                  <span>+ Add Step</span>
+                </button>
+              </div>
+
+              {/* Form Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)' }}>
+                <button
+                  type="button"
+                  className="cyber-hud-btn"
+                  onClick={() => setEditingChain(null)}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="cyber-hud-btn btn-primary"
+                  disabled={saving}
+                  style={{ minWidth: '120px' }}
+                >
+                  {saving ? 'Saving...' : 'Save Chain'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -339,6 +339,84 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class SnippetChainStep {
+	    id: string;
+	    title: string;
+	    description?: string;
+	    snippetId?: string;
+	    command: string;
+	    confirmBeforeRun: boolean;
+	    delayMs?: number;
+	    stopOnError: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnippetChainStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.description = source["description"];
+	        this.snippetId = source["snippetId"];
+	        this.command = source["command"];
+	        this.confirmBeforeRun = source["confirmBeforeRun"];
+	        this.delayMs = source["delayMs"];
+	        this.stopOnError = source["stopOnError"];
+	    }
+	}
+	export class SnippetChain {
+	    id: string;
+	    name: string;
+	    description?: string;
+	    hostId?: string;
+	    targetOs?: string;
+	    category?: string;
+	    steps: SnippetChainStep[];
+	    stopOnError: boolean;
+	    autoRunWithoutPrompt: boolean;
+	    tags?: string[];
+	    createdAt?: string;
+	    updatedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnippetChain(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.hostId = source["hostId"];
+	        this.targetOs = source["targetOs"];
+	        this.category = source["category"];
+	        this.steps = this.convertValues(source["steps"], SnippetChainStep);
+	        this.stopOnError = source["stopOnError"];
+	        this.autoRunWithoutPrompt = source["autoRunWithoutPrompt"];
+	        this.tags = source["tags"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SnippetVariable {
 	    name: string;
 	    defaultValue?: string;
@@ -631,6 +709,7 @@ export namespace core {
 	    findings?: FindingItem[];
 	    notes?: NotePage[];
 	    snippets?: Snippet[];
+	    snippetChains?: SnippetChain[];
 	    wordlists?: string[];
 	
 	    static createFrom(source: any = {}) {
@@ -651,6 +730,7 @@ export namespace core {
 	        this.findings = this.convertValues(source["findings"], FindingItem);
 	        this.notes = this.convertValues(source["notes"], NotePage);
 	        this.snippets = this.convertValues(source["snippets"], Snippet);
+	        this.snippetChains = this.convertValues(source["snippetChains"], SnippetChain);
 	        this.wordlists = source["wordlists"];
 	    }
 	
@@ -1932,6 +2012,8 @@ export namespace core {
 	    }
 	}
 	
+	
+	
 	export class SnippetContext {
 	    hostId?: string;
 	    hostLabel?: string;
@@ -2374,6 +2456,7 @@ export namespace core {
 	    keys: SshKeySummary[];
 	    proxyProfiles: ProxyProfileSummary[];
 	    snippets: Snippet[];
+	    snippetChains: SnippetChain[];
 	    totpRecords: TotpSummary[];
 	    notes: NotePageSummary[];
 	
@@ -2389,6 +2472,7 @@ export namespace core {
 	        this.keys = this.convertValues(source["keys"], SshKeySummary);
 	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfileSummary);
 	        this.snippets = this.convertValues(source["snippets"], Snippet);
+	        this.snippetChains = this.convertValues(source["snippetChains"], SnippetChain);
 	        this.totpRecords = this.convertValues(source["totpRecords"], TotpSummary);
 	        this.notes = this.convertValues(source["notes"], NotePageSummary);
 	    }

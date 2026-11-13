@@ -23,9 +23,11 @@ import { ProxychainsExportModal } from './components/ProxychainsExportModal';
 import { FileItem, TransferTask } from './types/sftp';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 import { ProxyProfile, ProxyProfileSummary, ProxychainsExportOptions } from './types/proxy';
-import { Snippet, SnippetContext } from './types/snippet';
+import { Snippet, SnippetContext, SnippetChain, SnippetVariable } from './types/snippet';
 import { SnippetsManagerModal } from './components/SnippetsManagerModal';
 import { SnippetRunModal } from './components/SnippetRunModal';
+import { SnippetChainsModal } from './components/SnippetChainsModal';
+import { SnippetChainRunnerModal } from './components/SnippetChainRunnerModal';
 import { TotpSummary, TotpRecord, TotpCodeResponse } from './types/totp';
 import { TotpManagerModal } from './components/TotpManagerModal';
 import { TotpQuickSelectorModal } from './components/TotpQuickSelectorModal';
@@ -186,6 +188,7 @@ interface VaultSummary {
   keys?: SshKeySummary[];
   proxyProfiles?: ProxyProfileSummary[];
   snippets?: Snippet[];
+  snippetChains?: SnippetChain[];
   totpRecords?: TotpSummary[];
   notes?: NotePageSummary[];
 }
@@ -849,6 +852,12 @@ interface WailsAppBindings {
   GetSnippetContext?: (sessionId: string) => Promise<SnippetContext>;
   ResolveSnippetTemplate?: (snippetId: string, sessionId: string, userValues: Record<string, string>) => Promise<string>;
   ExecuteSnippet?: (sessionId: string, snippetId: string, userValues: Record<string, string>) => Promise<void>;
+  SaveSnippetChain?: (chain: SnippetChain) => Promise<void>;
+  DeleteSnippetChain?: (chainId: string) => Promise<void>;
+  ListSnippetChains?: (hostId?: string) => Promise<SnippetChain[]>;
+  GetSnippetChainVariables?: (chainId: string) => Promise<SnippetVariable[]>;
+  ResolveSnippetChainStep?: (chainId: string, stepIndex: number, sessionId: string, userValues: Record<string, string>) => Promise<string>;
+  ExecuteSnippetChainStep?: (sessionId: string, chainId: string, stepIndex: number, userValues: Record<string, string>) => Promise<void>;
   SaveTotpRecord?: (record: TotpRecord) => Promise<void>;
   DeleteTotpRecord?: (totpId: string) => Promise<void>;
   ListTotpRecords?: () => Promise<TotpSummary[]>;
@@ -1389,6 +1398,14 @@ export function App({
   const [runModalContext, setRunModalContext] = useState<SnippetContext | null>(null);
   const [snippetActiveSessionId, setSnippetActiveSessionId] = useState<string>('');
   const [snippetPrefillBody, setSnippetPrefillBody] = useState<string>('');
+
+  // Snippet Chains State (F-16)
+  const [chains, setChains] = useState<SnippetChain[]>([]);
+  const [showChainsModal, setShowChainsModal] = useState<boolean>(false);
+  const [chainsHostFilter, setChainsHostFilter] = useState<string | null>(null);
+  const [runnerModalChain, setRunnerModalChain] = useState<SnippetChain | null>(null);
+  const [runnerModalContext, setRunnerModalContext] = useState<SnippetContext | null>(null);
+  const [runnerActiveSessionId, setRunnerActiveSessionId] = useState<string>('');
 
   // TOTP Authenticator Generator State (F-20)
   const [showTotpModal, setShowTotpModal] = useState<boolean>(false);
@@ -1950,6 +1967,9 @@ export function App({
             if (api.GetActiveEngagement) {
               api.GetActiveEngagement().then(setActiveEngagement).catch(() => {});
             }
+            if (api.ListSnippetChains) {
+              api.ListSnippetChains('').then(setChains).catch(() => {});
+            }
           }
           return;
         } catch {
@@ -1975,6 +1995,9 @@ export function App({
         }
         if (api.GetActiveEngagement) {
           api.GetActiveEngagement().then(setActiveEngagement).catch(() => {});
+        }
+        if (api.ListSnippetChains) {
+          api.ListSnippetChains('').then(setChains).catch(() => {});
         }
         if (api.ListForwardRules) {
           const rules = await api.ListForwardRules();
@@ -3564,6 +3587,81 @@ export function App({
       await api?.WriteTerminal?.(snippetActiveSessionId, previewCmd + '\n');
     }
     setStatusMessage(`⚡ Executed snippet "${runModalSnippet.name}".`);
+  };
+
+  const handleSaveSnippetChain = async (chain: SnippetChain) => {
+    const api = getWailsBindings();
+    if (api?.SaveSnippetChain) {
+      await api.SaveSnippetChain(chain);
+      await refreshVaultState();
+      setStatusMessage(`Saved snippet chain "${chain.name}" (F-16).`);
+    }
+  };
+
+  const handleDeleteSnippetChain = async (chainId: string) => {
+    const api = getWailsBindings();
+    if (api?.DeleteSnippetChain) {
+      await api.DeleteSnippetChain(chainId);
+      await refreshVaultState();
+      setStatusMessage(`Deleted snippet chain (F-16).`);
+    }
+  };
+
+  const handleTriggerChain = async (chain: SnippetChain, targetSessionId?: string) => {
+    const sessId = targetSessionId || sessionId;
+    if (!sessId) {
+      setStatusMessage('Please select an active terminal session to run the snippet chain.');
+      return;
+    }
+
+    const currentHost = activeTab?.hostId ? vaultSummary.hosts.find((h) => h.id === activeTab.hostId) : undefined;
+    const api = getWailsBindings();
+    let ctx: SnippetContext = {
+      hostId: activeTab?.hostId || undefined,
+      hostLabel: currentHost?.label || undefined,
+      address: currentHost?.address || undefined,
+      hostname: currentHost?.label || currentHost?.address || undefined,
+      port: currentHost?.effectivePort || 22,
+      username: currentHost?.effectiveUser || undefined,
+      workingDir: getSessionCwd(sessId) || '~',
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      date: new Date().toISOString().slice(0, 10),
+      time: new Date().toTimeString().slice(0, 8),
+    };
+
+    if (api?.GetSnippetContext) {
+      try {
+        const backendCtx = await api.GetSnippetContext(sessId);
+        ctx = { ...ctx, ...backendCtx };
+        if (!ctx.workingDir) {
+          ctx.workingDir = getSessionCwd(sessId) || '~';
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    setRunnerActiveSessionId(sessId);
+    setRunnerModalContext(ctx);
+    setRunnerModalChain(chain);
+  };
+
+  const handleExecuteChainStepFromRunner = async (stepIndex: number, userValues: Record<string, string>): Promise<void> => {
+    if (!runnerModalChain || !runnerActiveSessionId) {
+      throw new Error('No active terminal session for chain execution');
+    }
+    const api = getWailsBindings();
+    if (api?.ExecuteSnippetChainStep) {
+      await api.ExecuteSnippetChainStep(runnerActiveSessionId, runnerModalChain.id, stepIndex, userValues);
+    } else {
+      const step = runnerModalChain.steps[stepIndex];
+      let cmd = step.command;
+      for (const [k, v] of Object.entries(userValues)) {
+        cmd = cmd.replace(new RegExp(`\\{\\{${k}[^}]*\\}\\}`, 'g'), v);
+      }
+      await api?.WriteTerminal?.(runnerActiveSessionId, cmd + '\n');
+    }
+    setStatusMessage(`⚡ Executed step ${stepIndex + 1} of chain "${runnerModalChain.name}" (F-16).`);
   };
 
   const handleConnect = async (e: React.FormEvent): Promise<void> => {
@@ -7526,6 +7624,15 @@ export function App({
         setShowNmapImportModal(true);
       },
     },
+    'snippet-chains': {
+      label: 'Snippet Chains // Multi-Stage Exploits (F-16)',
+      shortLabel: 'Chains',
+      icon: 'chain',
+      action: () => {
+        setChainsHostFilter(activeTab?.hostId || null);
+        setShowChainsModal(true);
+      },
+    },
     proxychains: {
       label: 'Export proxychains.conf',
       shortLabel: 'Proxychains',
@@ -7946,6 +8053,10 @@ export function App({
                       setShowSessionLogsModal(true);
                     })}
                     {renderDropdownRow('snippets', 'Command Snippets & Variables', '⚡ Snippets', () => setShowSnippetsModal(true))}
+                    {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits (F-16)', '⛓️ Chains', () => {
+                      setChainsHostFilter(activeTab?.hostId || null);
+                      setShowChainsModal(true);
+                    })}
                     {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', '🛡️ Profiles', () => setShowProxyProfilesModal(true))}
 
                     <div className="tools-sub-header">Recon &amp; Network Attacks</div>
@@ -8106,6 +8217,10 @@ export function App({
                     {renderDropdownRow('eng-creds', 'Credential Pool & Spray Lists (F-36)', '🔑 Creds', () => setShowCredStoreModal(true))}
                     {renderDropdownRow('eng-evidence', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence', () => setShowEvidenceModal(true))}
                     {renderDropdownRow('eng-nmap', 'Import Nmap XML (-oX) (F-39)', 'Radar', () => setShowNmapImportModal(true))}
+                    {renderDropdownRow('eng-chains', 'Snippet Chains & Exploits (F-16)', 'Chains', () => {
+                      setChainsHostFilter(null);
+                      setShowChainsModal(true);
+                    })}
                     <div className="nav-dropdown-divider" />
                     {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', '📦 Export', () => {
                       setShowEngagementHubModal(true);
@@ -9140,6 +9255,20 @@ export function App({
                     >
                       <CyberIcon name="stabilize" size={12} />
                       <span>Stabilize</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="hud-seg-btn"
+                      aria-label="Snippet Chains (F-16)"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setChainsHostFilter(activeTab?.hostId || null);
+                        setShowChainsModal(true);
+                      }}
+                      title="Execute multi-stage exploit, privesc, or pivot chains on this host (F-16)"
+                    >
+                      <CyberIcon name="chain" size={12} />
+                      <span>Chains</span>
                     </button>
                   </div>
 
@@ -11672,6 +11801,43 @@ export function App({
           onScanXML={handleScanNmapXML}
           onImportXML={handleImportNmapXML}
           onClose={() => setShowNmapImportModal(false)}
+        />
+      )}
+
+      {showChainsModal && (
+        <SnippetChainsModal
+          chains={chains.length > 0 ? chains : (vaultSummary.snippetChains || [])}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: `${h.effectiveUser}@${h.address}:${h.effectivePort}`,
+          }))}
+          activeSessionId={sessionId}
+          activeHostId={chainsHostFilter || activeTab?.hostId || null}
+          onSaveChain={handleSaveSnippetChain}
+          onDeleteChain={handleDeleteSnippetChain}
+          onRunChain={(c) => {
+            setShowChainsModal(false);
+            void handleTriggerChain(c);
+          }}
+          onClose={() => {
+            setShowChainsModal(false);
+            setChainsHostFilter(null);
+          }}
+        />
+      )}
+
+      {runnerModalChain && runnerModalContext && (
+        <SnippetChainRunnerModal
+          chain={runnerModalChain}
+          sessionId={runnerActiveSessionId}
+          hostLabel={runnerModalContext.hostLabel}
+          context={runnerModalContext}
+          onExecuteStep={handleExecuteChainStepFromRunner}
+          onClose={() => {
+            setRunnerModalChain(null);
+            setRunnerModalContext(null);
+          }}
         />
       )}
     </main>
