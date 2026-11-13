@@ -98,6 +98,10 @@ export function DeleteNote(arg1) {
   return window['go']['main']['App']['DeleteNote'](arg1);
 }
 
+export function DeletePayloadTemplate(arg1) {
+  return window['go']['main']['App']['DeletePayloadTemplate'](arg1);
+}
+
 export function DeleteProxyProfile(arg1) {
   return window['go']['main']['App']['DeleteProxyProfile'](arg1);
 }
@@ -238,6 +242,10 @@ export function GetNote(arg1) {
   return window['go']['main']['App']['GetNote'](arg1);
 }
 
+export function GetPayloadTemplatesConfig() {
+  return window['go']['main']['App']['GetPayloadTemplatesConfig']();
+}
+
 export function GetRawTcpSessionStats(arg1) {
   return window['go']['main']['App']['GetRawTcpSessionStats'](arg1);
 }
@@ -350,6 +358,10 @@ export function ListNotes(arg1) {
   return window['go']['main']['App']['ListNotes'](arg1);
 }
 
+export function ListPayloadTemplates() {
+  return window['go']['main']['App']['ListPayloadTemplates']();
+}
+
 export function ListProxyProfiles() {
   return window['go']['main']['App']['ListProxyProfiles']();
 }
@@ -426,6 +438,10 @@ export function RelocateVaultFile(arg1, arg2) {
   return window['go']['main']['App']['RelocateVaultFile'](arg1, arg2);
 }
 
+export function RenderPayload(arg1) {
+  return window['go']['main']['App']['RenderPayload'](arg1);
+}
+
 export function ResetVault() {
   return window['go']['main']['App']['ResetVault']();
 }
@@ -486,6 +502,14 @@ export function SaveNote(arg1) {
   return window['go']['main']['App']['SaveNote'](arg1);
 }
 
+export function SavePayloadAsSnippet(arg1, arg2) {
+  return window['go']['main']['App']['SavePayloadAsSnippet'](arg1, arg2);
+}
+
+export function SavePayloadTemplate(arg1) {
+  return window['go']['main']['App']['SavePayloadTemplate'](arg1);
+}
+
 export function SaveProxyProfile(arg1) {
   return window['go']['main']['App']['SaveProxyProfile'](arg1);
 }
@@ -540,6 +564,10 @@ export function SendSerialBreak(arg1) {
 
 export function SetActiveEngagement(arg1) {
   return window['go']['main']['App']['SetActiveEngagement'](arg1);
+}
+
+export function SetPayloadTemplatesPath(arg1) {
+  return window['go']['main']['App']['SetPayloadTemplatesPath'](arg1);
 }
 
 export function SetRawTcpSessionLineMode(arg1, arg2, arg3) {

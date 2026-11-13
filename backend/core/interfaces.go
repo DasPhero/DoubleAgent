@@ -429,6 +429,50 @@ type SnippetChain struct {
 	UpdatedAt            string             `json:"updatedAt,omitempty"`
 }
 
+// PayloadTemplate represents a configurable reverse or bind payload template (Spec F-33).
+// Commands are loaded dynamically from an external file rather than compiled into the binary.
+type PayloadTemplate struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`        // e.g. "Bash Interactive TCP", "PowerShell TCP Client"
+	Description string            `json:"description,omitempty"`
+	OS          string            `json:"os"`          // "linux", "windows", "macos", "any"
+	Shell       string            `json:"shell"`       // "bash", "python", "powershell", "socat", "nc", "php", "ruby", "perl"
+	Kind        string            `json:"kind"`        // "reverse", "bind", "msfvenom", "one-liner"
+	Command     string            `json:"command"`     // template containing {{LHOST}}, {{LPORT}}, etc.
+	DefaultPort uint16            `json:"defaultPort,omitempty"`
+	Variables   []SnippetVariable `json:"variables,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	OpsecRisk   string            `json:"opsecRisk,omitempty"` // "low", "medium", "high"
+	Notes       string            `json:"notes,omitempty"`
+}
+
+// PayloadRenderOptions specifies parameter values and encodings for rendering a payload (F-33).
+type PayloadRenderOptions struct {
+	TemplateID string            `json:"templateId"`
+	LHOST      string            `json:"lhost"`
+	LPORT      uint16            `json:"lport"`
+	Encoding   string            `json:"encoding,omitempty"` // "none", "base64", "url", "powershell_b64", "hex"
+	CustomVars map[string]string `json:"customVars,omitempty"`
+}
+
+// PayloadRenderResult contains the generated payload string and OPSEC warnings (F-33).
+type PayloadRenderResult struct {
+	TemplateID    string            `json:"templateId"`
+	RawCommand    string            `json:"rawCommand"`
+	Rendered      string            `json:"rendered"`
+	Encoding      string            `json:"encoding"`
+	OpsecWarnings []string          `json:"opsecWarnings,omitempty"`
+	ResolvedVars  map[string]string `json:"resolvedVars"`
+}
+
+// PayloadFileConfig holds metadata about the external payload templates file (F-33).
+type PayloadFileConfig struct {
+	FilePath      string `json:"filePath"`
+	TemplateCount int    `json:"templateCount"`
+	Exists        bool   `json:"exists"`
+	LastModified  string `json:"lastModified,omitempty"`
+}
+
 // TotpRecord represents a time-based one-time password secret stored in the encrypted vault (Spec Section 8, F-20).
 // The Secret seed never leaves the Go process (Golden Rule 2, Threat Model Line 155).
 type TotpRecord struct {

@@ -1,10 +1,39 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-16` — Snippet Chains per Host — COMPLETED!
+- **Current Milestone:** `F-33` — Payload-Generator (External File Decoupled) — COMPLETED!
 - **Next Milestone:** Comprehensive Presets Library (`M-PRESETS`) / Multi-Theme Cyberpunk Visual Designs (`M-THEMES`) / WinRM Client (`F-41`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Dynamic Payload-Generator with External File Decoupling (`F-33` / Pentest Spec Line 29)**:
+  - **Decoupled External Template Architecture (`backend/core/payloads.go`, `interfaces.go`)**:
+    - **No commands compiled into the binary**: All payload templates and command strings are dynamically read and written to an external file (`data/payload_templates.json` in workspace, `<UserConfigDir>/DoubleAgent/payload_templates.json`, or custom configured path).
+    - Data models: `PayloadTemplate` (`ID`, `Name`, `Description`, `OS`, `Shell`, `Kind`, `Command`, `DefaultPort`, `Variables`, `Tags`, `OpsecRisk`, `Notes`), `PayloadRenderOptions`, `PayloadRenderResult`, and `PayloadFileConfig`.
+    - Initial templates file pre-structured with 10 reverse/bind shell definitions (Bash, Python3, PowerShell TCP, PowerShell ConPtyShell, Socat PTY, Netcat FIFO, PHP, Ruby, Perl, Linux Bind TCP) with empty commands ready for population by operator engagement packs.
+    - Dynamic variable substitution supports `{{LHOST}}`/`{{LPORT}}` as well as `$LHOST`, `%LHOST%`, and custom parameters.
+    - Automated OPSEC analysis (Spec Section 4): Detects noisy CTF/Metasploit default ports (4444, 1337, 31337, 6667) and flags warnings urging stealth egress ports (443, 80, 53); detects loopback `127.0.0.1`/`localhost` addresses; surfaces template detection risks.
+    - Multiple payload encodings: `none` / raw, `powershell_b64` (UTF-16LE converted to Base64 with `-nop -w hidden -e <b64>`), `base64`, `url` (query escaped), and `hex`.
+    - Direct export to encrypted Vault snippets (`core.PayloadToSnippet`, F-15/F-33 integration).
+    - Unit tests in `backend/core/payloads_test.go` (6 tests passing).
+  - **Wails Go Backend Bindings (`app.go`)**:
+    - `GetPayloadTemplatesConfig() (*core.PayloadFileConfig, error)`: Returns file path, template count, and modification status.
+    - `SetPayloadTemplatesPath(customPath string) (*core.PayloadFileConfig, error)`: Dynamically points template store to external file.
+    - `ListPayloadTemplates() ([]core.PayloadTemplate, error)`: Loads templates from external file without binary dependencies.
+    - `SavePayloadTemplate(tmpl core.PayloadTemplate) error`: Creates or updates templates directly in the external file.
+    - `DeletePayloadTemplate(templateID string) error`: Deletes template from external file.
+    - `RenderPayload(opts core.PayloadRenderOptions) (*core.PayloadRenderResult, error)`: Computes rendered string, applies encodings, and runs OPSEC verification.
+    - `SavePayloadAsSnippet(opts core.PayloadRenderOptions, snippetName string) (*core.Snippet, error)`: Saves rendered payload directly into Vault snippets.
+    - Backend integration test in `app_test.go` (`TestApp_PayloadGenerator_F33` passing).
+  - **Cyberpunk HUD Frontend Modal (`PayloadGeneratorModal.tsx`, `App.tsx`)**:
+    - External Template Store status banner with template count, file path, `[ Reload File ]`, and `[ Config Path ]` buttons.
+    - Parameter controls with LHOST auto-fill from active host IP, LPORT with one-click stealth presets (`443 HTTPS`, `80 HTTP`, `53 DNS`, `8443 Alt-HTTPS`, `4444 Metasploit Warning`), and Encoding dropdown.
+    - Template filter sidebar: Search by text, OS filter (`ALL`, `LINUX`, `WINDOWS`, `MACOS`, `ANY`), Shell filter (`bash`, `powershell`, `python`, `socat`, `nc`, `php`, `ruby`, `perl`), Kind filter (`reverse`, `bind`, `one-liner`, `msfvenom`).
+    - Template editor dialog allowing direct creation, editing, and saving of custom templates to external file.
+    - "Ready to Populate" guidance card when template command is empty, explaining placeholders and offering inline population.
+    - Monospace dark cyber terminal preview box, OPSEC warning notices banner, `[ Copy Payload ]` with vector icon, `[ Save as Snippet (F-15) ]`, and `[ Send to Terminal ]`.
+    - Strictly no emojis; vector SVGs via `<CyberIcon name="..." />` (`target`, `copy`, `shield`, `terminal`, `save`, `plus`, `edit`, `trash`, etc.) adhering to Golden Rule 9.
+    - Integrated into Tools Menu (`Tools ▾ > Payload Generator // Shells (F-33)`), Engagement Menu (`Engagement ▾ > Payload Generator (F-33)`), and Command Palette (`Ctrl+K`).
+    - Dedicated Vitest test suite in `PayloadGeneratorModal.test.tsx` (6 tests passing).
 - **Multi-Stage Snippet Chains per Host (`F-16` / Pentest Spec Line 25, 51, 69)**:
   - **Data Models & Encrypted Vault Persistence (`backend/core/interfaces.go`, `chains.go`, `hosts.go`, `pentest.go`)**:
     - `SnippetChainStep`: ordered step stages with `ID`, `Title`, `Description`, `SnippetID` (optional snippet reference), `Command` template with `{{VAR}}` support, `ConfirmBeforeRun` (defaults to `true`), `DelayMs` (custom inter-step pause), and `StopOnError` (defaults to `true`).

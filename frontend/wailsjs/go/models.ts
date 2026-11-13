@@ -1459,6 +1459,118 @@ export namespace core {
 	}
 	
 	
+	export class PayloadFileConfig {
+	    filePath: string;
+	    templateCount: number;
+	    exists: boolean;
+	    lastModified?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PayloadFileConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filePath = source["filePath"];
+	        this.templateCount = source["templateCount"];
+	        this.exists = source["exists"];
+	        this.lastModified = source["lastModified"];
+	    }
+	}
+	export class PayloadRenderOptions {
+	    templateId: string;
+	    lhost: string;
+	    lport: number;
+	    encoding?: string;
+	    customVars?: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new PayloadRenderOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.templateId = source["templateId"];
+	        this.lhost = source["lhost"];
+	        this.lport = source["lport"];
+	        this.encoding = source["encoding"];
+	        this.customVars = source["customVars"];
+	    }
+	}
+	export class PayloadRenderResult {
+	    templateId: string;
+	    rawCommand: string;
+	    rendered: string;
+	    encoding: string;
+	    opsecWarnings?: string[];
+	    resolvedVars: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new PayloadRenderResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.templateId = source["templateId"];
+	        this.rawCommand = source["rawCommand"];
+	        this.rendered = source["rendered"];
+	        this.encoding = source["encoding"];
+	        this.opsecWarnings = source["opsecWarnings"];
+	        this.resolvedVars = source["resolvedVars"];
+	    }
+	}
+	export class PayloadTemplate {
+	    id: string;
+	    name: string;
+	    description?: string;
+	    os: string;
+	    shell: string;
+	    kind: string;
+	    command: string;
+	    defaultPort?: number;
+	    variables?: SnippetVariable[];
+	    tags?: string[];
+	    opsecRisk?: string;
+	    notes?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PayloadTemplate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.os = source["os"];
+	        this.shell = source["shell"];
+	        this.kind = source["kind"];
+	        this.command = source["command"];
+	        this.defaultPort = source["defaultPort"];
+	        this.variables = this.convertValues(source["variables"], SnippetVariable);
+	        this.tags = source["tags"];
+	        this.opsecRisk = source["opsecRisk"];
+	        this.notes = source["notes"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ProxyProfile {
 	    id: string;
 	    name: string;

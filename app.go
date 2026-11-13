@@ -59,6 +59,7 @@ type App struct {
 
 	pendingMergeExternalPayload *core.VaultPayload
 	pendingMergeFilePath        string
+	payloadFilePath             string
 }
 
 type activeTransferTask struct {
@@ -3125,6 +3126,164 @@ func (a *App) ExecuteSnippetChainStep(sessionID string, chainID string, stepInde
 	}
 
 	return a.WriteTerminal(sessionID, resolvedCmd+"\n")
+}
+
+func (a *App) getPayloadFilePath() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.payloadFilePath != "" {
+		return a.payloadFilePath
+	}
+	return core.ResolveDefaultPayloadFilePath("")
+}
+
+// GetPayloadTemplatesConfig returns the filesystem configuration and status of the external templates file (F-33).
+func (a *App) GetPayloadTemplatesConfig() (*core.PayloadFileConfig, error) {
+	p := a.getPayloadFilePath()
+	cfg := core.GetPayloadFileConfig(p)
+	return &cfg, nil
+}
+
+// SetPayloadTemplatesPath sets a custom filesystem path for the external payload templates file (F-33).
+func (a *App) SetPayloadTemplatesPath(customPath string) (*core.PayloadFileConfig, error) {
+	clean := filepath.Clean(strings.TrimSpace(customPath))
+	if clean == "" {
+		return nil, errors.New("payload templates path must not be empty")
+	}
+
+	a.mu.Lock()
+	a.payloadFilePath = clean
+	a.mu.Unlock()
+
+	_, err := core.LoadPayloadTemplates(clean)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := core.GetPayloadFileConfig(clean)
+	return &cfg, nil
+}
+
+// ListPayloadTemplates loads all payload templates from the external JSON file (F-33).
+// No commands are stored in the Go executable; all templates are loaded dynamically from this file.
+func (a *App) ListPayloadTemplates() ([]core.PayloadTemplate, error) {
+	p := a.getPayloadFilePath()
+	return core.LoadPayloadTemplates(p)
+}
+
+// SavePayloadTemplate creates or updates a payload template in the external templates file (F-33).
+func (a *App) SavePayloadTemplate(tmpl core.PayloadTemplate) error {
+	tmpl.Name = strings.TrimSpace(tmpl.Name)
+	if tmpl.Name == "" {
+		return errors.New("template name is required")
+	}
+	if strings.TrimSpace(tmpl.Command) == "" {
+		return core.ErrEmptyPayloadCommand
+	}
+	if tmpl.ID == "" {
+		tmpl.ID = fmt.Sprintf("tmpl-%d", time.Now().UnixNano())
+	}
+	if tmpl.OS == "" {
+		tmpl.OS = "any"
+	}
+	if tmpl.Shell == "" {
+		tmpl.Shell = "bash"
+	}
+	if tmpl.Kind == "" {
+		tmpl.Kind = "reverse"
+	}
+
+	p := a.getPayloadFilePath()
+	templates, err := core.LoadPayloadTemplates(p)
+	if err != nil {
+		return err
+	}
+
+	updated := false
+	for i := range templates {
+		if templates[i].ID == tmpl.ID {
+			templates[i] = tmpl
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		templates = append(templates, tmpl)
+	}
+
+	return core.SavePayloadTemplates(p, templates)
+}
+
+// DeletePayloadTemplate removes a payload template by ID from the external templates file (F-33).
+func (a *App) DeletePayloadTemplate(templateID string) error {
+	p := a.getPayloadFilePath()
+	templates, err := core.LoadPayloadTemplates(p)
+	if err != nil {
+		return err
+	}
+
+	filtered := make([]core.PayloadTemplate, 0, len(templates))
+	for _, t := range templates {
+		if t.ID != templateID {
+			filtered = append(filtered, t)
+		}
+	}
+
+	return core.SavePayloadTemplates(p, filtered)
+}
+
+// RenderPayload generates the shell command from a template with LHOST, LPORT, and encoding applied (F-33).
+func (a *App) RenderPayload(opts core.PayloadRenderOptions) (*core.PayloadRenderResult, error) {
+	p := a.getPayloadFilePath()
+	templates, err := core.LoadPayloadTemplates(p)
+	if err != nil {
+		return nil, err
+	}
+
+	var target *core.PayloadTemplate
+	for i := range templates {
+		if templates[i].ID == opts.TemplateID {
+			target = &templates[i]
+			break
+		}
+	}
+	if target == nil {
+		return nil, fmt.Errorf("%w: %s", core.ErrTemplateNotFound, opts.TemplateID)
+	}
+
+	return core.RenderPayload(*target, opts)
+}
+
+// SavePayloadAsSnippet renders a payload and saves it into the vault as a reusable snippet (F-33, F-15).
+func (a *App) SavePayloadAsSnippet(opts core.PayloadRenderOptions, snippetName string) (*core.Snippet, error) {
+	p := a.getPayloadFilePath()
+	templates, err := core.LoadPayloadTemplates(p)
+	if err != nil {
+		return nil, err
+	}
+
+	var target *core.PayloadTemplate
+	for i := range templates {
+		if templates[i].ID == opts.TemplateID {
+			target = &templates[i]
+			break
+		}
+	}
+	if target == nil {
+		return nil, fmt.Errorf("%w: %s", core.ErrTemplateNotFound, opts.TemplateID)
+	}
+
+	rendered, err := core.RenderPayload(*target, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	snip := core.PayloadToSnippet(*target, rendered.Rendered, snippetName)
+	if err := a.SaveSnippet(snip); err != nil {
+		return nil, err
+	}
+
+	return &snip, nil
 }
 
 // SaveTotpRecord creates or updates a TOTP secret in the encrypted vault (F-20).

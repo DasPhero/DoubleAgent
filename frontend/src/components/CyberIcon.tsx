@@ -46,7 +46,8 @@ export type CyberIconName =
   | 'radar'
   | 'upload'
   | 'chain'
-  | 'skip';
+  | 'skip'
+  | 'copy';
 
 export interface CyberIconProps {
   name: CyberIconName;
@@ -442,6 +443,13 @@ export const CyberIcon: React.FC<CyberIconProps> = ({
         <svg {...commonProps}>
           <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" fillOpacity="0.2" />
           <line x1="19" y1="5" x2="19" y2="19" />
+        </svg>
+      );
+    case 'copy':
+      return (
+        <svg {...commonProps}>
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       );
   }

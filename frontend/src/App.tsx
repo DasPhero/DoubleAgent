@@ -62,6 +62,13 @@ import {
 import { ShellStabilizeModal, ShellStabilizeRequest } from './components/ShellStabilizeModal';
 import { NmapImportModal } from './components/NmapImportModal';
 import { NmapScanResult, NmapImportRequest, NmapImportSummary } from './types/nmap';
+import { PayloadGeneratorModal } from './components/PayloadGeneratorModal';
+import {
+  PayloadTemplate,
+  PayloadRenderOptions,
+  PayloadRenderResult,
+  PayloadFileConfig,
+} from './types/payload';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -929,6 +936,13 @@ interface WailsAppBindings {
   GetFindingTemplates?: () => Promise<FindingItem[]>;
   ScanNmapXML?: (xmlContent: string) => Promise<NmapScanResult>;
   ImportNmapXML?: (req: NmapImportRequest) => Promise<NmapImportSummary>;
+  GetPayloadTemplatesConfig?: () => Promise<PayloadFileConfig>;
+  SetPayloadTemplatesPath?: (customPath: string) => Promise<PayloadFileConfig>;
+  ListPayloadTemplates?: () => Promise<PayloadTemplate[]>;
+  SavePayloadTemplate?: (tmpl: PayloadTemplate) => Promise<void>;
+  DeletePayloadTemplate?: (templateId: string) => Promise<void>;
+  RenderPayload?: (opts: PayloadRenderOptions) => Promise<PayloadRenderResult>;
+  SavePayloadAsSnippet?: (opts: PayloadRenderOptions, snippetName: string) => Promise<Snippet>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1162,6 +1176,8 @@ export function App({
   const [showEvidenceModal, setShowEvidenceModal] = useState<boolean>(false);
   // Nmap XML Recon Ingest state (F-39)
   const [showNmapImportModal, setShowNmapImportModal] = useState<boolean>(false);
+  // Payload Generator state (F-33)
+  const [showPayloadGeneratorModal, setShowPayloadGeneratorModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
   const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
@@ -7624,6 +7640,14 @@ export function App({
         setShowNmapImportModal(true);
       },
     },
+    'payload-generator': {
+      label: 'Payload Generator // Reverse & Bind Shells (F-33)',
+      shortLabel: 'Payloads',
+      icon: 'target',
+      action: () => {
+        setShowPayloadGeneratorModal(true);
+      },
+    },
     'snippet-chains': {
       label: 'Snippet Chains // Multi-Stage Exploits (F-16)',
       shortLabel: 'Chains',
@@ -8061,6 +8085,7 @@ export function App({
 
                     <div className="tools-sub-header">Recon &amp; Network Attacks</div>
                     {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest (F-39)', 'Radar', () => setShowNmapImportModal(true))}
+                    {renderDropdownRow('payload-generator', 'Payload Generator // Shells (F-33)', 'Target', () => setShowPayloadGeneratorModal(true))}
                     {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
                     {renderDropdownRow('proxychains', 'Export proxychains.conf (F-14)', '⛓️ Export', () => void handleOpenProxychainsExport())}
                   </div>
@@ -8217,6 +8242,7 @@ export function App({
                     {renderDropdownRow('eng-creds', 'Credential Pool & Spray Lists (F-36)', '🔑 Creds', () => setShowCredStoreModal(true))}
                     {renderDropdownRow('eng-evidence', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence', () => setShowEvidenceModal(true))}
                     {renderDropdownRow('eng-nmap', 'Import Nmap XML (-oX) (F-39)', 'Radar', () => setShowNmapImportModal(true))}
+                    {renderDropdownRow('eng-payload', 'Payload Generator (F-33)', 'Target', () => setShowPayloadGeneratorModal(true))}
                     {renderDropdownRow('eng-chains', 'Snippet Chains & Exploits (F-16)', 'Chains', () => {
                       setChainsHostFilter(null);
                       setShowChainsModal(true);
@@ -11801,6 +11827,52 @@ export function App({
           onScanXML={handleScanNmapXML}
           onImportXML={handleImportNmapXML}
           onClose={() => setShowNmapImportModal(false)}
+        />
+      )}
+
+      {showPayloadGeneratorModal && (
+        <PayloadGeneratorModal
+          onClose={() => setShowPayloadGeneratorModal(false)}
+          activeSessionId={sessionId}
+          activeHostAddress={activeTab?.hostId ? vaultSummary.hosts.find((h) => h.id === activeTab.hostId)?.address : null}
+          onSendToTerminal={(sId, text) => {
+            void getWailsBindings()?.WriteTerminal?.(sId, text);
+          }}
+          listTemplates={async () => {
+            const api = getWailsBindings();
+            if (api?.ListPayloadTemplates) return api.ListPayloadTemplates();
+            return [];
+          }}
+          saveTemplate={async (tmpl) => {
+            const api = getWailsBindings();
+            if (api?.SavePayloadTemplate) await api.SavePayloadTemplate(tmpl);
+          }}
+          deleteTemplate={async (id) => {
+            const api = getWailsBindings();
+            if (api?.DeletePayloadTemplate) await api.DeletePayloadTemplate(id);
+          }}
+          renderPayload={async (opts) => {
+            const api = getWailsBindings();
+            if (api?.RenderPayload) return api.RenderPayload(opts);
+            throw new Error('RenderPayload API not available');
+          }}
+          saveAsSnippet={async (opts, name) => {
+            const api = getWailsBindings();
+            if (api?.SavePayloadAsSnippet) {
+              await api.SavePayloadAsSnippet(opts, name);
+              await refreshVaultState();
+            }
+          }}
+          getFileConfig={async () => {
+            const api = getWailsBindings();
+            if (api?.GetPayloadTemplatesConfig) return api.GetPayloadTemplatesConfig();
+            return { filePath: 'data/payload_templates.json', templateCount: 0, exists: false };
+          }}
+          setFilePath={async (path) => {
+            const api = getWailsBindings();
+            if (api?.SetPayloadTemplatesPath) return api.SetPayloadTemplatesPath(path);
+            throw new Error('SetPayloadTemplatesPath API not available');
+          }}
         />
       )}
 

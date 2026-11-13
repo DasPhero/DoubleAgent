@@ -51,6 +51,8 @@ export function DeleteHost(arg1:string):Promise<void>;
 
 export function DeleteNote(arg1:string):Promise<void>;
 
+export function DeletePayloadTemplate(arg1:string):Promise<void>;
+
 export function DeleteProxyProfile(arg1:string):Promise<void>;
 
 export function DeleteRemoteItem(arg1:string,arg2:string):Promise<void>;
@@ -121,6 +123,8 @@ export function GetLiveSessionIDs():Promise<Array<string>>;
 
 export function GetNote(arg1:string):Promise<core.NotePage>;
 
+export function GetPayloadTemplatesConfig():Promise<core.PayloadFileConfig>;
+
 export function GetRawTcpSessionStats(arg1:string):Promise<core.RawTcpSessionStats>;
 
 export function GetRemoteEditContent(arg1:string):Promise<string>;
@@ -177,6 +181,8 @@ export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
 
 export function ListNotes(arg1:string):Promise<Array<core.NotePage>>;
 
+export function ListPayloadTemplates():Promise<Array<core.PayloadTemplate>>;
+
 export function ListProxyProfiles():Promise<Array<core.ProxyProfileSummary>>;
 
 export function ListRawTcpListeners():Promise<Array<core.RawTcpListenerInfo>>;
@@ -215,6 +221,8 @@ export function ReadSessionLog(arg1:string):Promise<string>;
 
 export function RelocateVaultFile(arg1:string,arg2:boolean):Promise<void>;
 
+export function RenderPayload(arg1:core.PayloadRenderOptions):Promise<core.PayloadRenderResult>;
+
 export function ResetVault():Promise<void>;
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
@@ -245,6 +253,10 @@ export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
 
 export function SaveNote(arg1:core.NotePage):Promise<core.NotePage>;
 
+export function SavePayloadAsSnippet(arg1:core.PayloadRenderOptions,arg2:string):Promise<core.Snippet>;
+
+export function SavePayloadTemplate(arg1:core.PayloadTemplate):Promise<void>;
+
 export function SaveProxyProfile(arg1:core.ProxyProfile):Promise<void>;
 
 export function SaveProxychainsFile(arg1:string,arg2:string):Promise<void>;
@@ -272,6 +284,8 @@ export function SearchNotes(arg1:string):Promise<Array<core.NoteSearchResult>>;
 export function SendSerialBreak(arg1:string):Promise<void>;
 
 export function SetActiveEngagement(arg1:string):Promise<void>;
+
+export function SetPayloadTemplatesPath(arg1:string):Promise<core.PayloadFileConfig>;
 
 export function SetRawTcpSessionLineMode(arg1:string,arg2:boolean,arg3:string):Promise<void>;
 
