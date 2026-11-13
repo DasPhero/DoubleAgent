@@ -42,7 +42,9 @@ export type CyberIconName =
   | 'stabilize'
   | 'trash'
   | 'calculator'
-  | 'target';
+  | 'target'
+  | 'radar'
+  | 'upload';
 
 export interface CyberIconProps {
   name: CyberIconName;
@@ -406,6 +408,24 @@ export const CyberIcon: React.FC<CyberIconProps> = ({
           <line x1="6" y1="12" x2="2" y2="12" />
           <line x1="12" y1="6" x2="12" y2="2" />
           <line x1="12" y1="22" x2="12" y2="18" />
+        </svg>
+      );
+    case 'radar':
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="12" r="6" />
+          <circle cx="12" cy="12" r="2" />
+          <line x1="12" y1="2" x2="12" y2="12" />
+          <line x1="12" y1="12" x2="20" y2="6" />
+        </svg>
+      );
+    case 'upload':
+      return (
+        <svg {...commonProps}>
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
         </svg>
       );
   }

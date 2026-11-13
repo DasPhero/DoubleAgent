@@ -1426,13 +1426,13 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
                       {/* Attack Vector */}
                       <div>
-                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Attack Vector (AV)</label>
+                        <label className="cyber-label-sm" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.72rem', color: '#94a3b8' }}>Attack Vector (AV)</label>
                         <select
                           className="cyber-hud-select font-mono"
-                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          style={{ fontSize: '0.78rem', height: '36px', minHeight: '36px', padding: '0.35rem 0.65rem', lineHeight: '1.4', width: '100%' }}
                           value={cvssParams.av}
                           onChange={(e) => {
                             const next = { ...cvssParams, av: e.target.value as CvssV31Input['av'] };
@@ -1452,10 +1452,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
                       {/* Attack Complexity */}
                       <div>
-                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Attack Complexity (AC)</label>
+                        <label className="cyber-label-sm" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.72rem', color: '#94a3b8' }}>Attack Complexity (AC)</label>
                         <select
                           className="cyber-hud-select font-mono"
-                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          style={{ fontSize: '0.78rem', height: '36px', minHeight: '36px', padding: '0.35rem 0.65rem', lineHeight: '1.4', width: '100%' }}
                           value={cvssParams.ac}
                           onChange={(e) => {
                             const next = { ...cvssParams, ac: e.target.value as CvssV31Input['ac'] };
@@ -1473,10 +1473,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
                       {/* Privileges Required */}
                       <div>
-                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Privileges Required (PR)</label>
+                        <label className="cyber-label-sm" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.72rem', color: '#94a3b8' }}>Privileges Required (PR)</label>
                         <select
                           className="cyber-hud-select font-mono"
-                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          style={{ fontSize: '0.78rem', height: '36px', minHeight: '36px', padding: '0.35rem 0.65rem', lineHeight: '1.4', width: '100%' }}
                           value={cvssParams.pr}
                           onChange={(e) => {
                             const next = { ...cvssParams, pr: e.target.value as CvssV31Input['pr'] };
@@ -1495,10 +1495,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
                       {/* User Interaction */}
                       <div>
-                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>User Interaction (UI)</label>
+                        <label className="cyber-label-sm" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.72rem', color: '#94a3b8' }}>User Interaction (UI)</label>
                         <select
                           className="cyber-hud-select font-mono"
-                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          style={{ fontSize: '0.78rem', height: '36px', minHeight: '36px', padding: '0.35rem 0.65rem', lineHeight: '1.4', width: '100%' }}
                           value={cvssParams.ui}
                           onChange={(e) => {
                             const next = { ...cvssParams, ui: e.target.value as CvssV31Input['ui'] };
@@ -1516,10 +1516,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
                       {/* Scope */}
                       <div>
-                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Scope (S)</label>
+                        <label className="cyber-label-sm" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.72rem', color: '#94a3b8' }}>Scope (S)</label>
                         <select
                           className="cyber-hud-select font-mono"
-                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          style={{ fontSize: '0.78rem', height: '36px', minHeight: '36px', padding: '0.35rem 0.65rem', lineHeight: '1.4', width: '100%' }}
                           value={cvssParams.s}
                           onChange={(e) => {
                             const next = { ...cvssParams, s: e.target.value as CvssV31Input['s'] };
@@ -1537,10 +1537,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
                       {/* Confidentiality */}
                       <div>
-                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Confidentiality (C)</label>
+                        <label className="cyber-label-sm" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.72rem', color: '#94a3b8' }}>Confidentiality (C)</label>
                         <select
                           className="cyber-hud-select font-mono"
-                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          style={{ fontSize: '0.78rem', height: '36px', minHeight: '36px', padding: '0.35rem 0.65rem', lineHeight: '1.4', width: '100%' }}
                           value={cvssParams.c}
                           onChange={(e) => {
                             const next = { ...cvssParams, c: e.target.value as CvssV31Input['c'] };
@@ -1559,10 +1559,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
                       {/* Integrity */}
                       <div>
-                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Integrity (I)</label>
+                        <label className="cyber-label-sm" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.72rem', color: '#94a3b8' }}>Integrity (I)</label>
                         <select
                           className="cyber-hud-select font-mono"
-                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          style={{ fontSize: '0.78rem', height: '36px', minHeight: '36px', padding: '0.35rem 0.65rem', lineHeight: '1.4', width: '100%' }}
                           value={cvssParams.i}
                           onChange={(e) => {
                             const next = { ...cvssParams, i: e.target.value as CvssV31Input['i'] };
@@ -1581,10 +1581,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
 
                       {/* Availability */}
                       <div>
-                        <label className="cyber-label-sm" style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Availability (A)</label>
+                        <label className="cyber-label-sm" style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.72rem', color: '#94a3b8' }}>Availability (A)</label>
                         <select
                           className="cyber-hud-select font-mono"
-                          style={{ fontSize: '0.72rem', height: '26px' }}
+                          style={{ fontSize: '0.78rem', height: '36px', minHeight: '36px', padding: '0.35rem 0.65rem', lineHeight: '1.4', width: '100%' }}
                           value={cvssParams.a}
                           onChange={(e) => {
                             const next = { ...cvssParams, a: e.target.value as CvssV31Input['a'] };

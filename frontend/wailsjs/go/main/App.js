@@ -274,6 +274,10 @@ export function ImportEngagementPackage(arg1, arg2) {
   return window['go']['main']['App']['ImportEngagementPackage'](arg1, arg2);
 }
 
+export function ImportNmapXML(arg1) {
+  return window['go']['main']['App']['ImportNmapXML'](arg1);
+}
+
 export function ImportSSHConfig(arg1) {
   return window['go']['main']['App']['ImportSSHConfig'](arg1);
 }
@@ -488,6 +492,10 @@ export function SaveWorkspace(arg1) {
 
 export function ScanLocalPuTTYSessions() {
   return window['go']['main']['App']['ScanLocalPuTTYSessions']();
+}
+
+export function ScanNmapXML(arg1) {
+  return window['go']['main']['App']['ScanNmapXML'](arg1);
 }
 
 export function ScanSyncConflictFiles() {

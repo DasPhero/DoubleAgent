@@ -58,6 +58,8 @@ import {
   SaveSelectionFindingModal,
 } from './components/SaveSelectionModals';
 import { ShellStabilizeModal, ShellStabilizeRequest } from './components/ShellStabilizeModal';
+import { NmapImportModal } from './components/NmapImportModal';
+import { NmapScanResult, NmapImportRequest, NmapImportSummary } from './types/nmap';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -916,6 +918,8 @@ interface WailsAppBindings {
   GetFinding?: (id: string) => Promise<FindingItem>;
   DeleteFinding?: (id: string) => Promise<void>;
   GetFindingTemplates?: () => Promise<FindingItem[]>;
+  ScanNmapXML?: (xmlContent: string) => Promise<NmapScanResult>;
+  ImportNmapXML?: (req: NmapImportRequest) => Promise<NmapImportSummary>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1147,6 +1151,8 @@ export function App({
   const [showCredStoreModal, setShowCredStoreModal] = useState<boolean>(false);
   // Pentest Evidence Vault state (F-18)
   const [showEvidenceModal, setShowEvidenceModal] = useState<boolean>(false);
+  // Nmap XML Recon Ingest state (F-39)
+  const [showNmapImportModal, setShowNmapImportModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
   const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
@@ -3350,6 +3356,25 @@ export function App({
       await api.StabilizeShell(req);
     }
     setStatusMessage(`Injected F-34 PTY stabilization (${req.method} / ${req.mode}) into ${req.sessionId}.`);
+  };
+
+  const handleScanNmapXML = async (xmlContent: string): Promise<NmapScanResult> => {
+    const api = getWailsBindings();
+    if (api?.ScanNmapXML) {
+      return await api.ScanNmapXML(xmlContent);
+    }
+    throw new Error('ScanNmapXML API is unavailable');
+  };
+
+  const handleImportNmapXML = async (req: NmapImportRequest): Promise<NmapImportSummary> => {
+    const api = getWailsBindings();
+    if (api?.ImportNmapXML) {
+      const summary = await api.ImportNmapXML(req);
+      await refreshVaultState();
+      setStatusMessage(summary.message);
+      return summary;
+    }
+    throw new Error('ImportNmapXML API is unavailable');
   };
 
   const handleGenerateProxychainsConfig = async (opts: ProxychainsExportOptions): Promise<string> => {
@@ -7493,6 +7518,14 @@ export function App({
         setShowEvidenceModal(true);
       },
     },
+    'nmap-import': {
+      label: 'Nmap XML Recon Ingest (F-39)',
+      shortLabel: 'Nmap Ingest',
+      icon: 'radar',
+      action: () => {
+        setShowNmapImportModal(true);
+      },
+    },
     proxychains: {
       label: 'Export proxychains.conf',
       shortLabel: 'Proxychains',
@@ -7915,7 +7948,8 @@ export function App({
                     {renderDropdownRow('snippets', 'Command Snippets & Variables', '⚡ Snippets', () => setShowSnippetsModal(true))}
                     {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', '🛡️ Profiles', () => setShowProxyProfilesModal(true))}
 
-                    <div className="tools-sub-header">Network Attacks &amp; Sockets</div>
+                    <div className="tools-sub-header">Recon &amp; Network Attacks</div>
+                    {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest (F-39)', 'Radar', () => setShowNmapImportModal(true))}
                     {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
                     {renderDropdownRow('proxychains', 'Export proxychains.conf (F-14)', '⛓️ Export', () => void handleOpenProxychainsExport())}
                   </div>
@@ -8071,6 +8105,7 @@ export function App({
                     {renderDropdownRow('eng-scope', 'Target Scope & Hub (F-36)', '🎯 Scope', () => setShowEngagementHubModal(true))}
                     {renderDropdownRow('eng-creds', 'Credential Pool & Spray Lists (F-36)', '🔑 Creds', () => setShowCredStoreModal(true))}
                     {renderDropdownRow('eng-evidence', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence', () => setShowEvidenceModal(true))}
+                    {renderDropdownRow('eng-nmap', 'Import Nmap XML (-oX) (F-39)', 'Radar', () => setShowNmapImportModal(true))}
                     <div className="nav-dropdown-divider" />
                     {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', '📦 Export', () => {
                       setShowEngagementHubModal(true);
@@ -11625,6 +11660,18 @@ export function App({
           initialRows={shellStabilizeModal.rows}
           onStabilize={handleRunShellStabilize}
           onClose={() => setShellStabilizeModal(null)}
+        />
+      )}
+
+      {showNmapImportModal && (
+        <NmapImportModal
+          isOpen={showNmapImportModal}
+          engagements={engagementsList.map((e) => ({ id: e.id, name: e.name }))}
+          groups={vaultSummary.groups.map((g) => ({ id: g.id, name: g.name }))}
+          activeEngagementId={activeEngagement?.id}
+          onScanXML={handleScanNmapXML}
+          onImportXML={handleImportNmapXML}
+          onClose={() => setShowNmapImportModal(false)}
         />
       )}
     </main>

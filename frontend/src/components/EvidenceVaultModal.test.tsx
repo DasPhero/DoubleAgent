@@ -63,3 +63,4 @@ describe('CVSS v3.1 Calculator & MITRE ATT&CK (F-18)', () => {
     expect(COMMON_MITRE_TECHNIQUES).toContain('T1574.009 - Hijack Execution Flow: Path Interception by Unquoted Path');
   });
 });
+

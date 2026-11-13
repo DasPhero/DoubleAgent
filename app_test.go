@@ -140,15 +140,25 @@ func (f *fakeSshTransport) StartForwardDynamic(_ context.Context, sessionID stri
 	}, nil
 }
 
-type fakeSftpClient struct{}
+type fakeSftpClient struct {
+	modTime int64
+}
 
 func (f *fakeSftpClient) List(_ context.Context, path string) ([]core.FileItem, error) {
+	mt := f.modTime
+	if mt == 0 {
+		mt = 1700000000
+	}
 	return []core.FileItem{
-		{Name: "remote_file.txt", Path: path + "/remote_file.txt", Size: 42, IsDir: false, ModTime: time.Now().Unix(), Permissions: "-rw-r--r--"},
+		{Name: "remote_file.txt", Path: path + "/remote_file.txt", Size: 42, IsDir: false, ModTime: mt, Permissions: "-rw-r--r--"},
 	}, nil
 }
 func (f *fakeSftpClient) Stat(_ context.Context, path string) (core.FileItem, error) {
-	return core.FileItem{Name: "remote_file.txt", Path: path, Size: 42, IsDir: false, ModTime: time.Now().Unix(), Permissions: "-rw-r--r--"}, nil
+	mt := f.modTime
+	if mt == 0 {
+		mt = 1700000000
+	}
+	return core.FileItem{Name: "remote_file.txt", Path: path, Size: 42, IsDir: false, ModTime: mt, Permissions: "-rw-r--r--"}, nil
 }
 func (f *fakeSftpClient) Mkdir(_ context.Context, _ string) error { return nil }
 func (f *fakeSftpClient) Remove(_ context.Context, _ string) error { return nil }
@@ -2168,5 +2178,89 @@ func TestApp_ShellStabilize_F34(t *testing.T) {
 	}
 	if !strings.Contains(written, "stty rows 36 cols 120") {
 		t.Fatalf("expected stty resize command in stdin, got: %q", written)
+	}
+}
+
+func TestApp_NmapImport_F39(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_nmap_import.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	app.ctx = context.Background()
+
+	rawXML := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<nmaprun scanner="nmap" args="nmap -sV -p 22,80 10.20.30.40" start="1699990000" version="7.94">
+  <host>
+    <status state="up" reason="syn-ack"/>
+    <address addr="10.20.30.40" addrtype="ipv4"/>
+    <hostnames>
+      <hostname name="vulnbox.local" type="PTR"/>
+    </hostnames>
+    <ports>
+      <port protocol="tcp" portid="22">
+        <state state="open" reason="syn-ack"/>
+        <service name="ssh" product="OpenSSH" version="8.4"/>
+      </port>
+      <port protocol="tcp" portid="80">
+        <state state="open" reason="syn-ack"/>
+        <service name="http" product="nginx" version="1.18.0"/>
+        <script id="http-title" output="Welcome to nginx!"/>
+      </port>
+    </ports>
+    <os>
+      <osmatch name="Linux 5.10" accuracy="98"/>
+    </os>
+  </host>
+</nmaprun>`
+
+	// Test Scan preview
+	scanRes, err := app.ScanNmapXML(rawXML)
+	if err != nil {
+		t.Fatalf("ScanNmapXML failed: %v", err)
+	}
+	if scanRes.ScanKind != core.NmapScanKindPortScan {
+		t.Errorf("expected ScanKind port_scan, got %s", scanRes.ScanKind)
+	}
+	if scanRes.TotalOpenPorts != 2 {
+		t.Errorf("expected 2 open ports, got %d", scanRes.TotalOpenPorts)
+	}
+
+	// Test Import execution
+	importRes, err := app.ImportNmapXML(core.NmapImportRequest{
+		XMLContent: rawXML,
+		Options: core.NmapImportOptions{
+			CreateHostRecords:  true,
+			CreatePortNotes:    true,
+			CreateSummaryNotes: true,
+			CreatePortFindings: true,
+			OnlyUpHosts:        true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("ImportNmapXML failed: %v", err)
+	}
+	if importRes.CreatedHosts != 1 {
+		t.Errorf("expected 1 created host, got %d", importRes.CreatedHosts)
+	}
+	if importRes.CreatedPortNotes != 2 {
+		t.Errorf("expected 2 port notes, got %d", importRes.CreatedPortNotes)
+	}
+	if importRes.CreatedPortFindings != 2 {
+		t.Errorf("expected 2 port findings, got %d", importRes.CreatedPortFindings)
+	}
+
+	// Verify persistence in vault
+	summary, err := app.GetVaultSummary()
+	if err != nil {
+		t.Fatalf("GetVaultSummary failed: %v", err)
+	}
+	if len(summary.Hosts) != 1 {
+		t.Fatalf("expected 1 host in vault, got %d", len(summary.Hosts))
+	}
+	if summary.Hosts[0].Label != "vulnbox.local" {
+		t.Errorf("expected host label vulnbox.local, got %s", summary.Hosts[0].Label)
 	}
 }

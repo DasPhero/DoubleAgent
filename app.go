@@ -1480,6 +1480,50 @@ func (a *App) GetShellStabilizePresets() []core.ShellStabilizePreset {
 	return core.DefaultShellStabilizePresets()
 }
 
+// ScanNmapXML parses Nmap XML (-oX) and returns structured preview metrics (F-39).
+func (a *App) ScanNmapXML(xmlContent string) (*core.NmapScanResult, error) {
+	a.vaultStore.Touch()
+	return core.ParseNmapXML([]byte(xmlContent))
+}
+
+// ImportNmapXML parses and imports Nmap scan results into DoubleAgent's encrypted vault (F-39).
+func (a *App) ImportNmapXML(req core.NmapImportRequest) (*core.NmapImportSummary, error) {
+	a.vaultStore.Touch()
+
+	parsed, err := core.ParseNmapXML([]byte(req.XMLContent))
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+
+	summary, err := core.ImportNmapScan(&payload, parsed, req.Options)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if err := a.vaultStore.SavePayload(ctx, payload); err != nil {
+		return nil, fmt.Errorf("failed to save imported Nmap scan into vault: %w", err)
+	}
+
+	a.emit(a.ctx, "vault:updated", map[string]any{
+		"action":       "nmap:import",
+		"createdHosts": summary.CreatedHosts,
+		"updatedHosts": summary.UpdatedHosts,
+		"createdNotes": summary.CreatedNotes,
+	})
+
+	return summary, nil
+}
+
 // StabilizeShell upgrades a raw shell session into a fully interactive PTY terminal (F-34).
 func (a *App) StabilizeShell(req core.ShellStabilizeRequest) error {
 	a.vaultStore.Touch()

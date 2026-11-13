@@ -1034,6 +1034,232 @@ export namespace core {
 	
 	
 	
+	export class NmapImportOptions {
+	    engagementId?: string;
+	    groupId?: string;
+	    createHostRecords: boolean;
+	    createPortNotes: boolean;
+	    createSummaryNotes: boolean;
+	    createPortFindings: boolean;
+	    onlyUpHosts: boolean;
+	    tagPrefix?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NmapImportOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.engagementId = source["engagementId"];
+	        this.groupId = source["groupId"];
+	        this.createHostRecords = source["createHostRecords"];
+	        this.createPortNotes = source["createPortNotes"];
+	        this.createSummaryNotes = source["createSummaryNotes"];
+	        this.createPortFindings = source["createPortFindings"];
+	        this.onlyUpHosts = source["onlyUpHosts"];
+	        this.tagPrefix = source["tagPrefix"];
+	    }
+	}
+	export class NmapImportRequest {
+	    xmlContent: string;
+	    options: NmapImportOptions;
+	
+	    static createFrom(source: any = {}) {
+	        return new NmapImportRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.xmlContent = source["xmlContent"];
+	        this.options = this.convertValues(source["options"], NmapImportOptions);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class NmapImportSummary {
+	    createdHosts: number;
+	    updatedHosts: number;
+	    createdNotes: number;
+	    createdPortNotes: number;
+	    createdPortFindings: number;
+	    hostIds: string[];
+	    scanKind: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NmapImportSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.createdHosts = source["createdHosts"];
+	        this.updatedHosts = source["updatedHosts"];
+	        this.createdNotes = source["createdNotes"];
+	        this.createdPortNotes = source["createdPortNotes"];
+	        this.createdPortFindings = source["createdPortFindings"];
+	        this.hostIds = source["hostIds"];
+	        this.scanKind = source["scanKind"];
+	        this.message = source["message"];
+	    }
+	}
+	export class ParsedNmapPort {
+	    port: number;
+	    protocol: string;
+	    state: string;
+	    reason: string;
+	    service: string;
+	    product: string;
+	    version: string;
+	    extraInfo: string;
+	    osType: string;
+	    cpes: string[];
+	    scripts: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParsedNmapPort(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.protocol = source["protocol"];
+	        this.state = source["state"];
+	        this.reason = source["reason"];
+	        this.service = source["service"];
+	        this.product = source["product"];
+	        this.version = source["version"];
+	        this.extraInfo = source["extraInfo"];
+	        this.osType = source["osType"];
+	        this.cpes = source["cpes"];
+	        this.scripts = source["scripts"];
+	    }
+	}
+	export class ParsedNmapHost {
+	    ipv4: string;
+	    ipv6: string;
+	    mac: string;
+	    macVendor: string;
+	    hostnames: string[];
+	    primaryName: string;
+	    state: string;
+	    reason: string;
+	    osName: string;
+	    osAccuracy: string;
+	    openPorts: ParsedNmapPort[];
+	    filteredPorts: ParsedNmapPort[];
+	    closedCount: number;
+	    filteredCount: number;
+	    isAliveOnly: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParsedNmapHost(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ipv4 = source["ipv4"];
+	        this.ipv6 = source["ipv6"];
+	        this.mac = source["mac"];
+	        this.macVendor = source["macVendor"];
+	        this.hostnames = source["hostnames"];
+	        this.primaryName = source["primaryName"];
+	        this.state = source["state"];
+	        this.reason = source["reason"];
+	        this.osName = source["osName"];
+	        this.osAccuracy = source["osAccuracy"];
+	        this.openPorts = this.convertValues(source["openPorts"], ParsedNmapPort);
+	        this.filteredPorts = this.convertValues(source["filteredPorts"], ParsedNmapPort);
+	        this.closedCount = source["closedCount"];
+	        this.filteredCount = source["filteredCount"];
+	        this.isAliveOnly = source["isAliveOnly"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class NmapScanResult {
+	    scanner: string;
+	    args: string;
+	    version: string;
+	    startStr: string;
+	    summary: string;
+	    elapsedSecs: string;
+	    scanKind: string;
+	    totalHosts: number;
+	    upHostsCount: number;
+	    downHostsCount: number;
+	    totalOpenPorts: number;
+	    hosts: ParsedNmapHost[];
+	
+	    static createFrom(source: any = {}) {
+	        return new NmapScanResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.scanner = source["scanner"];
+	        this.args = source["args"];
+	        this.version = source["version"];
+	        this.startStr = source["startStr"];
+	        this.summary = source["summary"];
+	        this.elapsedSecs = source["elapsedSecs"];
+	        this.scanKind = source["scanKind"];
+	        this.totalHosts = source["totalHosts"];
+	        this.upHostsCount = source["upHostsCount"];
+	        this.downHostsCount = source["downHostsCount"];
+	        this.totalOpenPorts = source["totalOpenPorts"];
+	        this.hosts = this.convertValues(source["hosts"], ParsedNmapHost);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class NotePageSummary {
 	    id: string;
@@ -1151,6 +1377,8 @@ export namespace core {
 	        this.editRemotePath = source["editRemotePath"];
 	    }
 	}
+	
+	
 	export class ProxyProfile {
 	    id: string;
 	    name: string;

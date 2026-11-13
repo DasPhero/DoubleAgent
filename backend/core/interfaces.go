@@ -512,6 +512,7 @@ type VaultPayload struct {
 	Credentials   []CredentialEntry `json:"credentials,omitempty"`
 	Evidence      []EvidenceItem    `json:"evidence,omitempty"`
 	Findings      []FindingItem     `json:"findings,omitempty"`
+	PortFindings  []PortFinding     `json:"portFindings,omitempty"`
 }
 
 // RemoteEditStatus defines the synchronization status of a remote edited file (F-28).

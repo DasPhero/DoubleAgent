@@ -111,7 +111,6 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
       className={`host-notes-drawer ${isPinned ? 'is-pinned' : 'open'}`}
       role="complementary"
       aria-label="Host Documentation Drawer"
-      style={{ position: 'relative' }}
     >
       <div className="cyber-corner-reticle cyber-corner-tl" />
       <div className="cyber-corner-reticle cyber-corner-tr" />

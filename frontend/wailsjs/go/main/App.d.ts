@@ -139,6 +139,8 @@ export function ImportEngagementFile(arg1:string,arg2:string):Promise<core.Engag
 
 export function ImportEngagementPackage(arg1:string,arg2:string):Promise<core.EngagementPackage>;
 
+export function ImportNmapXML(arg1:core.NmapImportRequest):Promise<core.NmapImportSummary>;
+
 export function ImportSSHConfig(arg1:string):Promise<core.SSHConfigParseResult>;
 
 export function ImportSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
@@ -246,6 +248,8 @@ export function SaveTotpRecord(arg1:core.TotpRecord):Promise<void>;
 export function SaveWorkspace(arg1:core.WorkspaceState):Promise<void>;
 
 export function ScanLocalPuTTYSessions():Promise<core.ImportScanResult>;
+
+export function ScanNmapXML(arg1:string):Promise<core.NmapScanResult>;
 
 export function ScanSyncConflictFiles():Promise<Array<string>>;
 

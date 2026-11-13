@@ -1,10 +1,40 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-34` — One-Click Shell Stabilization & PTY Upgrade + `F-18`/`F-19` Pentest Findings & Evidence Architecture — COMPLETED!
-- **Next Milestone:** WinRM Client (`F-41`) / Nmap XML Import (`F-39`) / Snippet Chains (`F-16`)
+- **Current Milestone:** `F-39` — Nmap XML Ingest (Alive Checks & Port Scans) — COMPLETED!
+- **Next Milestone:** Comprehensive Presets Library (`M-PRESETS`) / Multi-Theme Cyberpunk Visual Designs (`M-THEMES`) / WinRM Client (`F-41`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Nmap XML Recon Ingest & Port Findings (`F-39` / Pentest Spec Line 32)**:
+  - **Backend Parser & Scan Classifier (`backend/core/nmap.go`)**:
+    - Complete XML unmarshaling of Nmap `-oX` output schema (scanner, args, runstats, addresses, hostnames, ports, services, scripts, and OS matches).
+    - Intelligent scan classification:
+      - `alive_check`: Identifies `-sn` / `-sP` ping sweeps and host discovery (ARP responses, ICMP echo-replies) where no ports were probed.
+      - `port_scan`: Identifies TCP/UDP SYN/Connect scans (`-sS`, `-sT`, `-sU`), version detection (`-sV`), and NSE scripts (`-sC`).
+      - `mixed`: Handles heterogeneous multi-subnet scans with both alive-only and port-probed targets.
+    - Automated OS detection and tag mapping (`linux`, `windows`, `bsd`, `cisco`, `nmap-imported`, `alive-check`).
+    - Creates structured `PortFinding` vault entities (`backend/core/pentest.go`, `interfaces.go`) storing Port, Protocol, Service, Product, Version, State, and NSE ScriptResults.
+    - Automated hierarchical documentation per Spec F-39: generates parent Nmap Scan Summary notes and creates structured child Note subpages for every open port (`Port <P>/<Proto> (<Service> - <Product>)`) populated with banners, CPEs, and formatted NSE script results.
+    - Unit tests in `backend/core/nmap_test.go` (`TestNmap_ParseAliveCheck_F39`, `TestNmap_ParsePortScan_F39`, `TestNmap_ImportScan_F39`, `TestNmap_ImportAliveCheck_F39`).
+  - **Wails Bindings (`app.go`)**:
+    - `ScanNmapXML(xmlContent string) (*core.NmapScanResult, error)`: Parses and extracts preview telemetry without writing to vault.
+    - `ImportNmapXML(req core.NmapImportRequest) (*core.NmapImportSummary, error)`: Ingests hosts, port notes, and port findings into the encrypted vault and emits `vault:updated`.
+    - Unit tests in `app_test.go` (`TestApp_NmapImport_F39`).
+  - **Cyberpunk HUD Modal (`NmapImportModal.tsx`, `App.tsx`)**:
+    - Drag-and-drop XML file dropzone + file picker + collapsible raw XML textarea.
+    - Live Scan Telemetry banner with neon colored badges (`[ ALIVE CHECK // HOST DISCOVERY ]` in cyan vs `[ FULL PORT & SERVICE SCAN ]` in purple).
+    - Discovered hosts accordion list displaying IP/hostname, MAC vendor, OS detection, open ports count, and expandable service badges.
+    - Configurable import options: target Engagement, target Group folder, checkboxes for creating Host Records, generating Port Note Subpages, generating Summary Notes, creating Port Findings, and skipping dead hosts.
+    - Accessible via `Tools ▾ > Nmap XML Recon Ingest (F-39)`, `Engagement ▾ > Import Nmap XML (-oX)`, and Command Palette (`Ctrl+K`).
+    - Dedicated Vitest unit tests in `NmapImportModal.test.tsx` (all passing).
+- **Bug Fix: Floating Notes Drawer Positioning (`HostNotesDrawer.tsx`, `styles.css`)**:
+  - Removed accidental inline `position: relative` override from the drawer outer element.
+  - Enforced `position: absolute !important; top: 0 !important; right: 0 !important; bottom: 0 !important; width: 420px; z-index: 50 !important;` in `styles.css`.
+  - When not pinned into a split pane, the notes drawer floats seamlessly over the right side of the workspace instead of collapsing to the bottom-left.
+- **Bug Fix: CVSS v3.1 Calculator Responsive Layout & Squished Inputs (`EvidenceVaultModal.tsx`)**:
+  - Removed restrictive hardcoded `height: '26px'` which clipped text and caused vertical squishing in the select inputs.
+  - Upgraded layout to responsive `gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))'` with `gap: '0.85rem'`.
+  - Set select styling to `minHeight: '36px'`, `padding: '0.35rem 0.65rem'`, and `lineHeight: '1.4'`, ensuring all 8 metrics (AV, AC, PR, UI, S, C, I, A) and their numeric weightings are crisp, unclipped, and legible.
 - **Strict No-Emoji UI Rule & Cyberpunk Vector Graphics System (`Golden Rule 9`)**:
   - Golden Rule 9 codified in `AGENTS.md`: Strict prohibition of Unicode emojis in UI controls, tabs, toolbars, dialogs, badges, and buttons.
   - Replaced all ad-hoc emojis across the application with crisp monochrome SVG vector paths via `<CyberIcon name="..." />` (`stabilize`, `calculator`, `target`, `trash`, `save`, `plus`, etc.).
