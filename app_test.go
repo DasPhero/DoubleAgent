@@ -2521,4 +2521,79 @@ func TestApp_PayloadGenerator_F33(t *testing.T) {
 	}
 }
 
+func TestApp_ListenerManager_F32(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_listeners_vault.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	app.ctx = context.Background()
+
+	// 1. Initial list returns default profiles when vault has none
+	profiles, err := app.ListListenerProfiles()
+	if err != nil {
+		t.Fatalf("ListListenerProfiles failed: %v", err)
+	}
+	if len(profiles) == 0 {
+		t.Fatalf("expected at least 1 default profile, got 0")
+	}
+
+	// 2. Save a custom profile
+	customProf := core.ListenerProfile{
+		ID:           "prof-custom-443",
+		Name:         "Custom HTTPS Reverse Listener",
+		Kind:         "reverse",
+		Tool:         "nc",
+		BindAddress:  "0.0.0.0",
+		BindPort:     443,
+		AutoSpawnTab: true,
+	}
+	if err := app.SaveListenerProfile(customProf); err != nil {
+		t.Fatalf("SaveListenerProfile failed: %v", err)
+	}
+
+	// 3. Command generation
+	cmd := app.GenerateListenerCommand(customProf)
+	if cmd != "nc -lvnp 443" {
+		t.Errorf("expected 'nc -lvnp 443', got: %s", cmd)
+	}
+
+	// 4. Start managed listener (nc tool tracks as configured/active preview)
+	info, err := app.StartManagedListener(customProf)
+	if err != nil {
+		t.Fatalf("StartManagedListener failed: %v", err)
+	}
+	if info == nil || info.Status != "listening" {
+		t.Fatalf("unexpected listener info: %+v", info)
+	}
+	if info.CommandPreview != "nc -lvnp 443" {
+		t.Errorf("unexpected command preview: %s", info.CommandPreview)
+	}
+
+	// 5. List active listeners
+	activeList := app.ListActiveManagedListeners()
+	if len(activeList) != 1 {
+		t.Fatalf("expected 1 active listener, got %d", len(activeList))
+	}
+	if activeList[0].ID != info.ID {
+		t.Errorf("ID mismatch: %s vs %s", activeList[0].ID, info.ID)
+	}
+
+	// 6. Stop managed listener
+	if err := app.StopManagedListener(info.ID); err != nil {
+		t.Fatalf("StopManagedListener failed: %v", err)
+	}
+	afterStop := app.ListActiveManagedListeners()
+	if len(afterStop) != 0 {
+		t.Fatalf("expected 0 active listeners after stop, got %d", len(afterStop))
+	}
+
+	// 7. Delete profile
+	if err := app.DeleteListenerProfile("prof-custom-443"); err != nil {
+		t.Fatalf("DeleteListenerProfile failed: %v", err)
+	}
+}
+
 

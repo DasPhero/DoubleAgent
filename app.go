@@ -60,6 +60,23 @@ type App struct {
 	pendingMergeExternalPayload *core.VaultPayload
 	pendingMergeFilePath        string
 	payloadFilePath             string
+	managedListeners            map[string]*managedListenerInstance
+}
+
+type managedListenerInstance struct {
+	id             string
+	profileID      string
+	name           string
+	kind           string
+	tool           string
+	bindAddress    string
+	port           uint16
+	autoSpawnTab   bool
+	rawListener    core.RawTcpListener
+	startedAt      time.Time
+	catchCount     int
+	sessions       map[string]core.RawTcpSession
+	commandPreview string
 }
 
 type activeTransferTask struct {
@@ -167,6 +184,7 @@ func NewAppWithDependencies(
 		activeTunnels:    make(map[string]core.ForwardTunnel),
 		logMgr:           core.NewSessionLogManager(defaultLogsDir()),
 		remoteEditMgr:    core.NewRemoteEditManager(""),
+		managedListeners: make(map[string]*managedListenerInstance),
 	}
 
 	if vaultStore == nil {
@@ -3284,6 +3302,269 @@ func (a *App) SavePayloadAsSnippet(opts core.PayloadRenderOptions, snippetName s
 	}
 
 	return &snip, nil
+}
+
+// ListListenerProfiles returns all saved listener profiles from the vault (F-32).
+// Seeds with standard built-in stealth listener profiles if none exist yet.
+func (a *App) ListListenerProfiles() ([]core.ListenerProfile, error) {
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return core.DefaultBuiltinListenerProfiles(), nil
+	}
+	profiles, err := st.ListListenerProfiles()
+	if err != nil {
+		return nil, err
+	}
+	if len(profiles) == 0 {
+		return core.DefaultBuiltinListenerProfiles(), nil
+	}
+	return profiles, nil
+}
+
+// SaveListenerProfile creates or updates a listener profile in the encrypted vault (F-32).
+func (a *App) SaveListenerProfile(profile core.ListenerProfile) error {
+	profile.Name = strings.TrimSpace(profile.Name)
+	if profile.Name == "" {
+		return errors.New("listener name cannot be empty")
+	}
+	if profile.ID == "" {
+		profile.ID = fmt.Sprintf("prof-listener-%d", time.Now().UnixNano())
+	}
+	if profile.BindAddress == "" {
+		profile.BindAddress = "0.0.0.0"
+	}
+	if profile.BindPort == 0 {
+		profile.BindPort = 443
+	}
+	if profile.Kind == "" {
+		profile.Kind = "reverse"
+	}
+	if profile.Tool == "" {
+		profile.Tool = "builtin"
+	}
+	if profile.CreatedAt == "" {
+		profile.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return errors.New("vault store not available")
+	}
+	if err := st.SaveListenerProfile(profile); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DeleteListenerProfile removes a saved listener profile from the vault (F-32).
+func (a *App) DeleteListenerProfile(profileID string) error {
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return errors.New("vault store not available")
+	}
+	if err := st.DeleteListenerProfile(profileID); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// StartManagedListener launches an operational reverse/bind listener (F-32).
+// For 'builtin', starts a native background raw TCP socket listener.
+// For external CLI tools ('nc', 'rlwrap', 'ncat-ssl', 'socat'), initializes a managed profile entry with live command preview.
+func (a *App) StartManagedListener(profile core.ListenerProfile) (*core.ManagedListenerInfo, error) {
+	if err := core.ValidateListenerProfile(profile); err != nil {
+		return nil, err
+	}
+
+	tool := strings.ToLower(strings.TrimSpace(profile.Tool))
+	if tool == "" {
+		tool = "builtin"
+	}
+	bindAddr := strings.TrimSpace(profile.BindAddress)
+	if bindAddr == "" {
+		bindAddr = "0.0.0.0"
+	}
+	port := profile.BindPort
+	if port == 0 {
+		port = 443
+	}
+
+	a.mu.Lock()
+	// Check if this port is already in use by a managed listener
+	for _, inst := range a.managedListeners {
+		if inst.port == port && inst.rawListener != nil {
+			a.mu.Unlock()
+			return nil, fmt.Errorf("a listener is already running on port %d", port)
+		}
+	}
+	a.mu.Unlock()
+
+	instID := core.GenerateManagedListenerID(tool, port)
+	cmdPreview := core.BuildListenerCommand(profile)
+	opsecWarns := core.AnalyzeListenerOpsec(profile.Kind, bindAddr, port)
+
+	inst := &managedListenerInstance{
+		id:             instID,
+		profileID:      profile.ID,
+		name:           profile.Name,
+		kind:           profile.Kind,
+		tool:           tool,
+		bindAddress:    bindAddr,
+		port:           port,
+		autoSpawnTab:   profile.AutoSpawnTab,
+		startedAt:      time.Now(),
+		sessions:       make(map[string]core.RawTcpSession),
+		commandPreview: cmdPreview,
+	}
+
+	if tool == "builtin" || tool == "raw-tcp" {
+		ctx := a.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+
+		cfg := core.RawTcpListenerConfig{
+			Port:         port,
+			BindAddress:  bindAddr,
+			AutoSpawnTab: profile.AutoSpawnTab,
+		}
+
+		var rawListener core.RawTcpListener
+		var err error
+		rawListener, err = rawtcp.Listen(ctx, cfg, func(sess core.RawTcpSession) {
+			sessionID := sess.ID()
+			a.mu.Lock()
+			a.rawTcpSessions[sessionID] = sess
+			inst.catchCount++
+			inst.sessions[sessionID] = sess
+			a.mu.Unlock()
+
+			go a.streamReaderLoop(sessionID, sess, true)
+
+			stats := sess.Stats()
+			a.emit(a.ctx, "listener:incoming", core.RawTcpIncomingEvent{
+				SessionID:    sessionID,
+				ListenerID:   instID,
+				ListenerPort: port,
+				RemoteAddr:   stats.RemoteAddr,
+			})
+			rID := instID
+			if rawListener != nil {
+				rID = rawListener.ID()
+			}
+			a.emit(a.ctx, "raw-tcp:incoming", core.RawTcpIncomingEvent{
+				SessionID:    sessionID,
+				ListenerID:   rID,
+				ListenerPort: port,
+				RemoteAddr:   stats.RemoteAddr,
+			})
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to start native listener on %s:%d: %w", bindAddr, port, err)
+		}
+
+		inst.rawListener = rawListener
+		a.mu.Lock()
+		a.rawTcpListeners[rawListener.ID()] = rawListener
+		a.mu.Unlock()
+	}
+
+	a.mu.Lock()
+	a.managedListeners[instID] = inst
+	a.mu.Unlock()
+
+	a.emit(a.ctx, "listeners:updated", true)
+
+	info := core.ManagedListenerInfo{
+		ID:             inst.id,
+		ProfileID:      inst.profileID,
+		Name:           inst.name,
+		Kind:           inst.kind,
+		Tool:           inst.tool,
+		BindAddress:    inst.bindAddress,
+		BindPort:       inst.port,
+		Status:         "listening",
+		StartedAt:      inst.startedAt.UTC().Format(time.RFC3339),
+		CatchCount:     0,
+		ActiveSessions: []core.RawTcpSessionStats{},
+		CommandPreview: cmdPreview,
+		OpsecWarnings:  opsecWarns,
+	}
+
+	return &info, nil
+}
+
+// StopManagedListener terminates an active managed listener and releases its port (F-32).
+func (a *App) StopManagedListener(listenerID string) error {
+	a.mu.Lock()
+	inst, ok := a.managedListeners[listenerID]
+	if ok {
+		delete(a.managedListeners, listenerID)
+		if inst.rawListener != nil {
+			delete(a.rawTcpListeners, inst.rawListener.ID())
+			_ = inst.rawListener.Close()
+		}
+	}
+	a.mu.Unlock()
+
+	if !ok || inst == nil {
+		return errors.New("managed listener not found")
+	}
+
+	a.emit(a.ctx, "listeners:updated", true)
+	return nil
+}
+
+// ListActiveManagedListeners returns the live operational status and session counts of all running listeners (F-32).
+func (a *App) ListActiveManagedListeners() []core.ManagedListenerInfo {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	list := make([]core.ManagedListenerInfo, 0, len(a.managedListeners))
+	for _, inst := range a.managedListeners {
+		if inst == nil {
+			continue
+		}
+
+		var activeSessions []core.RawTcpSessionStats
+		for _, sess := range inst.sessions {
+			if sess != nil {
+				activeSessions = append(activeSessions, sess.Stats())
+			}
+		}
+
+		state := "listening"
+		if len(activeSessions) > 0 {
+			state = "active"
+		}
+
+		opsecWarns := core.AnalyzeListenerOpsec(inst.kind, inst.bindAddress, inst.port)
+
+		list = append(list, core.ManagedListenerInfo{
+			ID:             inst.id,
+			ProfileID:      inst.profileID,
+			Name:           inst.name,
+			Kind:           inst.kind,
+			Tool:           inst.tool,
+			BindAddress:    inst.bindAddress,
+			BindPort:       inst.port,
+			Status:         state,
+			StartedAt:      inst.startedAt.UTC().Format(time.RFC3339),
+			CatchCount:     inst.catchCount,
+			ActiveSessions: activeSessions,
+			CommandPreview: inst.commandPreview,
+			OpsecWarnings:  opsecWarns,
+		})
+	}
+
+	return list
+}
+
+// GenerateListenerCommand generates the exact executable CLI command for a listener profile (F-32).
+func (a *App) GenerateListenerCommand(profile core.ListenerProfile) string {
+	return core.BuildListenerCommand(profile)
 }
 
 // SaveTotpRecord creates or updates a TOTP secret in the encrypted vault (F-20).

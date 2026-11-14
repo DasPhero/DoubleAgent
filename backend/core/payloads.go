@@ -264,3 +264,4 @@ func PayloadToSnippet(tmpl PayloadTemplate, renderedResult string, snippetName s
 		ConfirmBeforeRun: true,
 	}
 }
+

@@ -1,10 +1,43 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-33` — Payload-Generator (External File Decoupled) — COMPLETED!
+- **Current Milestone:** `F-32` — Unified Listener Manager (Reverse & Bind Catchers) — COMPLETED!
 - **Next Milestone:** Comprehensive Presets Library (`M-PRESETS`) / Multi-Theme Cyberpunk Visual Designs (`M-THEMES`) / WinRM Client (`F-41`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Unified Listener Manager for Reverse & Bind Shells (`F-32` / Pentest Spec Line 35, 54, 73)**:
+  - **Backend Models & Core Logic (`backend/core/listeners.go`, `interfaces.go`)**:
+    - Data models: `ListenerProfile` (`ID`, `Name`, `Kind`, `Tool`, `BindPort`, `BindAddress`, `AutoSpawnTab`, `Options`, `Notes`, `CreatedAt`) and `ManagedListenerInfo` (`ID`, `Profile`, `Status`, `StartedAt`, `ErrorMessage`, `ActiveSessions`, `CatchCount`, `OpsecWarnings`, `CommandPreview`).
+    - Multi-tool support: native Go raw TCP socket listener (`builtin`), `nc`, `rlwrap`, `ncat-ssl` (with certificate and fingerprint options), and `socat` (full PTY allocation).
+    - Validation via `ValidateListenerProfile`: enforces valid port ranges (1-65535), IP bind format, kind (`reverse` or `bind`), and tool type.
+    - Automated OPSEC analysis via `AnalyzeListenerOpsec`: detects noisy signature ports (`4444`, `1337`, `31337`, `6667`) and flags high-visibility warnings; warns on loopback bind (`127.0.0.1`) for reverse listeners.
+    - Command generator via `BuildListenerCommand`: constructs exact, production-ready CLI invocation commands for `nc`, `rlwrap nc`, `ncat --ssl`, and `socat file:tty,raw,echo=0 tcp-listen:...`.
+    - Built-in presets via `DefaultBuiltinListenerProfiles`: 7 stealth and standard presets (HTTPS 443, HTTP 80, DNS 53, Alt-HTTPS 8443, rlwrap Netcat, Socat PTY, Ncat SSL).
+    - Unit tests in `backend/core/listeners_test.go` (4 tests passing).
+  - **Encrypted Vault Persistence & Multi-Device Sync (`backend/vault/store.go`, `pentest.go`, `merge.go`)**:
+    - `Listeners []ListenerProfile` stored in encrypted `VaultPayload` and `VaultSummary`.
+    - Vault methods `ListListenerProfiles`, `SaveListenerProfile`, `DeleteListenerProfile` in `backend/vault/pentest.go`.
+    - Multi-device sync conflict resolution and slice union merging in `backend/vault/merge.go`.
+    - Unit test `TestListenerProfiles_VaultStore_F32` passing in `backend/vault/pentest_test.go`.
+  - **Wails Go Backend Bindings (`app.go`)**:
+    - `ListListenerProfiles() ([]core.ListenerProfile, error)`: Retrieves saved profiles.
+    - `SaveListenerProfile(prof core.ListenerProfile) error`: Persists profile into vault.
+    - `DeleteListenerProfile(profileID string) error`: Removes profile from vault.
+    - `StartManagedListener(prof core.ListenerProfile) (*core.ManagedListenerInfo, error)`: Starts native Go socket listener (`builtin`) or tracks external tool listener session. Automatically bridges incoming TCP connections to interactive terminal sessions.
+    - `StopManagedListener(listenerID string) error`: Shuts down active listener and releases bound port.
+    - `ListActiveManagedListeners() ([]*core.ManagedListenerInfo, error)`: Telemetry status, uptime, byte counts, and connected session list.
+    - `GenerateListenerCommand(prof core.ListenerProfile) (string, error)`: Returns command preview.
+    - Backend integration test in `app_test.go` (`TestApp_ListenerManager_F32` passing).
+  - **Cyberpunk HUD Frontend Modal (`ListenerManagerModal.tsx`, `App.tsx`)**:
+    - Three-tab interface: `Active Listeners`, `Saved Profiles`, and `Launch / New Listener`.
+    - Real-time telemetry dashboard: listener status badges (`LISTENING`, `ACTIVE`, `STOPPED`, `ERROR`), uptime counter, catch count, and live incoming sessions table.
+    - 1-click Shell Stabilization (`F-34`): Caught sessions have an instant `[ Stabilize (F-34) ]` button opening the interactive PTY upgrade modal.
+    - 1-click Payload Generator (`F-33`): `[ Payload (F-33) ]` button launches the payload generator with matching LHOST/LPORT pre-filled.
+    - 1-click Terminal Spawn: Spawns terminal tab or opens raw TCP stream tab directly.
+    - OPSEC warning banner alerting operators to signature ports and loopback binds.
+    - Strictly no emojis; cyberpunk vector SVGs via `<CyberIcon name="..." />` adhering to Golden Rule 9.
+    - Integrated into Tools Menu (`Tools ▾ > Listener Manager (F-32)`), Engagement Menu (`Engagement ▾ > Listener Manager (F-32)`), and Command Palette (`Ctrl+K`).
+    - Dedicated Vitest test suite in `ListenerManagerModal.test.tsx` (5 tests passing).
 - **Dynamic Payload-Generator with External File Decoupling (`F-33` / Pentest Spec Line 29)**:
   - **Decoupled External Template Architecture (`backend/core/payloads.go`, `interfaces.go`)**:
     - **No commands compiled into the binary**: All payload templates and command strings are dynamically read and written to an external file (`data/payload_templates.json` in workspace, `<UserConfigDir>/DoubleAgent/payload_templates.json`, or custom configured path).

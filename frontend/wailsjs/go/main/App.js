@@ -94,6 +94,10 @@ export function DeleteHost(arg1) {
   return window['go']['main']['App']['DeleteHost'](arg1);
 }
 
+export function DeleteListenerProfile(arg1) {
+  return window['go']['main']['App']['DeleteListenerProfile'](arg1);
+}
+
 export function DeleteNote(arg1) {
   return window['go']['main']['App']['DeleteNote'](arg1);
 }
@@ -176,6 +180,10 @@ export function ExportSprayList(arg1) {
 
 export function ExportTotpTokens(arg1) {
   return window['go']['main']['App']['ExportTotpTokens'](arg1);
+}
+
+export function GenerateListenerCommand(arg1) {
+  return window['go']['main']['App']['GenerateListenerCommand'](arg1);
 }
 
 export function GenerateProxychainsConfig(arg1) {
@@ -326,6 +334,10 @@ export function InjectTotpCode(arg1, arg2) {
   return window['go']['main']['App']['InjectTotpCode'](arg1, arg2);
 }
 
+export function ListActiveManagedListeners() {
+  return window['go']['main']['App']['ListActiveManagedListeners']();
+}
+
 export function ListActiveRemoteEdits() {
   return window['go']['main']['App']['ListActiveRemoteEdits']();
 }
@@ -348,6 +360,10 @@ export function ListFindings(arg1, arg2) {
 
 export function ListForwardRules() {
   return window['go']['main']['App']['ListForwardRules']();
+}
+
+export function ListListenerProfiles() {
+  return window['go']['main']['App']['ListListenerProfiles']();
 }
 
 export function ListLocalDir(arg1) {
@@ -498,6 +514,10 @@ export function SaveIdentity(arg1) {
   return window['go']['main']['App']['SaveIdentity'](arg1);
 }
 
+export function SaveListenerProfile(arg1) {
+  return window['go']['main']['App']['SaveListenerProfile'](arg1);
+}
+
 export function SaveNote(arg1) {
   return window['go']['main']['App']['SaveNote'](arg1);
 }
@@ -594,6 +614,10 @@ export function StartForwardTunnel(arg1, arg2) {
   return window['go']['main']['App']['StartForwardTunnel'](arg1, arg2);
 }
 
+export function StartManagedListener(arg1) {
+  return window['go']['main']['App']['StartManagedListener'](arg1);
+}
+
 export function StartRawTcpListener(arg1) {
   return window['go']['main']['App']['StartRawTcpListener'](arg1);
 }
@@ -616,6 +640,10 @@ export function StartSftpUpload(arg1, arg2, arg3) {
 
 export function StopForwardTunnel(arg1) {
   return window['go']['main']['App']['StopForwardTunnel'](arg1);
+}
+
+export function StopManagedListener(arg1) {
+  return window['go']['main']['App']['StopManagedListener'](arg1);
 }
 
 export function StopRawTcpListener(arg1) {

@@ -69,6 +69,8 @@ import {
   PayloadRenderResult,
   PayloadFileConfig,
 } from './types/payload';
+import { ListenerManagerModal } from './components/ListenerManagerModal';
+import { ListenerProfile, ManagedListenerInfo } from './types/listener';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -943,6 +945,13 @@ interface WailsAppBindings {
   DeletePayloadTemplate?: (templateId: string) => Promise<void>;
   RenderPayload?: (opts: PayloadRenderOptions) => Promise<PayloadRenderResult>;
   SavePayloadAsSnippet?: (opts: PayloadRenderOptions, snippetName: string) => Promise<Snippet>;
+  ListListenerProfiles?: () => Promise<ListenerProfile[]>;
+  SaveListenerProfile?: (prof: ListenerProfile) => Promise<void>;
+  DeleteListenerProfile?: (profileId: string) => Promise<void>;
+  StartManagedListener?: (prof: ListenerProfile) => Promise<ManagedListenerInfo>;
+  StopManagedListener?: (listenerId: string) => Promise<void>;
+  ListActiveManagedListeners?: () => Promise<ManagedListenerInfo[]>;
+  GenerateListenerCommand?: (prof: ListenerProfile) => Promise<string>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1178,6 +1187,8 @@ export function App({
   const [showNmapImportModal, setShowNmapImportModal] = useState<boolean>(false);
   // Payload Generator state (F-33)
   const [showPayloadGeneratorModal, setShowPayloadGeneratorModal] = useState<boolean>(false);
+  // Listener Manager state (F-32)
+  const [showListenerManagerModal, setShowListenerManagerModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
   const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
@@ -7648,6 +7659,14 @@ export function App({
         setShowPayloadGeneratorModal(true);
       },
     },
+    'listener-manager': {
+      label: 'Listener Manager // Reverse & Bind Catchers (F-32)',
+      shortLabel: 'Listeners',
+      icon: 'radar',
+      action: () => {
+        setShowListenerManagerModal(true);
+      },
+    },
     'snippet-chains': {
       label: 'Snippet Chains // Multi-Stage Exploits (F-16)',
       shortLabel: 'Chains',
@@ -8085,6 +8104,7 @@ export function App({
 
                     <div className="tools-sub-header">Recon &amp; Network Attacks</div>
                     {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest (F-39)', 'Radar', () => setShowNmapImportModal(true))}
+                    {renderDropdownRow('listener-manager', 'Listener Manager (F-32)', 'Radar', () => setShowListenerManagerModal(true))}
                     {renderDropdownRow('payload-generator', 'Payload Generator // Shells (F-33)', 'Target', () => setShowPayloadGeneratorModal(true))}
                     {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
                     {renderDropdownRow('proxychains', 'Export proxychains.conf (F-14)', '⛓️ Export', () => void handleOpenProxychainsExport())}
@@ -8242,6 +8262,7 @@ export function App({
                     {renderDropdownRow('eng-creds', 'Credential Pool & Spray Lists (F-36)', '🔑 Creds', () => setShowCredStoreModal(true))}
                     {renderDropdownRow('eng-evidence', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence', () => setShowEvidenceModal(true))}
                     {renderDropdownRow('eng-nmap', 'Import Nmap XML (-oX) (F-39)', 'Radar', () => setShowNmapImportModal(true))}
+                    {renderDropdownRow('eng-listeners', 'Listener Manager (F-32)', 'Radar', () => setShowListenerManagerModal(true))}
                     {renderDropdownRow('eng-payload', 'Payload Generator (F-33)', 'Target', () => setShowPayloadGeneratorModal(true))}
                     {renderDropdownRow('eng-chains', 'Snippet Chains & Exploits (F-16)', 'Chains', () => {
                       setChainsHostFilter(null);
@@ -11872,6 +11893,80 @@ export function App({
             const api = getWailsBindings();
             if (api?.SetPayloadTemplatesPath) return api.SetPayloadTemplatesPath(path);
             throw new Error('SetPayloadTemplatesPath API not available');
+          }}
+        />
+      )}
+
+      {showListenerManagerModal && (
+        <ListenerManagerModal
+          onClose={() => setShowListenerManagerModal(false)}
+          listProfiles={async () => {
+            const api = getWailsBindings();
+            if (api?.ListListenerProfiles) return api.ListListenerProfiles();
+            return [];
+          }}
+          saveProfile={async (prof) => {
+            const api = getWailsBindings();
+            if (api?.SaveListenerProfile) await api.SaveListenerProfile(prof);
+          }}
+          deleteProfile={async (profileId) => {
+            const api = getWailsBindings();
+            if (api?.DeleteListenerProfile) await api.DeleteListenerProfile(profileId);
+          }}
+          startListener={async (prof) => {
+            const api = getWailsBindings();
+            if (api?.StartManagedListener) return api.StartManagedListener(prof);
+            throw new Error('StartManagedListener API unavailable');
+          }}
+          stopListener={async (listenerId) => {
+            const api = getWailsBindings();
+            if (api?.StopManagedListener) await api.StopManagedListener(listenerId);
+          }}
+          listActiveListeners={async () => {
+            const api = getWailsBindings();
+            if (api?.ListActiveManagedListeners) return api.ListActiveManagedListeners();
+            return [];
+          }}
+          generateCommand={async (prof) => {
+            const api = getWailsBindings();
+            if (api?.GenerateListenerCommand) return api.GenerateListenerCommand(prof);
+            return '';
+          }}
+          onSpawnTerminal={() => {
+            void handleOpenLocalTerminal('powershell');
+          }}
+          onOpenSessionTab={(sId) => {
+            const tabId = `tab-rawtcp-${sId}`;
+            const paneId = `pane-rawtcp-${sId}`;
+            const tabTitle = `Raw TCP: ${sId}`;
+            const newTab: TabItem = {
+              id: tabId,
+              title: tabTitle,
+              color: '#00f0ff',
+              tabType: 'terminal',
+              rootNode: {
+                id: paneId,
+                type: 'pane',
+                sessionId: sId,
+                title: tabTitle,
+              },
+              activePaneId: paneId,
+            };
+            setTabs((prev) => [...prev, newTab]);
+            setActiveTabId(tabId);
+          }}
+          onStabilizeSession={(sId) => {
+            setShellStabilizeModal({
+              isOpen: true,
+              sessionId: sId,
+              sessionTitle: `Raw TCP Session (${sId})`,
+              isRawTcp: true,
+              cols: 80,
+              rows: 24,
+            });
+          }}
+          onOpenPayloadGenerator={() => {
+            setShowPayloadGeneratorModal(true);
           }}
         />
       )}

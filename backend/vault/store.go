@@ -772,6 +772,9 @@ func ensureNonNilSlices(p core.VaultPayload) core.VaultPayload {
 	if p.Findings == nil {
 		p.Findings = []core.FindingItem{}
 	}
+	if p.Listeners == nil {
+		p.Listeners = []core.ListenerProfile{}
+	}
 	return p
 }
 

@@ -42,3 +42,4 @@ export interface PayloadFileConfig {
   exists: boolean;
   lastModified?: string;
 }
+

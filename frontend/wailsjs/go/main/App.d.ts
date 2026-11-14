@@ -49,6 +49,8 @@ export function DeleteGroup(arg1:string):Promise<void>;
 
 export function DeleteHost(arg1:string):Promise<void>;
 
+export function DeleteListenerProfile(arg1:string):Promise<void>;
+
 export function DeleteNote(arg1:string):Promise<void>;
 
 export function DeletePayloadTemplate(arg1:string):Promise<void>;
@@ -90,6 +92,8 @@ export function ExportSessionLog(arg1:string,arg2:string):Promise<void>;
 export function ExportSprayList(arg1:core.SprayExportOptions):Promise<core.SprayExportResult>;
 
 export function ExportTotpTokens(arg1:string):Promise<string>;
+
+export function GenerateListenerCommand(arg1:core.ListenerProfile):Promise<string>;
 
 export function GenerateProxychainsConfig(arg1:core.ProxychainsExportOptions):Promise<string>;
 
@@ -165,6 +169,8 @@ export function InjectSessionPassword(arg1:string):Promise<void>;
 
 export function InjectTotpCode(arg1:string,arg2:string):Promise<void>;
 
+export function ListActiveManagedListeners():Promise<Array<core.ManagedListenerInfo>>;
+
 export function ListActiveRemoteEdits():Promise<Array<core.RemoteEditSession>>;
 
 export function ListCredentials(arg1:string,arg2:string):Promise<Array<core.CredentialEntry>>;
@@ -176,6 +182,8 @@ export function ListEvidence(arg1:string,arg2:string):Promise<Array<core.Evidenc
 export function ListFindings(arg1:string,arg2:string):Promise<Array<core.FindingItem>>;
 
 export function ListForwardRules():Promise<Array<core.ForwardRule>>;
+
+export function ListListenerProfiles():Promise<Array<core.ListenerProfile>>;
 
 export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
 
@@ -251,6 +259,8 @@ export function SaveHost(arg1:core.HostRecord):Promise<void>;
 
 export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
 
+export function SaveListenerProfile(arg1:core.ListenerProfile):Promise<void>;
+
 export function SaveNote(arg1:core.NotePage):Promise<core.NotePage>;
 
 export function SavePayloadAsSnippet(arg1:core.PayloadRenderOptions,arg2:string):Promise<core.Snippet>;
@@ -299,6 +309,8 @@ export function StabilizeShell(arg1:core.ShellStabilizeRequest):Promise<void>;
 
 export function StartForwardTunnel(arg1:string,arg2:string):Promise<string>;
 
+export function StartManagedListener(arg1:core.ListenerProfile):Promise<core.ManagedListenerInfo>;
+
 export function StartRawTcpListener(arg1:core.RawTcpListenerConfig):Promise<core.RawTcpListenerInfo>;
 
 export function StartRemoteEdit(arg1:string,arg2:string):Promise<core.RemoteEditSession>;
@@ -310,6 +322,8 @@ export function StartSftpDownload(arg1:string,arg2:string,arg3:string):Promise<s
 export function StartSftpUpload(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function StopForwardTunnel(arg1:string):Promise<void>;
+
+export function StopManagedListener(arg1:string):Promise<void>;
 
 export function StopRawTcpListener(arg1:string):Promise<void>;
 

@@ -1113,7 +1113,142 @@ export namespace core {
 	}
 	
 	
+	export class ListenerProfile {
+	    id: string;
+	    name: string;
+	    kind: string;
+	    tool: string;
+	    bindAddress: string;
+	    bindPort: number;
+	    autoSpawnTab: boolean;
+	    options?: Record<string, string>;
+	    notes?: string;
+	    createdAt?: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new ListenerProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.tool = source["tool"];
+	        this.bindAddress = source["bindAddress"];
+	        this.bindPort = source["bindPort"];
+	        this.autoSpawnTab = source["autoSpawnTab"];
+	        this.options = source["options"];
+	        this.notes = source["notes"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
+	
+	export class RawTcpSessionStats {
+	    id: string;
+	    remoteAddr: string;
+	    localAddr: string;
+	    isListener: boolean;
+	    listenerPort?: number;
+	    bytesSent: number;
+	    bytesReceived: number;
+	    // Go type: time
+	    connectedAt: any;
+	    lineMode: boolean;
+	    lineEnding: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RawTcpSessionStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.remoteAddr = source["remoteAddr"];
+	        this.localAddr = source["localAddr"];
+	        this.isListener = source["isListener"];
+	        this.listenerPort = source["listenerPort"];
+	        this.bytesSent = source["bytesSent"];
+	        this.bytesReceived = source["bytesReceived"];
+	        this.connectedAt = this.convertValues(source["connectedAt"], null);
+	        this.lineMode = source["lineMode"];
+	        this.lineEnding = source["lineEnding"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ManagedListenerInfo {
+	    id: string;
+	    profileId?: string;
+	    name: string;
+	    kind: string;
+	    tool: string;
+	    bindAddress: string;
+	    bindPort: number;
+	    status: string;
+	    errorMsg?: string;
+	    startedAt?: string;
+	    catchCount: number;
+	    activeSessions?: RawTcpSessionStats[];
+	    commandPreview?: string;
+	    opsecWarnings?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ManagedListenerInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.profileId = source["profileId"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.tool = source["tool"];
+	        this.bindAddress = source["bindAddress"];
+	        this.bindPort = source["bindPort"];
+	        this.status = source["status"];
+	        this.errorMsg = source["errorMsg"];
+	        this.startedAt = source["startedAt"];
+	        this.catchCount = source["catchCount"];
+	        this.activeSessions = this.convertValues(source["activeSessions"], RawTcpSessionStats);
+	        this.commandPreview = source["commandPreview"];
+	        this.opsecWarnings = source["opsecWarnings"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class NmapImportOptions {
 	    engagementId?: string;
 	    groupId?: string;
@@ -1764,55 +1899,7 @@ export namespace core {
 		    return a;
 		}
 	}
-	export class RawTcpSessionStats {
-	    id: string;
-	    remoteAddr: string;
-	    localAddr: string;
-	    isListener: boolean;
-	    listenerPort?: number;
-	    bytesSent: number;
-	    bytesReceived: number;
-	    // Go type: time
-	    connectedAt: any;
-	    lineMode: boolean;
-	    lineEnding: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new RawTcpSessionStats(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.remoteAddr = source["remoteAddr"];
-	        this.localAddr = source["localAddr"];
-	        this.isListener = source["isListener"];
-	        this.listenerPort = source["listenerPort"];
-	        this.bytesSent = source["bytesSent"];
-	        this.bytesReceived = source["bytesReceived"];
-	        this.connectedAt = this.convertValues(source["connectedAt"], null);
-	        this.lineMode = source["lineMode"];
-	        this.lineEnding = source["lineEnding"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class RemoteConflictInfo {
 	    hasConflict: boolean;
 	    remotePath: string;
@@ -2571,6 +2658,7 @@ export namespace core {
 	    snippetChains: SnippetChain[];
 	    totpRecords: TotpSummary[];
 	    notes: NotePageSummary[];
+	    listeners: ListenerProfile[];
 	
 	    static createFrom(source: any = {}) {
 	        return new VaultSummary(source);
@@ -2587,6 +2675,7 @@ export namespace core {
 	        this.snippetChains = this.convertValues(source["snippetChains"], SnippetChain);
 	        this.totpRecords = this.convertValues(source["totpRecords"], TotpSummary);
 	        this.notes = this.convertValues(source["notes"], NotePageSummary);
+	        this.listeners = this.convertValues(source["listeners"], ListenerProfile);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

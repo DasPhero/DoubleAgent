@@ -540,6 +540,41 @@ func MergeVaultPayloads(local, remote core.VaultPayload) (core.VaultPayload, cor
 		}
 	}
 
+	// 14. Listeners (F-32 / Listener Manager)
+	localListeners := make(map[string]core.ListenerProfile, len(local.Listeners))
+	for _, l := range local.Listeners {
+		localListeners[l.ID] = l
+	}
+	remoteListeners := make(map[string]core.ListenerProfile, len(remote.Listeners))
+	for _, l := range remote.Listeners {
+		remoteListeners[l.ID] = l
+	}
+	for _, ll := range local.Listeners {
+		if rl, exists := remoteListeners[ll.ID]; exists {
+			if jsonEqual(ll, rl) {
+				merged.Listeners = append(merged.Listeners, ll)
+			} else {
+				report.HasConflicts = true
+				report.Conflicts = append(report.Conflicts, core.VaultConflictItem{
+					ID:            ll.ID,
+					Type:          "listener",
+					Label:         fmt.Sprintf("Listener %s (%s:%d)", ll.Name, ll.Tool, ll.BindPort),
+					LocalSummary:  fmt.Sprintf("%s (%s:%d)", ll.Name, ll.Tool, ll.BindPort),
+					RemoteSummary: fmt.Sprintf("%s (%s:%d)", rl.Name, rl.Tool, rl.BindPort),
+				})
+				merged.Listeners = append(merged.Listeners, ll)
+			}
+		} else {
+			merged.Listeners = append(merged.Listeners, ll)
+		}
+	}
+	for _, rl := range remote.Listeners {
+		if _, exists := localListeners[rl.ID]; !exists {
+			merged.Listeners = append(merged.Listeners, rl)
+			report.AutoMerged++
+		}
+	}
+
 	return ensureNonNilSlices(merged), report
 }
 
@@ -866,6 +901,39 @@ func ResolveVaultConflicts(local, remote core.VaultPayload, resolutions map[stri
 		}
 	}
 	resolved.Findings = finalFindings
+
+	// 10. Listeners (F-32 / Listener Manager)
+	remoteListeners := make(map[string]core.ListenerProfile, len(remote.Listeners))
+	for _, l := range remote.Listeners {
+		remoteListeners[l.ID] = l
+	}
+	var finalListeners []core.ListenerProfile
+	for _, l := range resolved.Listeners {
+		res, hasRes := resolutions[l.ID]
+		if !hasRes {
+			finalListeners = append(finalListeners, l)
+			continue
+		}
+		switch res {
+		case core.ResolutionKeepRemote:
+			if rl, ok := remoteListeners[l.ID]; ok {
+				finalListeners = append(finalListeners, rl)
+			} else {
+				finalListeners = append(finalListeners, l)
+			}
+		case core.ResolutionKeepBoth:
+			finalListeners = append(finalListeners, l)
+			if rl, ok := remoteListeners[l.ID]; ok {
+				cloned := rl
+				cloned.ID = fmt.Sprintf("%s-synced", rl.ID)
+				cloned.Name = fmt.Sprintf("%s (Synced)", rl.Name)
+				finalListeners = append(finalListeners, cloned)
+			}
+		default:
+			finalListeners = append(finalListeners, l)
+		}
+	}
+	resolved.Listeners = finalListeners
 
 	return ensureNonNilSlices(resolved)
 }
