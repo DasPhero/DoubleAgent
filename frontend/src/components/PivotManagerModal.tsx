@@ -17,6 +17,7 @@ export interface PivotManagerModalProps {
   activeEngagementName?: string | null;
   onSendToTerminal?: (sessionId: string, text: string) => void;
   onSpawnLocalTerminal?: (initialCommand: string, title?: string) => void;
+  onOpenRouteHealth?: () => void;
   // Wails Bindings
   getDefaultRoutes: () => Promise<NetworkRoute[]>;
   listRoutes: () => Promise<NetworkRoute[]>;
@@ -47,6 +48,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
   activeEngagementName,
   onSendToTerminal,
   onSpawnLocalTerminal,
+  onOpenRouteHealth,
   getDefaultRoutes,
   listRoutes,
   saveRoute,
@@ -408,6 +410,20 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
           </div>
 
           <div className="cyber-hud-actions-block">
+            {onOpenRouteHealth && (
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-secondary"
+                onClick={() => {
+                  onClose();
+                  onOpenRouteHealth();
+                }}
+                title="Run OPSEC Route Health Check (F-38)"
+              >
+                <CyberIcon name="shield" size={13} />
+                <span>Health Check (F-38)</span>
+              </button>
+            )}
             <button
               type="button"
               className="cyber-btn cyber-btn-secondary"

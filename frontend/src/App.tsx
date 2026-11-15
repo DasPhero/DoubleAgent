@@ -87,6 +87,8 @@ import {
   PivotCommandSet,
   PivotInstanceInfo,
 } from './types/pivot';
+import { RouteHealthModal } from './components/RouteHealthModal';
+import type { RouteCheckRequest, RouteHealthReport, SocksCandidateOption } from './types/routeHealth';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -994,6 +996,8 @@ interface WailsAppBindings {
   SendPivotInput?: (instanceId: string, input: string) => Promise<void>;
   ListActivePivotInstances?: () => Promise<PivotInstanceInfo[]>;
   BuildPivotCommands?: (route: NetworkRoute, lhost: string) => Promise<PivotCommandSet>;
+  RunRouteHealthCheck?: (req: RouteCheckRequest) => Promise<RouteHealthReport>;
+  ParseRouteProbeTargets?: (raw: string) => Promise<string[]>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1317,6 +1321,8 @@ export function App({
   const [showFileTransferModal, setShowFileTransferModal] = useState<boolean>(false);
   // Network Pivoting Manager state (F-24)
   const [showPivotManagerModal, setShowPivotManagerModal] = useState<boolean>(false);
+  // Route Health Check state (F-38)
+  const [showRouteHealthModal, setShowRouteHealthModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
   const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
@@ -7985,6 +7991,14 @@ export function App({
         setShowPivotManagerModal(true);
       },
     },
+    'route-health': {
+      label: 'Route Health Check // Throttled OPSEC (F-38)',
+      shortLabel: 'Route Health',
+      icon: 'shield',
+      action: () => {
+        setShowRouteHealthModal(true);
+      },
+    },
     'snippet-chains': {
       label: 'Snippet Chains // Multi-Stage Exploits (F-16)',
       shortLabel: 'Chains',
@@ -8494,6 +8508,7 @@ export function App({
                     )}
                     {renderDropdownRow('proxy-profiles', 'Proxy Profiles & Proxychains (F-14)', undefined, () => setShowProxyProfilesModal(true))}
                   {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo & chisel (F-24)', undefined, () => setShowPivotManagerModal(true))}
+                  {renderDropdownRow('route-health', 'Route Health Check // OPSEC (F-38)', undefined, () => setShowRouteHealthModal(true))}
                     <div className="nav-dropdown-divider" />
                     <div className="tools-sub-header">Engagement Archive (.daeng)</div>
                     {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', undefined, () => {
@@ -8562,6 +8577,7 @@ export function App({
                   )}
                   {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', undefined, () => setShowProxyProfilesModal(true))}
                   {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo & chisel (F-24)', undefined, () => setShowPivotManagerModal(true))}
+                  {renderDropdownRow('route-health', 'Route Health Check // OPSEC (F-38)', undefined, () => setShowRouteHealthModal(true))}
                   {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', undefined, () => setShowRawTcpModal(true))}
                   {renderDropdownRow(
                     'sftp',
@@ -11038,6 +11054,40 @@ export function App({
                   </button>
                 );
               })()}
+              {(() => {
+                const q = paletteQuery.toLowerCase();
+                const showHealth =
+                  !q ||
+                  'health'.includes(q) ||
+                  'route'.includes(q) ||
+                  'probe'.includes(q) ||
+                  'opsec'.includes(q) ||
+                  'socks'.includes(q) ||
+                  'f-38'.includes(q);
+                if (!showHealth) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      setShowRouteHealthModal(true);
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <CyberIcon name="shield" size={14} />
+                        <span>Route Health Check // Throttled OPSEC (F-38)</span>
+                      </strong>
+                      <span>On-demand throttled TCP connect probes, SOCKS5 checks &amp; ligolo session status</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Check Health ↵</span>
+                    </div>
+                  </button>
+                );
+              })()}
 
               {(() => {
                 const cleanQ = paletteQuery.trim();
@@ -13350,7 +13400,44 @@ export function App({
             if (api?.GetLocalNetworkIPs) return api.GetLocalNetworkIPs();
             return [];
           }}
+          onOpenRouteHealth={() => setShowRouteHealthModal(true)}
           onSelectBinaryFile={(t) => getWailsBindings()?.SelectFileDialog?.(t, '', '') ?? Promise.resolve('')}
+        />
+      )}
+
+      {showRouteHealthModal && (
+        <RouteHealthModal
+          onClose={() => setShowRouteHealthModal(false)}
+          activeEngagementId={activeEngagement?.id || null}
+          activeEngagementName={activeEngagement?.name || null}
+          socksCandidates={(() => {
+            const list: SocksCandidateOption[] = [];
+            for (const tun of activeTunnels) {
+              if (tun.type === 'D' && tun.status === 'active') {
+                const host =
+                  !tun.bindAddress || tun.bindAddress === '0.0.0.0' || tun.bindAddress === '::'
+                    ? '127.0.0.1'
+                    : tun.bindAddress;
+                list.push({ label: `SSH -D`, addr: `${host}:${tun.bindPort}` });
+              }
+            }
+            for (const p of vaultSummary.proxyProfiles || []) {
+              if (p.type === 'socks5' && p.socksAddress) {
+                if (!list.some((x) => x.addr === p.socksAddress)) {
+                  list.push({ label: p.name, addr: p.socksAddress });
+                }
+              }
+            }
+            return list;
+          })()}
+          suggestedTargetHosts={vaultSummary.hosts.map((h) => h.address).filter(Boolean)}
+          runHealthCheck={async (req) => {
+            const api = getWailsBindings();
+            if (api?.RunRouteHealthCheck) return api.RunRouteHealthCheck(req);
+            throw new Error('RunRouteHealthCheck API unavailable');
+          }}
+          onOpenPivotManager={() => setShowPivotManagerModal(true)}
+          onOpenPortForwarding={() => setShowPortForwardingModal(true)}
         />
       )}
 

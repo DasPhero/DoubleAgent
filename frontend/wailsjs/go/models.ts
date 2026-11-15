@@ -2160,6 +2160,36 @@ export namespace core {
 	        this.connectedAgents = source["connectedAgents"];
 	    }
 	}
+	export class ProbeTargetResult {
+	    routeId?: string;
+	    routeName?: string;
+	    routeKind?: string;
+	    target: string;
+	    viaProxy?: string;
+	    status: string;
+	    reachable: boolean;
+	    latencyMs: number;
+	    detail: string;
+	    checkedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProbeTargetResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.routeId = source["routeId"];
+	        this.routeName = source["routeName"];
+	        this.routeKind = source["routeKind"];
+	        this.target = source["target"];
+	        this.viaProxy = source["viaProxy"];
+	        this.status = source["status"];
+	        this.reachable = source["reachable"];
+	        this.latencyMs = source["latencyMs"];
+	        this.detail = source["detail"];
+	        this.checkedAt = source["checkedAt"];
+	    }
+	}
 	
 	export class ProxyProfileSummary {
 	    id: string;
@@ -2410,6 +2440,148 @@ export namespace core {
 	        this.hasConflict = source["hasConflict"];
 	        this.errorMessage = source["errorMessage"];
 	    }
+	}
+	export class RouteCheckRequest {
+	    routeIds?: string[];
+	    engagementId?: string;
+	    checkMode: string;
+	    socksProxyAddr?: string;
+	    customTargets?: string[];
+	    throttleMs: number;
+	    timeoutMs: number;
+	    confirmActiveTraffic?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RouteCheckRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.routeIds = source["routeIds"];
+	        this.engagementId = source["engagementId"];
+	        this.checkMode = source["checkMode"];
+	        this.socksProxyAddr = source["socksProxyAddr"];
+	        this.customTargets = source["customTargets"];
+	        this.throttleMs = source["throttleMs"];
+	        this.timeoutMs = source["timeoutMs"];
+	        this.confirmActiveTraffic = source["confirmActiveTraffic"];
+	    }
+	}
+	export class RouteHealthEntry {
+	    id: string;
+	    sourceType: string;
+	    name: string;
+	    kind: string;
+	    bindEndpoint?: string;
+	    targetEndpoint?: string;
+	    subnets?: string[];
+	    hops?: string[];
+	    status: string;
+	    runtimeState: string;
+	    ligoloAgents?: string[];
+	    bytesTransferred?: number;
+	    errorMsg?: string;
+	    probes?: ProbeTargetResult[];
+	    lastCheck: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RouteHealthEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sourceType = source["sourceType"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.bindEndpoint = source["bindEndpoint"];
+	        this.targetEndpoint = source["targetEndpoint"];
+	        this.subnets = source["subnets"];
+	        this.hops = source["hops"];
+	        this.status = source["status"];
+	        this.runtimeState = source["runtimeState"];
+	        this.ligoloAgents = source["ligoloAgents"];
+	        this.bytesTransferred = source["bytesTransferred"];
+	        this.errorMsg = source["errorMsg"];
+	        this.probes = this.convertValues(source["probes"], ProbeTargetResult);
+	        this.lastCheck = source["lastCheck"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RouteHealthReport {
+	    reportId: string;
+	    checkedAt: string;
+	    checkMode: string;
+	    socksProxyAddr?: string;
+	    throttleMs: number;
+	    timeoutMs: number;
+	    totalRoutes: number;
+	    healthyRoutes: number;
+	    degradedRoutes: number;
+	    downRoutes: number;
+	    probesExecuted: number;
+	    probesSucceeded: number;
+	    durationMs: number;
+	    entries: RouteHealthEntry[];
+	    opsecWarnings?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RouteHealthReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.reportId = source["reportId"];
+	        this.checkedAt = source["checkedAt"];
+	        this.checkMode = source["checkMode"];
+	        this.socksProxyAddr = source["socksProxyAddr"];
+	        this.throttleMs = source["throttleMs"];
+	        this.timeoutMs = source["timeoutMs"];
+	        this.totalRoutes = source["totalRoutes"];
+	        this.healthyRoutes = source["healthyRoutes"];
+	        this.degradedRoutes = source["degradedRoutes"];
+	        this.downRoutes = source["downRoutes"];
+	        this.probesExecuted = source["probesExecuted"];
+	        this.probesSucceeded = source["probesSucceeded"];
+	        this.durationMs = source["durationMs"];
+	        this.entries = this.convertValues(source["entries"], RouteHealthEntry);
+	        this.opsecWarnings = source["opsecWarnings"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SSHConfigHostEntry {
 	    hostAlias: string;

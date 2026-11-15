@@ -27,7 +27,7 @@ Highlighting text in any terminal session displays four quick-save targets:
 - `📝 Save to Notes (Recon)... [RECON]`: Directly logs recon logs and port scan matrices into Host or Engagement Notes.
 - `🎯 Create Finding from Selection... [REPORT]`: Generates a structured Finding and attaches the highlighted excerpt as Evidence #1.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-24`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-39`, & `F-40`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-24`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-38`, `F-39`, & `F-40`)
 
 - **Pentest-Phase Top Navigation & Two-Section Activity Bar (`OPS` vs. `HOST`)**:
   - **Top Navigation Bar**:
@@ -50,6 +50,12 @@ Highlighting text in any terminal session displays four quick-save targets:
   - **Configure & Launch (`ligolo-ng` & `chisel`)**: Automatically scans local `PATH` for `ligolo-proxy`/`proxy` and `chisel` binaries (or browse to a custom executable), configures bind address, listen port (`11601` / `8443`), TUN interface or Chisel SOCKS5 port (`1080`), target CIDR subnets (`10.10.20.0/24`), and engagement vs. global vault scoping.
   - **Operator & Target Command Deck**: Selects local/VPN `LHOST` interfaces and builds copy/insert/run-ready Linux & Windows target agent commands (`./agent -connect ... -ignore-cert`, `./chisel client ... R:socks`), OS `ip tuntap` / `ip route add` commands, and `proxychains4` lines.
   - **Active Pivots & Live Interactive Console**: Displays live process status (`RUNNING`, `ERROR`, `STOPPED`), PID, detected incoming agent joins, error diagnostics, streaming stdout/stderr logs, an interactive stdin bar for `ligolo-proxy` commands (`session`, `ifconfig`, `start --tun ligolo`), and 1-click process shutdown.
+- **OPSEC Route & Tunnel Health Check (`F-38` / Pentest Module)**:
+  - Open via **Terminals ▾ &rarr; Route Health Check // OPSEC (F-38)**, **Engagement ▾ &rarr; Route Health Check // OPSEC (F-38)**, the **Health Check (F-38)** header button inside Pivot Manager (`F-24`), or Command Palette (`Ctrl+K` &rarr; `health` / `route`).
+  - **Strict On-Demand OPSEC Policy**: DoubleAgent **never** sends background probe traffic automatically. Checks run strictly when you click **Run Health Check**.
+  - **Passive Local Inspection Mode**: Zero traffic leaves toward target subnets; verifies active SSH forwards (`-L`/`-R`/`-D` bytes & SOCKS5 greeting), `ligolo-ng` agent join sessions, Chisel SOCKS5 listeners, and loopback proxy profiles.
+  - **Throttled TCP Connect Mode**: Executes sequential single-threaded TCP connect probes (`≥ 200ms` delay, capped at `25` targets per run, requiring explicit authorization checkbox) either directly over a `ligolo-ng` TUN interface or tunneled through any selected SSH `-D` / Chisel SOCKS5 proxy (`127.0.0.1:1080`).
+  - Updates `Status` and `LastCheck` timestamps on saved `NetworkRoute` entries in the encrypted vault.
 - **File Transfer Helper & HTTP Staging Engine (`F-31` / Pentest Module)**:
   - Open **Recon & Exploit ▾ &rarr; File Transfer Helper // Staging (F-31)** or type `transfer` / `http` / `serve` in the Command Palette (`Ctrl+K`).
   - **Built-in Native HTTP Staging Server & Upload Receiver**: Pick any local directory, bind interface, and port (`80`, `443`, `8000`, `8080`, `8443`), optionally enable the `POST/PUT /upload` exfiltration receiver and HTTP Basic Auth, and start/stop the server in one click with a live request access log.

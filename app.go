@@ -21,6 +21,7 @@ import (
 
 	"doubleagent/backend/core"
 	"doubleagent/backend/data"
+	"doubleagent/backend/health"
 	"doubleagent/backend/pivot"
 	"doubleagent/backend/pty"
 	"doubleagent/backend/rawtcp"
@@ -5497,6 +5498,80 @@ func (a *App) ListActivePivotInstances() []core.PivotInstanceInfo {
 func (a *App) BuildPivotCommands(route core.NetworkRoute, lhost string) core.PivotCommandSet {
 	return core.BuildPivotCommandSet(route, lhost)
 }
+
+// --- Route Health Check (Pentest Module F-38) ---
+
+// ParseRouteProbeTargets parses and validates host:port probe targets using OPSEC bounds (max 25, F-38).
+func (a *App) ParseRouteProbeTargets(raw string) ([]string, error) {
+	return core.ParseProbeTargets([]string{raw})
+}
+
+// RunRouteHealthCheck performs a strictly user-triggered, throttled, OPSEC-aware health check across
+// pivots (ligolo-ng/chisel), SSH tunnels (-L/-R/-D), proxy profiles, and optional target probes (F-38).
+func (a *App) RunRouteHealthCheck(req core.RouteCheckRequest) (*core.RouteHealthReport, error) {
+	snap := health.Snapshot{
+		ActivePivots:  a.ListActivePivotInstances(),
+		ActiveTunnels: a.GetActiveTunnels(),
+	}
+
+	if st, ok := a.vaultStore.(*vault.Store); ok && st != nil {
+		if routes, err := st.ListNetworkRoutes(); err == nil {
+			snap.Routes = routes
+		}
+	}
+	if a.vaultStore != nil {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			snap.ForwardRules = payload.ForwardRules
+			snap.ProxyProfiles = payload.ProxyProfiles
+		}
+	}
+
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	report, err := health.RunCheck(ctx, req, snap)
+	if err != nil {
+		return nil, err
+	}
+
+	// Persist LastCheck and derived Status back onto matching NetworkRoute records in the vault (Spec Line 57).
+	if st, ok := a.vaultStore.(*vault.Store); ok && st != nil && len(snap.Routes) > 0 {
+		byID := make(map[string]core.RouteHealthEntry, len(report.Entries))
+		for _, e := range report.Entries {
+			if e.SourceType == "pivot" {
+				byID[e.ID] = e
+			}
+		}
+		updatedAny := false
+		for _, r := range snap.Routes {
+			if entry, matched := byID[r.ID]; matched {
+				r.LastCheck = entry.LastCheck
+				switch entry.Status {
+				case "healthy":
+					r.Status = "running"
+				case "degraded":
+					r.Status = "running"
+				case "error", "down":
+					r.Status = entry.Status
+				default:
+					r.Status = "configured"
+				}
+				if saveErr := st.SaveNetworkRoute(r); saveErr == nil {
+					updatedAny = true
+				}
+			}
+		}
+		if updatedAny {
+			a.emit(a.ctx, "vault:updated", true)
+		}
+	}
+
+	a.emit(a.ctx, "route-health:updated", report)
+	return report, nil
+}
+
 
 
 

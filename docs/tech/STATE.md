@@ -1,10 +1,24 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-24` (`ligolo-ng` & `chisel` Pivoting Engine: Proxy/Relay Process Supervisor, Live Console & Stdin Control, Encrypted `NetworkRoute` Vault Storage, Agent & TUN Route Generators) — COMPLETED!
-- **Next Milestone:** `F-38` (Route Health Check) / `F-41` (WinRM Client) / `M-PRESETS` / `M-THEMES`
+- **Current Milestone:** `F-38` (OPSEC Route Health Check: On-Demand Passive & Throttled TCP/SOCKS5 Probes, Ligolo Session Inspection, Vault `LastCheck`/`Status` Persistence, & HUD Matrix UI) — COMPLETED!
+- **Next Milestone:** `F-41` (WinRM Client) / `M-PRESETS` / `M-THEMES`
 - **Stage:** `2-flagship`
 
 ## What Works
+- **OPSEC Route Health Check (`F-38` / Pentest Spec Line 34, 57, 72)**:
+  - **Backend Domain Logic & OPSEC Guardrails (`backend/core/route_health.go`, `backend/core/route_health_test.go`)**:
+    - Defines `RouteCheckRequest`, `ProbeTargetResult`, `RouteHealthEntry`, and `RouteHealthReport`.
+    - `NormalizeRouteCheckRequest` enforces `local_only` (zero remote packets) vs `throttled_tcp`, clamps `ThrottleMs` (minimum `200ms`, default `400ms`) and `TimeoutMs` (`250..10000ms`), normalizes SOCKS5 proxy addresses, and requires `ConfirmActiveTraffic: true` before sending remote target probes.
+    - `ParseProbeTargets` strictly validates `host:port` endpoints, rejects shell metacharacters, deduplicates targets, and caps per-run targets at `MaxHealthProbeTargetCount = 25` to prevent accidental port scanning.
+    - `AnalyzeRouteHealthOpsec` generates OPSEC notices (passive zero-traffic confirmation, throttle interval advisory, unrouted direct dial alert, and waiting-agent ligolo proxy warnings).
+  - **On-Demand Throttled Probe Engine (`backend/health/checker.go`, `backend/health/checker_test.go`)**:
+    - Strictly manual-triggered `RunCheck(ctx, req, snap)` — zero background tickers or autonomous scanning.
+    - Inspects saved `NetworkRoute` entries + live `PivotInstanceInfo` (`ligolo-ng` / `chisel` connected agent sessions, listener port, and Chisel SOCKS5 greeting), `ForwardRule` + `ForwardTunnelStatus` (`-L`, `-R`, `-D` with RFC 1928 SOCKS5 greeting verification and bytes transferred), and loopback `ProxyProfile` SOCKS5 endpoints.
+    - Supports sequential single-threaded TCP connect probes (`Dialer.DialContext` or custom `Snapshot.DialContext` in sandboxed tests) both direct/TUN and through an active RFC 1928 SOCKS5 proxy (`probeViaSocks5`), spaced cleanly by `ThrottleMs`.
+  - **Wails Backend Integration & UI (`app.go`, `app_test.go`, `frontend/src/types/routeHealth.ts`, `RouteHealthModal.tsx`, `RouteHealthModal.test.tsx`, `PivotManagerModal.tsx`, `App.tsx`)**:
+    - Exported bindings: `RunRouteHealthCheck` (which persists updated `LastCheck` & `Status` back to vault `NetworkRoute` records and emits `route-health:updated`) and `ParseRouteProbeTargets`.
+    - Verified in `TestApp_RouteHealthCheck_F38` and `RouteHealthModal.test.tsx` (2 tests passing; 72/72 total frontend tests passing).
+    - Integrated into `Terminals ▾`, `Engagement ▾`, `PivotManagerModal` header (`Health Check (F-38)`), and Command Palette (`Ctrl+K`).
 - **Network Pivoting & Tunnel Manager (`F-24` / Pentest Spec Line 33, 57)**:
   - **Backend Domain Logic & Security Boundaries (`backend/core/pivot.go`, `backend/core/pivot_test.go`)**:
     - Defines `NetworkRoute` (persisted in encrypted vault), `PivotInstanceInfo`, `PivotBinaryStatus`, and `PivotCommandSet`.

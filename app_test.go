@@ -2797,6 +2797,81 @@ func TestApp_PivotManager_F24(t *testing.T) {
 	}
 }
 
+func TestApp_RouteHealthCheck_F38(t *testing.T) {
+	vaultFile := filepath.Join(t.TempDir(), "test.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: vaultFile})
+	if err := store.Initialize(context.Background(), "master"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	app.ctx = context.Background()
+
+	// Seed a NetworkRoute and a ForwardRule in the vault
+	route := core.NetworkRoute{
+		ID:            "route-hc-1",
+		EngagementID:  "eng-hc",
+		Name:          "Internal AD Ligolo",
+		Tool:          "ligolo-ng",
+		BindAddress:   "127.0.0.1",
+		ListenPort:    11601,
+		InterfaceName: "ligolo",
+		Subnets:       []string{"10.10.20.0/24"},
+	}
+	if err := app.SaveNetworkRoute(route); err != nil {
+		t.Fatalf("SaveNetworkRoute failed: %v", err)
+	}
+
+	if err := app.SaveForwardRule(core.ForwardRule{
+		ID:          "fwd-hc-1",
+		Label:       "Dynamic SOCKS5",
+		Type:        core.ForwardDynamic,
+		BindAddress: "127.0.0.1",
+		BindPort:    1080,
+	}); err != nil {
+		t.Fatalf("SaveForwardRule failed: %v", err)
+	}
+
+	// 1. Validate ParseRouteProbeTargets
+	parsed, err := app.ParseRouteProbeTargets("10.10.20.10:445, 10.10.20.10:3389")
+	if err != nil || len(parsed) != 2 {
+		t.Fatalf("expected 2 parsed targets, got %v (err=%v)", parsed, err)
+	}
+	if _, err := app.ParseRouteProbeTargets("10.10.20.10:99999"); err == nil {
+		t.Fatal("expected out-of-range port error")
+	}
+
+	// 2. Passive inspection succeeds without touching any remote network
+	report, err := app.RunRouteHealthCheck(core.RouteCheckRequest{
+		CheckMode: "local_only",
+	})
+	if err != nil {
+		t.Fatalf("RunRouteHealthCheck failed: %v", err)
+	}
+	if report.TotalRoutes != 2 {
+		t.Fatalf("expected 2 inspected routes (1 pivot + 1 forward rule), got %d", report.TotalRoutes)
+	}
+	if len(report.OpsecWarnings) == 0 {
+		t.Fatal("expected OPSEC notice in report")
+	}
+
+	// Verify LastCheck persisted back to NetworkRoute in vault
+	savedRoutes, err := app.ListNetworkRoutes()
+	if err != nil || len(savedRoutes) != 1 || savedRoutes[0].LastCheck == "" {
+		t.Fatalf("expected LastCheck persisted on NetworkRoute, got %+v (err=%v)", savedRoutes, err)
+	}
+
+	// 3. Throttled remote probe without explicit confirmation fails safely
+	if _, err := app.RunRouteHealthCheck(core.RouteCheckRequest{
+		CheckMode:            "throttled_tcp",
+		CustomTargets:        []string{"10.10.20.10:445"},
+		ConfirmActiveTraffic: false,
+	}); err == nil {
+		t.Fatal("expected error when active probe traffic confirmation is missing")
+	}
+}
+
+
 
 
 

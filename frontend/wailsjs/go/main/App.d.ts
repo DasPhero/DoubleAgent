@@ -255,6 +255,8 @@ export function ParseOTPAuthURI(arg1:string):Promise<core.TotpRecord>;
 
 export function ParsePuTTYRegContent(arg1:string):Promise<core.ImportScanResult>;
 
+export function ParseRouteProbeTargets(arg1:string):Promise<Array<string>>;
+
 export function ParseTermiusContent(arg1:string):Promise<core.ImportScanResult>;
 
 export function ReadSessionLog(arg1:string):Promise<string>;
@@ -274,6 +276,8 @@ export function ResolveSnippetChainStep(arg1:string,arg2:number,arg3:string,arg4
 export function ResolveSnippetTemplate(arg1:string,arg2:string,arg3:Record<string, string>):Promise<string>;
 
 export function ResolveVaultConflicts(arg1:Record<string, string>,arg2:boolean):Promise<void>;
+
+export function RunRouteHealthCheck(arg1:core.RouteCheckRequest):Promise<core.RouteHealthReport>;
 
 export function SaveCredential(arg1:core.CredentialEntry):Promise<void>;
 

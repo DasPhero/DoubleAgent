@@ -506,6 +506,10 @@ export function ParsePuTTYRegContent(arg1) {
   return window['go']['main']['App']['ParsePuTTYRegContent'](arg1);
 }
 
+export function ParseRouteProbeTargets(arg1) {
+  return window['go']['main']['App']['ParseRouteProbeTargets'](arg1);
+}
+
 export function ParseTermiusContent(arg1) {
   return window['go']['main']['App']['ParseTermiusContent'](arg1);
 }
@@ -544,6 +548,10 @@ export function ResolveSnippetTemplate(arg1, arg2, arg3) {
 
 export function ResolveVaultConflicts(arg1, arg2) {
   return window['go']['main']['App']['ResolveVaultConflicts'](arg1, arg2);
+}
+
+export function RunRouteHealthCheck(arg1) {
+  return window['go']['main']['App']['RunRouteHealthCheck'](arg1);
 }
 
 export function SaveCredential(arg1) {
