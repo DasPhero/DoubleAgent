@@ -246,6 +246,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		proxySummaries = append(proxySummaries, ProxyProfileSummary{
 			ID:            p.ID,
 			Name:          p.Name,
+			EngagementID:  p.EngagementID,
 			Type:          p.Type,
 			JumpHostIDs:   jumpIDs,
 			Command:       p.Command,

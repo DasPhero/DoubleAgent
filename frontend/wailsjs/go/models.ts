@@ -654,6 +654,64 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class ProxyProfile {
+	    id: string;
+	    name: string;
+	    engagementId?: string;
+	    type: string;
+	    jumpHostIds?: string[];
+	    command?: string;
+	    socksAddress?: string;
+	    socksUsername?: string;
+	    socksPassword?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxyProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.engagementId = source["engagementId"];
+	        this.type = source["type"];
+	        this.jumpHostIds = source["jumpHostIds"];
+	        this.command = source["command"];
+	        this.socksAddress = source["socksAddress"];
+	        this.socksUsername = source["socksUsername"];
+	        this.socksPassword = source["socksPassword"];
+	    }
+	}
+	export class ForwardRule {
+	    id: string;
+	    hostId?: string;
+	    engagementId?: string;
+	    type: string;
+	    bindAddress: string;
+	    bindPort: number;
+	    targetHost?: string;
+	    targetPort?: number;
+	    autoStart: boolean;
+	    label?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ForwardRule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.hostId = source["hostId"];
+	        this.engagementId = source["engagementId"];
+	        this.type = source["type"];
+	        this.bindAddress = source["bindAddress"];
+	        this.bindPort = source["bindPort"];
+	        this.targetHost = source["targetHost"];
+	        this.targetPort = source["targetPort"];
+	        this.autoStart = source["autoStart"];
+	        this.label = source["label"];
+	    }
+	}
 	export class HostRecord {
 	    id: string;
 	    label: string;
@@ -704,6 +762,8 @@ export namespace core {
 	    ciphertext?: string;
 	    engagement: Engagement;
 	    hosts?: HostRecord[];
+	    forwardRules?: ForwardRule[];
+	    proxyProfiles?: ProxyProfile[];
 	    credentials?: CredentialEntry[];
 	    evidence?: EvidenceItem[];
 	    findings?: FindingItem[];
@@ -725,6 +785,8 @@ export namespace core {
 	        this.ciphertext = source["ciphertext"];
 	        this.engagement = this.convertValues(source["engagement"], Engagement);
 	        this.hosts = this.convertValues(source["hosts"], HostRecord);
+	        this.forwardRules = this.convertValues(source["forwardRules"], ForwardRule);
+	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfile);
 	        this.credentials = this.convertValues(source["credentials"], CredentialEntry);
 	        this.evidence = this.convertValues(source["evidence"], EvidenceItem);
 	        this.findings = this.convertValues(source["findings"], FindingItem);
@@ -776,34 +838,7 @@ export namespace core {
 	    }
 	}
 	
-	export class ForwardRule {
-	    id: string;
-	    hostId?: string;
-	    type: string;
-	    bindAddress: string;
-	    bindPort: number;
-	    targetHost?: string;
-	    targetPort?: number;
-	    autoStart: boolean;
-	    label?: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new ForwardRule(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.hostId = source["hostId"];
-	        this.type = source["type"];
-	        this.bindAddress = source["bindAddress"];
-	        this.bindPort = source["bindPort"];
-	        this.targetHost = source["targetHost"];
-	        this.targetPort = source["targetPort"];
-	        this.autoStart = source["autoStart"];
-	        this.label = source["label"];
-	    }
-	}
 	export class ForwardTunnelStatus {
 	    id: string;
 	    ruleId: string;
@@ -1706,35 +1741,11 @@ export namespace core {
 		    return a;
 		}
 	}
-	export class ProxyProfile {
-	    id: string;
-	    name: string;
-	    type: string;
-	    jumpHostIds?: string[];
-	    command?: string;
-	    socksAddress?: string;
-	    socksUsername?: string;
-	    socksPassword?: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new ProxyProfile(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.type = source["type"];
-	        this.jumpHostIds = source["jumpHostIds"];
-	        this.command = source["command"];
-	        this.socksAddress = source["socksAddress"];
-	        this.socksUsername = source["socksUsername"];
-	        this.socksPassword = source["socksPassword"];
-	    }
-	}
 	export class ProxyProfileSummary {
 	    id: string;
 	    name: string;
+	    engagementId?: string;
 	    type: string;
 	    jumpHostIds?: string[];
 	    command?: string;
@@ -1750,6 +1761,7 @@ export namespace core {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.engagementId = source["engagementId"];
 	        this.type = source["type"];
 	        this.jumpHostIds = source["jumpHostIds"];
 	        this.command = source["command"];
@@ -1765,6 +1777,7 @@ export namespace core {
 	    username?: string;
 	    password?: string;
 	    comment?: string;
+	    engagementId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ProxychainsProxyEntry(source);
@@ -1778,6 +1791,7 @@ export namespace core {
 	        this.username = source["username"];
 	        this.password = source["password"];
 	        this.comment = source["comment"];
+	        this.engagementId = source["engagementId"];
 	    }
 	}
 	export class ProxychainsExportOptions {

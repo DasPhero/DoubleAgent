@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ProxychainsExportOptions, ProxychainsProxyEntry, ProxychainsChainType } from '../types/proxy';
+import { CyberIcon } from './CyberIcon';
 
 export interface ProxychainsExportModalProps {
   initialOptions?: ProxychainsExportOptions;
+  engagements?: { id: string; name: string }[];
+  activeEngagementId?: string;
   onGenerateConfig: (opts: ProxychainsExportOptions) => Promise<string>;
   onSaveToFile?: (content: string, targetPath: string) => Promise<void>;
   onClose: () => void;
@@ -10,6 +13,8 @@ export interface ProxychainsExportModalProps {
 
 export function ProxychainsExportModal({
   initialOptions,
+  engagements = [],
+  activeEngagementId = '',
   onGenerateConfig,
   onSaveToFile,
   onClose,
@@ -22,8 +27,9 @@ export function ProxychainsExportModal({
   const [proxies, setProxies] = useState<ProxychainsProxyEntry[]>(
     initialOptions?.proxies && initialOptions.proxies.length > 0
       ? initialOptions.proxies
-      : [{ type: 'socks5', host: '127.0.0.1', port: 1080, comment: 'DoubleAgent SOCKS5' }]
+      : [{ type: 'socks5', host: '127.0.0.1', port: 1080, comment: 'DoubleAgent SOCKS5', engagementId: activeEngagementId || '' }]
   );
+  const [scopeFilter, setScopeFilter] = useState<'active_and_global' | 'engagement_only' | 'global_only'>('active_and_global');
 
   const [generatedConfig, setGeneratedConfig] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
@@ -37,6 +43,23 @@ export function ProxychainsExportModal({
   const [newUser, setNewUser] = useState<string>('');
   const [newPass, setNewPass] = useState<string>('');
   const [newComment, setNewComment] = useState<string>('');
+  const [newEngagementId, setNewEngagementId] = useState<string>(activeEngagementId || '');
+
+  const activeProxies = useMemo(() => {
+    return proxies.filter((p) => {
+      if (scopeFilter === 'global_only') return !p.engagementId;
+      if (scopeFilter === 'engagement_only') return activeEngagementId ? p.engagementId === activeEngagementId : Boolean(p.engagementId);
+      // active_and_global
+      if (!activeEngagementId) return true;
+      return !p.engagementId || p.engagementId === activeEngagementId;
+    });
+  }, [proxies, scopeFilter, activeEngagementId]);
+
+  const getEngagementName = (engId?: string) => {
+    if (!engId) return 'Global';
+    const found = engagements.find((e) => e.id === engId);
+    return found ? found.name : engId;
+  };
 
   // Re-generate config whenever options change
   useEffect(() => {
@@ -47,7 +70,7 @@ export function ProxychainsExportModal({
       quietMode,
       tcpReadTimeout,
       tcpConnectTimeout,
-      proxies,
+      proxies: activeProxies,
     };
     onGenerateConfig(opts)
       .then((cfg) => {
@@ -59,7 +82,7 @@ export function ProxychainsExportModal({
     return () => {
       active = false;
     };
-  }, [chainType, proxyDNS, quietMode, tcpReadTimeout, tcpConnectTimeout, proxies, onGenerateConfig]);
+  }, [chainType, proxyDNS, quietMode, tcpReadTimeout, tcpConnectTimeout, activeProxies, onGenerateConfig]);
 
   const handleAddProxy = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +97,7 @@ export function ProxychainsExportModal({
         username: newUser.trim() || undefined,
         password: newPass.trim() || undefined,
         comment: newComment.trim() || undefined,
+        engagementId: newEngagementId || undefined,
       },
     ]);
     setNewHost('127.0.0.1');
@@ -83,8 +107,8 @@ export function ProxychainsExportModal({
     setNewComment('');
   };
 
-  const handleRemoveProxy = (index: number) => {
-    setProxies(proxies.filter((_, i) => i !== index));
+  const handleRemoveProxy = (targetProxy: ProxychainsProxyEntry) => {
+    setProxies(proxies.filter((p) => p !== targetProxy));
   };
 
   const handleCopyToClipboard = async () => {
@@ -156,8 +180,8 @@ export function ProxychainsExportModal({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                ⛓️ Export proxychains.conf (F-14)
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CyberIcon name="chain" size={16} /> Export proxychains.conf (F-14)
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 CHAIN-ROUTER // RFC-COMPLIANT CONFIGURATION FOR PROXYCHAINS-NG
@@ -172,6 +196,50 @@ export function ProxychainsExportModal({
           >
             ×
           </button>
+        </div>
+
+        {/* Scope Filter Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 20px',
+            background: 'rgba(6, 12, 22, 0.9)',
+            borderBottom: '1px solid rgba(56, 189, 248, 0.2)',
+            gap: '8px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, Consolas, monospace', color: '#94a3b8', letterSpacing: '0.06em' }}>
+            PROXY CHAIN SCOPE:
+          </span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              type="button"
+              className={`cyber-btn ${scopeFilter === 'active_and_global' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+              style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+              onClick={() => setScopeFilter('active_and_global')}
+            >
+              Active Engagement + Global
+            </button>
+            <button
+              type="button"
+              className={`cyber-btn ${scopeFilter === 'engagement_only' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+              style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+              onClick={() => setScopeFilter('engagement_only')}
+            >
+              Engagement Only
+            </button>
+            <button
+              type="button"
+              className={`cyber-btn ${scopeFilter === 'global_only' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+              style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+              onClick={() => setScopeFilter('global_only')}
+            >
+              Global Only
+            </button>
+          </div>
         </div>
 
         {/* Body (2 columns: left settings, right preview) */}
@@ -286,7 +354,7 @@ export function ProxychainsExportModal({
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-bright)' }}>
-                  Proxy Chain List ({proxies.length})
+                  Proxy Chain List ({activeProxies.length})
                 </label>
               </div>
               <div
@@ -298,7 +366,7 @@ export function ProxychainsExportModal({
                   background: 'var(--bg-primary)',
                 }}
               >
-                {proxies.length === 0 ? (
+                {activeProxies.length === 0 ? (
                   <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                     No proxies in chain. Add one below.
                   </div>
@@ -308,16 +376,32 @@ export function ProxychainsExportModal({
                       <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left' }}>
                         <th style={{ padding: '6px 10px' }}>Type</th>
                         <th style={{ padding: '6px 10px' }}>Address</th>
+                        <th style={{ padding: '6px 10px' }}>Scope</th>
                         <th style={{ padding: '6px 10px' }}>Auth</th>
                         <th style={{ padding: '6px 10px', textAlign: 'right' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {proxies.map((p, idx) => (
+                      {activeProxies.map((p, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
                           <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--accent)' }}>{p.type}</td>
                           <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>
                             {p.host}:{p.port}
+                          </td>
+                          <td style={{ padding: '6px 10px' }}>
+                            <span
+                              style={{
+                                fontSize: '0.66rem',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                fontFamily: 'JetBrains Mono, Consolas, monospace',
+                                background: p.engagementId ? 'rgba(245, 158, 11, 0.14)' : 'rgba(56, 189, 248, 0.12)',
+                                border: `1px solid ${p.engagementId ? 'rgba(245, 158, 11, 0.35)' : 'rgba(56, 189, 248, 0.3)'}`,
+                                color: p.engagementId ? '#fbbf24' : '#38bdf8',
+                              }}
+                            >
+                              {getEngagementName(p.engagementId)}
+                            </span>
                           </td>
                           <td style={{ padding: '6px 10px', color: 'var(--text-muted)' }}>
                             {p.username ? p.username : '—'}
@@ -326,11 +410,11 @@ export function ProxychainsExportModal({
                             <button
                               type="button"
                               className="cyber-btn cyber-btn-secondary"
-                              onClick={() => handleRemoveProxy(idx)}
+                              onClick={() => handleRemoveProxy(p)}
                               style={{ padding: '2px 6px', fontSize: '0.75rem', color: '#f87171' }}
                               title="Remove Hop"
                             >
-                              ✕
+                              <CyberIcon name="close" size={11} />
                             </button>
                           </td>
                         </tr>
@@ -351,8 +435,24 @@ export function ProxychainsExportModal({
                 border: '1px solid var(--border-color)',
               }}
             >
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '8px', color: 'var(--text-bright)' }}>
-                + Add Proxy Hop to Chain
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-bright)' }}>
+                  + Add Proxy Hop to Chain
+                </span>
+                <select
+                  className="input"
+                  value={newEngagementId}
+                  onChange={(e) => setNewEngagementId(e.target.value)}
+                  style={{ padding: '2px 6px', fontSize: '0.72rem', width: 'auto' }}
+                  aria-label="New Proxy Scope"
+                >
+                  <option value="">Global Hop</option>
+                  {engagements.map((eng) => (
+                    <option key={eng.id} value={eng.id}>
+                      Engagement: {eng.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 80px', gap: '8px', marginBottom: '8px' }}>
                 <select
@@ -424,7 +524,7 @@ export function ProxychainsExportModal({
                 Generated proxychains.conf Preview
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {proxies.length} hop{proxies.length === 1 ? '' : 's'} configured
+                {activeProxies.length} hop{activeProxies.length === 1 ? '' : 's'} configured
               </span>
             </div>
 
@@ -479,7 +579,8 @@ export function ProxychainsExportModal({
                   onClick={handleCopyToClipboard}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <span>{copied ? '✓ Copied!' : '📋 Copy to Clipboard'}</span>
+                  <CyberIcon name={copied ? 'check' : 'clipboard'} size={13} />
+                  <span>{copied ? 'Copied!' : 'Copy to Clipboard'}</span>
                 </button>
                 <button
                   type="button"
@@ -487,7 +588,8 @@ export function ProxychainsExportModal({
                   onClick={handleDownloadFile}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <span>⬇️ Download .conf</span>
+                  <CyberIcon name="download" size={13} />
+                  <span>Download .conf</span>
                 </button>
               </div>
 
@@ -499,7 +601,8 @@ export function ProxychainsExportModal({
                   disabled={isSaving}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <span>{isSaving ? 'Saving...' : '💾 Save to Disk'}</span>
+                  <CyberIcon name="file" size={13} />
+                  <span>{isSaving ? 'Saving...' : 'Save to Disk'}</span>
                 </button>
               )}
             </div>

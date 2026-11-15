@@ -10035,6 +10035,37 @@ button:hover .cyber-svg-icon {
   box-sizing: border-box !important;
 }
 
+.activity-bar-section-divider {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.activity-bar-divider-line {
+  width: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.45), transparent);
+}
+
+.activity-bar-section-label {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.75);
+  text-transform: uppercase;
+}
+
+button.hud-status-pill:hover {
+  filter: brightness(1.2);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+}
+
+
 
 
 

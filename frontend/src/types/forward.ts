@@ -3,6 +3,7 @@ export type ForwardRuleType = 'L' | 'R' | 'D';
 export interface ForwardRule {
   id: string;
   hostId?: string;
+  engagementId?: string;
   type: ForwardRuleType;
   bindAddress: string;
   bindPort: number;

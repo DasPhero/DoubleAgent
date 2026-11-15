@@ -1,10 +1,35 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-32` — Unified Listener Manager (Reverse & Bind Catchers) — COMPLETED!
+- **Current Milestone:** Navigation & Sidebar Cleanup + Engagement Scoping (`F-13`, `F-14`, `F-32`, `F-33`, `F-36`) — COMPLETED!
 - **Next Milestone:** Comprehensive Presets Library (`M-PRESETS`) / Multi-Theme Cyberpunk Visual Designs (`M-THEMES`) / WinRM Client (`F-41`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Main Window Header & Pentest-Phase Menu Architecture**:
+  - **Bottom-Left Clickable Vault Pill**: Removed the redundant `Vault ▾` dropdown from the top bar; the bottom-left `"Vault Unlocked"` / `"Vault Locked"` status bar pill in `.cyber-hud-statusbar` is now an interactive `<button>` that locks or unlocks the encrypted vault with one click.
+  - **`View ▾` First**: Positioned `View ▾` as the first top-bar menu on the left, including `Interactive Network Topology Map (F-37)`, workspace split controls, broadcast input mode (`Alt+B`), and zoom controls.
+  - **Engagement Cluster**: Ordered immediately after `View ▾` as:
+    1. `Engagement Selector Dropdown` (`aria-label="Select Active Engagement"`)
+    2. `+` Button (`aria-label="+ New Engagement"`)
+    3. `Engagement ▾` Dropdown containing strictly engagement-scoped items: `Target Scope & Hub (F-36)`, `Credential Pool & Spray Lists (F-36)`, `Evidence Vault & Findings (F-18)`, `Port Forwarding & Tunnels (-L, -R, -D) (F-13)`, `Proxy Profiles & Proxychains (F-14)`, `Export .daeng Package (F-36)`, and `Import .daeng Package (F-36)`.
+  - **Logical 3-Menu Tool Split by Pentest Phase & Purpose**:
+    1. **`Terminals ▾`** (Shells, Hardware Bus & Network Links): Local Shells (`PowerShell`, `CMD`, `WSL`), Directory Shells (`Default Dir`, `CWD`, `Root Shell`), `Hardware Bus & UART Logic (F-23)` (renamed from `Serial / UART Console (COM)`), `Port Forwarding (-L, -R, -D)`, `Proxy Profiles (Jump, SOCKS5)`, `Raw TCP / Netcat (F-31)`, and `SFTP File Browser`.
+    2. **`Recon & Exploit ▾`** (Enumeration, Catchers, Payloads & Execution): `Nmap XML Recon Ingest (F-39)`, `Listener Manager (F-32)`, `Payload Generator // Shells (F-33)`, `Command Snippets & Variables`, and `Snippet Chains & Exploits (F-16)`.
+    3. **`Intel & Keys ▾`** (Documentation, Credentials, 2FA & Logs): `Command Palette` (`Ctrl+K`), `Host Notes & Docs`, `Session Logs & Recordings`, `TOTP Authenticator Generator`, and `Keychain & SSH Keys`.
+- **Global vs. Engagement Scoping for Port Forwards (`F-13`) & Proxy Profiles / Proxychains (`F-14`)**:
+  - Added `EngagementID` (`json:"engagementId,omitempty"`) to `ForwardRule`, `ProxyProfile`, `ProxyProfileSummary`, and `ProxychainsProxyEntry` (`""` = Global reusable across all engagements; `<engagementId>` = Engagement-scoped for isolation and data protection).
+  - Updated `.daeng` package export/import (`ExportEngagementPackage` / `ImportEngagementPackage`) and `DeleteEngagement` cleanup to include engagement-scoped `ForwardRules` and `ProxyProfiles`.
+  - Added scope filter bars (`Active Engagement + Global`, `Engagement Only`, `Global Only`, `All`) and Global vs. Engagement radio selectors to `PortForwardingView.tsx`, `ProxyProfilesView.tsx`, and `ProxychainsExportModal.tsx` (plus a direct `[ Export proxychains.conf ]` header button inside `ProxyProfilesView`).
+- **Two-Section Left Activity Bar (`OPS` vs. `HOST`)**:
+  - Split `.cyber-activity-bar` into two labeled groups separated by `.activity-bar-section-divider`:
+    - **`OPS` (Global / Unspecific)**: `Hosts` (`Ctrl+1`), `Snippets` (`Ctrl+2`), `Chains` (`Ctrl+3`), `Active Listeners` (`Ctrl+4`).
+    - **`HOST` (Host & Engagement Specific)**: `Notes` (`Ctrl+5`), `2FA / TOTP` (`Ctrl+6` — live 6-digit TOTP codes & countdowns for active host + global tokens with 1-click terminal inject and copy), and `Credentials` (`Ctrl+7` — filtered by active host & engagement).
+- **HUD Toolbar, Split-Pane Header & Settings Modal Polish**:
+  - Removed `Broadcast`, `2FA`, and `Chains` buttons from `.terminal-toolbar.hud-command-strip` (keeping `Pass` and `Stabilize`).
+  - Removed `Execute` and `Pin Notes` buttons from `.split-pane-header .pane-header-actions`.
+  - Settings opens first as a modal (`showGlobalSettingsModal`) with a `Pin to Terminal` button (`<CyberIcon name="pin" />`) in its modal header that docks Settings into a terminal tab (`openSettingsTab()`).
+- **Cyberpunk HUD Style Overhaul for `ListenerManagerModal.tsx` (`F-32`) & `PayloadGeneratorModal.tsx` (`F-33`)**:
+  - Restyled both modals to match the high-craft HUD aesthetic of `TotpManagerModal.tsx` (`/// TACTICAL CATCHERS & TELEMETRY`, `/// DYNAMIC SHELL & STAGER ENGINE`, corner reticles, chamfered cards, telemetry counters, and glowing status badges).
 - **Cyberpunk Multi-Panel Action Bar (Activity Bar)**:
   - Replaced the static collapsed sidebar strip with a full-featured, sleek 44px vertical **Activity Bar** on the left edge.
   - Six distinct operational panels with dedicated vector CyberIcons (Golden Rule 9 compliant):

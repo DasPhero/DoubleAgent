@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ForwardRule, ForwardTunnelStatus, ForwardRuleType } from '../types/forward';
 import { formatBytes } from './SftpBrowserView';
+import { CyberIcon } from './CyberIcon';
 
 export interface HostOption {
   id: string;
@@ -14,11 +15,18 @@ export interface ActiveSessionOption {
   title: string;
 }
 
+export interface EngagementOption {
+  id: string;
+  name: string;
+}
+
 export interface PortForwardingViewProps {
   rules: ForwardRule[];
   activeTunnels: ForwardTunnelStatus[];
   hosts: HostOption[];
   activeSessions: ActiveSessionOption[];
+  engagements?: EngagementOption[];
+  activeEngagementId?: string;
   onSaveRule: (rule: ForwardRule) => Promise<void>;
   onDeleteRule: (ruleId: string) => Promise<void>;
   onStartTunnel: (sessionId: string, ruleId: string) => Promise<void>;
@@ -34,6 +42,8 @@ export function PortForwardingView({
   activeTunnels,
   hosts,
   activeSessions,
+  engagements = [],
+  activeEngagementId = '',
   onSaveRule,
   onDeleteRule,
   onStartTunnel,
@@ -48,6 +58,8 @@ export function PortForwardingView({
   const [ruleType, setRuleType] = useState<ForwardRuleType>('L');
   const [label, setLabel] = useState<string>('');
   const [hostId, setHostId] = useState<string>(initialHostId || '');
+  const [ruleEngagementId, setRuleEngagementId] = useState<string>(activeEngagementId || '');
+  const [scopeFilter, setScopeFilter] = useState<'context' | 'engagement' | 'global' | 'all'>('context');
   const [bindAddress, setBindAddress] = useState<string>('127.0.0.1');
   const [bindPort, setBindPort] = useState<string>('8080');
   const [targetHost, setTargetHost] = useState<string>('127.0.0.1');
@@ -64,6 +76,7 @@ export function PortForwardingView({
     setRuleType('L');
     setLabel('');
     setHostId('');
+    setRuleEngagementId(activeEngagementId || '');
     setBindAddress('127.0.0.1');
     setBindPort('8080');
     setTargetHost('127.0.0.1');
@@ -77,6 +90,7 @@ export function PortForwardingView({
     setRuleType(rule.type);
     setLabel(rule.label || '');
     setHostId(rule.hostId || '');
+    setRuleEngagementId(rule.engagementId || '');
     setBindAddress(rule.bindAddress || '127.0.0.1');
     setBindPort(String(rule.bindPort));
     setTargetHost(rule.targetHost || '127.0.0.1');
@@ -85,6 +99,18 @@ export function PortForwardingView({
     setShowAddForm(true);
     setFormError('');
   };
+
+  const filteredRules = rules.filter((r) => {
+    const rEng = r.engagementId || '';
+    if (scopeFilter === 'all') return true;
+    if (scopeFilter === 'global') return rEng === '';
+    if (scopeFilter === 'engagement') {
+      return activeEngagementId ? rEng === activeEngagementId : rEng !== '';
+    }
+    // 'context': show global rules + active engagement rules (hide other engagements' rules)
+    if (!activeEngagementId) return rEng === '';
+    return rEng === '' || rEng === activeEngagementId;
+  });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +136,7 @@ export function PortForwardingView({
       label: label.trim() || undefined,
       type: ruleType,
       hostId: hostId || undefined,
+      engagementId: ruleEngagementId || undefined,
       bindAddress: bindAddress.trim() || '127.0.0.1',
       bindPort: bPort,
       targetHost: ruleType !== 'D' ? targetHost.trim() || '127.0.0.1' : undefined,
@@ -176,9 +203,9 @@ export function PortForwardingView({
                 type="button"
                 className="hud-btn-outline"
                 onClick={onOpenProxychainsExport}
-                style={{ fontSize: '11px', padding: '0.25rem 0.6rem' }}
+                style={{ fontSize: '11px', padding: '0.25rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
               >
-                <span>⛓️</span>
+                <CyberIcon name="chain" size={11} />
                 <span>Export proxychains.conf</span>
               </button>
             )}
@@ -240,7 +267,7 @@ export function PortForwardingView({
                     fontFamily: 'JetBrains Mono, monospace',
                   }}
                 >
-                  ⚠️ {formError}
+                  [ERROR] {formError}
                 </div>
               )}
 
@@ -290,18 +317,35 @@ export function PortForwardingView({
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
-                    <input
-                      aria-label="Auto-start tunnel"
-                      type="checkbox"
-                      checked={autoStart}
-                      onChange={(e) => setAutoStart(e.target.checked)}
-                      style={{ accentColor: '#00f0ff', width: '15px', height: '15px' }}
-                    />
-                    <span>Auto-start tunnel when connecting to host</span>
-                  </label>
+                <div>
+                  <label className="cyber-label">Configuration Scope (Global vs. Engagement)</label>
+                  <select
+                    aria-label="Rule Scope"
+                    value={ruleEngagementId}
+                    onChange={(e) => setRuleEngagementId(e.target.value)}
+                    className="cyber-hud-select"
+                  >
+                    <option value="">Global (Reusable across all engagements)</option>
+                    {engagements.map((eng) => (
+                      <option key={eng.id} value={eng.id}>
+                        Engagement: {eng.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
+                  <input
+                    aria-label="Auto-start tunnel"
+                    type="checkbox"
+                    checked={autoStart}
+                    onChange={(e) => setAutoStart(e.target.checked)}
+                    style={{ accentColor: '#00f0ff', width: '15px', height: '15px' }}
+                  />
+                  <span>Auto-start tunnel when connecting to host</span>
+                </label>
               </div>
 
               {/* Bind & Target parameters */}
@@ -437,7 +481,7 @@ export function PortForwardingView({
                       </span>
                       {tun.errorMessage && (
                         <span style={{ fontSize: '10px', color: '#ff4d6d' }}>
-                          ⚠️ {tun.errorMessage}
+                          [ERR] {tun.errorMessage}
                         </span>
                       )}
                     </div>
@@ -448,7 +492,7 @@ export function PortForwardingView({
                       style={{ fontSize: '10px', padding: '0.2rem 0.55rem' }}
                       title="Stop this running tunnel"
                     >
-                      ⏹ Stop
+                      Stop
                     </button>
                   </div>
                 ))}
@@ -456,8 +500,37 @@ export function PortForwardingView({
             </div>
           )}
 
+          {/* Scope Filter Bar */}
+          {engagements.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '6px 10px', background: 'rgba(6, 13, 24, 0.85)', border: '1px solid rgba(0, 240, 255, 0.2)' }}>
+              <span style={{ fontSize: '11px', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.05em' }}>
+                SCOPE VIEW:
+              </span>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {(
+                  [
+                    { id: 'context', label: activeEngagementId ? 'Active Engagement + Global' : 'Global (Casual Mode)' },
+                    { id: 'engagement', label: 'Engagement Only' },
+                    { id: 'global', label: 'Global Only' },
+                    { id: 'all', label: `All (${rules.length})` },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={scopeFilter === tab.id ? 'hud-btn-primary' : 'hud-btn-outline'}
+                    style={{ fontSize: '10px', padding: '3px 8px' }}
+                    onClick={() => setScopeFilter(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Rules List */}
-          {rules.length === 0 ? (
+          {filteredRules.length === 0 ? (
             <div
               style={{
                 padding: '40px 20px',
@@ -468,20 +541,23 @@ export function PortForwardingView({
                 clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
               }}
             >
-              <div style={{ fontSize: '26px', marginBottom: '8px', color: '#00f0ff' }}>⚡</div>
+              <div style={{ marginBottom: '8px', color: '#00f0ff', display: 'flex', justifyContent: 'center' }}>
+                <CyberIcon name="network" size={26} />
+              </div>
               <p style={{ margin: '0 0 6px', fontWeight: 800, color: '#f1f5f9', letterSpacing: '0.06em' }}>
                 /// NO PORT FORWARDING RULES CONFIGURED ///
               </p>
               <p style={{ margin: 0, fontSize: '12px' }}>
-                Add Local (-L), Remote (-R), or Dynamic SOCKS5 (-D) rules to route network traffic securely through SSH tunnels.
+                Add Local (-L), Remote (-R), or Dynamic SOCKS5 (-D) rules globally or scoped to the active engagement.
               </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {rules.map((rule) => {
+              {filteredRules.map((rule) => {
                 const activeTun = getTunnelForRule(rule);
                 const isActive = !!activeTun;
                 const associatedHost = hosts.find((h) => h.id === rule.hostId);
+                const ruleEngagement = engagements.find((e) => e.id === rule.engagementId);
 
                 return (
                   <div
@@ -501,6 +577,20 @@ export function PortForwardingView({
                         <strong style={{ fontSize: '13px', color: '#f1f5f9', letterSpacing: '0.04em' }}>
                           {rule.label || `${rule.bindAddress}:${rule.bindPort}`}
                         </strong>
+
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            color: ruleEngagement ? '#00f0ff' : '#94a3b8',
+                            background: ruleEngagement ? 'rgba(0, 240, 255, 0.12)' : 'rgba(148, 163, 184, 0.1)',
+                            border: `1px solid ${ruleEngagement ? 'rgba(0, 240, 255, 0.4)' : 'rgba(148, 163, 184, 0.25)'}`,
+                            padding: '1px 6px',
+                            fontFamily: 'JetBrains Mono, monospace',
+                          }}
+                          title={ruleEngagement ? `Scoped to engagement ${ruleEngagement.name}` : 'Global rule (available across all engagements)'}
+                        >
+                          {ruleEngagement ? `ENGAGEMENT: ${ruleEngagement.name}` : 'GLOBAL'}
+                        </span>
 
                         {associatedHost && (
                           <span
@@ -526,7 +616,7 @@ export function PortForwardingView({
                               padding: '1px 5px',
                             }}
                           >
-                            ⚡ AUTO-START
+                            AUTO-START
                           </span>
                         )}
                       </div>
@@ -721,7 +811,7 @@ export function PortForwardingView({
                             onClick={() => void onStopTunnel(activeTun.id)}
                             style={{ fontSize: '11px', padding: '0.25rem 0.65rem' }}
                           >
-                            ⏹ Stop Tunnel
+                            Stop Tunnel
                           </button>
                         )}
                       </div>

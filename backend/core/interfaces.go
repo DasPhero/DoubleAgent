@@ -157,15 +157,16 @@ const (
 
 // ForwardRule defines a saved port forwarding configuration in the vault (Spec Section 8, F-13).
 type ForwardRule struct {
-	ID          string          `json:"id"`
-	HostID      string          `json:"hostId,omitempty"`
-	Type        ForwardRuleType `json:"type"` // "L", "R", "D"
-	BindAddress string          `json:"bindAddress"`
-	BindPort    uint16          `json:"bindPort"`
-	TargetHost  string          `json:"targetHost,omitempty"`
-	TargetPort  uint16          `json:"targetPort,omitempty"`
-	AutoStart   bool            `json:"autoStart"`
-	Label       string          `json:"label,omitempty"`
+	ID           string          `json:"id"`
+	HostID       string          `json:"hostId,omitempty"`
+	EngagementID string          `json:"engagementId,omitempty"`
+	Type         ForwardRuleType `json:"type"` // "L", "R", "D"
+	BindAddress  string          `json:"bindAddress"`
+	BindPort     uint16          `json:"bindPort"`
+	TargetHost   string          `json:"targetHost,omitempty"`
+	TargetPort   uint16          `json:"targetPort,omitempty"`
+	AutoStart    bool            `json:"autoStart"`
+	Label        string          `json:"label,omitempty"`
 }
 
 // ForwardTunnelStatus represents the runtime status and metrics of an active port forwarding tunnel (F-13).
@@ -285,6 +286,7 @@ const (
 type ProxyProfile struct {
 	ID            string           `json:"id"`
 	Name          string           `json:"name"`
+	EngagementID  string           `json:"engagementId,omitempty"`
 	Type          ProxyProfileType `json:"type"` // "jump", "command", "socks5"
 	JumpHostIDs   []string         `json:"jumpHostIds,omitempty"`
 	Command       string           `json:"command,omitempty"`
@@ -297,6 +299,7 @@ type ProxyProfile struct {
 type ProxyProfileSummary struct {
 	ID            string           `json:"id"`
 	Name          string           `json:"name"`
+	EngagementID  string           `json:"engagementId,omitempty"`
 	Type          ProxyProfileType `json:"type"`
 	JumpHostIDs   []string         `json:"jumpHostIds,omitempty"`
 	Command       string           `json:"command,omitempty"`

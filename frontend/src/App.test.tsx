@@ -88,7 +88,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     render(<App />);
 
     // Open Keychain and generate Ed25519 key
-    fireEvent.click(screen.getByRole('button', { name: /^Tools/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Intel & Keys/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Keychain/i }));
     fireEvent.change(screen.getByLabelText('Key Label'), { target: { value: 'Laptop Ed25519' } });
     fireEvent.click(screen.getByRole('button', { name: /Generate Keypair/i }));
@@ -272,17 +272,17 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     render(<App />);
 
     // 1. Verify Top Bar Menu System
-    const vaultMenuBtn = screen.getByRole('button', { name: /Vault ▾/i });
-    const toolsMenuBtn = screen.getByRole('button', { name: /Tools ▾/i });
     const viewMenuBtn = screen.getByRole('button', { name: /View ▾/i });
+    const terminalsMenuBtn = screen.getByRole('button', { name: /Terminals ▾/i });
+    const intelMenuBtn = screen.getByRole('button', { name: /Intel & Keys ▾/i });
 
-    expect(vaultMenuBtn).toBeInTheDocument();
-    expect(toolsMenuBtn).toBeInTheDocument();
     expect(viewMenuBtn).toBeInTheDocument();
+    expect(terminalsMenuBtn).toBeInTheDocument();
+    expect(intelMenuBtn).toBeInTheDocument();
 
-    // Open Tools dropdown and trigger Command Palette
-    fireEvent.click(toolsMenuBtn);
-    expect(screen.getByRole('menu', { name: 'Tools Menu' })).toBeInTheDocument();
+    // Open Intel & Keys dropdown and trigger Command Palette
+    fireEvent.click(intelMenuBtn);
+    expect(screen.getByRole('menu', { name: 'Intel and Keys Menu' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: /Command Palette/i }));
     expect(screen.getByRole('dialog', { name: 'Command Palette' })).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
@@ -425,10 +425,10 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
     expect(sidebar).not.toHaveClass('collapsed');
 
-    // 1. Open Local PowerShell terminal via Hoverable Tools Menu
-    const toolsBtn = screen.getByRole('button', { name: /Tools ▾/i });
+    // 1. Open Local PowerShell terminal via Hoverable Terminals Menu
+    const toolsBtn = screen.getByRole('button', { name: /Terminals ▾/i });
     fireEvent.mouseEnter(toolsBtn);
-    expect(screen.getByRole('menu', { name: 'Tools Menu' })).toBeInTheDocument();
+    expect(screen.getByRole('menu', { name: 'Terminals Menu' })).toBeInTheDocument();
 
     const pwshItem = screen.getByRole('menuitem', { name: /Local Shell \(PowerShell\)/i });
     fireEvent.click(pwshItem);
@@ -445,7 +445,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('button', { name: 'Split Vertical' }));
     expect(screen.getByLabelText('Pane Local (PowerShell) (V-Split #3)')).toBeInTheDocument();
 
-    // 3. Open Local Command Prompt (CMD) via Tools Menu
+    // 3. Open Local Command Prompt (CMD) via Terminals Menu
     fireEvent.mouseEnter(toolsBtn);
     const cmdItem = screen.getByRole('menuitem', { name: /Local Shell \(Command Prompt\)/i });
     fireEvent.click(cmdItem);
@@ -453,9 +453,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByRole('tab', { name: 'Tab Local (CMD)' })).toBeInTheDocument();
     expect(screen.getByLabelText('Pane Local (CMD)')).toBeInTheDocument();
 
-    // 4. Open Serial / UART Console Connection Modal (F-23)
+    // 4. Open Hardware Bus & UART Logic Connection Modal (F-23)
     fireEvent.mouseEnter(toolsBtn);
-    const serialItem = screen.getByRole('menuitem', { name: /Serial \/ UART Console \(COM\)/i });
+    const serialItem = screen.getByRole('menuitem', { name: /Hardware Bus & UART Logic \(F-23\)/i });
     fireEvent.click(serialItem);
 
     expect(screen.getByRole('dialog', { name: 'Serial Connection' })).toBeInTheDocument();
@@ -551,8 +551,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
   it('spawns new terminals in Default Directory, Current Directory (CWD), and Root Shell (F-10)', () => {
     render(<App />);
 
-    // 1. Open Local Shell (PowerShell) via Tools Menu
-    const toolsBtn = screen.getByRole('button', { name: /Tools ▾/i });
+    // 1. Open Local Shell (PowerShell) via Terminals Menu
+    const toolsBtn = screen.getByRole('button', { name: /Terminals ▾/i });
     fireEvent.mouseEnter(toolsBtn);
     const pwshItem = screen.getByRole('menuitem', { name: /Local Shell \(PowerShell\)/i });
     fireEvent.click(pwshItem);
@@ -1069,14 +1069,14 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Wait for initial vault load
       expect(await screen.findByText('Bastion EU')).toBeInTheDocument();
 
-      // 1. Open Tools -> Proxy Profiles
-      const toolsBtn = screen.getByRole('button', { name: /Tools/i });
+      // 1. Open Terminals -> Proxy Profiles
+      const toolsBtn = screen.getByRole('button', { name: /Terminals ▾/i });
       fireEvent.click(toolsBtn);
       const profilesMenuItem = screen.getByRole('menuitem', { name: /Proxy Profiles/i });
       fireEvent.click(profilesMenuItem);
 
       // Verify Proxy Profiles modal is open
-      expect(screen.getByText('Proxy Profiles')).toBeInTheDocument();
+      expect(screen.getByText(/Proxy Profiles & Bastion Chains/i)).toBeInTheDocument();
       expect(screen.getByText('Corporate SOCKS5')).toBeInTheDocument();
 
       // Click "+ New Proxy Profile"
@@ -1236,8 +1236,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       fireEvent.click(screen.getByRole('button', { name: /^Connect$/i }));
       expect(await screen.findByText(/Connected to Production DB/i)).toBeInTheDocument();
 
-      // 1. Open Tools -> Command Snippets & Variables
-      const toolsBtn = screen.getByRole('button', { name: /Tools/i });
+      // 1. Open Recon & Exploit -> Command Snippets & Variables
+      const toolsBtn = screen.getByRole('button', { name: /Recon & Exploit/i });
       fireEvent.click(toolsBtn);
       const snippetsMenuItem = screen.getByRole('menuitem', { name: /Command Snippets/i });
       fireEvent.click(snippetsMenuItem);
@@ -1551,8 +1551,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       render(<App initialLocked={false} />);
       expect(await screen.findByText('Production Bastion')).toBeInTheDocument();
 
-      // 1. Open Tools menu and click "TOTP Authenticator Generator"
-      const toolsBtn = screen.getByRole('button', { name: /Tools/i });
+      // 1. Open Intel & Keys menu and click "TOTP Authenticator Generator"
+      const toolsBtn = screen.getByRole('button', { name: /Intel & Keys/i });
       fireEvent.click(toolsBtn);
 
       const totpMenuItem = screen.getByRole('menuitem', { name: /TOTP Authenticator Generator/i });
@@ -1619,11 +1619,15 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       const closeBtn = screen.getByRole('button', { name: 'Close TOTP Authenticator' });
       fireEvent.click(closeBtn);
 
-      // 5. Connect to host and test terminal 2FA injection button
+      // 5. Connect to host, open 2FA sidebar panel, and test terminal 2FA injection button
       const connectBtn = screen.getByRole('button', { name: /^Connect$/i });
       fireEvent.click(connectBtn);
 
-      // Wait for terminal session header to show 2FA button
+      // Open 2FA / TOTP panel in the HOST section of the sidebar
+      const sidebarTotpBtn = screen.getByRole('button', { name: '2FA and TOTP Panel' });
+      fireEvent.click(sidebarTotpBtn);
+
+      // Wait for 2FA sidebar header to show Quick Inject 2FA button
       const inject2faBtn = await screen.findByRole('button', { name: /🔐 2FA \/ TOTP/i });
       expect(inject2faBtn).toBeInTheDocument();
 
@@ -1668,8 +1672,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('button', { name: 'Save Host' }));
     expect(await screen.findByText('Core Router')).toBeInTheDocument();
 
-    // 2. Open Host Notes via Tools -> Host Notes & Docs
-    fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
+    // 2. Open Host Notes via Intel & Keys -> Host Notes & Docs
+    fireEvent.click(screen.getByRole('button', { name: /Intel & Keys/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Host Notes & Docs/i }));
 
     const notesDialog = screen.getByRole('dialog', { name: 'Host Notes & Documentation' });
@@ -1735,7 +1739,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.queryByLabelText(/Notes Pane Notes: Core Router/i)).toBeNull();
 
     // 6. Search Notes via Command Palette (Ctrl+K)
-    fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Intel & Keys/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Command Palette/i }));
 
     const paletteInput = screen.getByLabelText('Command Palette Input');
@@ -1779,8 +1783,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(recBtn);
     expect(recBtn).toHaveTextContent('⏺ REC');
 
-    // 4. Open Session Logs & Recordings via Tools -> Session Logs & Recordings (F-21)
-    fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
+    // 4. Open Session Logs & Recordings via Intel & Keys -> Session Logs & Recordings (F-21)
+    fireEvent.click(screen.getByRole('button', { name: /Intel & Keys/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Session Logs & Recordings/i }));
 
     const logsDialog = await screen.findByRole('dialog', { name: 'Session Logs & Recordings' });
@@ -1818,9 +1822,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     const pane2 = await screen.findByLabelText('Pane Cluster Node (H-Split #2)');
     expect(pane2).toBeInTheDocument();
 
-    // 3. Toggle Broadcast Input via toolbar button
-    const broadcastToggleBtn = screen.getByRole('button', { name: 'Toggle Broadcast Input' });
-    fireEvent.click(broadcastToggleBtn);
+    // 3. Toggle Broadcast Input via Alt+B shortcut
+    fireEvent.keyDown(window, { key: 'b', altKey: true });
 
     // 4. Verify Broadcast status pill in top header
     const broadcastStatusPill = await screen.findByRole('status', { name: 'Broadcast Input Mode Active' });
@@ -1860,10 +1863,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByLabelText('Pane Cluster Node')).not.toHaveClass('is-broadcasting');
     expect(screen.getByLabelText('Pane Cluster Node (H-Split #2)')).not.toHaveClass('is-broadcasting');
 
-    // 8. Test Toggle via Tools Dropdown Menu & Disarm via Escape key
-    fireEvent.click(screen.getByRole('button', { name: /Tools/i }));
-    const broadcastMenuItem = screen.getByRole('menuitem', { name: /Broadcast Input Mode/i });
-    fireEvent.click(broadcastMenuItem);
+    // 8. Test Toggle via Alt+B & Disarm via Escape key
+    fireEvent.keyDown(window, { key: 'b', altKey: true });
 
     expect(await screen.findByRole('status', { name: 'Broadcast Input Mode Active' })).toBeInTheDocument();
     expect(screen.getByLabelText('Pane Cluster Node')).toHaveClass('is-broadcasting');
@@ -2256,8 +2257,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Wait for vault to load hosts and labels in sidebar
       expect((await screen.findAllByText('Internal-Postgres')).length).toBeGreaterThan(0);
 
-      // 1. Open Tools dropdown and launch Network Topology Map tab
-      const toolsMenuBtn = await screen.findByRole('button', { name: /Tools/i });
+      // 1. Open View dropdown and launch Network Topology Map tab
+      const toolsMenuBtn = await screen.findByRole('button', { name: /^View/i });
       fireEvent.click(toolsMenuBtn);
       const openMapBtn = await screen.findByText(/Interactive Network Topology Map/i);
       expect(openMapBtn).toBeInTheDocument();
@@ -2527,9 +2528,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     try {
       render(<App />);
 
-      // 1. Open Settings modal via Vault menu -> Storage & Sync
-      fireEvent.click(screen.getByRole('button', { name: /^Vault ▾/i }));
-      const syncMenuItem = screen.getByRole('menuitem', { name: /Storage & Sync/i });
+      // 1. Open Settings modal -> Storage & Sync
+      fireEvent.click(screen.getByRole('button', { name: /Settings ⚙/i }));
+      const syncMenuItem = screen.getByRole('tab', { name: /Storage & Sync/i });
       fireEvent.click(syncMenuItem);
 
       // Verify Settings opens on the Storage & Sync tab
@@ -2751,8 +2752,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Wait for app to render
       expect(screen.getByLabelText('DoubleAgent Workspace')).toBeInTheDocument();
 
-      // 1. Open Raw TCP modal via Tools dropdown
-      const toolsMenuBtn = screen.getByRole('button', { name: /^Tools/i });
+      // 1. Open Raw TCP modal via Terminals dropdown
+      const toolsMenuBtn = screen.getByRole('button', { name: /^Terminals/i });
       fireEvent.click(toolsMenuBtn);
       const rawTcpToolBtn = screen.getByText(/Raw TCP \/ Netcat \(F-31\)/i);
       fireEvent.click(rawTcpToolBtn);
@@ -2784,7 +2785,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
       // 3. Test Inbound Listener mode
       // Re-open Raw TCP modal
-      fireEvent.click(screen.getByRole('button', { name: /^Tools/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^Terminals/i }));
       fireEvent.click(screen.getByText(/Raw TCP \/ Netcat \(F-31\)/i));
 
       // Switch to Listener tab

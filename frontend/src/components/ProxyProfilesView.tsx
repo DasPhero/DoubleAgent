@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ProxyProfile, ProxyProfileSummary, ProxyProfileType } from '../types/proxy';
+import { CyberIcon } from './CyberIcon';
 
 export interface HostOption {
   id: string;
@@ -8,9 +9,16 @@ export interface HostOption {
   port?: number;
 }
 
+export interface EngagementOption {
+  id: string;
+  name: string;
+}
+
 export interface ProxyProfilesViewProps {
   profiles: ProxyProfileSummary[];
   hosts: HostOption[];
+  engagements?: EngagementOption[];
+  activeEngagementId?: string;
   onSaveProfile: (profile: ProxyProfile) => Promise<void>;
   onDeleteProfile: (profileId: string) => Promise<void>;
   onOpenProxychainsExport: () => void;
@@ -20,6 +28,8 @@ export interface ProxyProfilesViewProps {
 export function ProxyProfilesView({
   profiles,
   hosts,
+  engagements = [],
+  activeEngagementId = '',
   onSaveProfile,
   onDeleteProfile,
   onOpenProxychainsExport,
@@ -27,9 +37,11 @@ export function ProxyProfilesView({
 }: ProxyProfilesViewProps): React.JSX.Element {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [scopeFilter, setScopeFilter] = useState<'context' | 'engagement' | 'global' | 'all'>('context');
 
   // Form states
   const [name, setName] = useState<string>('');
+  const [profileEngagementId, setProfileEngagementId] = useState<string>(activeEngagementId || '');
   const [type, setType] = useState<ProxyProfileType>('jump');
   const [jumpHostIds, setJumpHostIds] = useState<string[]>([]);
   const [customJumpSpec, setCustomJumpSpec] = useState<string>('');
@@ -46,6 +58,7 @@ export function ProxyProfilesView({
     setShowAddForm(false);
     setEditingProfileId(null);
     setName('');
+    setProfileEngagementId(activeEngagementId || '');
     setType('jump');
     setJumpHostIds([]);
     setCustomJumpSpec('');
@@ -60,6 +73,7 @@ export function ProxyProfilesView({
   const handleStartEdit = (p: ProxyProfileSummary) => {
     setEditingProfileId(p.id);
     setName(p.name);
+    setProfileEngagementId(p.engagementId || '');
     setType(p.type);
     setJumpHostIds(p.jumpHostIds || []);
     setCommand(p.command || '');
@@ -70,6 +84,17 @@ export function ProxyProfilesView({
     setShowAddForm(true);
     setFormError('');
   };
+
+  const filteredProfiles = profiles.filter((p) => {
+    const pEng = p.engagementId || '';
+    if (scopeFilter === 'all') return true;
+    if (scopeFilter === 'global') return pEng === '';
+    if (scopeFilter === 'engagement') {
+      return activeEngagementId ? pEng === activeEngagementId : pEng !== '';
+    }
+    if (!activeEngagementId) return pEng === '';
+    return pEng === '' || pEng === activeEngagementId;
+  });
 
   const handleAddJumpHop = (hostId: string) => {
     if (!hostId || jumpHostIds.includes(hostId)) return;
@@ -126,6 +151,7 @@ export function ProxyProfilesView({
       const profileToSave: ProxyProfile = {
         id: editingProfileId || `prof-${Date.now()}`,
         name: name.trim(),
+        engagementId: profileEngagementId || undefined,
         type,
         jumpHostIds: type === 'jump' ? jumpHostIds : undefined,
         command: type === 'command' ? command.trim() : undefined,
@@ -194,9 +220,9 @@ export function ProxyProfilesView({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                <span>🛡️ </span>
-                <span>Proxy Profiles</span>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CyberIcon name="shield" size={16} />
+                <span>Proxy Profiles &amp; Bastion Chains</span>
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 VAULT-PROXIES // JUMP CHAINS · SOCKS5 (WITH AUTH) · COMMAND
@@ -208,8 +234,10 @@ export function ProxyProfilesView({
               type="button"
               className="cyber-btn cyber-btn-secondary cyber-btn-sm"
               onClick={onOpenProxychainsExport}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
             >
-              ⛓️ Export proxychains.conf
+              <CyberIcon name="chain" size={12} />
+              <span>Export proxychains.conf</span>
             </button>
             <button
               type="button"
@@ -224,22 +252,47 @@ export function ProxyProfilesView({
 
         {/* Content Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          {/* Top Actions */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-              {profiles.length} configured profile{profiles.length === 1 ? '' : 's'}
+          {/* Top Actions & Scope Filter */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {filteredProfiles.length} of {profiles.length} profile{profiles.length === 1 ? '' : 's'}
+              </span>
+              {engagements.length > 0 && (
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {(
+                    [
+                      { id: 'context', label: activeEngagementId ? 'Active Engagement + Global' : 'Global (Casual Mode)' },
+                      { id: 'engagement', label: 'Engagement Only' },
+                      { id: 'global', label: 'Global Only' },
+                      { id: 'all', label: `All (${profiles.length})` },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={`cyber-btn cyber-btn-sm ${scopeFilter === tab.id ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
+                      style={{ fontSize: '0.7rem', padding: '3px 8px' }}
+                      onClick={() => setScopeFilter(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {!showAddForm && (
               <button
                 type="button"
                 className="cyber-btn cyber-btn-primary"
+                aria-label="+ New Proxy Profile"
                 onClick={() => {
                   resetForm();
                   setShowAddForm(true);
                 }}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                <span>+</span>
+                <CyberIcon name="plus" size={12} />
                 <span>New Proxy Profile</span>
               </button>
             )}
@@ -287,7 +340,7 @@ export function ProxyProfilesView({
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
                     Profile Name *
@@ -301,6 +354,25 @@ export function ProxyProfilesView({
                     style={{ width: '100%', padding: '8px 12px' }}
                     required
                   />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                    Configuration Scope
+                  </label>
+                  <select
+                    aria-label="Profile Scope"
+                    className="cyber-hud-select"
+                    value={profileEngagementId}
+                    onChange={(e) => setProfileEngagementId(e.target.value)}
+                    style={{ width: '100%', height: '36px' }}
+                  >
+                    <option value="">Global (All Engagements)</option>
+                    {engagements.map((eng) => (
+                      <option key={eng.id} value={eng.id}>
+                        Engagement: {eng.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
@@ -529,7 +601,7 @@ export function ProxyProfilesView({
                   </div>
                   {hasExistingPassword && (
                     <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--accent-bright)' }}>
-                      🔒 Password is saved in encrypted vault. Leave blank to keep existing password.
+                      Password is saved in encrypted vault. Leave blank to keep existing password.
                     </div>
                   )}
                 </div>
@@ -558,7 +630,7 @@ export function ProxyProfilesView({
           )}
 
           {/* Profiles List */}
-          {profiles.length === 0 ? (
+          {filteredProfiles.length === 0 ? (
             <div
               style={{
                 textAlign: 'center',
@@ -568,12 +640,14 @@ export function ProxyProfilesView({
                 border: '1px dashed var(--border-color)',
               }}
             >
-              <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🛡️</div>
+              <div style={{ marginBottom: '12px', color: '#00f0ff', display: 'flex', justifyContent: 'center' }}>
+                <CyberIcon name="shield" size={32} />
+              </div>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'var(--text-bright)' }}>
                 No Proxy Profiles Configured
               </h3>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '420px', marginInline: 'auto' }}>
-                Create a proxy profile to route SSH connections through jump bastions, local streaming commands, or SOCKS5 proxies.
+                Create a global or engagement-scoped proxy profile to route SSH connections through jump bastions, local streaming commands, or SOCKS5 proxies.
               </p>
               <button
                 type="button"
@@ -588,11 +662,12 @@ export function ProxyProfilesView({
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '16px' }}>
-              {profiles.map((p) => {
+              {filteredProfiles.map((p) => {
                 const badgeColor =
                   p.type === 'jump' ? '#2dd4bf' : p.type === 'command' ? '#c084fc' : '#fbbf24';
                 const badgeLabel =
                   p.type === 'jump' ? 'ProxyJump' : p.type === 'command' ? 'ProxyCommand' : 'SOCKS5';
+                const profEngagement = engagements.find((e) => e.id === p.engagementId);
 
                 return (
                   <div
@@ -609,10 +684,24 @@ export function ProxyProfilesView({
                     }}
                   >
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-bright)' }}>
-                          {p.name}
-                        </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-bright)' }}>
+                            {p.name}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              color: profEngagement ? '#00f0ff' : '#94a3b8',
+                              background: profEngagement ? 'rgba(0, 240, 255, 0.12)' : 'rgba(148, 163, 184, 0.1)',
+                              border: `1px solid ${profEngagement ? 'rgba(0, 240, 255, 0.4)' : 'rgba(148, 163, 184, 0.25)'}`,
+                              padding: '1px 6px',
+                              fontFamily: 'JetBrains Mono, monospace',
+                            }}
+                          >
+                            {profEngagement ? `ENGAGEMENT: ${profEngagement.name}` : 'GLOBAL'}
+                          </span>
+                        </div>
                         <span
                           style={{
                             background: `${badgeColor}22`,
@@ -656,7 +745,7 @@ export function ProxyProfilesView({
                             </code>
                             {p.socksUsername && (
                               <span style={{ marginLeft: '8px', opacity: 0.8 }}>
-                                (User: {p.socksUsername}{p.hasPassword ? ', 🔒 Pass' : ''})
+                                (User: {p.socksUsername}{p.hasPassword ? ', Encrypted Pass' : ''})
                               </span>
                             )}
                           </div>

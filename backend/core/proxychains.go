@@ -18,12 +18,13 @@ const (
 
 // ProxychainsProxyEntry represents a single proxy hop in proxychains.conf (F-14).
 type ProxychainsProxyEntry struct {
-	Type     string `json:"type"` // "socks5", "socks4", "http"
-	Host     string `json:"host"`
-	Port     uint16 `json:"port"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	Comment  string `json:"comment,omitempty"`
+	Type         string `json:"type"` // "socks5", "socks4", "http"
+	Host         string `json:"host"`
+	Port         uint16 `json:"port"`
+	Username     string `json:"username,omitempty"`
+	Password     string `json:"password,omitempty"`
+	Comment      string `json:"comment,omitempty"`
+	EngagementID string `json:"engagementId,omitempty"`
 }
 
 // ProxychainsExportOptions configures the generation of proxychains.conf (F-14).
@@ -124,9 +125,20 @@ func BuildDefaultProxychainsOptions(payload VaultPayload) ProxychainsExportOptio
 		Proxies:           make([]ProxychainsProxyEntry, 0),
 	}
 
-	// 1. Dynamic forwarding rules (-D SOCKS5 proxies)
+	var activeEngID string
+	for _, e := range payload.Engagements {
+		if e.IsActive {
+			activeEngID = e.ID
+			break
+		}
+	}
+
+	// 1. Dynamic forwarding rules (-D SOCKS5 proxies) — include Global ("") + Active Engagement
 	for _, rule := range payload.ForwardRules {
 		if rule.Type == ForwardDynamic {
+			if rule.EngagementID != "" && activeEngID != "" && rule.EngagementID != activeEngID {
+				continue
+			}
 			bindAddr := rule.BindAddress
 			if bindAddr == "" || bindAddr == "0.0.0.0" {
 				bindAddr = "127.0.0.1"
@@ -136,17 +148,21 @@ func BuildDefaultProxychainsOptions(payload VaultPayload) ProxychainsExportOptio
 				comment = "Dynamic -D rule for host " + rule.HostID
 			}
 			opts.Proxies = append(opts.Proxies, ProxychainsProxyEntry{
-				Type:    "socks5",
-				Host:    bindAddr,
-				Port:    rule.BindPort,
-				Comment: comment,
+				Type:         "socks5",
+				Host:         bindAddr,
+				Port:         rule.BindPort,
+				Comment:      comment,
+				EngagementID: rule.EngagementID,
 			})
 		}
 	}
 
-	// 2. Saved SOCKS5 proxy profiles
+	// 2. Saved SOCKS5 proxy profiles — include Global ("") + Active Engagement
 	for _, prof := range payload.ProxyProfiles {
 		if prof.Type == ProxyTypeSocks5 && prof.SocksAddress != "" {
+			if prof.EngagementID != "" && activeEngID != "" && prof.EngagementID != activeEngID {
+				continue
+			}
 			host := prof.SocksAddress
 			port := uint16(1080)
 			if h, pStr, err := netSplitHostPort(prof.SocksAddress); err == nil {
@@ -156,12 +172,13 @@ func BuildDefaultProxychainsOptions(payload VaultPayload) ProxychainsExportOptio
 				}
 			}
 			opts.Proxies = append(opts.Proxies, ProxychainsProxyEntry{
-				Type:     "socks5",
-				Host:     host,
-				Port:     port,
-				Username: prof.SocksUsername,
-				Password: prof.SocksPassword,
-				Comment:  "Profile: " + prof.Name,
+				Type:         "socks5",
+				Host:         host,
+				Port:         port,
+				Username:     prof.SocksUsername,
+				Password:     prof.SocksPassword,
+				Comment:      "Profile: " + prof.Name,
+				EngagementID: prof.EngagementID,
 			})
 		}
 	}
@@ -186,4 +203,3 @@ func netSplitHostPort(addr string) (string, string, error) {
 	}
 	return addr[:idx], addr[idx+1:], nil
 }
-

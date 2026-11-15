@@ -4746,6 +4746,22 @@ func (a *App) DeleteEngagement(id string) error {
 	}
 	payload.Credentials = filteredCreds
 
+	filteredRules := make([]core.ForwardRule, 0, len(payload.ForwardRules))
+	for _, r := range payload.ForwardRules {
+		if r.EngagementID != id {
+			filteredRules = append(filteredRules, r)
+		}
+	}
+	payload.ForwardRules = filteredRules
+
+	filteredProxies := make([]core.ProxyProfile, 0, len(payload.ProxyProfiles))
+	for _, p := range payload.ProxyProfiles {
+		if p.EngagementID != id {
+			filteredProxies = append(filteredProxies, p)
+		}
+	}
+	payload.ProxyProfiles = filteredProxies
+
 	if err := a.vaultStore.SavePayload(a.ctx, payload); err != nil {
 		return err
 	}

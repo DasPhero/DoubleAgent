@@ -992,7 +992,8 @@ export interface SerialPortInfo {
   isConnected?: boolean;
 }
 
-export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'listeners' | 'notes' | 'credentials';
+export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'listeners' | 'notes' | 'totp' | 'credentials';
+export type NavDropdownMenu = 'view' | 'engagement-tools' | 'terminals' | 'offense' | 'intel';
 
 interface WailsRuntime {
   EventsOn: (eventName: string, callback: (data: unknown) => void) => () => void;
@@ -1081,6 +1082,9 @@ export function App({
   const [snippetDrawerQuery, setSnippetDrawerQuery] = useState<string>('');
   const [snippetDrawerOs, setSnippetDrawerOs] = useState<'all' | 'linux' | 'windows'>('all');
   const [credDrawerQuery, setCredDrawerQuery] = useState<string>('');
+  const [credDrawerScope, setCredDrawerScope] = useState<'host_and_engagement' | 'all'>('host_and_engagement');
+  const [totpDrawerScope, setTotpDrawerScope] = useState<'host_and_global' | 'all'>('host_and_global');
+  const [drawerTotpCodes, setDrawerTotpCodes] = useState<Record<string, TotpCodeResponse>>({});
   const [scratchpadContent, setScratchpadContent] = useState<string>(() => {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -1143,6 +1147,39 @@ export function App({
     }
   }, [activeSidebarPanel]);
 
+  useEffect(() => {
+    if (activeSidebarPanel !== 'totp') return;
+    let active = true;
+    const pollTotp = async () => {
+      const api = getWailsBindings();
+      if (api?.ListTotpRecords) {
+        try {
+          const list = await api.ListTotpRecords();
+          if (active && Array.isArray(list)) {
+            setTotpTokensList(list);
+          }
+        } catch {}
+      }
+      if (api?.GetAllTotpCodes) {
+        try {
+          const res = await api.GetAllTotpCodes();
+          if (active && Array.isArray(res)) {
+            const map: Record<string, TotpCodeResponse> = {};
+            for (const c of res) {
+              map[c.id] = c;
+            }
+            setDrawerTotpCodes(map);
+          }
+        } catch {}
+      }
+    };
+    void pollTotp();
+    const interval = window.setInterval(() => void pollTotp(), 1000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [activeSidebarPanel]);
 
   const [serialDetecting, setSerialDetecting] = useState<boolean>(false);
   const [serialDetectResult, setSerialDetectResult] = useState<SerialAutoDetectResult | null>(null);
@@ -1152,7 +1189,7 @@ export function App({
   const [, setRxDataTicks] = useState<number>(0);
   const menuCloseTimerRef = useRef<number | null>(null);
 
-  const handleMenuEnter = (menu: 'vault' | 'tools' | 'view' | 'engagement-tools'): void => {
+  const handleMenuEnter = (menu: NavDropdownMenu): void => {
     if (menuCloseTimerRef.current !== null) {
       window.clearTimeout(menuCloseTimerRef.current);
       menuCloseTimerRef.current = null;
@@ -1345,7 +1382,7 @@ export function App({
   const [hostKeyPrompt, setHostKeyPrompt] = useState<HostKeyPromptInfo | null>(null);
 
   // Top Bar Dropdowns & Tab Groups state (F-09)
-  const [activeDropdownMenu, setActiveDropdownMenu] = useState<'vault' | 'tools' | 'view' | 'engagement-tools' | null>(
+  const [activeDropdownMenu, setActiveDropdownMenu] = useState<NavDropdownMenu | null>(
     null
   );
   const [groupTabsByHost, setGroupTabsByHost] = useState<boolean>(false);
@@ -2108,11 +2145,11 @@ export function App({
     try {
       if (api.ListForwardRules) {
         const rules = await api.ListForwardRules();
-        setForwardRules(rules || []);
+        setForwardRules(rules ? [...rules] : []);
       }
       if (api.GetActiveTunnels) {
         const tunnels = await api.GetActiveTunnels();
-        setActiveTunnels(tunnels || []);
+        setActiveTunnels(tunnels ? [...tunnels] : []);
       }
     } catch {
       // ignore
@@ -3282,6 +3319,7 @@ export function App({
           socksAddress: profile.socksAddress,
           socksUsername: profile.socksUsername,
           hasPassword: !!profile.socksPassword,
+          engagementId: profile.engagementId,
         };
         let next: ProxyProfileSummary[];
         if (idx >= 0) {
@@ -3675,9 +3713,14 @@ export function App({
     });
   }, [vaultSummary.snippets, snippetDrawerOs, snippetDrawerQuery]);
 
+  const activeHostId = activePane?.hostId || activeTab?.hostId;
+
   const filteredDrawerCreds = useMemo(() => {
     const list = drawerCreds || [];
-    return list.filter((c: CredentialEntry) => {
+    const filtered = list.filter((c: CredentialEntry) => {
+      if (credDrawerScope === 'host_and_engagement' && activeHostId) {
+        if (c.hostId && c.hostId !== activeHostId) return false;
+      }
       if (credDrawerQuery) {
         const q = credDrawerQuery.toLowerCase();
         const matchesLabel = (c.label || '').toLowerCase().includes(q);
@@ -3687,7 +3730,12 @@ export function App({
       }
       return true;
     });
-  }, [drawerCreds, credDrawerQuery]);
+    return filtered.sort((a, b) => {
+      const aMatch = activeHostId && a.hostId === activeHostId ? 1 : 0;
+      const bMatch = activeHostId && b.hostId === activeHostId ? 1 : 0;
+      return bMatch - aMatch;
+    });
+  }, [drawerCreds, credDrawerScope, activeHostId, credDrawerQuery]);
 
   const drawerChains = useMemo(() => {
     return chains.length > 0 ? chains : (vaultSummary.snippetChains || []);
@@ -6711,19 +6759,6 @@ export function App({
               )}
               <button
                 type="button"
-                className="pane-hud-btn"
-                aria-label={`Run Snippet in ${node.title}`}
-                title="Run command snippet in this terminal"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSnippetActiveSessionId(node.sessionId);
-                  setShowSnippetsModal(true);
-                }}
-              >
-                <CyberIcon name="bolt" size={12} />
-              </button>
-              <button
-                type="button"
                 className={`pane-hud-btn pane-rec-btn ${activeLogSessions.has(node.sessionId) ? 'recording' : ''}`}
                 aria-label={`Toggle Session Logging for ${node.title}`}
                 title="Toggle Timestamped Session Logging"
@@ -6772,18 +6807,6 @@ export function App({
                     }}
                   >
                     <CyberIcon name="note" size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    className="pane-hud-btn"
-                    aria-label={`Pin Notes Split for ${node.title}`}
-                    title="Pin notes as horizontal split view alongside terminal"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePinNotesSplit(node.hostId);
-                    }}
-                  >
-                    <CyberIcon name="pin" size={11} />
                   </button>
                 </div>
               )}
@@ -7659,8 +7682,8 @@ export function App({
       },
     },
     serial: {
-      label: 'Serial / UART Console (COM)',
-      shortLabel: 'Serial COM',
+      label: 'Hardware Bus & UART Logic (F-23)',
+      shortLabel: 'Hardware Bus',
       icon: 'serial',
       action: () => {
         void handleOpenSerialModal();
@@ -7732,7 +7755,7 @@ export function App({
     },
     tunnels: {
       label: 'Port Forwarding (-L, -R, -D)',
-      shortLabel: activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} Tunnels` : 'Tunnels ⇄',
+      shortLabel: activeTunnels.length > 0 ? `${activeTunnels.length} Tunnels` : 'Tunnels',
       ariaLabel: 'Port Forwarding',
       icon: 'network',
       active: activeTunnels.length > 0,
@@ -8057,229 +8080,7 @@ export function App({
         </div>
 
         <nav className="nav-menu-bar" aria-label="Application Menu">
-            {/* Vault Dropdown */}
-            <div
-              className="nav-menu-container"
-              onMouseEnter={() => handleMenuEnter('vault')}
-              onMouseMove={handleMenuMove}
-              onMouseLeave={handleMenuLeave}
-            >
-              <button
-                type="button"
-                className={`nav-menu-trigger ${activeDropdownMenu === 'vault' ? 'active' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={activeDropdownMenu === 'vault'}
-                onClick={() =>
-                  setActiveDropdownMenu((prev) => (prev === 'vault' ? null : 'vault'))
-                }
-              >
-                <span>Vault</span>
-                <span style={{ fontSize: '0.65rem' }}>▾</span>
-              </button>
-              {activeDropdownMenu === 'vault' && (
-                <div
-                  className="nav-dropdown-menu"
-                  role="menu"
-                  aria-label="Vault Menu"
-                  onMouseEnter={() => handleMenuEnter('vault')}
-                  onMouseMove={handleMenuMove}
-                >
-                  {vaultLocked ? (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        handleOpenVaultButton();
-                      }}
-                    >
-                      <span>{vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleVaultLock();
-                      }}
-                    >
-                      <span>Lock Vault</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setModalError('');
-                      openSettingsTab('security');
-                    }}
-                  >
-                    <span>Vault Security &amp; Hello</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      openSettingsTab('sync');
-                    }}
-                  >
-                    <span>Storage &amp; Sync (F-29)</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      void handleResetVault();
-                    }}
-                  >
-                    <span>Reset Vault</span>
-                  </button>
-                  <div className="nav-dropdown-divider" />
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="nav-dropdown-item"
-                    onClick={() => {
-                      setActiveDropdownMenu(null);
-                      setSettingsActiveTab('about');
-                      setShowGlobalSettingsModal(true);
-                    }}
-                  >
-                    <span>ℹ About DoubleAgent</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Tools Dropdown */}
-            <div
-              className="nav-menu-container"
-              onMouseEnter={() => handleMenuEnter('tools')}
-              onMouseMove={handleMenuMove}
-              onMouseLeave={handleMenuLeave}
-            >
-              <button
-                type="button"
-                className={`nav-menu-trigger ${activeDropdownMenu === 'tools' ? 'active' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={activeDropdownMenu === 'tools'}
-                onClick={() =>
-                  setActiveDropdownMenu((prev) => (prev === 'tools' ? null : 'tools'))
-                }
-              >
-                <span>Tools</span>
-                <span style={{ fontSize: '0.65rem' }}>▾</span>
-              </button>
-              {activeDropdownMenu === 'tools' && (
-                <div
-                  className="nav-dropdown-menu tools-dropdown-menu"
-                  role="menu"
-                  aria-label="Tools Menu"
-                  onMouseEnter={() => handleMenuEnter('tools')}
-                  onMouseMove={handleMenuMove}
-                >
-                  {/* Column 1: Terminals & Connections */}
-                  <div className="tools-dropdown-col">
-                    <div className="tools-col-title">
-                      <span>Terminals &amp; Consoles</span>
-                    </div>
-
-                    <div className="tools-sub-header">Local &amp; Directory Shells</div>
-                    {renderDropdownRow('powershell', 'Local Shell (PowerShell)', undefined, () => void handleOpenLocalTerminal('powershell'))}
-                    {renderDropdownRow('cmd', 'Local Shell (Command Prompt)', undefined, () => void handleOpenLocalTerminal('cmd'))}
-                    {renderDropdownRow('wsl', 'Local Shell (WSL Linux)', undefined, () => void handleOpenLocalTerminal('wsl'))}
-                    {renderDropdownRow('dir-default', 'New in Default Directory', undefined, () => void handleOpenTerminalDirectory('default'))}
-                    {renderDropdownRow('dir-cwd', 'New in Current Directory (CWD)', undefined, () => void handleOpenTerminalDirectory('current'))}
-                    {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', undefined, () => void handleOpenTerminalDirectory('root'))}
-
-                    <div className="tools-sub-header">Hardware &amp; Direct Links</div>
-                    {renderDropdownRow('serial', 'Serial / UART Console (COM)', undefined, () => void handleOpenSerialModal())}
-                    {renderDropdownRow(
-                      'tunnels',
-                      'Port Forwarding (-L, -R, -D)',
-                      activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
-                      () => setShowPortForwardingModal(true),
-                      false,
-                      activeTunnels.length > 0
-                    )}
-                    {renderDropdownRow('network-map', 'Interactive Network Topology Map (F-37)', undefined, () => openNetworkMapTab())}
-                    {renderDropdownRow(
-                      'sftp',
-                      'SFTP File Browser',
-                      undefined,
-                      () => {
-                        if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
-                          openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
-                        }
-                      },
-                      !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
-                    )}
-                  </div>
-
-                  {/* Column 2: Tools & Utilities */}
-                  <div className="tools-dropdown-col">
-                    <div className="tools-col-title">
-                      <span>Tools &amp; Utilities</span>
-                    </div>
-
-                    <div className="tools-sub-header">Security &amp; Credentials</div>
-                    {renderDropdownRow('palette', 'Command Palette', 'Ctrl+K', () => {
-                      setPaletteQuery('');
-                      setShowCommandPalette(true);
-                    })}
-                    {renderDropdownRow('totp', 'TOTP Authenticator Generator', undefined, () => setShowTotpModal(true))}
-                    {renderDropdownRow('keychain', 'Keychain & SSH Keys', undefined, () => {
-                      setModalError('');
-                      setShowKeychainModal(true);
-                    })}
-
-                    <div className="tools-sub-header">Automation &amp; Transcripts</div>
-                    {renderDropdownRow(
-                      'broadcast',
-                      broadcastState.enabled ? 'Disarm Broadcast Mode' : 'Broadcast Input Mode',
-                      'Alt+B',
-                      handleToggleBroadcast,
-                      false,
-                      broadcastState.enabled
-                    )}
-                    {renderDropdownRow('notes', 'Host Notes & Docs', undefined, () => {
-                      setNotesModalHostId(activeTab?.hostId);
-                      setNotesModalInitialNoteId(null);
-                      setShowNotesModal(true);
-                    })}
-                    {renderDropdownRow('session-logs', 'Session Logs & Recordings', undefined, () => {
-                      void refreshSessionLogs();
-                      setShowSessionLogsModal(true);
-                    })}
-                    {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true))}
-                    {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits (F-16)', undefined, () => {
-                      setChainsHostFilter(activeTab?.hostId || null);
-                      setShowChainsModal(true);
-                    })}
-                    {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', undefined, () => setShowProxyProfilesModal(true))}
-
-                    <div className="tools-sub-header">Recon &amp; Network Attacks</div>
-                    {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest (F-39)', undefined, () => setShowNmapImportModal(true))}
-                    {renderDropdownRow('listener-manager', 'Listener Manager (F-32)', undefined, () => setShowListenerManagerModal(true))}
-                    {renderDropdownRow('payload-generator', 'Payload Generator // Shells (F-33)', undefined, () => setShowPayloadGeneratorModal(true))}
-                    {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', undefined, () => setShowRawTcpModal(true))}
-                    {renderDropdownRow('proxychains', 'Export proxychains.conf (F-14)', undefined, () => void handleOpenProxychainsExport())}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* View Dropdown */}
+            {/* 1. View Dropdown (First Button) */}
             <div
               className="nav-menu-container"
               onMouseEnter={() => handleMenuEnter('view')}
@@ -8310,7 +8111,7 @@ export function App({
                   <div className="nav-dropdown-divider" />
                   {renderDropdownRow('new-tab', 'New Connection Tab', 'Ctrl+T', handleOpenNewConnectionTab)}
                   {renderDropdownRow('new-split', 'New Connection Split', undefined, () => handleOpenNewConnectionSplit('right'))}
-                  {renderDropdownRow('view-map', 'Network Topology Map', undefined, openNetworkMapTab)}
+                  {renderDropdownRow('view-map', 'Interactive Network Topology Map (F-37)', undefined, openNetworkMapTab)}
                   {renderDropdownRow('split-h', 'Split Horizontal', undefined, () => void handleSplitPane('horizontal'))}
                   {renderDropdownRow('split-v', 'Split Vertical', undefined, () => void handleSplitPane('vertical'))}
                   {renderDropdownRow('find', 'Find in Terminal', 'Ctrl+F', () => {
@@ -8350,7 +8151,7 @@ export function App({
               <span className="cyber-glitch-slashes">//</span>
             </div>
 
-            {/* Engagement Controls: Dropdown + New Engagement + Engagement Tools */}
+            {/* 2. Engagement Section: Engagement Selector -> + Button -> Engagement Dropdown */}
             <div className="nav-engagement-controls-cluster" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               {/* Engagement Selector Dropdown */}
               <div className="nav-menu-container">
@@ -8363,8 +8164,8 @@ export function App({
                     height: '32px',
                     fontSize: '0.78rem',
                     padding: '2px 10px',
-                    minWidth: '240px',
-                    maxWidth: '340px',
+                    minWidth: '220px',
+                    maxWidth: '320px',
                     border: '1px solid rgba(0, 240, 255, 0.45)',
                     background: 'rgba(5, 12, 22, 0.95)',
                     color: activeEngagement ? '#00f0ff' : '#94a3b8',
@@ -8383,7 +8184,7 @@ export function App({
                 </select>
               </div>
 
-              {/* + New Engagement Button */}
+              {/* + Button (to add a new engagement) */}
               <button
                 type="button"
                 className="nav-menu-trigger nav-engagement-btn"
@@ -8391,13 +8192,24 @@ export function App({
                   setEditingEngagement(null);
                   setShowNewEngagementModal(true);
                 }}
-                style={{ height: '32px', fontSize: '0.74rem', padding: '0 10px', color: '#38bdf8', boxSizing: 'border-box' }}
+                style={{
+                  height: '32px',
+                  width: '32px',
+                  fontSize: '0.85rem',
+                  padding: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#00f0ff',
+                  boxSizing: 'border-box',
+                }}
                 title="Create a new encapsulated target engagement"
+                aria-label="+ New Engagement"
               >
-                <span>+ New Engagement</span>
+                <CyberIcon name="plus" size={13} />
               </button>
 
-              {/* Engagement Specific Tools Menu */}
+              {/* Engagement Dropdown */}
               <div
                 className="nav-menu-container"
                 onMouseEnter={() => handleMenuEnter('engagement-tools')}
@@ -8414,7 +8226,8 @@ export function App({
                   }
                   style={{ height: '32px', fontSize: '0.74rem', padding: '0 10px', boxSizing: 'border-box' }}
                 >
-                  <span>⚔️ Engagement</span>
+                  <CyberIcon name="target" size={12} />
+                  <span>Engagement</span>
                   <span style={{ fontSize: '0.65rem' }}>▾</span>
                 </button>
                 {activeDropdownMenu === 'engagement-tools' && (
@@ -8426,19 +8239,24 @@ export function App({
                     onMouseMove={handleMenuMove}
                   >
                     <div className="tools-sub-header">
-                      {activeEngagement ? `🎯 ${activeEngagement.name}` : 'Casual / Global Mode'}
+                      {activeEngagement ? `ACTIVE: ${activeEngagement.name}` : 'Casual / Global Mode'}
                     </div>
                     {renderDropdownRow('eng-scope', 'Target Scope & Hub (F-36)', undefined, () => setShowEngagementHubModal(true))}
-                    {renderDropdownRow('eng-creds', 'Credential Pool & Spray Lists (F-36)', undefined, () => setShowCredStoreModal(true))}
-                    {renderDropdownRow('eng-evidence', 'Evidence Vault & Findings (F-18)', undefined, () => setShowEvidenceModal(true))}
-                    {renderDropdownRow('eng-nmap', 'Import Nmap XML (-oX) (F-39)', undefined, () => setShowNmapImportModal(true))}
-                    {renderDropdownRow('eng-listeners', 'Listener Manager (F-32)', undefined, () => setShowListenerManagerModal(true))}
-                    {renderDropdownRow('eng-payload', 'Payload Generator (F-33)', undefined, () => setShowPayloadGeneratorModal(true))}
-                    {renderDropdownRow('eng-chains', 'Snippet Chains & Exploits (F-16)', undefined, () => {
-                      setChainsHostFilter(null);
-                      setShowChainsModal(true);
-                    })}
+                    {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists (F-36)', undefined, () => setShowCredStoreModal(true))}
+                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings (F-18)', undefined, () => setShowEvidenceModal(true))}
                     <div className="nav-dropdown-divider" />
+                    <div className="tools-sub-header">Tunnels &amp; Routing (Engagement / Global)</div>
+                    {renderDropdownRow(
+                      'tunnels',
+                      'Port Forwarding & Tunnels (-L, -R, -D) (F-13)',
+                      activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
+                      () => setShowPortForwardingModal(true),
+                      false,
+                      activeTunnels.length > 0
+                    )}
+                    {renderDropdownRow('proxy-profiles', 'Proxy Profiles & Proxychains (F-14)', undefined, () => setShowProxyProfilesModal(true))}
+                    <div className="nav-dropdown-divider" />
+                    <div className="tools-sub-header">Engagement Archive (.daeng)</div>
                     {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', undefined, () => {
                       setShowEngagementHubModal(true);
                     })}
@@ -8448,6 +8266,180 @@ export function App({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Cyberpunk delimiter before Tool Section */}
+            <div className="nav-cyber-divider" aria-hidden="true">
+              <span className="cyber-glitch-slashes">//</span>
+            </div>
+
+            {/* 3. Tool Section: Split into Terminals, Recon & Exploit, and Intel & Keys */}
+            {/* 3a. Terminals Dropdown */}
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('terminals')}
+              onMouseMove={handleMenuMove}
+              onMouseLeave={handleMenuLeave}
+            >
+              <button
+                type="button"
+                className={`nav-menu-trigger ${activeDropdownMenu === 'terminals' ? 'active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'terminals'}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) => (prev === 'terminals' ? null : 'terminals'))
+                }
+              >
+                <CyberIcon name="terminal" size={11} />
+                <span>Terminals</span>
+                <span style={{ fontSize: '0.65rem' }}>▾</span>
+              </button>
+              {activeDropdownMenu === 'terminals' && (
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="Terminals Menu"
+                  onMouseEnter={() => handleMenuEnter('terminals')}
+                  onMouseMove={handleMenuMove}
+                >
+                  <div className="tools-sub-header">Local &amp; Directory Shells</div>
+                  {renderDropdownRow('powershell', 'Local Shell (PowerShell)', undefined, () => void handleOpenLocalTerminal('powershell'))}
+                  {renderDropdownRow('cmd', 'Local Shell (Command Prompt)', undefined, () => void handleOpenLocalTerminal('cmd'))}
+                  {renderDropdownRow('wsl', 'Local Shell (WSL Linux)', undefined, () => void handleOpenLocalTerminal('wsl'))}
+                  {renderDropdownRow('dir-default', 'New in Default Directory', undefined, () => void handleOpenTerminalDirectory('default'))}
+                  {renderDropdownRow('dir-cwd', 'New in Current Directory (CWD)', undefined, () => void handleOpenTerminalDirectory('current'))}
+                  {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', undefined, () => void handleOpenTerminalDirectory('root'))}
+
+                  <div className="nav-dropdown-divider" />
+                  <div className="tools-sub-header">Hardware, Tunnels &amp; Direct Links</div>
+                  {renderDropdownRow('serial', 'Hardware Bus & UART Logic (F-23)', undefined, () => void handleOpenSerialModal())}
+                  {renderDropdownRow(
+                    'tunnels',
+                    'Port Forwarding (-L, -R, -D)',
+                    activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
+                    () => setShowPortForwardingModal(true),
+                    false,
+                    activeTunnels.length > 0
+                  )}
+                  {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', undefined, () => setShowProxyProfilesModal(true))}
+                  {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', undefined, () => setShowRawTcpModal(true))}
+                  {renderDropdownRow(
+                    'sftp',
+                    'SFTP File Browser',
+                    undefined,
+                    () => {
+                      if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
+                        openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
+                      }
+                    },
+                    !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 3b. Recon & Exploit Dropdown (Active Offensive Pentest Phases) */}
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('offense')}
+              onMouseMove={handleMenuMove}
+              onMouseLeave={handleMenuLeave}
+            >
+              <button
+                type="button"
+                className={`nav-menu-trigger ${activeDropdownMenu === 'offense' ? 'active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'offense'}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) => (prev === 'offense' ? null : 'offense'))
+                }
+              >
+                <CyberIcon name="radar" size={11} />
+                <span>Recon &amp; Exploit</span>
+                <span style={{ fontSize: '0.65rem' }}>▾</span>
+              </button>
+              {activeDropdownMenu === 'offense' && (
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="Recon and Exploit Menu"
+                  onMouseEnter={() => handleMenuEnter('offense')}
+                  onMouseMove={handleMenuMove}
+                >
+                  <div className="tools-sub-header">Phase 1 // Recon &amp; Enumeration</div>
+                  {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest (F-39)', undefined, () => setShowNmapImportModal(true))}
+
+                  <div className="nav-dropdown-divider" />
+                  <div className="tools-sub-header">Phase 2 // Delivery &amp; Catchers</div>
+                  {renderDropdownRow('listener-manager', 'Listener Manager (F-32)', undefined, () => setShowListenerManagerModal(true))}
+                  {renderDropdownRow('payload-generator', 'Payload Generator // Shells (F-33)', undefined, () => setShowPayloadGeneratorModal(true))}
+
+                  <div className="nav-dropdown-divider" />
+                  <div className="tools-sub-header">Phase 3 // Execution &amp; Post-Exploit</div>
+                  {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true))}
+                  {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits (F-16)', undefined, () => {
+                    setChainsHostFilter(activeTab?.hostId || null);
+                    setShowChainsModal(true);
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 3c. Intel & Keys Dropdown (Information, Logs, Documentation & Auth) */}
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('intel')}
+              onMouseMove={handleMenuMove}
+              onMouseLeave={handleMenuLeave}
+            >
+              <button
+                type="button"
+                className={`nav-menu-trigger ${activeDropdownMenu === 'intel' ? 'active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'intel'}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) => (prev === 'intel' ? null : 'intel'))
+                }
+              >
+                <CyberIcon name="shield" size={11} />
+                <span>Intel &amp; Keys</span>
+                <span style={{ fontSize: '0.65rem' }}>▾</span>
+              </button>
+              {activeDropdownMenu === 'intel' && (
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="Intel and Keys Menu"
+                  onMouseEnter={() => handleMenuEnter('intel')}
+                  onMouseMove={handleMenuMove}
+                >
+                  <div className="tools-sub-header">Navigation &amp; Quick Search</div>
+                  {renderDropdownRow('palette', 'Command Palette', 'Ctrl+K', () => {
+                    setPaletteQuery('');
+                    setShowCommandPalette(true);
+                  })}
+
+                  <div className="nav-dropdown-divider" />
+                  <div className="tools-sub-header">Documentation &amp; Audit Transcripts</div>
+                  {renderDropdownRow('notes', 'Host Notes & Docs', undefined, () => {
+                    setNotesModalHostId(activeTab?.hostId);
+                    setNotesModalInitialNoteId(null);
+                    setShowNotesModal(true);
+                  })}
+                  {renderDropdownRow('session-logs', 'Session Logs & Recordings', undefined, () => {
+                    void refreshSessionLogs();
+                    setShowSessionLogsModal(true);
+                  })}
+
+                  <div className="nav-dropdown-divider" />
+                  <div className="tools-sub-header">Authentication &amp; Cryptographic Keys</div>
+                  {renderDropdownRow('totp', 'TOTP Authenticator Generator', undefined, () => setShowTotpModal(true))}
+                  {renderDropdownRow('keychain', 'Keychain & SSH Keys', undefined, () => {
+                    setModalError('');
+                    setShowKeychainModal(true);
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Cyberpunk delimiter before Pinned Tools */}
@@ -8525,7 +8517,7 @@ export function App({
               aria-label="Settings ⚙"
             >
               <CyberIcon name="gear" size={12} />
-              <span>Settings ⚙</span>
+              <span>Settings</span>
             </button>
           </nav>
       </header>
@@ -8544,6 +8536,11 @@ export function App({
               }}
               title="DoubleAgent HUD (Click to view Hosts)"
             />
+
+            {/* SECTION 1: Global / Unspecific Actions (Hosts, Snippets, Chains, Active Listeners) */}
+            <div className="activity-bar-section-label" title="Global & Unspecific Tools">
+              OPS
+            </div>
 
             {/* 1. Hosts & Targets */}
             <button
@@ -8628,6 +8625,13 @@ export function App({
               )}
             </button>
 
+            {/* Cyberpunk Section Divider between Global Ops and Host-Specific Context */}
+            <div className="activity-bar-section-divider" role="separator" aria-label="Host Specific Actions">
+              <span className="activity-bar-divider-line" />
+              <span className="activity-bar-section-label">HOST</span>
+            </div>
+
+            {/* SECTION 2: Host & Engagement Specific Actions (Notes, 2FA, Credentials) */}
             {/* 5. Scratchpad & Host Notes (F-17) */}
             <button
               type="button"
@@ -8640,13 +8644,36 @@ export function App({
                   setSidebarCollapsed(false);
                 }
               }}
-              title="Scratchpad & Host Notes (Ctrl+5)"
+              title="Host Notes & Scratchpad (Ctrl+5)"
               aria-label="Scratchpad and Notes Panel"
             >
               <CyberIcon name="note" size={18} />
             </button>
 
-            {/* 6. Credentials & Loot (F-36) */}
+            {/* 6. 2FA / TOTP Authenticators (Active Host + Global) (F-20) */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'totp' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'totp' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('totp');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="2FA / TOTP Authenticators for Active Host & Global (Ctrl+6)"
+              aria-label="2FA and TOTP Panel"
+            >
+              <CyberIcon name="totp" size={18} />
+              {(totpTokensList.length > 0 || (vaultSummary.totpRecords && vaultSummary.totpRecords.length > 0)) && (
+                <span className="activity-bar-badge">
+                  {totpTokensList.length || vaultSummary.totpRecords?.length || 0}
+                </span>
+              )}
+            </button>
+
+            {/* 7. Credentials & Loot (Host & Engagement Bound) (F-36) */}
             <button
               type="button"
               className={`activity-bar-btn ${activeSidebarPanel === 'credentials' && !sidebarCollapsed ? 'active' : ''}`}
@@ -8658,7 +8685,7 @@ export function App({
                   setSidebarCollapsed(false);
                 }
               }}
-              title="Credentials & Loot Pool (Ctrl+6)"
+              title="Host & Engagement Credentials Pool (Ctrl+7)"
               aria-label="Credentials Panel"
             >
               <CyberIcon name="key" size={18} />
@@ -9258,6 +9285,175 @@ export function App({
                 </div>
               )}
 
+              {activeSidebarPanel === 'totp' && (
+                <div className="drawer-panel drawer-totp-panel">
+                  <div className="sidebar-header">
+                    <h2>2FA / TOTP</h2>
+                    <div className="sidebar-actions">
+                      {sessionId && (
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          onClick={() => void handleTerminalTotpClick()}
+                          aria-label="🔐 2FA / TOTP"
+                          title="Quick Inject 2FA code into active terminal"
+                        >
+                          Inject
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setShowTotpModal(true)}
+                        title="Open 2FA Authenticator Vault (F-20)"
+                      >
+                        + 2FA Vault
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '0.1rem 0 0.35rem 0' }}>
+                    Host: <strong style={{ color: '#00f0ff' }}>{activeTab?.title || 'Global Only'}</strong>
+                  </div>
+                  <div className="drawer-filter-bar">
+                    <button
+                      type="button"
+                      className={`drawer-filter-btn ${totpDrawerScope === 'host_and_global' ? 'active' : ''}`}
+                      onClick={() => setTotpDrawerScope('host_and_global')}
+                    >
+                      HOST + GLOBAL
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-filter-btn ${totpDrawerScope === 'all' ? 'active' : ''}`}
+                      onClick={() => setTotpDrawerScope('all')}
+                    >
+                      ALL TOKENS
+                    </button>
+                  </div>
+                  <div className="drawer-items-list">
+                    {(() => {
+                      const allTokens = totpTokensList.length > 0 ? totpTokensList : (vaultSummary.totpRecords || []);
+                      const visibleTokens = allTokens
+                        .filter((t) => {
+                          if (totpDrawerScope === 'all') return true;
+                          return !t.hostId || (activeHostId && t.hostId === activeHostId);
+                        })
+                        .sort((a, b) => {
+                          const aHost = activeHostId && a.hostId === activeHostId ? 1 : 0;
+                          const bHost = activeHostId && b.hostId === activeHostId ? 1 : 0;
+                          return bHost - aHost;
+                        });
+
+                      if (visibleTokens.length === 0) {
+                        return (
+                          <div className="drawer-empty-state">
+                            <span>No 2FA authenticators configured for this scope.</span>
+                            <button
+                              type="button"
+                              className="cyber-btn cyber-btn-sm"
+                              style={{ marginTop: '0.5rem' }}
+                              onClick={() => setShowTotpModal(true)}
+                            >
+                              Open 2FA Vault
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      return visibleTokens.map((tok) => {
+                        const codeResp = drawerTotpCodes[tok.id];
+                        const rawCode = codeResp?.code || '------';
+                        const digits = tok.digits || 6;
+                        const mid = Math.floor(digits / 2);
+                        const formattedCode =
+                          rawCode.length === digits
+                            ? `${rawCode.slice(0, mid)} ${rawCode.slice(mid)}`
+                            : rawCode;
+                        const remaining = codeResp ? codeResp.remainingSeconds : (tok.period || 30);
+                        const isHostBound = Boolean(activeHostId && tok.hostId === activeHostId);
+
+                        return (
+                          <div key={tok.id} className="drawer-card">
+                            <div className="drawer-card-header">
+                              <span className="drawer-card-title">{tok.issuer || tok.label}</span>
+                              <span
+                                className="drawer-badge"
+                                style={{
+                                  borderColor: isHostBound ? 'rgba(0, 240, 255, 0.5)' : 'rgba(56, 189, 248, 0.35)',
+                                  color: isHostBound ? '#00f0ff' : '#38bdf8',
+                                }}
+                              >
+                                {isHostBound ? 'ACTIVE HOST' : tok.hostId ? 'HOST LINKED' : 'GLOBAL'}
+                              </span>
+                            </div>
+                            {tok.issuer && tok.label && (
+                              <div className="drawer-card-desc">{tok.label}</div>
+                            )}
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '6px 8px',
+                                background: 'rgba(2, 6, 14, 0.85)',
+                                border: '1px solid rgba(0, 240, 255, 0.22)',
+                                borderRadius: '3px',
+                                marginTop: '4px',
+                                fontFamily: 'JetBrains Mono, Consolas, monospace',
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: '0.96rem',
+                                  fontWeight: 700,
+                                  letterSpacing: '0.1em',
+                                  color: remaining <= 5 ? '#f87171' : '#00f0ff',
+                                }}
+                              >
+                                {formattedCode}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  color: remaining <= 5 ? '#f87171' : '#94a3b8',
+                                }}
+                              >
+                                {remaining}s
+                              </span>
+                            </div>
+                            <div className="drawer-card-actions">
+                              <button
+                                type="button"
+                                className="drawer-action-btn"
+                                onClick={() => {
+                                  if (codeResp?.code) {
+                                    void navigator.clipboard.writeText(codeResp.code);
+                                    setStatusMessage(`Copied 2FA code for ${tok.label}.`);
+                                  }
+                                }}
+                                title="Copy TOTP code to clipboard"
+                              >
+                                <CyberIcon name="copy" size={12} />
+                                <span>Copy</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="drawer-action-btn run-btn"
+                                onClick={() => void handleInjectTotp(tok.id)}
+                                title="Inject 2FA code directly into active terminal prompt"
+                              >
+                                <CyberIcon name="bolt" size={12} />
+                                <span>Inject</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {activeSidebarPanel === 'credentials' && (
                 <div className="drawer-panel drawer-creds-panel">
                   <div className="sidebar-header">
@@ -9273,6 +9469,26 @@ export function App({
                       </button>
                     </div>
                   </div>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', padding: '0.1rem 0 0.35rem 0', display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
+                    <span>Host: <strong style={{ color: '#00f0ff' }}>{activeTab?.title || 'Any'}</strong></span>
+                    <span>Eng: <strong style={{ color: '#fbbf24' }}>{activeEngagement?.name || 'Global'}</strong></span>
+                  </div>
+                  <div className="drawer-filter-bar">
+                    <button
+                      type="button"
+                      className={`drawer-filter-btn ${credDrawerScope === 'host_and_engagement' ? 'active' : ''}`}
+                      onClick={() => setCredDrawerScope('host_and_engagement')}
+                    >
+                      HOST &amp; ENG
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-filter-btn ${credDrawerScope === 'all' ? 'active' : ''}`}
+                      onClick={() => setCredDrawerScope('all')}
+                    >
+                      ALL ENG POOL
+                    </button>
+                  </div>
                   <input
                     className="sidebar-search"
                     aria-label="Filter Credentials"
@@ -9283,7 +9499,7 @@ export function App({
                   <div className="drawer-items-list">
                     {filteredDrawerCreds.length === 0 ? (
                       <div className="drawer-empty-state">
-                        <span>No credentials found.</span>
+                        <span>No credentials found for this host &amp; engagement.</span>
                         <button
                           type="button"
                           className="cyber-btn cyber-btn-sm"
@@ -9296,11 +9512,14 @@ export function App({
                     ) : (
                       filteredDrawerCreds.map((cred: CredentialEntry) => {
                         const secret = cred.secret || cred.username || '';
+                        const isHostBound = Boolean(activeHostId && cred.hostId === activeHostId);
                         return (
                           <div key={cred.id} className="drawer-card">
                             <div className="drawer-card-header">
                               <span className="drawer-card-title">{cred.label || cred.username || 'Credential'}</span>
-                              <span className="drawer-badge">{cred.category?.toUpperCase() || 'PASS'}</span>
+                              <span className="drawer-badge">
+                                {isHostBound ? 'HOST' : cred.category?.toUpperCase() || 'PASS'}
+                              </span>
                             </div>
                             {cred.username && (
                               <div className="drawer-card-meta">
@@ -9940,23 +10159,8 @@ export function App({
                     </button>
                   </div>
 
-                  {/* GROUP 3: Security Ops, Injection & Broadcast */}
+                  {/* GROUP 3: Security Ops & Shell Upgrade */}
                   <div className="hud-btn-group">
-                    <button
-                      type="button"
-                      className={`hud-seg-btn ${broadcastState.enabled ? 'is-danger-active' : ''}`}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handleToggleBroadcast(broadcastState.enabled ? undefined : 'tab')}
-                      title="Toggle Broadcast Input (Alt+B). Simultaneously sends typed keystrokes to multiple terminals."
-                      aria-label="Toggle Broadcast Input"
-                    >
-                      <CyberIcon name="broadcast" size={12} />
-                      <span>
-                        {broadcastState.enabled
-                          ? `CAST (${getBroadcastTargetSessionIds().length})`
-                          : 'Broadcast'}
-                      </span>
-                    </button>
                     <button
                       type="button"
                       className="hud-seg-btn"
@@ -9971,17 +10175,6 @@ export function App({
                     <button
                       type="button"
                       className="hud-seg-btn"
-                      aria-label="🔐 2FA / TOTP"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => void handleTerminalTotpClick()}
-                      title="Injects the TOTP 2FA code directly from the Go Vault into the terminal prompt"
-                    >
-                      <CyberIcon name="totp" size={12} />
-                      <span>2FA</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
                       aria-label="Stabilize Shell (F-34)"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={handleOpenShellStabilize}
@@ -9989,20 +10182,6 @@ export function App({
                     >
                       <CyberIcon name="stabilize" size={12} />
                       <span>Stabilize</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
-                      aria-label="Snippet Chains (F-16)"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setChainsHostFilter(activeTab?.hostId || null);
-                        setShowChainsModal(true);
-                      }}
-                      title="Execute multi-stage exploit, privesc, or pivot chains on this host (F-16)"
-                    >
-                      <CyberIcon name="chain" size={12} />
-                      <span>Chains</span>
                     </button>
                   </div>
 
@@ -10210,7 +10389,24 @@ export function App({
       {/* Sci-Fi HUD Bottom Telemetry Bar */}
       <footer className="cyber-hud-statusbar" aria-label="System Telemetry Footer">
         <div className="hud-status-left">
-          <span className={`hud-status-pill ${vaultLocked ? 'locked' : 'unlocked'}`}>
+          <button
+            type="button"
+            className={`hud-status-pill ${vaultLocked ? 'locked' : 'unlocked'}`}
+            onClick={() => {
+              if (vaultLocked) {
+                handleOpenVaultButton();
+              } else {
+                void handleVaultLock();
+              }
+            }}
+            style={{ cursor: 'pointer', background: 'none' }}
+            title={
+              vaultLocked
+                ? 'Vault is Locked — Click to Unlock or Set Up Vault'
+                : 'Vault is Unlocked — Click to Lock Vault'
+            }
+            aria-label={vaultLocked ? 'Unlock Vault' : 'Lock Vault'}
+          >
             <CyberIcon name={vaultLocked ? 'lock' : 'unlock'} size={11} />
             <span>
               {vaultLocked
@@ -10219,7 +10415,7 @@ export function App({
                   ? 'Vault Unlocked (No PW)'
                   : 'Vault Unlocked'}
             </span>
-          </span>
+          </button>
           {activePane ? (
             <span className="hud-status-segment">
               <span className="hud-status-key">TARGET:</span>
@@ -10842,11 +11038,16 @@ export function App({
                   style={{ width: '100%', marginBottom: '8px' }}
                 >
                   <option value="">Direct Connection</option>
-                  {(vaultSummary.proxyProfiles || []).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      Use Proxy Profile: {p.name} ({p.type})
-                    </option>
-                  ))}
+                  {(vaultSummary.proxyProfiles || [])
+                    .filter((p) => {
+                      const targetEng = hostEngagementId || activeEngagement?.id || '';
+                      return !p.engagementId || p.engagementId === targetEng;
+                    })
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        Use Proxy Profile: {p.name} ({p.type}) {p.engagementId ? '[Engagement]' : '[Global]'}
+                      </option>
+                    ))}
                 </select>
 
                 {!hostProxyProfileId && (
@@ -12028,6 +12229,8 @@ export function App({
             label: h.label,
             address: `${h.effectiveUser}@${h.address}:${h.effectivePort}`,
           }))}
+          engagements={engagementsList.map((e) => ({ id: e.id, name: e.name }))}
+          activeEngagementId={activeEngagement?.id}
           activeSessions={(() => {
             const sessions: { sessionId: string; hostId?: string; title: string }[] = [];
             for (const t of tabs) {
@@ -12074,6 +12277,8 @@ export function App({
             address: h.address,
             port: h.effectivePort,
           }))}
+          engagements={engagementsList.map((e) => ({ id: e.id, name: e.name }))}
+          activeEngagementId={activeEngagement?.id}
           onSaveProfile={handleSaveProxyProfile}
           onDeleteProfile={handleDeleteProxyProfile}
           onOpenProxychainsExport={handleOpenProxychainsExport}
@@ -12084,6 +12289,8 @@ export function App({
       {showProxychainsExportModal && (
         <ProxychainsExportModal
           initialOptions={proxychainsOptions}
+          engagements={engagementsList.map((e) => ({ id: e.id, name: e.name }))}
+          activeEngagementId={activeEngagement?.id}
           onGenerateConfig={handleGenerateProxychainsConfig}
           onSaveToFile={handleSaveProxychainsFile}
           onClose={() => setShowProxychainsExportModal(false)}

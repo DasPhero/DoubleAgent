@@ -27,8 +27,23 @@ Highlighting text in any terminal session displays four quick-save targets:
 - `📝 Save to Notes (Recon)... [RECON]`: Directly logs recon logs and port scan matrices into Host or Engagement Notes.
 - `🎯 Create Finding from Selection... [REPORT]`: Generates a structured Finding and attaches the highlighted excerpt as Evidence #1.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-36`, `F-37`, & `F-40`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-39`, & `F-40`)
 
+- **Pentest-Phase Top Navigation & Two-Section Activity Bar (`OPS` vs. `HOST`)**:
+  - **Top Navigation Bar**:
+    - **`View ▾`**: Placed first on the left; includes the Interactive Network Topology Map (`F-37`), workspace split controls, broadcast input mode (`Alt+B`), and zoom controls.
+    - **Engagement Cluster**: Placed immediately after `View ▾` in the order `Select Active Engagement` dropdown $\to$ `+` (New Engagement) $\to$ `Engagement ▾` menu (`Target Scope & Hub`, `Credential Pool & Spray Lists`, `Evidence Vault & Findings`, `Port Forwarding & Tunnels`, `Proxy Profiles & Proxychains`, and `.daeng` Export/Import).
+    - **Three Phase-Ordered Tool Menus**:
+      - **`Terminals ▾`**: Local & Directory Shells, `Hardware Bus & UART Logic (F-23)` (Serial/UART/COM/Hardware buses), `Port Forwarding (-L, -R, -D)`, `Proxy Profiles (Jump, SOCKS5)`, `Raw TCP / Netcat (F-31)`, and `SFTP File Browser`.
+      - **`Recon & Exploit ▾`**: `Nmap XML Recon Ingest (F-39)`, `Listener Manager (F-32)`, `Payload Generator // Shells (F-33)`, `Command Snippets & Variables`, and `Snippet Chains & Exploits (F-16)`.
+      - **`Intel & Keys ▾`**: `Command Palette` (`Ctrl+K`), `Host Notes & Docs`, `Session Logs & Recordings`, `TOTP Authenticator Generator`, and `Keychain & SSH Keys`.
+    - **Settings Modal + Pin to Terminal**: Clicking **Settings** opens a modal overlay first, with a **`Pin to Terminal`** button in the modal header to dock Settings into a full workspace tab.
+  - **Bottom-Left Vault Lock / Unlock Pill**: Click the **`Vault Unlocked`** / **`Vault Locked`** pill in the bottom-left status bar at any time to lock or unlock the encrypted vault.
+  - **Left Activity Bar Split (`OPS` vs. `HOST`)**:
+    - **`OPS` (Global / Unspecific)**: `Hosts` (`Ctrl+1`), `Snippets` (`Ctrl+2`), `Chains` (`Ctrl+3`), `Active Listeners` (`Ctrl+4`).
+    - **`HOST` (Active Host & Engagement Specific)**: `Notes` (`Ctrl+5`), `2FA / TOTP` (`Ctrl+6` — live 6-digit codes for the active host + global tokens), and `Credentials` (`Ctrl+7` — filtered by active host & engagement).
+- **Global vs. Engagement Scoping for Port Forwarding (`F-13`) & Proxy Profiles / Proxychains (`F-14`)**:
+  - Both Port Forwarding Rules (`-L`, `-R`, `-D`) and Proxy Profiles (`SSH Jump` / `SOCKS5`) can be saved as **Global (All Engagements)** for reusable infrastructure or scoped to a **Specific Engagement** so client-specific pivot routes and internal ports remain isolated and are included in `.daeng` archives (and cleaned up when an engagement is deleted).
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
 - **One-Click Shell Stabilization & PTY Upgrade (`F-34` / Pentest Module Wave 1)**:
   - Click **`🐚 Stabilize`** in the terminal command strip to upgrade any raw/dumb shell (such as an incoming reverse shell from the Raw TCP Listener or a nested `nc` session) into a full interactive PTY terminal.

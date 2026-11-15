@@ -349,8 +349,8 @@ export function SettingsView({
         <div className="dialog-title">
           <span className="cyber-hazard-stripes">///</span>
           <div>
-            <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-              ⚙️ Global Settings &amp; Preferences (F-18, F-29)
+            <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CyberIcon name="gear" size={16} /> Global Settings &amp; Preferences (F-18, F-29)
             </h3>
             <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
               SYSTEM CONFIGURATION // THEMES · VAULT SECURITY · CLOUD SYNC · MIGRATION
@@ -363,9 +363,12 @@ export function SettingsView({
               type="button"
               className="cyber-btn cyber-btn-secondary cyber-btn-sm"
               onClick={onOpenAsTab}
-              title="Open Settings in a dedicated workspace tab"
+              title="Pin Settings into a dedicated terminal workspace tab"
+              aria-label="Pin to Terminal"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              🗗 Open as Tab
+              <CyberIcon name="pin" size={12} />
+              <span>Pin to Terminal</span>
             </button>
           )}
           {isModal && onClose && (
@@ -389,8 +392,10 @@ export function SettingsView({
           aria-selected={activeTab === 'appearance'}
           className={`settings-tab-btn ${activeTab === 'appearance' ? 'active' : ''}`}
           onClick={() => onTabChange('appearance')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          🎨 Appearance &amp; Terminal
+          <CyberIcon name="terminal" size={12} />
+          <span>Appearance &amp; Terminal</span>
         </button>
         <button
           type="button"
@@ -398,8 +403,10 @@ export function SettingsView({
           aria-selected={activeTab === 'security'}
           className={`settings-tab-btn ${activeTab === 'security' ? 'active' : ''}`}
           onClick={() => onTabChange('security')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          🔒 Vault &amp; Security
+          <CyberIcon name="lock" size={12} />
+          <span>Vault &amp; Security</span>
         </button>
         <button
           type="button"
@@ -407,8 +414,10 @@ export function SettingsView({
           aria-selected={activeTab === 'sync'}
           className={`settings-tab-btn ${activeTab === 'sync' ? 'active' : ''}`}
           onClick={() => onTabChange('sync')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          ☁️ Storage &amp; Sync
+          <CyberIcon name="network" size={12} />
+          <span>Storage &amp; Sync</span>
         </button>
         <button
           type="button"
@@ -416,8 +425,10 @@ export function SettingsView({
           aria-selected={activeTab === 'shortcuts'}
           className={`settings-tab-btn ${activeTab === 'shortcuts' ? 'active' : ''}`}
           onClick={() => onTabChange('shortcuts')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          ⌨️ Keyboard Shortcuts
+          <CyberIcon name="bolt" size={12} />
+          <span>Keyboard Shortcuts</span>
         </button>
         <button
           type="button"
@@ -425,8 +436,10 @@ export function SettingsView({
           aria-selected={activeTab === 'migration'}
           className={`settings-tab-btn ${activeTab === 'migration' ? 'active' : ''}`}
           onClick={() => onTabChange('migration')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          📥 Config Migration
+          <CyberIcon name="download" size={12} />
+          <span>Config Migration</span>
         </button>
         <button
           type="button"
@@ -434,8 +447,10 @@ export function SettingsView({
           aria-selected={activeTab === 'about'}
           className={`settings-tab-btn ${activeTab === 'about' ? 'active' : ''}`}
           onClick={() => onTabChange('about')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          ℹ About DoubleAgent
+          <CyberIcon name="shield" size={12} />
+          <span>About DoubleAgent</span>
         </button>
       </div>
 

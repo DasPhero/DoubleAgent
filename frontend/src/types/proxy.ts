@@ -3,6 +3,7 @@ export type ProxyProfileType = 'jump' | 'command' | 'socks5';
 export interface ProxyProfile {
   id: string;
   name: string;
+  engagementId?: string;
   type: ProxyProfileType;
   jumpHostIds?: string[];
   command?: string;
@@ -14,6 +15,7 @@ export interface ProxyProfile {
 export interface ProxyProfileSummary {
   id: string;
   name: string;
+  engagementId?: string;
   type: ProxyProfileType;
   jumpHostIds?: string[];
   command?: string;
@@ -31,6 +33,7 @@ export interface ProxychainsProxyEntry {
   username?: string;
   password?: string;
   comment?: string;
+  engagementId?: string;
 }
 
 export interface ProxychainsExportOptions {
