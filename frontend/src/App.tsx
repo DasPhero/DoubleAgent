@@ -23,7 +23,7 @@ import { ProxychainsExportModal } from './components/ProxychainsExportModal';
 import { FileItem, TransferTask } from './types/sftp';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 import { ProxyProfile, ProxyProfileSummary, ProxychainsExportOptions } from './types/proxy';
-import { Snippet, SnippetContext, SnippetChain, SnippetVariable } from './types/snippet';
+import { Snippet, SnippetContext, SnippetChain, SnippetVariable, SnippetChainsFileConfig } from './types/snippet';
 import { SnippetsManagerModal } from './components/SnippetsManagerModal';
 import { SnippetRunModal } from './components/SnippetRunModal';
 import { SnippetChainsModal } from './components/SnippetChainsModal';
@@ -945,6 +945,13 @@ interface WailsAppBindings {
   DeletePayloadTemplate?: (templateId: string) => Promise<void>;
   RenderPayload?: (opts: PayloadRenderOptions) => Promise<PayloadRenderResult>;
   SavePayloadAsSnippet?: (opts: PayloadRenderOptions, snippetName: string) => Promise<Snippet>;
+  SelectFileDialog?: (title: string, filterName: string, filterPattern: string) => Promise<string>;
+  SelectDirectoryDialog?: (title: string) => Promise<string>;
+  GetSnippetChainsConfig?: () => Promise<SnippetChainsFileConfig>;
+  SetSnippetChainsPath?: (customPath: string) => Promise<SnippetChainsFileConfig>;
+  ListSnippetChainsFromFile?: () => Promise<SnippetChain[]>;
+  SaveSnippetChainToFile?: (chain: SnippetChain) => Promise<void>;
+  DeleteSnippetChainFromFile?: (chainId: string) => Promise<void>;
   ListListenerProfiles?: () => Promise<ListenerProfile[]>;
   SaveListenerProfile?: (prof: ListenerProfile) => Promise<void>;
   DeleteListenerProfile?: (profileId: string) => Promise<void>;
@@ -3618,6 +3625,13 @@ export function App({
 
   const handleSaveSnippetChain = async (chain: SnippetChain) => {
     const api = getWailsBindings();
+    if (api?.SaveSnippetChainToFile) {
+      try {
+        await api.SaveSnippetChainToFile(chain);
+      } catch {
+        // Continue to vault save
+      }
+    }
     if (api?.SaveSnippetChain) {
       await api.SaveSnippetChain(chain);
       await refreshVaultState();
@@ -3627,6 +3641,13 @@ export function App({
 
   const handleDeleteSnippetChain = async (chainId: string) => {
     const api = getWailsBindings();
+    if (api?.DeleteSnippetChainFromFile) {
+      try {
+        await api.DeleteSnippetChainFromFile(chainId);
+      } catch {
+        // Continue to vault delete
+      }
+    }
     if (api?.DeleteSnippetChain) {
       await api.DeleteSnippetChain(chainId);
       await refreshVaultState();
@@ -8025,32 +8046,32 @@ export function App({
                   {/* Column 1: Terminals & Connections */}
                   <div className="tools-dropdown-col">
                     <div className="tools-col-title">
-                      <span>⚡ Terminals &amp; Consoles</span>
+                      <span>Terminals &amp; Consoles</span>
                     </div>
 
                     <div className="tools-sub-header">Local &amp; Directory Shells</div>
-                    {renderDropdownRow('powershell', 'Local Shell (PowerShell)', '⚡ pwsh', () => void handleOpenLocalTerminal('powershell'))}
-                    {renderDropdownRow('cmd', 'Local Shell (Command Prompt)', 'cmd', () => void handleOpenLocalTerminal('cmd'))}
-                    {renderDropdownRow('wsl', 'Local Shell (WSL Linux)', '🐧 wsl', () => void handleOpenLocalTerminal('wsl'))}
-                    {renderDropdownRow('dir-default', 'New in Default Directory', '🏠', () => void handleOpenTerminalDirectory('default'))}
-                    {renderDropdownRow('dir-cwd', 'New in Current Directory (CWD)', '📂', () => void handleOpenTerminalDirectory('current'))}
-                    {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', '⚡ root', () => void handleOpenTerminalDirectory('root'))}
+                    {renderDropdownRow('powershell', 'Local Shell (PowerShell)', undefined, () => void handleOpenLocalTerminal('powershell'))}
+                    {renderDropdownRow('cmd', 'Local Shell (Command Prompt)', undefined, () => void handleOpenLocalTerminal('cmd'))}
+                    {renderDropdownRow('wsl', 'Local Shell (WSL Linux)', undefined, () => void handleOpenLocalTerminal('wsl'))}
+                    {renderDropdownRow('dir-default', 'New in Default Directory', undefined, () => void handleOpenTerminalDirectory('default'))}
+                    {renderDropdownRow('dir-cwd', 'New in Current Directory (CWD)', undefined, () => void handleOpenTerminalDirectory('current'))}
+                    {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', undefined, () => void handleOpenTerminalDirectory('root'))}
 
                     <div className="tools-sub-header">Hardware &amp; Direct Links</div>
-                    {renderDropdownRow('serial', 'Serial / UART Console (COM)', '🔌 COM', () => void handleOpenSerialModal())}
+                    {renderDropdownRow('serial', 'Serial / UART Console (COM)', undefined, () => void handleOpenSerialModal())}
                     {renderDropdownRow(
                       'tunnels',
                       'Port Forwarding (-L, -R, -D)',
-                      activeTunnels.length > 0 ? `⚡ ${activeTunnels.length} active` : '⇄ Tunnels',
+                      activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
                       () => setShowPortForwardingModal(true),
                       false,
                       activeTunnels.length > 0
                     )}
-                    {renderDropdownRow('network-map', 'Interactive Network Topology Map (F-37)', '🌐 Map', () => openNetworkMapTab())}
+                    {renderDropdownRow('network-map', 'Interactive Network Topology Map (F-37)', undefined, () => openNetworkMapTab())}
                     {renderDropdownRow(
                       'sftp',
                       'SFTP File Browser',
-                      '📁 SFTP',
+                      undefined,
                       () => {
                         if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
                           openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
@@ -8063,7 +8084,7 @@ export function App({
                   {/* Column 2: Tools & Utilities */}
                   <div className="tools-dropdown-col">
                     <div className="tools-col-title">
-                      <span>🛠️ Tools &amp; Utilities</span>
+                      <span>Tools &amp; Utilities</span>
                     </div>
 
                     <div className="tools-sub-header">Security &amp; Credentials</div>
@@ -8071,8 +8092,8 @@ export function App({
                       setPaletteQuery('');
                       setShowCommandPalette(true);
                     })}
-                    {renderDropdownRow('totp', 'TOTP Authenticator Generator', '🔐 2FA', () => setShowTotpModal(true))}
-                    {renderDropdownRow('keychain', 'Keychain & SSH Keys', '🔑', () => {
+                    {renderDropdownRow('totp', 'TOTP Authenticator Generator', undefined, () => setShowTotpModal(true))}
+                    {renderDropdownRow('keychain', 'Keychain & SSH Keys', undefined, () => {
                       setModalError('');
                       setShowKeychainModal(true);
                     })}
@@ -8080,34 +8101,34 @@ export function App({
                     <div className="tools-sub-header">Automation &amp; Transcripts</div>
                     {renderDropdownRow(
                       'broadcast',
-                      broadcastState.enabled ? '🔴 Disarm Broadcast Mode' : '📡 Broadcast Input Mode',
+                      broadcastState.enabled ? 'Disarm Broadcast Mode' : 'Broadcast Input Mode',
                       'Alt+B',
                       handleToggleBroadcast,
                       false,
                       broadcastState.enabled
                     )}
-                    {renderDropdownRow('notes', 'Host Notes & Docs', '📝', () => {
+                    {renderDropdownRow('notes', 'Host Notes & Docs', undefined, () => {
                       setNotesModalHostId(activeTab?.hostId);
                       setNotesModalInitialNoteId(null);
                       setShowNotesModal(true);
                     })}
-                    {renderDropdownRow('session-logs', 'Session Logs & Recordings', '⏺', () => {
+                    {renderDropdownRow('session-logs', 'Session Logs & Recordings', undefined, () => {
                       void refreshSessionLogs();
                       setShowSessionLogsModal(true);
                     })}
-                    {renderDropdownRow('snippets', 'Command Snippets & Variables', '⚡ Snippets', () => setShowSnippetsModal(true))}
-                    {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits (F-16)', '⛓️ Chains', () => {
+                    {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true))}
+                    {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits (F-16)', undefined, () => {
                       setChainsHostFilter(activeTab?.hostId || null);
                       setShowChainsModal(true);
                     })}
-                    {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', '🛡️ Profiles', () => setShowProxyProfilesModal(true))}
+                    {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', undefined, () => setShowProxyProfilesModal(true))}
 
                     <div className="tools-sub-header">Recon &amp; Network Attacks</div>
-                    {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest (F-39)', 'Radar', () => setShowNmapImportModal(true))}
-                    {renderDropdownRow('listener-manager', 'Listener Manager (F-32)', 'Radar', () => setShowListenerManagerModal(true))}
-                    {renderDropdownRow('payload-generator', 'Payload Generator // Shells (F-33)', 'Target', () => setShowPayloadGeneratorModal(true))}
-                    {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', '⚡ Raw TCP', () => setShowRawTcpModal(true))}
-                    {renderDropdownRow('proxychains', 'Export proxychains.conf (F-14)', '⛓️ Export', () => void handleOpenProxychainsExport())}
+                    {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest (F-39)', undefined, () => setShowNmapImportModal(true))}
+                    {renderDropdownRow('listener-manager', 'Listener Manager (F-32)', undefined, () => setShowListenerManagerModal(true))}
+                    {renderDropdownRow('payload-generator', 'Payload Generator // Shells (F-33)', undefined, () => setShowPayloadGeneratorModal(true))}
+                    {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', undefined, () => setShowRawTcpModal(true))}
+                    {renderDropdownRow('proxychains', 'Export proxychains.conf (F-14)', undefined, () => void handleOpenProxychainsExport())}
                   </div>
                 </div>
               )}
@@ -8142,18 +8163,18 @@ export function App({
                 >
                   {renderDropdownRow('sidebar-toggle', sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar', 'Ctrl+B', () => setSidebarCollapsed((prev) => !prev))}
                   <div className="nav-dropdown-divider" />
-                  {renderDropdownRow('new-tab', 'New Connection Tab', '+ Tab', handleOpenNewConnectionTab)}
-                  {renderDropdownRow('new-split', 'New Connection Split', '+ Split', () => handleOpenNewConnectionSplit('right'))}
-                  {renderDropdownRow('view-map', 'Network Topology Map', '🌐 Map', openNetworkMapTab)}
-                  {renderDropdownRow('split-h', 'Split Horizontal', '⬌', () => void handleSplitPane('horizontal'))}
-                  {renderDropdownRow('split-v', 'Split Vertical', '⬍', () => void handleSplitPane('vertical'))}
+                  {renderDropdownRow('new-tab', 'New Connection Tab', 'Ctrl+T', handleOpenNewConnectionTab)}
+                  {renderDropdownRow('new-split', 'New Connection Split', undefined, () => handleOpenNewConnectionSplit('right'))}
+                  {renderDropdownRow('view-map', 'Network Topology Map', undefined, openNetworkMapTab)}
+                  {renderDropdownRow('split-h', 'Split Horizontal', undefined, () => void handleSplitPane('horizontal'))}
+                  {renderDropdownRow('split-v', 'Split Vertical', undefined, () => void handleSplitPane('vertical'))}
                   {renderDropdownRow('find', 'Find in Terminal', 'Ctrl+F', () => {
                     if (activePane) {
                       togglePaneSearch(activePane.sessionId);
                     }
                   }, !activePane)}
                   <div className="nav-dropdown-divider" />
-                  {renderDropdownRow('group-tabs', 'Group Tabs by Host', groupTabsByHost ? '✓ Active' : 'Off', () => setGroupTabsByHost((prev) => !prev), false, groupTabsByHost)}
+                  {renderDropdownRow('group-tabs', 'Group Tabs by Host', groupTabsByHost ? 'Active' : undefined, () => setGroupTabsByHost((prev) => !prev), false, groupTabsByHost)}
                   <div className="nav-dropdown-divider" />
                   {renderDropdownRow('zoom-in', 'Zoom In Pane', 'Ctrl +', () => {
                     if (activePane) {
@@ -8194,20 +8215,23 @@ export function App({
                   value={activeEngagement?.id || ''}
                   onChange={(e) => void handleSelectEngagement(e.target.value)}
                   style={{
-                    height: '24px',
-                    fontSize: '0.72rem',
-                    padding: '1px 6px',
-                    border: '1px solid rgba(0, 240, 255, 0.4)',
-                    background: 'rgba(5, 12, 22, 0.9)',
+                    height: '28px',
+                    fontSize: '0.78rem',
+                    padding: '2px 10px',
+                    minWidth: '240px',
+                    maxWidth: '340px',
+                    border: '1px solid rgba(0, 240, 255, 0.45)',
+                    background: 'rgba(5, 12, 22, 0.95)',
                     color: activeEngagement ? '#00f0ff' : '#94a3b8',
                     fontWeight: 600,
+                    borderRadius: '3px',
                   }}
                   title="Switch between Encapsulated Pentest Engagements or Casual Mode"
                 >
-                  <option value="">🌐 No Engagement (Casual)</option>
+                  <option value="">No Engagement (Casual)</option>
                   {engagementsList.map((eng) => (
                     <option key={eng.id} value={eng.id}>
-                      🎯 {eng.name}
+                      {eng.name}
                     </option>
                   ))}
                 </select>
@@ -8256,34 +8280,25 @@ export function App({
                     onMouseMove={handleMenuMove}
                   >
                     <div className="tools-sub-header">
-                      {activeEngagement ? `🎯 ${activeEngagement.name}` : '🌐 Casual / Global Mode'}
+                      {activeEngagement ? `🎯 ${activeEngagement.name}` : 'Casual / Global Mode'}
                     </div>
-                    {renderDropdownRow('eng-scope', 'Target Scope & Hub (F-36)', '🎯 Scope', () => setShowEngagementHubModal(true))}
-                    {renderDropdownRow('eng-creds', 'Credential Pool & Spray Lists (F-36)', '🔑 Creds', () => setShowCredStoreModal(true))}
-                    {renderDropdownRow('eng-evidence', 'Evidence Vault & Findings (F-18)', '🛡️ Evidence', () => setShowEvidenceModal(true))}
-                    {renderDropdownRow('eng-nmap', 'Import Nmap XML (-oX) (F-39)', 'Radar', () => setShowNmapImportModal(true))}
-                    {renderDropdownRow('eng-listeners', 'Listener Manager (F-32)', 'Radar', () => setShowListenerManagerModal(true))}
-                    {renderDropdownRow('eng-payload', 'Payload Generator (F-33)', 'Target', () => setShowPayloadGeneratorModal(true))}
-                    {renderDropdownRow('eng-chains', 'Snippet Chains & Exploits (F-16)', 'Chains', () => {
+                    {renderDropdownRow('eng-scope', 'Target Scope & Hub (F-36)', undefined, () => setShowEngagementHubModal(true))}
+                    {renderDropdownRow('eng-creds', 'Credential Pool & Spray Lists (F-36)', undefined, () => setShowCredStoreModal(true))}
+                    {renderDropdownRow('eng-evidence', 'Evidence Vault & Findings (F-18)', undefined, () => setShowEvidenceModal(true))}
+                    {renderDropdownRow('eng-nmap', 'Import Nmap XML (-oX) (F-39)', undefined, () => setShowNmapImportModal(true))}
+                    {renderDropdownRow('eng-listeners', 'Listener Manager (F-32)', undefined, () => setShowListenerManagerModal(true))}
+                    {renderDropdownRow('eng-payload', 'Payload Generator (F-33)', undefined, () => setShowPayloadGeneratorModal(true))}
+                    {renderDropdownRow('eng-chains', 'Snippet Chains & Exploits (F-16)', undefined, () => {
                       setChainsHostFilter(null);
                       setShowChainsModal(true);
                     })}
                     <div className="nav-dropdown-divider" />
-                    {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', '📦 Export', () => {
+                    {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', undefined, () => {
                       setShowEngagementHubModal(true);
                     })}
-                    {renderDropdownRow('eng-import', 'Import .daeng Package (F-36)', '📥 Import', () => {
+                    {renderDropdownRow('eng-import', 'Import .daeng Package (F-36)', undefined, () => {
                       setShowEngagementHubModal(true);
                     })}
-                    {activeEngagement && (
-                      <>
-                        <div className="nav-dropdown-divider" />
-                        {renderDropdownRow('eng-edit', 'Edit Scope & Lockout Policy', '✏️ Edit', () => {
-                          setEditingEngagement(activeEngagement);
-                          setShowNewEngagementModal(true);
-                        })}
-                      </>
-                    )}
                   </div>
                 )}
               </div>
@@ -11894,6 +11909,8 @@ export function App({
             if (api?.SetPayloadTemplatesPath) return api.SetPayloadTemplatesPath(path);
             throw new Error('SetPayloadTemplatesPath API not available');
           }}
+          onSelectFile={(t, fn, fp) => getWailsBindings()?.SelectFileDialog?.(t, fn, fp) ?? Promise.resolve('')}
+          onSelectDirectory={(t) => getWailsBindings()?.SelectDirectoryDialog?.(t) ?? Promise.resolve('')}
         />
       )}
 
@@ -11991,6 +12008,27 @@ export function App({
             setShowChainsModal(false);
             setChainsHostFilter(null);
           }}
+          getFileConfig={async () => {
+            const api = getWailsBindings();
+            if (api?.GetSnippetChainsConfig) return api.GetSnippetChainsConfig();
+            return { filePath: 'data/snippet_chains.json', chainCount: 0, exists: false };
+          }}
+          setFilePath={async (path) => {
+            const api = getWailsBindings();
+            if (api?.SetSnippetChainsPath) return api.SetSnippetChainsPath(path);
+            throw new Error('SetSnippetChainsPath API not available');
+          }}
+          onReloadFromFile={async () => {
+            const api = getWailsBindings();
+            if (api?.ListSnippetChainsFromFile) {
+              const loaded = await api.ListSnippetChainsFromFile();
+              setChains(loaded);
+              return loaded;
+            }
+            return [];
+          }}
+          onSelectFile={(t, fn, fp) => getWailsBindings()?.SelectFileDialog?.(t, fn, fp) ?? Promise.resolve('')}
+          onSelectDirectory={(t) => getWailsBindings()?.SelectDirectoryDialog?.(t) ?? Promise.resolve('')}
         />
       )}
 

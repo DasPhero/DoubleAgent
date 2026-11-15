@@ -882,7 +882,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                         }
                       }
                     }}
-                    style={{ fontSize: '0.74rem', height: '26px', minWidth: '220px', borderColor: 'rgba(0, 240, 255, 0.4)' }}
+                    style={{ fontSize: '0.78rem', height: '32px', minWidth: '320px', borderColor: 'rgba(0, 240, 255, 0.45)', padding: '2px 8px' }}
                   >
                     <option value="">🌐 No Engagement (Casual / Global)</option>
                     {engagements.map((eng) => (

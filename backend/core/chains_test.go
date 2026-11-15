@@ -2,6 +2,7 @@ package core_test
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -254,6 +255,52 @@ func TestSnippetChain_BuiltinPresets_F16(t *testing.T) {
 				t.Errorf("built-in preset %q step %d must have ConfirmBeforeRun=true by default", chain.Name, i+1)
 			}
 		}
+	}
+}
+
+func TestSnippetChain_ExternalFile_F16(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// 1. Folder resolution - passing a folder should resolve to <folder>/snippet_chains.json
+	resolvedDir := core.ResolveChainsFilePath(tmpDir)
+	expectedDirFile := filepath.Join(tmpDir, "snippet_chains.json")
+	if resolvedDir != expectedDirFile {
+		t.Errorf("expected directory to resolve to %q, got %q", expectedDirFile, resolvedDir)
+	}
+
+	// 2. Specific file resolution - passing a specific file should preserve that file
+	customFile := filepath.Join(tmpDir, "my_custom_chains.json")
+	resolvedFile := core.ResolveChainsFilePath(customFile)
+	if resolvedFile != customFile {
+		t.Errorf("expected specific file to resolve to %q, got %q", customFile, resolvedFile)
+	}
+
+	// 3. Load non-existent file should initialize with built-in presets
+	chains, err := core.LoadSnippetChainsFromFile(customFile)
+	if err != nil {
+		t.Fatalf("failed to load/init chains: %v", err)
+	}
+	if len(chains) == 0 {
+		t.Fatalf("expected non-empty initialized chains from presets, got 0")
+	}
+
+	// 4. Save and reload custom chain
+	chains[0].Name = "Custom Testing Chain"
+	if err := core.SaveSnippetChainsToFile(customFile, chains); err != nil {
+		t.Fatalf("failed to save chains: %v", err)
+	}
+	reloaded, err := core.LoadSnippetChainsFromFile(customFile)
+	if err != nil {
+		t.Fatalf("failed to reload chains: %v", err)
+	}
+	if len(reloaded) != len(chains) || reloaded[0].Name != "Custom Testing Chain" {
+		t.Errorf("mismatch in reloaded chains: %+v", reloaded[0])
+	}
+
+	// 5. Check config
+	cfg := core.GetSnippetChainsFileConfig(customFile)
+	if !cfg.Exists || cfg.ChainCount != len(chains) {
+		t.Errorf("invalid chains file config: %+v", cfg)
 	}
 }
 

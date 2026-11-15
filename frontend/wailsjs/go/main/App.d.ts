@@ -67,6 +67,8 @@ export function DeleteSnippet(arg1:string):Promise<void>;
 
 export function DeleteSnippetChain(arg1:string):Promise<void>;
 
+export function DeleteSnippetChainFromFile(arg1:string):Promise<void>;
+
 export function DeleteTotpRecord(arg1:string):Promise<void>;
 
 export function DisconnectSession(arg1:string):Promise<void>;
@@ -139,6 +141,8 @@ export function GetShellStabilizePresets():Promise<Array<core.ShellStabilizePres
 
 export function GetSnippetChainVariables(arg1:string):Promise<Array<core.SnippetVariable>>;
 
+export function GetSnippetChainsConfig():Promise<core.SnippetChainsFileConfig>;
+
 export function GetSnippetContext(arg1:string):Promise<core.SnippetContext>;
 
 export function GetTotpCode(arg1:string):Promise<core.TotpCodeResponse>;
@@ -202,6 +206,8 @@ export function ListSerialPorts():Promise<Array<core.SerialPortInfo>>;
 export function ListSessionLogs():Promise<Array<core.SessionLogRecord>>;
 
 export function ListSnippetChains(arg1:string):Promise<Array<core.SnippetChain>>;
+
+export function ListSnippetChainsFromFile():Promise<Array<core.SnippetChain>>;
 
 export function ListSnippets():Promise<Array<core.Snippet>>;
 
@@ -277,6 +283,8 @@ export function SaveSnippet(arg1:core.Snippet):Promise<void>;
 
 export function SaveSnippetChain(arg1:core.SnippetChain):Promise<void>;
 
+export function SaveSnippetChainToFile(arg1:core.SnippetChain):Promise<void>;
+
 export function SaveTotpRecord(arg1:core.TotpRecord):Promise<void>;
 
 export function SaveWorkspace(arg1:core.WorkspaceState):Promise<void>;
@@ -291,6 +299,10 @@ export function SearchCommandPalette(arg1:string):Promise<core.CommandPaletteRes
 
 export function SearchNotes(arg1:string):Promise<Array<core.NoteSearchResult>>;
 
+export function SelectDirectoryDialog(arg1:string):Promise<string>;
+
+export function SelectFileDialog(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function SendSerialBreak(arg1:string):Promise<void>;
 
 export function SetActiveEngagement(arg1:string):Promise<void>;
@@ -302,6 +314,8 @@ export function SetRawTcpSessionLineMode(arg1:string,arg2:boolean,arg3:string):P
 export function SetSerialDTR(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
+
+export function SetSnippetChainsPath(arg1:string):Promise<core.SnippetChainsFileConfig>;
 
 export function SetWorkspaceStore(arg1:data.WorkspaceStore):Promise<void>;
 

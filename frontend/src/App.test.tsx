@@ -3145,7 +3145,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       fireEvent.click(engToolsMenuBtn);
       expect(screen.getByText(/Target Scope & Hub \(F-36\)/i)).toBeInTheDocument();
       expect(screen.getByText(/Export \.daeng Package \(F-36\)/i)).toBeInTheDocument();
-      expect(screen.getByText(/Edit Scope & Lockout Policy/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Edit Scope & Lockout Policy/i)).toBeNull();
 
       // 3. Open New Engagement Modal
       fireEvent.click(newEngBtn);

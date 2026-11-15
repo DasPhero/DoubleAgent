@@ -539,7 +539,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
               className="cyber-hud-select"
               value={selectedEngagementId}
               onChange={(e) => void handleEngagementChange(e.target.value)}
-              style={{ fontSize: '0.76rem', height: '28px', minWidth: '240px', borderColor: 'rgba(0, 240, 255, 0.4)' }}
+              style={{ fontSize: '0.78rem', height: '32px', minWidth: '320px', borderColor: 'rgba(0, 240, 255, 0.45)', padding: '2px 8px' }}
             >
               <option value="">🌐 No Engagement (Casual / Global Pool)</option>
               {engagements.map((eng) => (

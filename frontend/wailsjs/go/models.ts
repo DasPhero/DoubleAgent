@@ -2213,6 +2213,24 @@ export namespace core {
 	
 	
 	
+	export class SnippetChainsFileConfig {
+	    filePath: string;
+	    chainCount: number;
+	    exists: boolean;
+	    lastModified?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnippetChainsFileConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filePath = source["filePath"];
+	        this.chainCount = source["chainCount"];
+	        this.exists = source["exists"];
+	        this.lastModified = source["lastModified"];
+	    }
+	}
 	export class SnippetContext {
 	    hostId?: string;
 	    hostLabel?: string;

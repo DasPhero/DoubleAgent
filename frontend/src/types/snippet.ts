@@ -58,3 +58,10 @@ export interface SnippetChain {
   updatedAt?: string;
 }
 
+export interface SnippetChainsFileConfig {
+  filePath: string;
+  chainCount: number;
+  exists: boolean;
+  lastModified?: string;
+}
+

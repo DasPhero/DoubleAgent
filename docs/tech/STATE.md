@@ -5,6 +5,14 @@
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Menu Shortcuts & Navigation Bar Polish**:
+  - Removed heterogeneous, unstandardized badge tags from Tools & View dropdown menus (`⚡ pwsh`, `cmd`, `🐧 wsl`, `Radar`, `Target`, `SFTP`, `Tunnels`, emojis, etc.) — clean layout preserving only genuine keyboard shortcuts (`Ctrl+K`, `Alt+B`, `Ctrl+B`, `Ctrl+T`, `Ctrl+F`, `Ctrl +`, etc.).
+  - Widened engagement selector dropdowns across the top navigation bar, Evidence Vault, Credential Store, and Engagement Hub modals to eliminate cramped/squished text.
+  - Removed redundant "Edit Scope & Lockout Policy" item from Engagement menu (fully accessible within Engagement Hub).
+- **Decoupled File & Folder Selectors for Payload Generator (`F-33`) & Snippet Chains (`F-16`)**:
+  - Added native file (`SelectFileDialog`) and folder (`SelectDirectoryDialog`) picker integration to both tools.
+  - Automatic directory resolution: if the operator selects or specifies a directory instead of a file, the system automatically resolves to the canonical file (`payload_templates.json` or `snippet_chains.json`). If a specific file path is chosen, that exact file is loaded.
+  - Payload Generator variables support generalized ports (`PORT`, `RPORT`, `TARGET_PORT`, `BIND_PORT`) and arbitrary custom parameters beyond just `LPORT`/`LHOST`.
 - **Unified Listener Manager for Reverse & Bind Shells (`F-32` / Pentest Spec Line 35, 54, 73)**:
   - **Backend Models & Core Logic (`backend/core/listeners.go`, `interfaces.go`)**:
     - Data models: `ListenerProfile` (`ID`, `Name`, `Kind`, `Tool`, `BindPort`, `BindAddress`, `AutoSpawnTab`, `Options`, `Notes`, `CreatedAt`) and `ManagedListenerInfo` (`ID`, `Profile`, `Status`, `StartedAt`, `ErrorMessage`, `ActiveSessions`, `CatchCount`, `OpsecWarnings`, `CommandPreview`).

@@ -429,6 +429,14 @@ type SnippetChain struct {
 	UpdatedAt            string             `json:"updatedAt,omitempty"`
 }
 
+// SnippetChainsFileConfig holds metadata about the external snippet chains JSON file (Spec F-16).
+type SnippetChainsFileConfig struct {
+	FilePath     string `json:"filePath"`
+	ChainCount   int    `json:"chainCount"`
+	Exists       bool   `json:"exists"`
+	LastModified string `json:"lastModified,omitempty"`
+}
+
 // PayloadTemplate represents a configurable reverse or bind payload template (Spec F-33).
 // Commands are loaded dynamically from an external file rather than compiled into the binary.
 type PayloadTemplate struct {

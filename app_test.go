@@ -2519,6 +2519,35 @@ func TestApp_PayloadGenerator_F33(t *testing.T) {
 	if len(postDelete) != 0 {
 		t.Errorf("expected 0 templates after delete, got %d", len(postDelete))
 	}
+
+	// 7. Directory-only path should automatically append default filename "payload_templates.json"
+	tmpFolder := t.TempDir()
+	dirCfg, err := app.SetPayloadTemplatesPath(tmpFolder)
+	if err != nil {
+		t.Fatalf("SetPayloadTemplatesPath with folder failed: %v", err)
+	}
+	expectedFolderFile := filepath.Join(tmpFolder, "payload_templates.json")
+	if dirCfg.FilePath != expectedFolderFile {
+		t.Errorf("expected %q, got %q", expectedFolderFile, dirCfg.FilePath)
+	}
+
+	// 8. Snippet chains external file & directory resolution
+	chainsDir := t.TempDir()
+	chainsCfg, err := app.SetSnippetChainsPath(chainsDir)
+	if err != nil {
+		t.Fatalf("SetSnippetChainsPath with folder failed: %v", err)
+	}
+	expectedChainsFile := filepath.Join(chainsDir, "snippet_chains.json")
+	if chainsCfg.FilePath != expectedChainsFile {
+		t.Errorf("expected %q, got %q", expectedChainsFile, chainsCfg.FilePath)
+	}
+	loadedChains, err := app.ListSnippetChainsFromFile()
+	if err != nil {
+		t.Fatalf("ListSnippetChainsFromFile failed: %v", err)
+	}
+	if len(loadedChains) == 0 {
+		t.Errorf("expected initialized built-in chains in external file, got 0")
+	}
 }
 
 func TestApp_ListenerManager_F32(t *testing.T) {

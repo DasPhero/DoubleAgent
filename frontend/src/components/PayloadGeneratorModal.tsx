@@ -22,6 +22,8 @@ export interface PayloadGeneratorModalProps {
   saveAsSnippet: (opts: PayloadRenderOptions, name: string) => Promise<void>;
   getFileConfig: () => Promise<PayloadFileConfig>;
   setFilePath: (path: string) => Promise<PayloadFileConfig>;
+  onSelectFile?: (title: string, filterName: string, filterPattern: string) => Promise<string>;
+  onSelectDirectory?: (title: string) => Promise<string>;
 }
 
 export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
@@ -36,6 +38,8 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
   saveAsSnippet,
   getFileConfig,
   setFilePath,
+  onSelectFile,
+  onSelectDirectory,
 }) => {
   const [templates, setTemplates] = useState<PayloadTemplate[]>([]);
   const [fileConfig, setFileConfig] = useState<PayloadFileConfig | null>(null);
@@ -48,7 +52,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
   const [lhost, setLhost] = useState<string>(activeHostAddress || '10.10.14.1');
   const [lport, setLport] = useState<number>(443);
   const [encoding, setEncoding] = useState<PayloadEncoding>('none');
-  const [customVars] = useState<Record<string, string>>({});
+  const [customVars, setCustomVars] = useState<Record<string, string>>({});
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -105,6 +109,65 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
     setSelectedTemplateId(tmpl.id);
     if (tmpl.defaultPort && tmpl.defaultPort > 0) {
       setLport(tmpl.defaultPort);
+    }
+  };
+
+  // Dynamically detect any variable placeholders from the command: {{VAR}}
+  const detectedVariables = useMemo(() => {
+    if (!currentTemplate) return [];
+    const set = new Set<string>();
+    if (currentTemplate.variables) {
+      currentTemplate.variables.forEach((v: unknown) => {
+        if (typeof v === 'string') {
+          set.add((v as string).toUpperCase());
+        } else if (v && typeof v === 'object' && 'name' in v && typeof (v as { name: unknown }).name === 'string') {
+          set.add((v as { name: string }).name.toUpperCase());
+        }
+      });
+    }
+    const re = /\{\{([A-Za-z0-9_]+)\}\}/g;
+    let match;
+    while ((match = re.exec(currentTemplate.command || '')) !== null) {
+      set.add(match[1].toUpperCase());
+    }
+    return Array.from(set);
+  }, [currentTemplate]);
+
+  const handleBrowseFile = async () => {
+    try {
+      const file = onSelectFile
+        ? await onSelectFile('Select Payload Templates JSON File', 'JSON Files', '*.json')
+        : await (window as unknown as { go?: { main?: { App?: { SelectFileDialog: (t: string, fn: string, fp: string) => Promise<string> } } } }).go?.main?.App?.SelectFileDialog?.(
+            'Select Payload Templates JSON File',
+            'JSON Files',
+            '*.json'
+          );
+      if (file && file.trim()) {
+        const updated = await setFilePath(file.trim());
+        setFileConfig(updated);
+        await refreshAll();
+        setInfoMessage(`Loaded template file: ${file.trim()}`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleBrowseFolder = async () => {
+    try {
+      const folder = onSelectDirectory
+        ? await onSelectDirectory('Select Payload Templates Folder')
+        : await (window as unknown as { go?: { main?: { App?: { SelectDirectoryDialog: (t: string) => Promise<string> } } } }).go?.main?.App?.SelectDirectoryDialog?.(
+            'Select Payload Templates Folder'
+          );
+      if (folder && folder.trim()) {
+        const updated = await setFilePath(folder.trim());
+        setFileConfig(updated);
+        await refreshAll();
+        setInfoMessage(`Configured templates folder: ${folder.trim()} (using default payload_templates.json)`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -403,7 +466,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="cyber-hud-btn btn-sm"
@@ -417,6 +480,26 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
             <button
               type="button"
               className="cyber-hud-btn btn-sm"
+              onClick={() => void handleBrowseFile()}
+              title="Select a specific payload templates JSON file"
+              style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem' }}
+            >
+              <CyberIcon name="folder" size={11} />
+              <span style={{ marginLeft: '0.35rem' }}>Browse File</span>
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => void handleBrowseFolder()}
+              title="Select a folder (uses default payload_templates.json inside)"
+              style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem' }}
+            >
+              <CyberIcon name="folder" size={11} />
+              <span style={{ marginLeft: '0.35rem' }}>Browse Folder</span>
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
               onClick={() => {
                 setCustomPathValue(fileConfig?.filePath || '');
                 setShowPathInput(!showPathInput);
@@ -424,7 +507,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
               title="Change templates file path"
               style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem' }}
             >
-              <CyberIcon name="folder" size={11} />
+              <CyberIcon name="edit" size={11} />
               <span style={{ marginLeft: '0.35rem' }}>Config Path</span>
             </button>
           </div>
@@ -440,19 +523,36 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '0.65rem',
+              flexWrap: 'wrap',
             }}
           >
             <span style={{ fontSize: '0.75rem', color: '#cbd5e1', whiteSpace: 'nowrap' }}>
-              Templates File Path:
+              File or Folder Path:
             </span>
             <input
               type="text"
               className="cyber-hud-input"
               value={customPathValue}
               onChange={(e) => setCustomPathValue(e.target.value)}
-              placeholder="e.g. data/payload_templates.json"
-              style={{ flex: 1, fontSize: '0.78rem' }}
+              placeholder="e.g. data/payload_templates.json or folder path"
+              style={{ flex: 1, minWidth: '220px', fontSize: '0.78rem' }}
             />
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => void handleBrowseFile()}
+              title="Pick file from disk"
+            >
+              Pick File
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => void handleBrowseFolder()}
+              title="Pick folder from disk"
+            >
+              Pick Folder
+            </button>
             <button
               type="button"
               className="cyber-hud-btn btn-sm btn-primary"
@@ -657,6 +757,67 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
             </select>
           </div>
         </div>
+
+        {/* Dynamic General Ports & Custom Variables Row */}
+        {detectedVariables.filter((v) => v !== 'LHOST' && v !== 'LPORT').length > 0 && (
+          <div
+            style={{
+              padding: '0.65rem 1.25rem',
+              borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+              backgroundColor: 'rgba(5, 15, 30, 0.85)',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              alignItems: 'center',
+            }}
+          >
+            <div style={{ fontSize: '0.72rem', color: '#00f0ff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <CyberIcon name="terminal" size={12} />
+              <span>GENERAL PORTS &amp; PARAMETERS:</span>
+            </div>
+            {detectedVariables
+              .filter((v) => v !== 'LHOST' && v !== 'LPORT')
+              .map((varName) => {
+                const isPort = varName.includes('PORT');
+                const currentVal = customVars[varName] ?? (isPort ? (currentTemplate?.defaultPort ? String(currentTemplate.defaultPort) : '443') : '');
+                return (
+                  <div key={varName} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>
+                      &#123;&#123;{varName}&#125;&#125;:
+                    </span>
+                    <input
+                      type={isPort ? 'number' : 'text'}
+                      min={isPort ? '1' : undefined}
+                      max={isPort ? '65535' : undefined}
+                      className="cyber-hud-input"
+                      value={currentVal}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomVars((prev) => ({ ...prev, [varName]: val }));
+                      }}
+                      placeholder={`value for ${varName}`}
+                      style={{ width: isPort ? '90px' : '150px', fontSize: '0.78rem', height: '26px' }}
+                    />
+                    {isPort && (
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        {[443, 80, 53, 8443].map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            className={`cyber-hud-btn btn-sm ${currentVal === String(p) ? 'btn-primary' : ''}`}
+                            onClick={() => setCustomVars((prev) => ({ ...prev, [varName]: String(p) }))}
+                            style={{ padding: '0.1rem 0.35rem', fontSize: '0.65rem' }}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+        )}
 
         {/* Main Content Split: Templates List (Left) & Output / Preview (Right) */}
         <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>

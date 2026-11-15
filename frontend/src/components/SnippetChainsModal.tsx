@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { SnippetChain, SnippetChainStep } from '../types/snippet';
+import React, { useState, useMemo, useEffect } from 'react';
+import { SnippetChain, SnippetChainStep, SnippetChainsFileConfig } from '../types/snippet';
 import { CyberIcon } from './CyberIcon';
 
 export interface SnippetChainsModalProps {
@@ -11,6 +11,12 @@ export interface SnippetChainsModalProps {
   onDeleteChain: (chainId: string) => Promise<void>;
   onRunChain: (chain: SnippetChain) => void;
   onClose: () => void;
+  // External File decoupling (F-16/F-33)
+  getFileConfig?: () => Promise<SnippetChainsFileConfig>;
+  setFilePath?: (path: string) => Promise<SnippetChainsFileConfig>;
+  onReloadFromFile?: () => Promise<SnippetChain[]>;
+  onSelectFile?: (title: string, filterName: string, filterPattern: string) => Promise<string>;
+  onSelectDirectory?: (title: string) => Promise<string>;
 }
 
 export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
@@ -22,6 +28,11 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
   onDeleteChain,
   onRunChain,
   onClose,
+  getFileConfig,
+  setFilePath,
+  onReloadFromFile,
+  onSelectFile,
+  onSelectDirectory,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [osFilter, setOsFilter] = useState<'all' | 'linux' | 'windows'>('all');
@@ -31,6 +42,93 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
   const [editingChain, setEditingChain] = useState<SnippetChain | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+  const [chainsList, setChainsList] = useState<SnippetChain[]>(chains);
+
+  // File decoupling state
+  const [fileConfig, setFileConfig] = useState<SnippetChainsFileConfig | null>(null);
+  const [showPathInput, setShowPathInput] = useState<boolean>(false);
+  const [customPathValue, setCustomPathValue] = useState<string>('');
+
+  useEffect(() => {
+    setChainsList(chains);
+  }, [chains]);
+
+  useEffect(() => {
+    if (getFileConfig) {
+      getFileConfig()
+        .then(setFileConfig)
+        .catch(() => {});
+    }
+  }, [getFileConfig]);
+
+  const handleReload = async () => {
+    try {
+      if (onReloadFromFile) {
+        const loaded = await onReloadFromFile();
+        setChainsList(loaded);
+      }
+      if (getFileConfig) {
+        const cfg = await getFileConfig();
+        setFileConfig(cfg);
+      }
+      setInfoMessage('Reloaded snippet chains from disk.');
+      setTimeout(() => setInfoMessage(''), 3000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleBrowseFile = async () => {
+    try {
+      const file = onSelectFile
+        ? await onSelectFile('Select Snippet Chains JSON File', 'JSON Files', '*.json')
+        : await (window as unknown as { go?: { main?: { App?: { SelectFileDialog: (t: string, fn: string, fp: string) => Promise<string> } } } }).go?.main?.App?.SelectFileDialog?.(
+            'Select Snippet Chains JSON File',
+            'JSON Files',
+            '*.json'
+          );
+      if (file && file.trim() && setFilePath) {
+        const updated = await setFilePath(file.trim());
+        setFileConfig(updated);
+        await handleReload();
+        setInfoMessage(`Loaded snippet chains from file: ${file.trim()}`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleBrowseFolder = async () => {
+    try {
+      const folder = onSelectDirectory
+        ? await onSelectDirectory('Select Snippet Chains Folder')
+        : await (window as unknown as { go?: { main?: { App?: { SelectDirectoryDialog: (t: string) => Promise<string> } } } }).go?.main?.App?.SelectDirectoryDialog?.(
+            'Select Snippet Chains Folder'
+          );
+      if (folder && folder.trim() && setFilePath) {
+        const updated = await setFilePath(folder.trim());
+        setFileConfig(updated);
+        await handleReload();
+        setInfoMessage(`Configured snippet chains folder: ${folder.trim()} (using default snippet_chains.json)`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleApplyCustomPath = async () => {
+    if (!customPathValue.trim() || !setFilePath) return;
+    try {
+      const updated = await setFilePath(customPathValue.trim());
+      setFileConfig(updated);
+      setShowPathInput(false);
+      await handleReload();
+      setInfoMessage(`Configured snippet chains path: ${updated.filePath}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   // Start new chain
   const startNewChain = () => {
@@ -154,7 +252,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
   // Filtered chains
   const filteredChains = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return chains.filter((c) => {
+    return chainsList.filter((c) => {
       // OS filter
       if (osFilter !== 'all') {
         const cOS = (c.targetOs || 'any').toLowerCase();
@@ -207,6 +305,172 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
             <CyberIcon name="close" size={14} />
           </button>
         </div>
+
+        {/* External File Decoupling Status Banner */}
+        <div
+          style={{
+            padding: '0.55rem 1.25rem',
+            backgroundColor: 'rgba(5, 12, 22, 0.95)',
+            borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.65rem',
+            fontSize: '0.74rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', overflow: 'hidden' }}>
+            <span style={{ color: '#00f0ff', fontWeight: 600 }}>CHAINS STORE:</span>
+            <span
+              style={{
+                color: '#cbd5e1',
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: '0.72rem',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                maxWidth: '420px',
+              }}
+              title={fileConfig?.filePath || 'data/snippet_chains.json'}
+            >
+              {fileConfig?.filePath || 'data/snippet_chains.json'}
+            </span>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                color: '#34d399',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                padding: '0.1rem 0.4rem',
+                borderRadius: '3px',
+                fontWeight: 600,
+              }}
+            >
+              {chainsList.length} CHAINS
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => void handleReload()}
+              title="Reload chains from disk"
+              style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem' }}
+            >
+              <CyberIcon name="radar" size={11} />
+              <span style={{ marginLeft: '0.35rem' }}>Reload File</span>
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => void handleBrowseFile()}
+              title="Select a specific snippet chains JSON file"
+              style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem' }}
+            >
+              <CyberIcon name="folder" size={11} />
+              <span style={{ marginLeft: '0.35rem' }}>Browse File</span>
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => void handleBrowseFolder()}
+              title="Select a folder (uses default snippet_chains.json inside)"
+              style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem' }}
+            >
+              <CyberIcon name="folder" size={11} />
+              <span style={{ marginLeft: '0.35rem' }}>Browse Folder</span>
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => {
+                setCustomPathValue(fileConfig?.filePath || '');
+                setShowPathInput(!showPathInput);
+              }}
+              title="Change snippet chains file path"
+              style={{ padding: '0.2rem 0.55rem', fontSize: '0.72rem' }}
+            >
+              <CyberIcon name="edit" size={11} />
+              <span style={{ marginLeft: '0.35rem' }}>Config Path</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Custom Path Edit Expandable */}
+        {showPathInput && (
+          <div
+            style={{
+              padding: '0.75rem 1.25rem',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ fontSize: '0.75rem', color: '#cbd5e1', whiteSpace: 'nowrap' }}>
+              File or Folder Path:
+            </span>
+            <input
+              type="text"
+              className="cyber-hud-input"
+              value={customPathValue}
+              onChange={(e) => setCustomPathValue(e.target.value)}
+              placeholder="e.g. data/snippet_chains.json or folder path"
+              style={{ flex: 1, minWidth: '220px', fontSize: '0.78rem' }}
+            />
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => void handleBrowseFile()}
+              title="Pick file from disk"
+            >
+              Pick File
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => void handleBrowseFolder()}
+              title="Pick folder from disk"
+            >
+              Pick Folder
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm btn-primary"
+              onClick={() => void handleApplyCustomPath()}
+            >
+              Apply Path
+            </button>
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => setShowPathInput(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Notifications & Error messages */}
+        {infoMessage && (
+          <div
+            style={{
+              margin: '0.65rem 1.25rem 0 1.25rem',
+              padding: '0.55rem 0.85rem',
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid #10b981',
+              color: '#6ee7b7',
+              borderRadius: '4px',
+              fontSize: '0.78rem',
+            }}
+          >
+            {infoMessage}
+          </div>
+        )}
 
         {/* Body Container */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>

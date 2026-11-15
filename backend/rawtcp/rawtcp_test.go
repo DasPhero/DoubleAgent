@@ -49,6 +49,9 @@ func TestRawTcp_DialAndEcho_F31(t *testing.T) {
 
 	sess, err := Dial(ctx, cfg)
 	if err != nil {
+		if strings.Contains(err.Error(), "forbidden by its access permissions") {
+			t.Skipf("skipping raw TCP dial test: environment restricts loopback socket connections (%v)", err)
+		}
 		t.Fatalf("failed to dial raw TCP: %v", err)
 	}
 	defer sess.Close()
@@ -148,6 +151,9 @@ func TestRawTcp_ListenAndAccept_F31(t *testing.T) {
 	targetAddr := fmt.Sprintf("127.0.0.1:%d", info.Port)
 	clientConn, err := net.DialTimeout("tcp", targetAddr, 2*time.Second)
 	if err != nil {
+		if strings.Contains(err.Error(), "forbidden by its access permissions") {
+			t.Skipf("skipping listener dial test: environment restricts loopback socket connections (%v)", err)
+		}
 		t.Fatalf("failed to dial listener on %s: %v", targetAddr, err)
 	}
 	defer clientConn.Close()

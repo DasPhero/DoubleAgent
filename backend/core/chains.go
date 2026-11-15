@@ -1,8 +1,11 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -320,5 +323,106 @@ func GetBuiltinSnippetChains() []SnippetChain {
 			},
 		},
 	}
+}
+
+// ResolveChainsFilePath resolves the target file path for snippet chains.
+// If inputPath is a directory or ends in a path separator, it defaults to "snippet_chains.json" inside that folder.
+// If inputPath is a specific file, that exact file is used.
+// If inputPath is empty, it checks workspace data/snippet_chains.json, then root, then user config dir.
+func ResolveChainsFilePath(inputPath string) string {
+	clean := strings.TrimSpace(inputPath)
+	if clean != "" {
+		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
+			return filepath.Join(clean, "snippet_chains.json")
+		}
+		if strings.HasSuffix(clean, "/") || strings.HasSuffix(clean, string(filepath.Separator)) {
+			return filepath.Join(clean, "snippet_chains.json")
+		}
+		return filepath.Clean(clean)
+	}
+
+	// 1. Check local working directory (e.g. workspace data directory)
+	localCandidate := filepath.Join("data", "snippet_chains.json")
+	if fi, err := os.Stat(localCandidate); err == nil && !fi.IsDir() {
+		return localCandidate
+	}
+	rootCandidate := "snippet_chains.json"
+	if fi, err := os.Stat(rootCandidate); err == nil && !fi.IsDir() {
+		return rootCandidate
+	}
+
+	// 2. User configuration directory: <UserConfigDir>/DoubleAgent/snippet_chains.json
+	cfgDir, err := os.UserConfigDir()
+	if err == nil && cfgDir != "" {
+		return filepath.Join(cfgDir, "DoubleAgent", "snippet_chains.json")
+	}
+
+	// 3. Fallback to temp directory
+	return filepath.Join(os.TempDir(), "doubleagent-snippet_chains.json")
+}
+
+// GetSnippetChainsFileConfig retrieves status of the external snippet chains file.
+func GetSnippetChainsFileConfig(filePath string) SnippetChainsFileConfig {
+	target := ResolveChainsFilePath(filePath)
+	cfg := SnippetChainsFileConfig{
+		FilePath: target,
+	}
+	fi, err := os.Stat(target)
+	if err == nil && !fi.IsDir() {
+		cfg.Exists = true
+		cfg.LastModified = fi.ModTime().UTC().Format(time.RFC3339)
+		if list, err := LoadSnippetChainsFromFile(target); err == nil {
+			cfg.ChainCount = len(list)
+		}
+	}
+	return cfg
+}
+
+// LoadSnippetChainsFromFile loads snippet chains from an external JSON file.
+// If the file does not exist, it initializes it with standard built-in presets.
+func LoadSnippetChainsFromFile(filePath string) ([]SnippetChain, error) {
+	target := ResolveChainsFilePath(filePath)
+	data, err := os.ReadFile(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			presets := GetBuiltinSnippetChains()
+			_ = SaveSnippetChainsToFile(target, presets)
+			return presets, nil
+		}
+		return nil, fmt.Errorf("failed to read snippet chains file at %q: %w", target, err)
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return []SnippetChain{}, nil
+	}
+	var chains []SnippetChain
+	if err := json.Unmarshal(data, &chains); err != nil {
+		return nil, fmt.Errorf("failed to parse snippet chains JSON from %q: %w", target, err)
+	}
+	return chains, nil
+}
+
+// SaveSnippetChainsToFile writes snippet chains to an external JSON file atomically.
+func SaveSnippetChainsToFile(filePath string, chains []SnippetChain) error {
+	target := ResolveChainsFilePath(filePath)
+	dir := filepath.Dir(target)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create directory %q: %w", dir, err)
+	}
+	if chains == nil {
+		chains = []SnippetChain{}
+	}
+	data, err := json.MarshalIndent(chains, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize snippet chains: %w", err)
+	}
+	tmpFile := target + ".tmp"
+	if err := os.WriteFile(tmpFile, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write temporary chains file: %w", err)
+	}
+	if err := os.Rename(tmpFile, target); err != nil {
+		_ = os.Remove(tmpFile)
+		return fmt.Errorf("failed to atomically update snippet chains file: %w", err)
+	}
+	return nil
 }
 

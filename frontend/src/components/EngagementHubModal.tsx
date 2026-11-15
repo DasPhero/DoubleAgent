@@ -421,7 +421,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 className="cyber-hud-select"
                 value={activeEngagement?.id || ''}
                 onChange={(e) => void handleSetActive(e.target.value)}
-                style={{ flex: 1, maxWidth: '320px', height: '34px', fontSize: '0.82rem', fontWeight: 600, color: '#00f0ff' }}
+                style={{ flex: 1, minWidth: '280px', maxWidth: '420px', height: '34px', fontSize: '0.82rem', fontWeight: 600, color: '#00f0ff' }}
               >
                 {engagements.length === 0 && <option value="">No Engagements Configured</option>}
                 {engagements.map((eng) => (

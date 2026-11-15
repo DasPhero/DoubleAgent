@@ -60,6 +60,7 @@ type App struct {
 	pendingMergeExternalPayload *core.VaultPayload
 	pendingMergeFilePath        string
 	payloadFilePath             string
+	chainsFilePath              string
 	managedListeners            map[string]*managedListenerInstance
 }
 
@@ -3146,6 +3147,124 @@ func (a *App) ExecuteSnippetChainStep(sessionID string, chainID string, stepInde
 	return a.WriteTerminal(sessionID, resolvedCmd+"\n")
 }
 
+func (a *App) getChainsFilePath() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.chainsFilePath != "" {
+		return a.chainsFilePath
+	}
+	return core.ResolveChainsFilePath("")
+}
+
+// GetSnippetChainsConfig returns the status of the external snippet chains file (F-16/F-33).
+func (a *App) GetSnippetChainsConfig() (*core.SnippetChainsFileConfig, error) {
+	p := a.getChainsFilePath()
+	cfg := core.GetSnippetChainsFileConfig(p)
+	return &cfg, nil
+}
+
+// SetSnippetChainsPath configures a custom filesystem path for snippet chains (F-16).
+// If a folder/directory is specified, it automatically resolves to snippet_chains.json in that folder.
+func (a *App) SetSnippetChainsPath(customPath string) (*core.SnippetChainsFileConfig, error) {
+	clean := core.ResolveChainsFilePath(customPath)
+	if clean == "" {
+		return nil, errors.New("snippet chains path must not be empty")
+	}
+
+	a.mu.Lock()
+	a.chainsFilePath = clean
+	a.mu.Unlock()
+
+	_, err := core.LoadSnippetChainsFromFile(clean)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := core.GetSnippetChainsFileConfig(clean)
+	return &cfg, nil
+}
+
+// ListSnippetChainsFromFile loads snippet chains from the external JSON file (F-16).
+func (a *App) ListSnippetChainsFromFile() ([]core.SnippetChain, error) {
+	p := a.getChainsFilePath()
+	return core.LoadSnippetChainsFromFile(p)
+}
+
+// SaveSnippetChainToFile creates or updates a chain in the external JSON file (F-16).
+func (a *App) SaveSnippetChainToFile(chain core.SnippetChain) error {
+	if err := core.ValidateSnippetChain(chain); err != nil {
+		return err
+	}
+	p := a.getChainsFilePath()
+	chains, err := core.LoadSnippetChainsFromFile(p)
+	if err != nil {
+		return err
+	}
+	updated := false
+	for i, c := range chains {
+		if c.ID == chain.ID {
+			chains[i] = chain
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		if chain.ID == "" {
+			chain.ID = fmt.Sprintf("chain-%d", time.Now().UnixNano())
+		}
+		chains = append(chains, chain)
+	}
+	return core.SaveSnippetChainsToFile(p, chains)
+}
+
+// DeleteSnippetChainFromFile removes a snippet chain from the external JSON file (F-16).
+func (a *App) DeleteSnippetChainFromFile(chainID string) error {
+	p := a.getChainsFilePath()
+	chains, err := core.LoadSnippetChainsFromFile(p)
+	if err != nil {
+		return err
+	}
+	var filtered []core.SnippetChain
+	for _, c := range chains {
+		if c.ID != chainID {
+			filtered = append(filtered, c)
+		}
+	}
+	return core.SaveSnippetChainsToFile(p, filtered)
+}
+
+// SelectFileDialog opens a native file chooser dialog (Wails runtime) and returns the selected path.
+func (a *App) SelectFileDialog(title string, filterName string, filterPattern string) (string, error) {
+	if a.ctx == nil {
+		return "", errors.New("application context not initialized")
+	}
+	pattern := filterPattern
+	if pattern == "" {
+		pattern = "*.json"
+	}
+	name := filterName
+	if name == "" {
+		name = "JSON Files"
+	}
+	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: title,
+		Filters: []runtime.FileFilter{
+			{DisplayName: fmt.Sprintf("%s (%s)", name, pattern), Pattern: pattern},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+}
+
+// SelectDirectoryDialog opens a native folder chooser dialog (Wails runtime) and returns the selected directory path.
+func (a *App) SelectDirectoryDialog(title string) (string, error) {
+	if a.ctx == nil {
+		return "", errors.New("application context not initialized")
+	}
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: title,
+	})
+}
+
 func (a *App) getPayloadFilePath() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -3163,8 +3282,9 @@ func (a *App) GetPayloadTemplatesConfig() (*core.PayloadFileConfig, error) {
 }
 
 // SetPayloadTemplatesPath sets a custom filesystem path for the external payload templates file (F-33).
+// If a folder or directory is specified, it automatically resolves to payload_templates.json inside that folder.
 func (a *App) SetPayloadTemplatesPath(customPath string) (*core.PayloadFileConfig, error) {
-	clean := filepath.Clean(strings.TrimSpace(customPath))
+	clean := core.ResolveDefaultPayloadFilePath(customPath)
 	if clean == "" {
 		return nil, errors.New("payload templates path must not be empty")
 	}
