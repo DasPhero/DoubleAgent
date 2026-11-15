@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Snippet } from '../types/snippet';
+import { CyberIcon } from './CyberIcon';
 
 export interface SnippetsManagerModalProps {
   snippets: Snippet[];
@@ -50,6 +51,7 @@ export function SnippetsManagerModal({
   const [formConfirm, setFormConfirm] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Sync edit form state when editingSnippet changes
   const startEdit = (snip: Snippet) => {
@@ -121,7 +123,23 @@ export function SnippetsManagerModal({
   }, [formBody]);
 
   const handleInsertVariable = (varText: string) => {
-    setFormBody((prev) => prev + varText);
+    const el = bodyTextareaRef.current;
+    if (el) {
+      const start = typeof el.selectionStart === 'number' ? el.selectionStart : formBody.length;
+      const end = typeof el.selectionEnd === 'number' ? el.selectionEnd : formBody.length;
+      const nextBody = formBody.slice(0, start) + varText + formBody.slice(end);
+      const nextCursor = start + varText.length;
+      setFormBody(nextBody);
+      el.focus();
+      setTimeout(() => {
+        if (bodyTextareaRef.current) {
+          bodyTextareaRef.current.focus();
+          bodyTextareaRef.current.setSelectionRange(nextCursor, nextCursor);
+        }
+      }, 0);
+    } else {
+      setFormBody((prev) => prev + varText);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -179,7 +197,7 @@ export function SnippetsManagerModal({
         role={isDocked ? 'region' : undefined}
         aria-label={isDocked ? 'Docked Command Snippets' : undefined}
         style={{
-          maxWidth: isDocked ? undefined : '780px',
+          maxWidth: isDocked ? undefined : '820px',
           width: isDocked ? undefined : '94vw',
           maxHeight: isDocked ? undefined : '88vh',
           display: 'flex',
@@ -199,8 +217,8 @@ export function SnippetsManagerModal({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    <span>⚡ </span>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <CyberIcon name="bolt" size={16} />
                     <span>Command Snippets</span>
                   </h3>
                   <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
@@ -212,12 +230,14 @@ export function SnippetsManagerModal({
                 {onDockToView && (
                   <button
                     type="button"
-                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    className="cyber-hud-btn btn-sm"
                     onClick={onDockToView}
                     aria-label="Dock Snippets to View"
                     title="Dock Command Snippets as a split panel inside the current workspace view"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                   >
-                    📌 Dock
+                    <CyberIcon name="pin" size={12} />
+                    <span>Dock</span>
                   </button>
                 )}
                 <button
@@ -240,19 +260,71 @@ export function SnippetsManagerModal({
         {!editingSnippet ? (
           <div>
             {/* Search & Actions Bar */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center' }}>
-              <input
-                type="text"
-                placeholder="Search snippets by name, tag, or command..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ flex: 1 }}
-              />
+            <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  position: 'relative',
+                  flex: 1,
+                  minWidth: '220px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: '0.75rem',
+                    color: '#00f0ff',
+                    opacity: 0.75,
+                    pointerEvents: 'none',
+                    display: 'inline-flex',
+                  }}
+                >
+                  <CyberIcon name="search" size={14} />
+                </span>
+                <input
+                  type="text"
+                  className="cyber-hud-input"
+                  placeholder="Search snippets by name, tag, or command..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    paddingLeft: '2.2rem',
+                    paddingRight: searchQuery ? '2rem' : '0.85rem',
+                    height: '36px',
+                    fontSize: '0.82rem',
+                    backgroundColor: 'rgba(4, 10, 20, 0.92)',
+                    border: '1px solid rgba(0, 240, 255, 0.35)',
+                    color: '#e2e8f0',
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    title="Clear search"
+                    style={{
+                      position: 'absolute',
+                      right: '0.5rem',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      padding: '2px 5px',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
               {allTags.length > 0 && (
                 <select
+                  className="cyber-hud-select"
                   value={selectedTag}
                   onChange={(e) => setSelectedTag(e.target.value)}
-                  style={{ width: '130px' }}
+                  style={{ width: '145px', height: '36px' }}
                 >
                   <option value="all">All Tags</option>
                   {allTags.map((t) => (
@@ -262,8 +334,14 @@ export function SnippetsManagerModal({
                   ))}
                 </select>
               )}
-              <button type="button" className="cyber-btn cyber-btn-primary" onClick={startNew}>
-                + New Snippet
+              <button
+                type="button"
+                className="cyber-hud-btn btn-primary"
+                onClick={startNew}
+                style={{ height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <CyberIcon name="plus" size={13} />
+                <span>+ New Snippet</span>
               </button>
             </div>
 
@@ -276,19 +354,19 @@ export function SnippetsManagerModal({
               <div className="snippets-list-grid">
                 {filteredSnippets.map((s) => (
                   <div key={s.id} className="snippet-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
                       <div>
-                        <h4 style={{ margin: '0 0 0.2rem 0', color: 'var(--text-bright)' }}>{s.name}</h4>
+                        <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-bright)', fontSize: '0.92rem' }}>{s.name}</h4>
                         {s.description && (
-                          <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                             {s.description}
                           </p>
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                         <button
                           type="button"
-                          className="cyber-btn cyber-btn-primary btn-sm"
+                          className="cyber-hud-btn btn-primary btn-sm"
                           onClick={() => {
                             if (!isDocked) {
                               onClose();
@@ -296,24 +374,26 @@ export function SnippetsManagerModal({
                             onRunSnippet(s);
                           }}
                           title="Run in active terminal session"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                         >
-                          ⚡ Run
+                          <CyberIcon name="bolt" size={12} />
+                          <span>Run</span>
                         </button>
                         <button
                           type="button"
-                          className="cyber-btn cyber-btn-secondary btn-sm"
+                          className="cyber-hud-btn btn-sm"
                           onClick={() => startEdit(s)}
                           title="Edit snippet"
                         >
-                          ✏
+                          <CyberIcon name="edit" size={12} />
                         </button>
                         <button
                           type="button"
-                          className="tab-close-btn"
-                          onClick={() => handleDelete(s.id)}
+                          className="cyber-hud-btn btn-sm btn-danger"
+                          onClick={() => void handleDelete(s.id)}
                           title="Delete snippet"
                         >
-                          ×
+                          <CyberIcon name="trash" size={12} />
                         </button>
                       </div>
                     </div>
@@ -322,8 +402,8 @@ export function SnippetsManagerModal({
                       <code>{s.body}</code>
                     </pre>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem' }}>
-                      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.45rem' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                         {s.tags?.map((t) => (
                           <span key={t} className="snippet-tag-badge">
                             #{t}
@@ -341,71 +421,124 @@ export function SnippetsManagerModal({
           </div>
         ) : (
           /* Edit / New Snippet Form */
-          <form onSubmit={handleSave} className="snippet-edit-form">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <h3 style={{ margin: 0, fontSize: '0.95rem' }}>
+          <form
+            onSubmit={handleSave}
+            className="snippet-edit-form"
+            style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingBottom: '0.65rem',
+                borderBottom: '1px solid rgba(0, 240, 255, 0.22)',
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#00f0ff', letterSpacing: '0.04em' }}>
                 {editingSnippet.id ? `Edit Snippet: ${editingSnippet.name}` : 'New Command Snippet'}
               </h3>
               <button
                 type="button"
-                className="cyber-btn cyber-btn-secondary btn-sm"
+                className="cyber-hud-btn btn-sm"
                 onClick={() => setEditingSnippet(null)}
               >
                 Back to List
               </button>
             </div>
 
-            <div className="settings-field-row">
-              <label htmlFor="snip-name">Snippet Name *</label>
-              <input
-                id="snip-name"
-                type="text"
-                placeholder="e.g. Inspect Nginx Logs"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                required
-                autoFocus
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label htmlFor="snip-name" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  Snippet Name *
+                </label>
+                <input
+                  id="snip-name"
+                  type="text"
+                  className="cyber-hud-input"
+                  placeholder="e.g. Inspect Nginx Logs"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  style={{ width: '100%' }}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label htmlFor="snip-tags" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  Tags (comma-separated)
+                </label>
+                <input
+                  id="snip-tags"
+                  type="text"
+                  className="cyber-hud-input"
+                  placeholder="e.g. web, logs, nginx, linux"
+                  value={formTags}
+                  onChange={(e) => setFormTags(e.target.value)}
+                  style={{ width: '100%' }}
+                />
+              </div>
             </div>
 
-            <div className="settings-field-row">
-              <label htmlFor="snip-desc">Description</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <label htmlFor="snip-desc" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                Description
+              </label>
               <input
                 id="snip-desc"
                 type="text"
+                className="cyber-hud-input"
                 placeholder="Optional explanation of what this command executes"
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
+                style={{ width: '100%' }}
               />
             </div>
 
-            <div className="settings-field-row">
-              <label htmlFor="snip-tags">Tags (comma-separated)</label>
-              <input
-                id="snip-tags"
-                type="text"
-                placeholder="e.g. web, logs, nginx"
-                value={formTags}
-                onChange={(e) => setFormTags(e.target.value)}
-              />
-            </div>
-
-            <div className="settings-field-row">
-              <label htmlFor="snip-body">Command Body *</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label htmlFor="snip-body" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                Command Body *
+              </label>
               <textarea
+                ref={bodyTextareaRef}
                 id="snip-body"
+                className="cyber-hud-input"
                 rows={5}
                 placeholder="e.g. tail -n {{LINES=50}} {{FILE=/var/log/nginx/access.log}}"
                 value={formBody}
                 onChange={(e) => setFormBody(e.target.value)}
-                style={{ fontFamily: 'monospace', fontSize: '0.82rem', width: '100%', resize: 'vertical' }}
+                style={{
+                  fontFamily: 'JetBrains Mono, Consolas, monospace',
+                  fontSize: '0.84rem',
+                  lineHeight: 1.5,
+                  width: '100%',
+                  resize: 'vertical',
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: 'rgba(3, 8, 18, 0.95)',
+                  border: '1px solid rgba(0, 240, 255, 0.38)',
+                  color: '#a7f3d0',
+                  borderRadius: '4px',
+                }}
                 required
               />
             </div>
 
             {/* Quick-Insert Variables Helper */}
-            <div className="snippet-var-insert-bar">
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            <div
+              className="snippet-var-insert-bar"
+              style={{
+                padding: '0.65rem 0.85rem',
+                backgroundColor: 'rgba(6, 14, 26, 0.88)',
+                border: '1px solid rgba(0, 240, 255, 0.2)',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.45rem',
+              }}
+            >
+              <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600, marginRight: '0.25rem' }}>
                 Insert Auto Variable:
               </span>
               <button type="button" className="btn-var-pill" onClick={() => handleInsertVariable('{{HOST}}')}>
@@ -436,38 +569,49 @@ export function SnippetsManagerModal({
 
             {/* Detected Variables Indicator */}
             {detectedVariables.length > 0 && (
-              <div style={{ margin: '0.5rem 0', fontSize: '0.78rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Detected Template Variables: </span>
+              <div style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
+                <span style={{ color: '#94a3b8' }}>Detected Template Variables: </span>
                 {detectedVariables.map((v) => (
-                  <code key={v} style={{ margin: '0 0.2rem', padding: '0.1rem 0.35rem', background: 'var(--bg-card)', borderRadius: '4px' }}>
+                  <code
+                    key={v}
+                    style={{
+                      padding: '0.15rem 0.45rem',
+                      background: 'rgba(0, 240, 255, 0.1)',
+                      border: '1px solid rgba(0, 240, 255, 0.3)',
+                      color: '#00f0ff',
+                      borderRadius: '3px',
+                      fontFamily: 'JetBrains Mono, Consolas, monospace',
+                      fontSize: '0.74rem',
+                    }}
+                  >
                     {v}
                   </code>
                 ))}
               </div>
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <input
                 id="snip-confirm"
                 type="checkbox"
                 checked={formConfirm}
                 onChange={(e) => setFormConfirm(e.target.checked)}
               />
-              <label htmlFor="snip-confirm" style={{ fontSize: '0.82rem', cursor: 'pointer' }}>
+              <label htmlFor="snip-confirm" style={{ fontSize: '0.82rem', cursor: 'pointer', color: '#e2e8f0' }}>
                 Always prompt and confirm parameters before execution
               </label>
             </div>
 
-            <div className="modal-actions" style={{ marginTop: '0.8rem' }}>
+            <div className="modal-actions" style={{ marginTop: '0.4rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)' }}>
               <button
                 type="button"
-                className="cyber-btn cyber-btn-secondary"
+                className="cyber-hud-btn"
                 onClick={() => setEditingSnippet(null)}
                 disabled={saving}
               >
                 Cancel
               </button>
-              <button type="submit" className="cyber-btn cyber-btn-primary" disabled={saving}>
+              <button type="submit" className="cyber-hud-btn btn-primary" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Snippet'}
               </button>
             </div>

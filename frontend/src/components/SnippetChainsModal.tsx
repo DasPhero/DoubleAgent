@@ -172,7 +172,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
       title: `Step ${nextIdx}`,
       description: '',
       command: '',
-      confirmBeforeRun: true,
+      confirmBeforeRun: !editingChain.autoRunWithoutPrompt,
       delayMs: 300,
       stopOnError: true,
     };
@@ -213,8 +213,25 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
 
   const insertVariableIntoStep = (stepIdx: number, placeholder: string) => {
     if (!editingChain) return;
+    const el = document.getElementById(`chain-step-cmd-${stepIdx}`) as HTMLTextAreaElement | null;
     const currentCmd = editingChain.steps[stepIdx].command || '';
-    handleStepChange(stepIdx, 'command', currentCmd + placeholder);
+    if (el) {
+      const start = typeof el.selectionStart === 'number' ? el.selectionStart : currentCmd.length;
+      const end = typeof el.selectionEnd === 'number' ? el.selectionEnd : currentCmd.length;
+      const nextCmd = currentCmd.slice(0, start) + placeholder + currentCmd.slice(end);
+      const nextCursor = start + placeholder.length;
+      handleStepChange(stepIdx, 'command', nextCmd);
+      el.focus();
+      setTimeout(() => {
+        const refEl = document.getElementById(`chain-step-cmd-${stepIdx}`) as HTMLTextAreaElement | null;
+        if (refEl) {
+          refEl.focus();
+          refEl.setSelectionRange(nextCursor, nextCursor);
+        }
+      }, 0);
+    } else {
+      handleStepChange(stepIdx, 'command', currentCmd + placeholder);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -666,7 +683,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.68rem', color: '#64748b' }}>
                                       <span>Delay: {st.delayMs || 0}ms</span>
-                                      <span>Confirm: {st.confirmBeforeRun ? 'YES' : 'NO'}</span>
+                                      <span>Confirm: {chain.autoRunWithoutPrompt ? 'NO (Global Auto)' : st.confirmBeforeRun ? 'YES' : 'NO'}</span>
                                       <span>StopOnError: {st.stopOnError ? 'YES' : 'NO'}</span>
                                     </div>
                                   </div>
@@ -814,7 +831,17 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                   <input
                     type="checkbox"
                     checked={editingChain.autoRunWithoutPrompt}
-                    onChange={(e) => setEditingChain({ ...editingChain, autoRunWithoutPrompt: e.target.checked })}
+                    onChange={(e) => {
+                      const nextAutoRun = e.target.checked;
+                      setEditingChain({
+                        ...editingChain,
+                        autoRunWithoutPrompt: nextAutoRun,
+                        steps: editingChain.steps.map((s) => ({
+                          ...s,
+                          confirmBeforeRun: !nextAutoRun,
+                        })),
+                      });
+                    }}
                   />
                   <span><strong>Automatic Execution Without Prompts ("ohne Nachfrage"):</strong> Run entire sequence sequentially without manual confirmation per step</span>
                 </label>
@@ -920,6 +947,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                         </div>
                       </div>
                       <textarea
+                        id={`chain-step-cmd-${idx}`}
                         className="cyber-hud-input"
                         value={step.command}
                         onChange={(e) => handleStepChange(idx, 'command', e.target.value)}
@@ -931,13 +959,25 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#cbd5e1' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          cursor: editingChain.autoRunWithoutPrompt ? 'not-allowed' : 'pointer',
+                          opacity: editingChain.autoRunWithoutPrompt ? 0.6 : 1,
+                        }}
+                      >
                         <input
                           type="checkbox"
-                          checked={step.confirmBeforeRun}
+                          checked={!editingChain.autoRunWithoutPrompt && step.confirmBeforeRun}
+                          disabled={editingChain.autoRunWithoutPrompt}
                           onChange={(e) => handleStepChange(idx, 'confirmBeforeRun', e.target.checked)}
                         />
-                        <span>Confirm Before Run (Spec Default)</span>
+                        <span>
+                          Confirm Before Run{' '}
+                          {editingChain.autoRunWithoutPrompt ? '(Overruled by Global No-Prompt)' : '(Spec Default)'}
+                        </span>
                       </label>
 
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>

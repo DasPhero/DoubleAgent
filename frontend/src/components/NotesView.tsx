@@ -52,7 +52,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  // Sync state when note selection changes
+  // Sync state when note selection or external note content changes
   useEffect(() => {
     if (selectedNote) {
       setEditTitle(selectedNote.title);
@@ -62,7 +62,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
       setEditIsFolder(selectedNote.isFolder);
       setSaveStatus(null);
     }
-  }, [selectedNote]);
+  }, [selectedNote, selectedNote?.body, selectedNote?.title, selectedNote?.updatedAt]);
 
   // Filter notes based on host and search query
   const filteredNotes = useMemo(() => {
@@ -83,6 +83,13 @@ export const NotesView: React.FC<NotesViewProps> = ({
       return matchesHost && matchesSearch;
     });
   }, [notes, selectedHostFilter, searchQuery]);
+
+  // Auto-select first available note if none is selected
+  useEffect(() => {
+    if ((!selectedNoteId || !notes.some((n) => n.id === selectedNoteId)) && filteredNotes.length > 0) {
+      setSelectedNoteId(filteredNotes[0].id);
+    }
+  }, [filteredNotes, notes, selectedNoteId]);
 
   // Hierarchical tree structure (if parent isn't in filtered set, treat as root so search results are always visible)
   const filteredIds = useMemo(() => new Set(filteredNotes.map((n) => n.id)), [filteredNotes]);

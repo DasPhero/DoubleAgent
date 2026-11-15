@@ -993,7 +993,7 @@ export interface SerialPortInfo {
 }
 
 export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'listeners' | 'notes' | 'totp' | 'credentials';
-export type NavDropdownMenu = 'view' | 'engagement-tools' | 'terminals' | 'offense' | 'intel';
+export type NavDropdownMenu = 'view' | 'engagement-selector' | 'engagement-tools' | 'terminals' | 'offense' | 'intel';
 
 interface WailsRuntime {
   EventsOn: (eventName: string, callback: (data: unknown) => void) => () => void;
@@ -1515,6 +1515,7 @@ export function App({
   const [showSnippetsModal, setShowSnippetsModal] = useState<boolean>(false);
   const [runModalSnippet, setRunModalSnippet] = useState<Snippet | null>(null);
   const [runModalContext, setRunModalContext] = useState<SnippetContext | null>(null);
+  const [runModalMode, setRunModalMode] = useState<'run' | 'insert'>('run');
   const [snippetActiveSessionId, setSnippetActiveSessionId] = useState<string>('');
   const [snippetPrefillBody, setSnippetPrefillBody] = useState<string>('');
 
@@ -3585,9 +3586,28 @@ export function App({
 
   const handleSaveNote = async (note: NotePage): Promise<void> => {
     const api = getWailsBindings();
+    const now = new Date().toISOString();
+    const optimisticId = note.id || `note-${Date.now()}`;
+    const optimisticNote: NotePage = {
+      ...note,
+      id: optimisticId,
+      createdAt: note.createdAt || now,
+      updatedAt: now,
+    };
+    setNotes((prev) => {
+      const exists = prev.some((n) => n.id === optimisticId);
+      return exists ? prev.map((n) => (n.id === optimisticId ? optimisticNote : n)) : [...prev, optimisticNote];
+    });
+    if (
+      optimisticId.startsWith('note-scratchpad-') ||
+      optimisticId.startsWith('note-sp-') ||
+      (note.title || '').toLowerCase().startsWith('scratchpad')
+    ) {
+      setScratchpadContent(note.body || '');
+    }
     if (api?.SaveNote) {
       try {
-        await api.SaveNote(note);
+        await api.SaveNote(optimisticNote);
         await refreshVaultState();
         setStatusMessage(`Saved ${note.isFolder ? 'folder' : 'note'} "${note.title}".`);
       } catch (err: unknown) {
@@ -3595,18 +3615,6 @@ export function App({
         setStatusMessage(`Save note failed: ${msg}`);
       }
     } else {
-      setNotes((prev) => {
-        const id = note.id || `note-${Date.now()}`;
-        const now = new Date().toISOString();
-        const updated: NotePage = {
-          ...note,
-          id,
-          createdAt: note.createdAt || now,
-          updatedAt: now,
-        };
-        const exists = prev.some((n) => n.id === id);
-        return exists ? prev.map((n) => (n.id === id ? updated : n)) : [...prev, updated];
-      });
       setStatusMessage(`Saved ${note.isFolder ? 'folder' : 'note'} "${note.title}".`);
     }
   };
@@ -3642,11 +3650,15 @@ export function App({
   };
 
   const handleTriggerSnippet = useCallback(
-    async (snippet: Snippet, targetSessionId?: string): Promise<void> => {
+    async (snippet: Snippet, targetSessionId?: string, mode: 'run' | 'insert' = 'run'): Promise<void> => {
       const sessId = targetSessionId || sessionId;
 
       if (!sessId) {
-        setStatusMessage('No active terminal session to run snippet in.');
+        setStatusMessage(
+          mode === 'insert'
+            ? 'No active terminal session to insert snippet into.'
+            : 'No active terminal session to run snippet in.'
+        );
         return;
       }
 
@@ -3674,7 +3686,20 @@ export function App({
 
       const hasVars = (snippet.variables && snippet.variables.length > 0) || /\{\{([^{}]+)\}\}/.test(snippet.body);
 
+      if (mode === 'insert') {
+        if (hasVars || snippet.confirmBeforeRun) {
+          setRunModalMode('insert');
+          setRunModalSnippet(snippet);
+          setRunModalContext(ctx);
+        } else {
+          await api?.WriteTerminal?.(sessId, snippet.body);
+          setStatusMessage(`Inserted snippet "${snippet.name}" into terminal.`);
+        }
+        return;
+      }
+
       if (snippet.confirmBeforeRun || hasVars) {
+        setRunModalMode('run');
         setRunModalSnippet(snippet);
         setRunModalContext(ctx);
       } else {
@@ -3684,7 +3709,7 @@ export function App({
           } else {
             await api?.WriteTerminal?.(sessId, snippet.body + '\n');
           }
-          setStatusMessage(`⚡ Sent snippet "${snippet.name}" to terminal.`);
+          setStatusMessage(`Sent snippet "${snippet.name}" to terminal.`);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           setStatusMessage(`Execute snippet failed: ${msg}`);
@@ -3714,6 +3739,25 @@ export function App({
   }, [vaultSummary.snippets, snippetDrawerOs, snippetDrawerQuery]);
 
   const activeHostId = activePane?.hostId || activeTab?.hostId;
+
+  // Sync Scratchpad buffer when switching host or when the host's single scratchpad note updates in vault
+  const lastSyncedScratchpadKeyRef = useRef<string>('');
+  useEffect(() => {
+    const hostId = activeHostId || '';
+    const canonicalId = hostId ? `note-scratchpad-${hostId}` : 'note-scratchpad-global';
+    const existingNote = notes.find(
+      (n) =>
+        !n.isFolder &&
+        (n.id === canonicalId ||
+          ((n.hostId || '') === hostId &&
+            (n.id.startsWith('note-sp-') || n.title.toLowerCase().startsWith('scratchpad'))))
+    );
+    const syncKey = `${hostId}::${existingNote?.id || ''}::${existingNote?.updatedAt || ''}`;
+    if (existingNote && lastSyncedScratchpadKeyRef.current !== syncKey) {
+      lastSyncedScratchpadKeyRef.current = syncKey;
+      setScratchpadContent(existingNote.body || '');
+    }
+  }, [activeHostId, notes]);
 
   const filteredDrawerCreds = useMemo(() => {
     const list = drawerCreds || [];
@@ -3746,23 +3790,45 @@ export function App({
       setStatusMessage('Scratchpad buffer is empty.');
       return;
     }
-    const hostId = activeTab?.hostId || '';
+    const hostId = activeHostId || '';
+    const canonicalId = hostId ? `note-scratchpad-${hostId}` : 'note-scratchpad-global';
+    const existingNote = notes.find(
+      (n) =>
+        !n.isFolder &&
+        (n.id === canonicalId ||
+          ((n.hostId || '') === hostId &&
+            (n.id.startsWith('note-sp-') || n.title.toLowerCase().startsWith('scratchpad'))))
+    );
+    const noteId = existingNote?.id || canonicalId;
+    const hostObj = vaultSummary.hosts.find((h) => h.id === hostId);
+    const hostLabel = hostObj?.label || hostObj?.address || activeTab?.title || '';
     const now = new Date().toISOString();
-    const title = `Scratchpad Loot (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+    const title =
+      existingNote && !existingNote.title.startsWith('Scratchpad Loot (')
+        ? existingNote.title
+        : hostId && hostLabel
+        ? `Scratchpad (${hostLabel})`
+        : 'Scratchpad';
     const note: NotePage = {
-      id: `note-sp-${Date.now()}`,
+      id: noteId,
       hostId,
-      engagementId: activeEngagement?.id || '',
-      parentId: '',
+      engagementId: existingNote?.engagementId ?? (activeEngagement?.id || ''),
+      parentId: existingNote?.parentId || '',
       isFolder: false,
       title,
       type: 'markdown',
       body: scratchpadContent,
-      order: 0,
-      createdAt: now,
+      order: existingNote?.order || 0,
+      createdAt: existingNote?.createdAt || now,
       updatedAt: now,
     };
     await handleSaveNote(note);
+    setNotesModalInitialNoteId(noteId);
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.tabType === 'notes' ? { ...t, notesInitialNoteId: noteId } : t
+      )
+    );
     setStatusMessage(`Saved scratchpad to Host Notes: "${title}".`);
   };
 
@@ -8153,35 +8219,144 @@ export function App({
 
             {/* 2. Engagement Section: Engagement Selector -> + Button -> Engagement Dropdown */}
             <div className="nav-engagement-controls-cluster" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              {/* Engagement Selector Dropdown */}
-              <div className="nav-menu-container">
-                <select
+              {/* Engagement Selector Custom HUD Dropdown */}
+              <div
+                className="nav-menu-container"
+                onMouseEnter={() => handleMenuEnter('engagement-selector')}
+                onMouseMove={handleMenuMove}
+                onMouseLeave={handleMenuLeave}
+              >
+                <button
+                  type="button"
                   aria-label="Select Active Engagement"
-                  className="cyber-hud-select nav-engagement-select"
-                  value={activeEngagement?.id || ''}
-                  onChange={(e) => void handleSelectEngagement(e.target.value)}
+                  aria-haspopup="true"
+                  aria-expanded={activeDropdownMenu === 'engagement-selector'}
+                  className={`nav-menu-trigger nav-engagement-selector-btn ${activeDropdownMenu === 'engagement-selector' ? 'active' : ''} ${activeEngagement ? 'has-active-engagement' : ''}`}
+                  onClick={() =>
+                    setActiveDropdownMenu((prev) =>
+                      prev === 'engagement-selector' ? null : 'engagement-selector'
+                    )
+                  }
                   style={{
                     height: '32px',
-                    fontSize: '0.78rem',
-                    padding: '2px 10px',
-                    minWidth: '220px',
-                    maxWidth: '320px',
-                    border: '1px solid rgba(0, 240, 255, 0.45)',
-                    background: 'rgba(5, 12, 22, 0.95)',
-                    color: activeEngagement ? '#00f0ff' : '#94a3b8',
-                    fontWeight: 600,
-                    borderRadius: '3px',
+                    minWidth: '205px',
+                    maxWidth: '280px',
+                    fontSize: '0.75rem',
+                    padding: '0 10px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
                     boxSizing: 'border-box',
+                    borderColor: activeEngagement ? 'rgba(0, 240, 255, 0.55)' : undefined,
+                    color: activeEngagement ? '#00f0ff' : '#cbd5e1',
                   }}
                   title="Switch between Encapsulated Pentest Engagements or Casual Mode"
                 >
-                  <option value="">No Engagement (Casual)</option>
-                  {engagementsList.map((eng) => (
-                    <option key={eng.id} value={eng.id}>
-                      {eng.name}
-                    </option>
-                  ))}
-                </select>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', minWidth: 0, overflow: 'hidden' }}>
+                    <span
+                      style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        backgroundColor: activeEngagement ? '#10b981' : '#64748b',
+                        boxShadow: activeEngagement ? '0 0 8px rgba(16, 185, 129, 0.8)' : 'none',
+                      }}
+                    />
+                    <span
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {activeEngagement ? activeEngagement.name : 'No Engagement (Casual)'}
+                    </span>
+                  </span>
+                  <CyberIcon name="chevron-down" size={11} />
+                </button>
+                {activeDropdownMenu === 'engagement-selector' && (
+                  <div
+                    className="nav-dropdown-menu"
+                    role="menu"
+                    aria-label="Select Active Engagement Menu"
+                    onMouseEnter={() => handleMenuEnter('engagement-selector')}
+                    onMouseMove={handleMenuMove}
+                    style={{ minWidth: '250px' }}
+                  >
+                    <div className="nav-dropdown-section-title">Active Engagement Scope</div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        void handleSelectEngagement('');
+                      }}
+                      style={{
+                        color: !activeEngagement ? '#00f0ff' : undefined,
+                        backgroundColor: !activeEngagement ? 'rgba(0, 240, 255, 0.1)' : undefined,
+                      }}
+                    >
+                      <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <CyberIcon name={!activeEngagement ? 'check' : 'shield'} size={12} />
+                        <span>No Engagement (Casual / Global)</span>
+                      </span>
+                      {!activeEngagement && <span className="nav-item-shortcut">ACTIVE</span>}
+                    </button>
+
+                    {engagementsList.length > 0 && (
+                      <>
+                        <div className="nav-dropdown-divider" />
+                        <div className="nav-dropdown-section-title">Saved Engagements ({engagementsList.length})</div>
+                        {engagementsList.map((eng) => {
+                          const isSelected = activeEngagement?.id === eng.id;
+                          return (
+                            <button
+                              key={eng.id}
+                              type="button"
+                              role="menuitem"
+                              className="nav-dropdown-item"
+                              onClick={() => {
+                                setActiveDropdownMenu(null);
+                                void handleSelectEngagement(eng.id);
+                              }}
+                              style={{
+                                color: isSelected ? '#00f0ff' : undefined,
+                                backgroundColor: isSelected ? 'rgba(0, 240, 255, 0.12)' : undefined,
+                              }}
+                            >
+                              <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                <CyberIcon name={isSelected ? 'check' : 'target'} size={12} />
+                                <span>{eng.name}</span>
+                              </span>
+                              {isSelected && <span className="nav-item-shortcut">ACTIVE</span>}
+                            </button>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    <div className="nav-dropdown-divider" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="nav-dropdown-item"
+                      onClick={() => {
+                        setActiveDropdownMenu(null);
+                        setEditingEngagement(null);
+                        setShowNewEngagementModal(true);
+                      }}
+                    >
+                      <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#00f0ff' }}>
+                        <CyberIcon name="plus" size={12} />
+                        <span>New Engagement...</span>
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* + Button (to add a new engagement) */}
@@ -9033,11 +9208,12 @@ export function App({
                         <span>No matching snippets found.</span>
                         <button
                           type="button"
-                          className="cyber-btn cyber-btn-sm"
-                          style={{ marginTop: '0.5rem' }}
+                          className="cyber-hud-btn btn-primary btn-sm"
+                          style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                           onClick={() => setShowSnippetsModal(true)}
                         >
-                          Create Snippet
+                          <CyberIcon name="plus" size={12} />
+                          <span>Create Snippet</span>
                         </button>
                       </div>
                     ) : (
@@ -9057,15 +9233,8 @@ export function App({
                             <button
                               type="button"
                               className="drawer-action-btn"
-                              onClick={() => {
-                                if (sessionId) {
-                                  void getWailsBindings()?.WriteTerminal?.(sessionId, snip.body);
-                                  setStatusMessage(`Inserted snippet "${snip.name}" into terminal.`);
-                                } else {
-                                  setStatusMessage('No active terminal session to insert snippet into.');
-                                }
-                              }}
-                              title="Paste snippet command into active terminal"
+                              onClick={() => void handleTriggerSnippet(snip, sessionId || undefined, 'insert')}
+                              title="Resolve variables and insert snippet command into active terminal"
                             >
                               <CyberIcon name="copy" size={12} />
                               <span>Insert</span>
@@ -9073,15 +9242,8 @@ export function App({
                             <button
                               type="button"
                               className="drawer-action-btn run-btn"
-                              onClick={() => {
-                                if (sessionId) {
-                                  void getWailsBindings()?.WriteTerminal?.(sessionId, snip.body + '\n');
-                                  setStatusMessage(`⚡ Executed snippet "${snip.name}".`);
-                                } else {
-                                  setStatusMessage('No active terminal session to run snippet in.');
-                                }
-                              }}
-                              title="Execute snippet directly in active terminal"
+                              onClick={() => void handleTriggerSnippet(snip, sessionId || undefined, 'run')}
+                              title="Resolve variables and execute snippet in active terminal"
                             >
                               <CyberIcon name="play" size={12} />
                               <span>Run</span>
@@ -9118,11 +9280,12 @@ export function App({
                         <span>No snippet chains found.</span>
                         <button
                           type="button"
-                          className="cyber-btn cyber-btn-sm"
-                          style={{ marginTop: '0.5rem' }}
+                          className="cyber-hud-btn btn-primary btn-sm"
+                          style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                           onClick={() => setShowChainsModal(true)}
                         >
-                          Create Chain
+                          <CyberIcon name="plus" size={12} />
+                          <span>Create Chain</span>
                         </button>
                       </div>
                     ) : (
@@ -9176,11 +9339,12 @@ export function App({
                         <span>No listeners currently active.</span>
                         <button
                           type="button"
-                          className="cyber-btn cyber-btn-sm"
-                          style={{ marginTop: '0.5rem' }}
+                          className="cyber-hud-btn btn-primary btn-sm"
+                          style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                           onClick={() => setShowListenerManagerModal(true)}
                         >
-                          Launch Listener
+                          <CyberIcon name="radar" size={12} />
+                          <span>Launch Listener</span>
                         </button>
                       </div>
                     ) : (
@@ -9243,9 +9407,23 @@ export function App({
                     <div className="sidebar-actions">
                       <button
                         type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => {
+                          const hostId = activeHostId || '';
+                          const canonicalId = hostId ? `note-scratchpad-${hostId}` : 'note-scratchpad-global';
+                          setNotesModalHostId(hostId || undefined);
+                          setNotesModalInitialNoteId(canonicalId);
+                          setShowNotesModal(true);
+                        }}
+                        title="Open full Host Notes editor"
+                      >
+                        Full View
+                      </button>
+                      <button
+                        type="button"
                         className="btn-primary btn-sm"
                         onClick={() => void handleSaveScratchpadToHostNotes()}
-                        title="Save scratchpad buffer as a host note"
+                        title="Save scratchpad buffer into this host's scratchpad note"
                       >
                         Save
                       </button>
@@ -9350,11 +9528,12 @@ export function App({
                             <span>No 2FA authenticators configured for this scope.</span>
                             <button
                               type="button"
-                              className="cyber-btn cyber-btn-sm"
-                              style={{ marginTop: '0.5rem' }}
+                              className="cyber-hud-btn btn-primary btn-sm"
+                              style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                               onClick={() => setShowTotpModal(true)}
                             >
-                              Open 2FA Vault
+                              <CyberIcon name="totp" size={12} />
+                              <span>Open 2FA Vault</span>
                             </button>
                           </div>
                         );
@@ -9502,11 +9681,12 @@ export function App({
                         <span>No credentials found for this host &amp; engagement.</span>
                         <button
                           type="button"
-                          className="cyber-btn cyber-btn-sm"
-                          style={{ marginTop: '0.5rem' }}
+                          className="cyber-hud-btn btn-primary btn-sm"
+                          style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                           onClick={() => setShowCredStoreModal(true)}
                         >
-                          Add Credential
+                          <CyberIcon name="plus" size={12} />
+                          <span>Add Credential</span>
                         </button>
                       </div>
                     ) : (
@@ -12316,7 +12496,14 @@ export function App({
         <SnippetRunModal
           snippet={runModalSnippet}
           context={runModalContext}
+          mode={runModalMode}
           onExecute={handleExecuteSnippetFromModal}
+          onInsert={async (resolvedCmd) => {
+            if (snippetActiveSessionId) {
+              await getWailsBindings()?.WriteTerminal?.(snippetActiveSessionId, resolvedCmd);
+              setStatusMessage(`Inserted snippet "${runModalSnippet.name}" into terminal.`);
+            }
+          }}
           onClose={() => {
             setRunModalSnippet(null);
             setRunModalContext(null);

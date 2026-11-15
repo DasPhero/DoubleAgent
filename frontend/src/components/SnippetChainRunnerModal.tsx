@@ -137,42 +137,50 @@ export const SnippetChainRunnerModal: React.FC<SnippetChainRunnerModalProps> = (
     return cmd;
   }, [currentStep, userValues, context]);
 
-  // Execute current step
+  // Execute current step (and auto-continue subsequent steps if chain.autoRunWithoutPrompt is set or step.confirmBeforeRun is false)
   const handleExecuteCurrentStep = async () => {
     if (!currentStep) return;
     setExecuting(true);
     setError('');
 
-    // Update status to running
     const updatedStatuses = [...stepStatuses];
-    updatedStatuses[currentStepIndex] = 'running';
-    setStepStatuses(updatedStatuses);
+    let idx = currentStepIndex;
 
     try {
-      await onExecuteStep(currentStepIndex, userValues);
+      while (idx < chain.steps.length) {
+        const step = chain.steps[idx];
+        setCurrentStepIndex(idx);
+        updatedStatuses[idx] = 'running';
+        setStepStatuses([...updatedStatuses]);
 
-      // Delay if specified
-      if (currentStep.delayMs && currentStep.delayMs > 0) {
-        await new Promise((r) => setTimeout(r, currentStep.delayMs));
-      }
+        await onExecuteStep(idx, userValues);
 
-      updatedStatuses[currentStepIndex] = 'completed';
-      setStepStatuses(updatedStatuses);
+        if (step.delayMs && step.delayMs > 0) {
+          await new Promise((r) => setTimeout(r, step.delayMs));
+        }
 
-      // Advance or complete
-      if (currentStepIndex + 1 < chain.steps.length) {
-        setCurrentStepIndex(currentStepIndex + 1);
-      } else {
-        setCompletedAll(true);
+        updatedStatuses[idx] = 'completed';
+        setStepStatuses([...updatedStatuses]);
+
+        if (idx + 1 < chain.steps.length) {
+          const nextStep = chain.steps[idx + 1];
+          const nextNeedsConfirm = !chain.autoRunWithoutPrompt && nextStep.confirmBeforeRun;
+          idx += 1;
+          setCurrentStepIndex(idx);
+          if (nextNeedsConfirm) {
+            break;
+          }
+        } else {
+          setCompletedAll(true);
+          break;
+        }
       }
     } catch (err: unknown) {
-      updatedStatuses[currentStepIndex] = 'failed';
-      setStepStatuses(updatedStatuses);
+      updatedStatuses[idx] = 'failed';
+      setStepStatuses([...updatedStatuses]);
       setError(err instanceof Error ? err.message : 'Step execution failed');
 
-      // Check stop on error
-      if (currentStep.stopOnError || chain.stopOnError) {
-        // Halt chain
+      if (chain.steps[idx]?.stopOnError || chain.stopOnError) {
         setError((prev) => `${prev} (Chain halted due to StopOnError policy)`);
       }
     } finally {
@@ -378,9 +386,13 @@ export const SnippetChainRunnerModal: React.FC<SnippetChainRunnerModalProps> = (
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.7rem' }}>
-                    {currentStep.confirmBeforeRun && (
+                    {!chain.autoRunWithoutPrompt && currentStep.confirmBeforeRun ? (
                       <span style={{ padding: '0.1rem 0.4rem', borderRadius: '2px', backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
                         CONFIRM REQUIRED
+                      </span>
+                    ) : (
+                      <span style={{ padding: '0.1rem 0.4rem', borderRadius: '2px', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.35)' }}>
+                        AUTO-RUN (NO PROMPT)
                       </span>
                     )}
                     {currentStep.delayMs ? (

@@ -441,7 +441,21 @@ export function TerminalView({
       }
 
       // Prevent Alt+Arrow, Ctrl+K, Ctrl+,, and Ctrl+F from sending raw ANSI escape sequences to the remote terminal,
-      // and intercept Ctrl + / - / 0 to zoom font size in the pane
+      // and intercept Ctrl + / - / 0 to zoom font size in the pane.
+      // Note: xterm.js invokes attachCustomKeyEventHandler for keydown, keypress, AND keyup,
+      // so side effects MUST only run when e.type === 'keydown'.
+      let lastClipboardPasteTs = 0;
+      wrapper.addEventListener(
+        'paste',
+        (ev: ClipboardEvent) => {
+          if (Date.now() - lastClipboardPasteTs < 250) {
+            ev.preventDefault();
+            ev.stopPropagation();
+          }
+        },
+        true
+      );
+
       term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
         if (
           e.altKey &&
@@ -460,14 +474,18 @@ export function TerminalView({
         }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
           e.preventDefault();
-          onToggleSearchRef.current?.(sessionId);
+          if (e.type === 'keydown') {
+            onToggleSearchRef.current?.(sessionId);
+          }
           return false;
         }
         if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
           if (term.hasSelection()) {
-            const sel = term.getSelection();
-            if (sel && navigator.clipboard?.writeText) {
-              void navigator.clipboard.writeText(sel);
+            if (e.type === 'keydown') {
+              const sel = term.getSelection();
+              if (sel && navigator.clipboard?.writeText) {
+                void navigator.clipboard.writeText(sel);
+              }
             }
             return false;
           }
@@ -478,12 +496,16 @@ export function TerminalView({
         }
         if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
           e.preventDefault();
-          if (navigator.clipboard?.readText) {
-            void navigator.clipboard.readText().then((text) => {
-              if (text) {
-                inputCallbacks.get(sessionId)?.(text);
-              }
-            });
+          e.stopPropagation();
+          if (e.type === 'keydown' && !e.repeat) {
+            lastClipboardPasteTs = Date.now();
+            if (navigator.clipboard?.readText) {
+              void navigator.clipboard.readText().then((text) => {
+                if (text) {
+                  inputCallbacks.get(sessionId)?.(text);
+                }
+              });
+            }
           }
           return false;
         }
@@ -492,15 +514,17 @@ export function TerminalView({
           (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '_' || e.key === '0')
         ) {
           e.preventDefault();
-          if (e.key === '=' || e.key === '+') {
-            const next = changeTerminalFontSize(sessionId, +1);
-            onFontSizeChangeRef.current?.(sessionId, next);
-          } else if (e.key === '-' || e.key === '_') {
-            const next = changeTerminalFontSize(sessionId, -1);
-            onFontSizeChangeRef.current?.(sessionId, next);
-          } else if (e.key === '0') {
-            resetTerminalFontSize(sessionId, cfg.fontSize);
-            onFontSizeChangeRef.current?.(sessionId, cfg.fontSize);
+          if (e.type === 'keydown') {
+            if (e.key === '=' || e.key === '+') {
+              const next = changeTerminalFontSize(sessionId, +1);
+              onFontSizeChangeRef.current?.(sessionId, next);
+            } else if (e.key === '-' || e.key === '_') {
+              const next = changeTerminalFontSize(sessionId, -1);
+              onFontSizeChangeRef.current?.(sessionId, next);
+            } else if (e.key === '0') {
+              resetTerminalFontSize(sessionId, cfg.fontSize);
+              onFontSizeChangeRef.current?.(sessionId, cfg.fontSize);
+            }
           }
           return false;
         }

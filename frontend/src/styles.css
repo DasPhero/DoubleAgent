@@ -3137,8 +3137,20 @@ body,
   transition: all 0.15s ease;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  justify-content: center;
+  gap: 0.38rem;
   box-sizing: border-box;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.38);
+  color: #38bdf8;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+}
+
+.cyber-btn:hover:not(:disabled) {
+  background: rgba(0, 240, 255, 0.18);
+  border-color: #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
 }
 
 .cyber-btn-primary {
@@ -9009,11 +9021,21 @@ button:hover .cyber-svg-icon {
   border: 1px solid rgba(0, 240, 255, 0.3);
   clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   color: #f1f5f9;
+  color-scheme: dark;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.78rem;
   padding: 0.45rem 0.65rem;
   outline: none;
   transition: all 0.15s ease;
+}
+
+.cyber-hud-select option,
+.cyber-hud-select optgroup,
+select option,
+select optgroup {
+  background-color: #060d1a;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 .cyber-hud-input:focus,

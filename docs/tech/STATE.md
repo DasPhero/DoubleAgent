@@ -1,10 +1,27 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** Navigation & Sidebar Cleanup + Engagement Scoping (`F-13`, `F-14`, `F-32`, `F-33`, `F-36`) — COMPLETED!
+- **Current Milestone:** UI/UX Polish & Behavioral Fixes (`F-08`, `F-15`, `F-16`, `F-17`, `F-20`, `F-36`) — COMPLETED!
 - **Next Milestone:** Comprehensive Presets Library (`M-PRESETS`) / Multi-Theme Cyberpunk Visual Designs (`M-THEMES`) / WinRM Client (`F-41`)
 - **Stage:** `2-flagship`
 
 ## What Works
+- **UI/UX Polish & Behavioral Fixes (`F-08`, `F-15`, `F-16`, `F-17`, `F-20`, `F-36`)**:
+  - **Snippet Editor & Search Bar Overhaul (`SnippetsManagerModal.tsx`, `F-15`)**:
+    - Replaced unstyled browser-default gray `<textarea>` and search `<input>` with dark Cyberpunk HUD fields (`.cyber-hud-input`, `.cyber-hud-select`, search vector icon, clear `×` button, and `1rem` vertical spacing between form rows).
+    - Clicking any `Insert Auto Variable:` pill (`{{HOST}}`, `{{USER}}`, `{{PORT}}`, `{{CWD}}`, etc.) now inserts the variable at the active cursor position and immediately returns focus (`el.focus()` + `setSelectionRange`) to the `Command Body *` `<textarea>`.
+  - **Sidebar Snippet Run / Insert Variable Prompt (`App.tsx`, `SnippetRunModal.tsx`, `F-15`)**:
+    - Clicking `Run` or `Insert` on a snippet in the left sidebar (`activeSidebarPanel === 'snippets'`) now routes through `handleTriggerSnippet(snip, sessionId, 'run' | 'insert')`, opening `SnippetRunModal` whenever the snippet contains `{{...}}` variables or has `confirmBeforeRun` enabled instead of writing raw `{{HOST}}` placeholders into the terminal.
+    - Added `extractVariablesFromSnippet` in `SnippetRunModal.tsx` so template variables are always parsed directly from `snippet.body` even when `snippet.variables` is omitted on summary objects.
+  - **`Ctrl+V` Single-Paste Fix (`TerminalView.tsx`, `F-08`)**:
+    - Guarded `Ctrl+V`, `Ctrl+C`, `Ctrl+F`, and `Ctrl++/=-/0` inside `term.attachCustomKeyEventHandler` with `if (e.type === 'keydown')` (plus `!e.repeat` and a 250ms native `paste` deduplication guard) so `Ctrl+V` pastes once instead of firing on both `keydown` and `keyup`.
+  - **Snippet Chain Global "Automatic Execution Without Prompts" Override (`SnippetChainsModal.tsx`, `SnippetChainRunnerModal.tsx`, `F-16`)**:
+    - Toggling the global `autoRunWithoutPrompt` checkbox in `SnippetChainsModal.tsx` now overrules and unchecks `confirmBeforeRun` across all steps (`confirmBeforeRun: !nextAutoRun`, disabled with `(Overruled by Global No-Prompt)` while active), and `SnippetChainRunnerModal.tsx` automatically advances through all steps without pausing when `chain.autoRunWithoutPrompt` is enabled.
+    - Clicking `+ {{VAR}}` step buttons in `SnippetChainsModal.tsx` also inserts at the cursor position and restores focus to the step command `<textarea>`.
+  - **Single Canonical Scratchpad Note & Live `NotesView` Sync (`App.tsx`, `NotesView.tsx`, `F-17`)**:
+    - Clicking `Save` in the sidebar Scratchpad now creates or updates a single canonical note per host/scope (`note-scratchpad-${hostId || 'global'}`) instead of creating a duplicate note on every click, optimistically updates `notes` state, and synchronizes immediately with `NotesView.tsx` (plus a `Full View` button in the Scratchpad header).
+  - **Sidebar Empty-State Buttons & Custom Cyberpunk Engagement Selector (`App.tsx`, `styles.css`, `F-20`, `F-36`)**:
+    - Added dark Cyberpunk HUD base styling to `.cyber-btn` in `styles.css` and upgraded sidebar empty-state buttons (`Open 2FA Vault`, `Add Credential`, `Create Snippet`, `Create Chain`, `Launch Listener`) to `.cyber-hud-btn.btn-primary.btn-sm` with `<CyberIcon>` vector icons.
+    - Replaced the native `<select>` Engagement Selector in the top header with a custom Cyberpunk HUD dropdown menu (`activeDropdownMenu === 'engagement-selector'`) featuring status LEDs, engagement scope metadata, and dark `<option>` fallback rules.
 - **Main Window Header & Pentest-Phase Menu Architecture**:
   - **Bottom-Left Clickable Vault Pill**: Removed the redundant `Vault ▾` dropdown from the top bar; the bottom-left `"Vault Unlocked"` / `"Vault Locked"` status bar pill in `.cyber-hud-statusbar` is now an interactive `<button>` that locks or unlocks the encrypted vault with one click.
   - **`View ▾` First**: Positioned `View ▾` as the first top-bar menu on the left, including `Interactive Network Topology Map (F-37)`, workspace split controls, broadcast input mode (`Alt+B`), and zoom controls.
