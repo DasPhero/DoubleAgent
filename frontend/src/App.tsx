@@ -992,6 +992,8 @@ export interface SerialPortInfo {
   isConnected?: boolean;
 }
 
+export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'listeners' | 'notes' | 'credentials';
+
 interface WailsRuntime {
   EventsOn: (eventName: string, callback: (data: unknown) => void) => () => void;
 }
@@ -1075,6 +1077,20 @@ export function App({
     return 280;
   });
   const [isResizingSidebar, setIsResizingSidebar] = useState<boolean>(false);
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>('hosts');
+  const [snippetDrawerQuery, setSnippetDrawerQuery] = useState<string>('');
+  const [snippetDrawerOs, setSnippetDrawerOs] = useState<'all' | 'linux' | 'windows'>('all');
+  const [credDrawerQuery, setCredDrawerQuery] = useState<string>('');
+  const [scratchpadContent, setScratchpadContent] = useState<string>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem('doubleagent_scratchpad') || '';
+      }
+    } catch {}
+    return '';
+  });
+  const [drawerListeners, setDrawerListeners] = useState<ManagedListenerInfo[]>([]);
+  const [drawerCreds, setDrawerCreds] = useState<CredentialEntry[]>([]);
 
   const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -1107,6 +1123,27 @@ export function App({
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('doubleagent_scratchpad', scratchpadContent);
+      }
+    } catch {}
+  }, [scratchpadContent]);
+
+  useEffect(() => {
+    if (activeSidebarPanel === 'listeners') {
+      const api = getWailsBindings();
+      if (api?.ListActiveManagedListeners) {
+        void api.ListActiveManagedListeners().then((list) => {
+          if (list) setDrawerListeners(list);
+        }).catch(() => {});
+      }
+    }
+  }, [activeSidebarPanel]);
+
+
   const [serialDetecting, setSerialDetecting] = useState<boolean>(false);
   const [serialDetectResult, setSerialDetectResult] = useState<SerialAutoDetectResult | null>(null);
   const [activeSignalAnalyzers, setActiveSignalAnalyzers] = useState<Set<string>>(new Set());
@@ -1203,6 +1240,17 @@ export function App({
   const [showNewEngagementModal, setShowNewEngagementModal] = useState<boolean>(false);
   const [editingEngagement, setEditingEngagement] = useState<Engagement | null>(null);
   const [filterByEngagementScope, setFilterByEngagementScope] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (activeSidebarPanel === 'credentials') {
+      const api = getWailsBindings();
+      if (api?.ListCredentials) {
+        void api.ListCredentials(activeEngagement?.id || '', '').then((list) => {
+          if (list) setDrawerCreds(list);
+        }).catch(() => {});
+      }
+    }
+  }, [activeSidebarPanel, activeEngagement]);
 
   // Terminal Selection Context Menu & Quick Save State (F-19)
   const [terminalContextMenu, setTerminalContextMenu] = useState<{
@@ -3607,6 +3655,68 @@ export function App({
     },
     [sessionId]
   );
+
+  const filteredDrawerSnippets = useMemo(() => {
+    const list = vaultSummary.snippets || [];
+    return list.filter((s) => {
+      if (snippetDrawerOs !== 'all') {
+        const hasOsTag = (s.tags || []).some((t) => t.toLowerCase() === snippetDrawerOs);
+        if (!hasOsTag) return false;
+      }
+      if (snippetDrawerQuery) {
+        const q = snippetDrawerQuery.toLowerCase();
+        const matchesName = (s.name || '').toLowerCase().includes(q);
+        const matchesDesc = (s.description || '').toLowerCase().includes(q);
+        const matchesCmd = (s.body || '').toLowerCase().includes(q);
+        const matchesTag = (s.tags || []).some((t) => t.toLowerCase().includes(q));
+        if (!matchesName && !matchesDesc && !matchesCmd && !matchesTag) return false;
+      }
+      return true;
+    });
+  }, [vaultSummary.snippets, snippetDrawerOs, snippetDrawerQuery]);
+
+  const filteredDrawerCreds = useMemo(() => {
+    const list = drawerCreds || [];
+    return list.filter((c: CredentialEntry) => {
+      if (credDrawerQuery) {
+        const q = credDrawerQuery.toLowerCase();
+        const matchesLabel = (c.label || '').toLowerCase().includes(q);
+        const matchesUser = (c.username || '').toLowerCase().includes(q);
+        const matchesHost = (c.hostId || '').toLowerCase().includes(q);
+        if (!matchesLabel && !matchesUser && !matchesHost) return false;
+      }
+      return true;
+    });
+  }, [drawerCreds, credDrawerQuery]);
+
+  const drawerChains = useMemo(() => {
+    return chains.length > 0 ? chains : (vaultSummary.snippetChains || []);
+  }, [chains, vaultSummary.snippetChains]);
+
+  const handleSaveScratchpadToHostNotes = async () => {
+    if (!scratchpadContent.trim()) {
+      setStatusMessage('Scratchpad buffer is empty.');
+      return;
+    }
+    const hostId = activeTab?.hostId || '';
+    const now = new Date().toISOString();
+    const title = `Scratchpad Loot (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+    const note: NotePage = {
+      id: `note-sp-${Date.now()}`,
+      hostId,
+      engagementId: activeEngagement?.id || '',
+      parentId: '',
+      isFolder: false,
+      title,
+      type: 'markdown',
+      body: scratchpadContent,
+      order: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await handleSaveNote(note);
+    setStatusMessage(`Saved scratchpad to Host Notes: "${title}".`);
+  };
 
   const handleExecuteSnippetFromModal = async (userValues: Record<string, string>): Promise<void> => {
     if (!runModalSnippet || !snippetActiveSessionId) return;
@@ -7364,6 +7474,41 @@ export function App({
         }
       }
 
+      // Activity Bar Quick Panel Switching (Ctrl+1 .. Ctrl+6)
+      if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !isInput) {
+        if (e.key === '1') {
+          e.preventDefault();
+          setActiveSidebarPanel('hosts');
+          setSidebarCollapsed(false);
+          return;
+        } else if (e.key === '2') {
+          e.preventDefault();
+          setActiveSidebarPanel('snippets');
+          setSidebarCollapsed(false);
+          return;
+        } else if (e.key === '3') {
+          e.preventDefault();
+          setActiveSidebarPanel('chains');
+          setSidebarCollapsed(false);
+          return;
+        } else if (e.key === '4') {
+          e.preventDefault();
+          setActiveSidebarPanel('listeners');
+          setSidebarCollapsed(false);
+          return;
+        } else if (e.key === '5') {
+          e.preventDefault();
+          setActiveSidebarPanel('notes');
+          setSidebarCollapsed(false);
+          return;
+        } else if (e.key === '6') {
+          e.preventDefault();
+          setActiveSidebarPanel('credentials');
+          setSidebarCollapsed(false);
+          return;
+        }
+      }
+
       // 3. Normal / Direct Shortcut Matching
       // When inside an input element, only trigger combinations with Ctrl / Alt / Meta
       if (isInput && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -8215,7 +8360,7 @@ export function App({
                   value={activeEngagement?.id || ''}
                   onChange={(e) => void handleSelectEngagement(e.target.value)}
                   style={{
-                    height: '28px',
+                    height: '32px',
                     fontSize: '0.78rem',
                     padding: '2px 10px',
                     minWidth: '240px',
@@ -8225,6 +8370,7 @@ export function App({
                     color: activeEngagement ? '#00f0ff' : '#94a3b8',
                     fontWeight: 600,
                     borderRadius: '3px',
+                    boxSizing: 'border-box',
                   }}
                   title="Switch between Encapsulated Pentest Engagements or Casual Mode"
                 >
@@ -8245,7 +8391,7 @@ export function App({
                   setEditingEngagement(null);
                   setShowNewEngagementModal(true);
                 }}
-                style={{ fontSize: '0.74rem', padding: '2px 8px', color: '#38bdf8' }}
+                style={{ height: '32px', fontSize: '0.74rem', padding: '0 10px', color: '#38bdf8', boxSizing: 'border-box' }}
                 title="Create a new encapsulated target engagement"
               >
                 <span>+ New Engagement</span>
@@ -8266,7 +8412,7 @@ export function App({
                   onClick={() =>
                     setActiveDropdownMenu((prev) => (prev === 'engagement-tools' ? null : 'engagement-tools'))
                   }
-                  style={{ fontSize: '0.74rem', padding: '2px 8px' }}
+                  style={{ height: '32px', fontSize: '0.74rem', padding: '0 10px', boxSizing: 'border-box' }}
                 >
                   <span>⚔️ Engagement</span>
                   <span style={{ fontSize: '0.65rem' }}>▾</span>
@@ -8385,44 +8531,178 @@ export function App({
       </header>
 
       <div className="workspace-body">
+        {/* Left-most Cyberpunk Activity Bar (Action Bar) */}
+        <div className="cyber-activity-bar" role="toolbar" aria-label="Activity Bar">
+          <div className="activity-bar-items">
+            <img
+              src={appLogo}
+              alt="DoubleAgent"
+              className="activity-bar-logo"
+              onClick={() => {
+                setSidebarCollapsed(false);
+                setActiveSidebarPanel('hosts');
+              }}
+              title="DoubleAgent HUD (Click to view Hosts)"
+            />
+
+            {/* 1. Hosts & Targets */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'hosts' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'hosts' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('hosts');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Hosts & Target Inventory (Ctrl+1)"
+              aria-label="Hosts and Targets Panel"
+            >
+              <CyberIcon name="network" size={18} />
+            </button>
+
+            {/* 2. Quick Snippets */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'snippets' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'snippets' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('snippets');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Quick Snippets & Commands (Ctrl+2)"
+              aria-label="Quick Snippets Panel"
+            >
+              <CyberIcon name="bolt" size={18} />
+              {vaultSummary.snippets && vaultSummary.snippets.length > 0 && (
+                <span className="activity-bar-badge">{vaultSummary.snippets.length}</span>
+              )}
+            </button>
+
+            {/* 3. Snippet Chains & Exploits (F-16) */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'chains' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'chains' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('chains');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Snippet Chains & Exploits (Ctrl+3)"
+              aria-label="Snippet Chains Panel"
+            >
+              <CyberIcon name="chain" size={18} />
+              {drawerChains.length > 0 && (
+                <span className="activity-bar-badge">{drawerChains.length}</span>
+              )}
+            </button>
+
+            {/* 4. Active Listeners (F-32) */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'listeners' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'listeners' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('listeners');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Active Listeners & Catchers (Ctrl+4)"
+              aria-label="Active Listeners Panel"
+            >
+              <CyberIcon name="radar" size={18} />
+              {drawerListeners.length > 0 && (
+                <span className="activity-bar-badge" style={{ background: '#34d399' }}>
+                  {drawerListeners.length}
+                </span>
+              )}
+            </button>
+
+            {/* 5. Scratchpad & Host Notes (F-17) */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'notes' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'notes' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('notes');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Scratchpad & Host Notes (Ctrl+5)"
+              aria-label="Scratchpad and Notes Panel"
+            >
+              <CyberIcon name="note" size={18} />
+            </button>
+
+            {/* 6. Credentials & Loot (F-36) */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'credentials' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'credentials' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('credentials');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Credentials & Loot Pool (Ctrl+6)"
+              aria-label="Credentials Panel"
+            >
+              <CyberIcon name="key" size={18} />
+            </button>
+          </div>
+
+          <div className="activity-bar-bottom">
+            <button
+              type="button"
+              className="activity-bar-btn toggle-sidebar-btn"
+              onClick={() => setSidebarCollapsed((prev) => !prev)}
+              title={sidebarCollapsed ? 'Expand Sidebar (Ctrl+B)' : 'Collapse Sidebar (Ctrl+B)'}
+              aria-label={sidebarCollapsed ? 'Expand Sidebar' : 'Toggle Sidebar (Ctrl+B)'}
+            >
+              <CyberIcon name={sidebarCollapsed ? 'chevron-right' : 'chevron-left'} size={16} />
+            </button>
+          </div>
+        </div>
+
         <aside
           className={`hosts-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${
             sidebarWidth < 280 ? 'narrow' : ''
           } ${sidebarWidth < 220 ? 'compact' : ''}`}
-          style={{ width: sidebarCollapsed ? undefined : `${sidebarWidth}px` }}
+          style={{
+            width: sidebarCollapsed ? 0 : `${sidebarWidth}px`,
+            display: sidebarCollapsed ? 'none' : 'flex',
+          }}
           aria-label="Hosts and Groups Sidebar"
         >
           {sidebarCollapsed ? (
-            <div className="sidebar-collapsed-content">
-              <img
-                src={appLogo}
-                alt="DoubleAgent"
-                className="sidebar-collapsed-logo"
-                onClick={() => setSidebarCollapsed(false)}
-                title="DoubleAgent (Click to expand sidebar)"
-              />
-              <button
-                type="button"
-                className="sidebar-expand-btn"
-                onClick={() => setSidebarCollapsed(false)}
-                title="Expand Sidebar (Ctrl+B)"
-                aria-label="Expand Sidebar"
-              >
-                <CyberIcon name="chevron-right" size={14} />
-                <span className="sidebar-vertical-title">Hosts &amp; Groups</span>
-              </button>
-            </div>
+            <div className="sidebar-collapsed-content" style={{ display: 'none' }} />
           ) : (
             <>
-              <div className="sidebar-header">
-                <h2>Hosts &amp; Labels</h2>
-                {!vaultLocked && (
-                  <div className="sidebar-actions">
-                    <button
-                      type="button"
-                      className="btn-primary btn-sm"
-                      onClick={() => {
-                        setEditingHostId(null);
+              {activeSidebarPanel === 'hosts' && (
+                <>
+                  <div className="sidebar-header">
+                    <h2>Hosts &amp; Labels</h2>
+                    {!vaultLocked && (
+                      <div className="sidebar-actions">
+                        <button
+                          type="button"
+                          className="btn-primary btn-sm"
+                          onClick={() => {
+                            setEditingHostId(null);
                         setHostLabel('');
                         setHostAddr('');
                         setHostPort('22');
@@ -8671,6 +8951,398 @@ export function App({
                     )}
                   </div>
                 </>
+              )}
+                </>
+              )}
+
+              {activeSidebarPanel === 'snippets' && (
+                <div className="drawer-panel drawer-snippets-panel">
+                  <div className="sidebar-header">
+                    <h2>Quick Snippets</h2>
+                    <div className="sidebar-actions">
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setShowSnippetsModal(true)}
+                        title="Open Snippets Manager (F-15)"
+                      >
+                        + Manage
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    className="sidebar-search"
+                    aria-label="Filter Snippets"
+                    placeholder="Search snippets & commands..."
+                    value={snippetDrawerQuery}
+                    onChange={(e) => setSnippetDrawerQuery(e.target.value)}
+                  />
+                  <div className="drawer-filter-bar">
+                    <button
+                      type="button"
+                      className={`drawer-filter-btn ${snippetDrawerOs === 'all' ? 'active' : ''}`}
+                      onClick={() => setSnippetDrawerOs('all')}
+                    >
+                      ALL
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-filter-btn ${snippetDrawerOs === 'linux' ? 'active' : ''}`}
+                      onClick={() => setSnippetDrawerOs('linux')}
+                    >
+                      LINUX
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-filter-btn ${snippetDrawerOs === 'windows' ? 'active' : ''}`}
+                      onClick={() => setSnippetDrawerOs('windows')}
+                    >
+                      WINDOWS
+                    </button>
+                  </div>
+                  <div className="drawer-items-list">
+                    {filteredDrawerSnippets.length === 0 ? (
+                      <div className="drawer-empty-state">
+                        <span>No matching snippets found.</span>
+                        <button
+                          type="button"
+                          className="cyber-btn cyber-btn-sm"
+                          style={{ marginTop: '0.5rem' }}
+                          onClick={() => setShowSnippetsModal(true)}
+                        >
+                          Create Snippet
+                        </button>
+                      </div>
+                    ) : (
+                      filteredDrawerSnippets.map((snip) => (
+                        <div key={snip.id} className="drawer-card">
+                          <div className="drawer-card-header">
+                            <span className="drawer-card-title">{snip.name}</span>
+                            <span className="drawer-badge">
+                              {snip.tags && snip.tags.length > 0 ? snip.tags[0].toUpperCase() : 'SNIP'}
+                            </span>
+                          </div>
+                          {snip.description && <div className="drawer-card-desc">{snip.description}</div>}
+                          <div className="drawer-card-code">
+                            <code>{snip.body}</code>
+                          </div>
+                          <div className="drawer-card-actions">
+                            <button
+                              type="button"
+                              className="drawer-action-btn"
+                              onClick={() => {
+                                if (sessionId) {
+                                  void getWailsBindings()?.WriteTerminal?.(sessionId, snip.body);
+                                  setStatusMessage(`Inserted snippet "${snip.name}" into terminal.`);
+                                } else {
+                                  setStatusMessage('No active terminal session to insert snippet into.');
+                                }
+                              }}
+                              title="Paste snippet command into active terminal"
+                            >
+                              <CyberIcon name="copy" size={12} />
+                              <span>Insert</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="drawer-action-btn run-btn"
+                              onClick={() => {
+                                if (sessionId) {
+                                  void getWailsBindings()?.WriteTerminal?.(sessionId, snip.body + '\n');
+                                  setStatusMessage(`⚡ Executed snippet "${snip.name}".`);
+                                } else {
+                                  setStatusMessage('No active terminal session to run snippet in.');
+                                }
+                              }}
+                              title="Execute snippet directly in active terminal"
+                            >
+                              <CyberIcon name="play" size={12} />
+                              <span>Run</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeSidebarPanel === 'chains' && (
+                <div className="drawer-panel drawer-chains-panel">
+                  <div className="sidebar-header">
+                    <h2>Chains &amp; Exploits</h2>
+                    <div className="sidebar-actions">
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => {
+                          setChainsHostFilter(null);
+                          setShowChainsModal(true);
+                        }}
+                        title="Open Chains Manager (F-16)"
+                      >
+                        + Chains
+                      </button>
+                    </div>
+                  </div>
+                  <div className="drawer-items-list">
+                    {drawerChains.length === 0 ? (
+                      <div className="drawer-empty-state">
+                        <span>No snippet chains found.</span>
+                        <button
+                          type="button"
+                          className="cyber-btn cyber-btn-sm"
+                          style={{ marginTop: '0.5rem' }}
+                          onClick={() => setShowChainsModal(true)}
+                        >
+                          Create Chain
+                        </button>
+                      </div>
+                    ) : (
+                      drawerChains.map((c) => (
+                        <div key={c.id} className="drawer-card">
+                          <div className="drawer-card-header">
+                            <span className="drawer-card-title">{c.name}</span>
+                            <span className="drawer-badge">{c.steps?.length || 0} STEPS</span>
+                          </div>
+                          {c.description && <div className="drawer-card-desc">{c.description}</div>}
+                          <div className="drawer-card-meta">
+                            <span>OS: {c.targetOs?.toUpperCase() || 'ANY'}</span>
+                            <span>MODE: {c.autoRunWithoutPrompt ? 'AUTO' : 'CONFIRM'}</span>
+                          </div>
+                          <div className="drawer-card-actions">
+                            <button
+                              type="button"
+                              className="drawer-action-btn run-btn"
+                              onClick={() => void handleTriggerChain(c)}
+                              title="Launch chain runner on active session"
+                            >
+                              <CyberIcon name="play" size={12} />
+                              <span>Run Chain</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeSidebarPanel === 'listeners' && (
+                <div className="drawer-panel drawer-listeners-panel">
+                  <div className="sidebar-header">
+                    <h2>Active Listeners</h2>
+                    <div className="sidebar-actions">
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setShowListenerManagerModal(true)}
+                        title="Open Unified Listener Manager (F-32)"
+                      >
+                        + Listeners
+                      </button>
+                    </div>
+                  </div>
+                  <div className="drawer-items-list">
+                    {drawerListeners.length === 0 ? (
+                      <div className="drawer-empty-state">
+                        <span>No listeners currently active.</span>
+                        <button
+                          type="button"
+                          className="cyber-btn cyber-btn-sm"
+                          style={{ marginTop: '0.5rem' }}
+                          onClick={() => setShowListenerManagerModal(true)}
+                        >
+                          Launch Listener
+                        </button>
+                      </div>
+                    ) : (
+                      drawerListeners.map((l) => (
+                        <div key={l.id} className="drawer-card">
+                          <div className="drawer-card-header">
+                            <span className="drawer-card-title">{l.name || l.id}</span>
+                            <span className="drawer-badge">{l.status?.toUpperCase() || 'LISTENING'}</span>
+                          </div>
+                          <div className="drawer-card-meta">
+                            <span>PORT: {l.bindPort}</span>
+                            <span>TOOL: {l.tool?.toUpperCase()}</span>
+                            <span>CATCHES: {l.catchCount || 0}</span>
+                          </div>
+                          <div className="drawer-card-actions">
+                            {l.activeSessions && l.activeSessions.length > 0 ? (
+                              l.activeSessions.map((sess) => (
+                                <button
+                                  key={sess.id}
+                                  type="button"
+                                  className="drawer-action-btn"
+                                  onClick={() => {
+                                    setShellStabilizeModal({
+                                      isOpen: true,
+                                      sessionId: sess.id,
+                                      sessionTitle: `Caught Shell (${sess.id})`,
+                                      isRawTcp: true,
+                                      cols: 80,
+                                      rows: 24,
+                                    });
+                                  }}
+                                  title="Stabilize caught shell (F-34)"
+                                >
+                                  <CyberIcon name="stabilize" size={12} />
+                                  <span>Stabilize ({sess.id.slice(0, 8)})</span>
+                                </button>
+                              ))
+                            ) : (
+                              <button
+                                type="button"
+                                className="drawer-action-btn"
+                                onClick={() => setShowListenerManagerModal(true)}
+                              >
+                                <CyberIcon name="radar" size={12} />
+                                <span>Details</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeSidebarPanel === 'notes' && (
+                <div className="drawer-panel drawer-notes-panel">
+                  <div className="sidebar-header">
+                    <h2>Scratchpad &amp; Notes</h2>
+                    <div className="sidebar-actions">
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => void handleSaveScratchpadToHostNotes()}
+                        title="Save scratchpad buffer as a host note"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '0.1rem 0 0.3rem 0' }}>
+                    Target: <strong style={{ color: '#00f0ff' }}>{activeTab?.title || 'Global Workspace'}</strong>
+                  </div>
+                  <textarea
+                    className="drawer-scratchpad-textarea"
+                    value={scratchpadContent}
+                    onChange={(e) => setScratchpadContent(e.target.value)}
+                    placeholder="Paste loot, write command notes, dumped credentials..."
+                    rows={12}
+                  />
+                  <div className="drawer-card-actions" style={{ marginTop: '0.4rem' }}>
+                    <button
+                      type="button"
+                      className="drawer-action-btn"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(scratchpadContent);
+                        setStatusMessage('Copied scratchpad buffer to clipboard.');
+                      }}
+                    >
+                      <CyberIcon name="copy" size={12} />
+                      <span>Copy</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="drawer-action-btn"
+                      onClick={() => setScratchpadContent('')}
+                    >
+                      <CyberIcon name="trash" size={12} />
+                      <span>Clear</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeSidebarPanel === 'credentials' && (
+                <div className="drawer-panel drawer-creds-panel">
+                  <div className="sidebar-header">
+                    <h2>Credentials &amp; Loot</h2>
+                    <div className="sidebar-actions">
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setShowCredStoreModal(true)}
+                        title="Open Credential Pool Modal (F-36)"
+                      >
+                        + Pool
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    className="sidebar-search"
+                    aria-label="Filter Credentials"
+                    placeholder="Search credentials & hashes..."
+                    value={credDrawerQuery}
+                    onChange={(e) => setCredDrawerQuery(e.target.value)}
+                  />
+                  <div className="drawer-items-list">
+                    {filteredDrawerCreds.length === 0 ? (
+                      <div className="drawer-empty-state">
+                        <span>No credentials found.</span>
+                        <button
+                          type="button"
+                          className="cyber-btn cyber-btn-sm"
+                          style={{ marginTop: '0.5rem' }}
+                          onClick={() => setShowCredStoreModal(true)}
+                        >
+                          Add Credential
+                        </button>
+                      </div>
+                    ) : (
+                      filteredDrawerCreds.map((cred: CredentialEntry) => {
+                        const secret = cred.secret || cred.username || '';
+                        return (
+                          <div key={cred.id} className="drawer-card">
+                            <div className="drawer-card-header">
+                              <span className="drawer-card-title">{cred.label || cred.username || 'Credential'}</span>
+                              <span className="drawer-badge">{cred.category?.toUpperCase() || 'PASS'}</span>
+                            </div>
+                            {cred.username && (
+                              <div className="drawer-card-meta">
+                                <span>User: <strong>{cred.username}</strong></span>
+                              </div>
+                            )}
+                            <div className="drawer-card-actions">
+                              <button
+                                type="button"
+                                className="drawer-action-btn"
+                                onClick={() => {
+                                  void navigator.clipboard.writeText(secret);
+                                  setStatusMessage(`Copied secret for ${cred.label || cred.username}.`);
+                                }}
+                                title="Copy secret to clipboard"
+                              >
+                                <CyberIcon name="copy" size={12} />
+                                <span>Copy</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="drawer-action-btn"
+                                onClick={() => {
+                                  if (sessionId) {
+                                    void getWailsBindings()?.WriteTerminal?.(sessionId, secret);
+                                    setStatusMessage(`Inserted secret into terminal.`);
+                                  } else {
+                                    setStatusMessage('No active terminal session.');
+                                  }
+                                }}
+                                title="Insert secret into active terminal"
+                              >
+                                <CyberIcon name="key" size={12} />
+                                <span>Insert</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               )}
             </>
           )}

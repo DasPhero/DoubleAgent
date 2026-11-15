@@ -5,6 +5,18 @@
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Cyberpunk Multi-Panel Action Bar (Activity Bar)**:
+  - Replaced the static collapsed sidebar strip with a full-featured, sleek 44px vertical **Activity Bar** on the left edge.
+  - Six distinct operational panels with dedicated vector CyberIcons (Golden Rule 9 compliant):
+    1. **Hosts & Target Inventory** (`network` icon, shortcut `Ctrl+1`): The full interactive hosts & groups tree with search, engagement scoping, and connect triggers.
+    2. **Quick Snippets & Commands** (`bolt` icon, shortcut `Ctrl+2`): Live searchable palette of operator snippets with OS tag filters (`ALL`, `LINUX`, `WINDOWS`), 1-click **[ Insert ]** into terminal, 1-click **[ Run ⚡ ]**, and `+ Manage` modal shortcut.
+    3. **Snippet Chains & Exploits** (`chain` icon, shortcut `Ctrl+3`, `F-16`): Fast access to multi-step execution chains with step counts, OS filters, and 1-click **[ Run Chain ]** launcher.
+    4. **Active Listeners & Catchers** (`radar` icon, shortcut `Ctrl+4`, `F-32`): Real-time monitor of active listeners, caught connection counters, 1-click shell stabilization (`F-34`), and listener launcher.
+    5. **Target Scratchpad & Notes** (`note` icon, shortcut `Ctrl+5`, `F-17`): Persistent auto-saving scratchpad synchronized with current active host, with 1-click **[ Save to Host Notes ]**, clipboard copy, and clear buffer controls.
+    6. **Credentials & Loot Quick-Drawer** (`key` icon, shortcut `Ctrl+6`, `F-36`): In-engagement credential store with search, 1-click clipboard secret copy, and 1-click direct terminal injection.
+  - Interactive activity bar behaviors: Clicking the active icon toggles the drawer open/collapsed; clicking an inactive icon opens the drawer and switches panels; keyboard shortcuts `Ctrl+1` through `Ctrl+6` switch panels instantly; `Ctrl+B` toggles the drawer.
+- **Top Navigation Bar Engagement Dropdown Height**:
+  - Upgraded `.nav-engagement-select`, `.nav-engagement-btn`, and `⚔️ Engagement` trigger button heights to a uniform `32px` matching `.nav-menu-trigger` (`Vault`, `Tools`, `View`, `Settings`) to eliminate vertical squishing.
 - **Menu Shortcuts & Navigation Bar Polish**:
   - Removed heterogeneous, unstandardized badge tags from Tools & View dropdown menus (`⚡ pwsh`, `cmd`, `🐧 wsl`, `Radar`, `Target`, `SFTP`, `Tunnels`, emojis, etc.) — clean layout preserving only genuine keyboard shortcuts (`Ctrl+K`, `Alt+B`, `Ctrl+B`, `Ctrl+T`, `Ctrl+F`, `Ctrl +`, etc.).
   - Widened engagement selector dropdowns across the top navigation bar, Evidence Vault, Credential Store, and Engagement Hub modals to eliminate cramped/squished text.
