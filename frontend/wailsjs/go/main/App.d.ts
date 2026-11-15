@@ -11,6 +11,8 @@ export function AutoDetectSerial(arg1:string):Promise<core.SerialAutoDetectResul
 
 export function BroadcastInput(arg1:Array<string>,arg2:string):Promise<void>;
 
+export function BuildPivotCommands(arg1:core.NetworkRoute,arg2:string):Promise<core.PivotCommandSet>;
+
 export function CancelTransfer(arg1:string):Promise<void>;
 
 export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;
@@ -51,6 +53,8 @@ export function DeleteHost(arg1:string):Promise<void>;
 
 export function DeleteListenerProfile(arg1:string):Promise<void>;
 
+export function DeleteNetworkRoute(arg1:string):Promise<void>;
+
 export function DeleteNote(arg1:string):Promise<void>;
 
 export function DeletePayloadTemplate(arg1:string):Promise<void>;
@@ -70,6 +74,8 @@ export function DeleteSnippetChain(arg1:string):Promise<void>;
 export function DeleteSnippetChainFromFile(arg1:string):Promise<void>;
 
 export function DeleteTotpRecord(arg1:string):Promise<void>;
+
+export function DetectPivotBinaries():Promise<Array<core.PivotBinaryStatus>>;
 
 export function DisconnectSession(arg1:string):Promise<void>;
 
@@ -112,6 +118,8 @@ export function GetActiveTransfers():Promise<Array<core.TransferTask>>;
 export function GetActiveTunnels():Promise<Array<core.ForwardTunnelStatus>>;
 
 export function GetAllTotpCodes():Promise<Array<core.TotpCodeResponse>>;
+
+export function GetDefaultNetworkRoutes():Promise<Array<core.NetworkRoute>>;
 
 export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOptions>;
 
@@ -185,6 +193,8 @@ export function InjectTotpCode(arg1:string,arg2:string):Promise<void>;
 
 export function ListActiveManagedListeners():Promise<Array<core.ManagedListenerInfo>>;
 
+export function ListActivePivotInstances():Promise<Array<core.PivotInstanceInfo>>;
+
 export function ListActiveRemoteEdits():Promise<Array<core.RemoteEditSession>>;
 
 export function ListCredentials(arg1:string,arg2:string):Promise<Array<core.CredentialEntry>>;
@@ -204,6 +214,8 @@ export function ListHostedTransferFiles(arg1:string):Promise<Array<core.HostedFi
 export function ListListenerProfiles():Promise<Array<core.ListenerProfile>>;
 
 export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
+
+export function ListNetworkRoutes():Promise<Array<core.NetworkRoute>>;
 
 export function ListNotes(arg1:string):Promise<Array<core.NotePage>>;
 
@@ -281,6 +293,8 @@ export function SaveIdentity(arg1:core.IdentityRecord):Promise<void>;
 
 export function SaveListenerProfile(arg1:core.ListenerProfile):Promise<void>;
 
+export function SaveNetworkRoute(arg1:core.NetworkRoute):Promise<void>;
+
 export function SaveNote(arg1:core.NotePage):Promise<core.NotePage>;
 
 export function SavePayloadAsSnippet(arg1:core.PayloadRenderOptions,arg2:string):Promise<core.Snippet>;
@@ -317,6 +331,8 @@ export function SelectDirectoryDialog(arg1:string):Promise<string>;
 
 export function SelectFileDialog(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function SendPivotInput(arg1:string,arg2:string):Promise<void>;
+
 export function SendSerialBreak(arg1:string):Promise<void>;
 
 export function SetActiveEngagement(arg1:string):Promise<void>;
@@ -341,6 +357,8 @@ export function StartForwardTunnel(arg1:string,arg2:string):Promise<string>;
 
 export function StartManagedListener(arg1:core.ListenerProfile):Promise<core.ManagedListenerInfo>;
 
+export function StartPivotInstance(arg1:core.NetworkRoute):Promise<core.PivotInstanceInfo>;
+
 export function StartRawTcpListener(arg1:core.RawTcpListenerConfig):Promise<core.RawTcpListenerInfo>;
 
 export function StartRemoteEdit(arg1:string,arg2:string):Promise<core.RemoteEditSession>;
@@ -356,6 +374,8 @@ export function StopFileTransferServer(arg1:string):Promise<void>;
 export function StopForwardTunnel(arg1:string):Promise<void>;
 
 export function StopManagedListener(arg1:string):Promise<void>;
+
+export function StopPivotInstance(arg1:string):Promise<void>;
 
 export function StopRawTcpListener(arg1:string):Promise<void>;
 

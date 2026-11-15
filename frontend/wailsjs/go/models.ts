@@ -654,6 +654,58 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class NetworkRoute {
+	    id: string;
+	    engagementId?: string;
+	    name: string;
+	    kind: string;
+	    tool: string;
+	    bindAddress: string;
+	    listenPort: number;
+	    socksPort?: number;
+	    interfaceName?: string;
+	    subnets?: string[];
+	    hops?: string[];
+	    remoteSpecs?: string[];
+	    reverse: boolean;
+	    selfCert: boolean;
+	    ignoreCert: boolean;
+	    binaryPath?: string;
+	    extraArgs?: string;
+	    status?: string;
+	    lastCheck?: string;
+	    notes?: string;
+	    createdAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NetworkRoute(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.engagementId = source["engagementId"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.tool = source["tool"];
+	        this.bindAddress = source["bindAddress"];
+	        this.listenPort = source["listenPort"];
+	        this.socksPort = source["socksPort"];
+	        this.interfaceName = source["interfaceName"];
+	        this.subnets = source["subnets"];
+	        this.hops = source["hops"];
+	        this.remoteSpecs = source["remoteSpecs"];
+	        this.reverse = source["reverse"];
+	        this.selfCert = source["selfCert"];
+	        this.ignoreCert = source["ignoreCert"];
+	        this.binaryPath = source["binaryPath"];
+	        this.extraArgs = source["extraArgs"];
+	        this.status = source["status"];
+	        this.lastCheck = source["lastCheck"];
+	        this.notes = source["notes"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class ProxyProfile {
 	    id: string;
 	    name: string;
@@ -764,6 +816,7 @@ export namespace core {
 	    hosts?: HostRecord[];
 	    forwardRules?: ForwardRule[];
 	    proxyProfiles?: ProxyProfile[];
+	    networkRoutes?: NetworkRoute[];
 	    credentials?: CredentialEntry[];
 	    evidence?: EvidenceItem[];
 	    findings?: FindingItem[];
@@ -787,6 +840,7 @@ export namespace core {
 	        this.hosts = this.convertValues(source["hosts"], HostRecord);
 	        this.forwardRules = this.convertValues(source["forwardRules"], ForwardRule);
 	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfile);
+	        this.networkRoutes = this.convertValues(source["networkRoutes"], NetworkRoute);
 	        this.credentials = this.convertValues(source["credentials"], CredentialEntry);
 	        this.evidence = this.convertValues(source["evidence"], EvidenceItem);
 	        this.findings = this.convertValues(source["findings"], FindingItem);
@@ -1550,6 +1604,7 @@ export namespace core {
 	        this.isVpn = source["isVpn"];
 	    }
 	}
+	
 	export class NmapImportOptions {
 	    engagementId?: string;
 	    groupId?: string;
@@ -2006,6 +2061,104 @@ export namespace core {
 		    }
 		    return a;
 		}
+	}
+	export class PivotBinaryStatus {
+	    tool: string;
+	    found: boolean;
+	    binaryName: string;
+	    path?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PivotBinaryStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tool = source["tool"];
+	        this.found = source["found"];
+	        this.binaryName = source["binaryName"];
+	        this.path = source["path"];
+	    }
+	}
+	export class PivotCommandSet {
+	    tool: string;
+	    lhost: string;
+	    proxyCommand: string;
+	    setupCommands?: string[];
+	    routeCommands?: string[];
+	    consoleCommands?: string[];
+	    linuxAgentCmd: string;
+	    windowsAgentCmd: string;
+	    proxychainsLine?: string;
+	    opsecWarnings?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PivotCommandSet(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tool = source["tool"];
+	        this.lhost = source["lhost"];
+	        this.proxyCommand = source["proxyCommand"];
+	        this.setupCommands = source["setupCommands"];
+	        this.routeCommands = source["routeCommands"];
+	        this.consoleCommands = source["consoleCommands"];
+	        this.linuxAgentCmd = source["linuxAgentCmd"];
+	        this.windowsAgentCmd = source["windowsAgentCmd"];
+	        this.proxychainsLine = source["proxychainsLine"];
+	        this.opsecWarnings = source["opsecWarnings"];
+	    }
+	}
+	export class PivotInstanceInfo {
+	    id: string;
+	    routeId?: string;
+	    engagementId?: string;
+	    name: string;
+	    tool: string;
+	    bindAddress: string;
+	    listenPort: number;
+	    socksPort?: number;
+	    interfaceName?: string;
+	    subnets?: string[];
+	    status: string;
+	    pid?: number;
+	    binaryPath?: string;
+	    startedAt?: string;
+	    stoppedAt?: string;
+	    errorMsg?: string;
+	    commandPreview: string;
+	    opsecWarnings?: string[];
+	    recentLogs?: string[];
+	    connectedAgents?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PivotInstanceInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.routeId = source["routeId"];
+	        this.engagementId = source["engagementId"];
+	        this.name = source["name"];
+	        this.tool = source["tool"];
+	        this.bindAddress = source["bindAddress"];
+	        this.listenPort = source["listenPort"];
+	        this.socksPort = source["socksPort"];
+	        this.interfaceName = source["interfaceName"];
+	        this.subnets = source["subnets"];
+	        this.status = source["status"];
+	        this.pid = source["pid"];
+	        this.binaryPath = source["binaryPath"];
+	        this.startedAt = source["startedAt"];
+	        this.stoppedAt = source["stoppedAt"];
+	        this.errorMsg = source["errorMsg"];
+	        this.commandPreview = source["commandPreview"];
+	        this.opsecWarnings = source["opsecWarnings"];
+	        this.recentLogs = source["recentLogs"];
+	        this.connectedAgents = source["connectedAgents"];
+	    }
 	}
 	
 	export class ProxyProfileSummary {

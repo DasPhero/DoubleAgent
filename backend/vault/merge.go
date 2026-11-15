@@ -575,6 +575,41 @@ func MergeVaultPayloads(local, remote core.VaultPayload) (core.VaultPayload, cor
 		}
 	}
 
+	// 15. NetworkRoutes (F-24 / F-38 Pivoting)
+	localRoutes := make(map[string]core.NetworkRoute, len(local.NetworkRoutes))
+	for _, r := range local.NetworkRoutes {
+		localRoutes[r.ID] = r
+	}
+	remoteRoutes := make(map[string]core.NetworkRoute, len(remote.NetworkRoutes))
+	for _, r := range remote.NetworkRoutes {
+		remoteRoutes[r.ID] = r
+	}
+	for _, lr := range local.NetworkRoutes {
+		if rr, exists := remoteRoutes[lr.ID]; exists {
+			if jsonEqual(lr, rr) {
+				merged.NetworkRoutes = append(merged.NetworkRoutes, lr)
+			} else {
+				report.HasConflicts = true
+				report.Conflicts = append(report.Conflicts, core.VaultConflictItem{
+					ID:            lr.ID,
+					Type:          "network_route",
+					Label:         fmt.Sprintf("Pivot %s (%s:%d)", lr.Name, lr.Tool, lr.ListenPort),
+					LocalSummary:  fmt.Sprintf("%s (%s:%d)", lr.Name, lr.Tool, lr.ListenPort),
+					RemoteSummary: fmt.Sprintf("%s (%s:%d)", rr.Name, rr.Tool, rr.ListenPort),
+				})
+				merged.NetworkRoutes = append(merged.NetworkRoutes, lr)
+			}
+		} else {
+			merged.NetworkRoutes = append(merged.NetworkRoutes, lr)
+		}
+	}
+	for _, rr := range remote.NetworkRoutes {
+		if _, exists := localRoutes[rr.ID]; !exists {
+			merged.NetworkRoutes = append(merged.NetworkRoutes, rr)
+			report.AutoMerged++
+		}
+	}
+
 	return ensureNonNilSlices(merged), report
 }
 

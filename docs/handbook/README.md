@@ -27,7 +27,7 @@ Highlighting text in any terminal session displays four quick-save targets:
 - `📝 Save to Notes (Recon)... [RECON]`: Directly logs recon logs and port scan matrices into Host or Engagement Notes.
 - `🎯 Create Finding from Selection... [REPORT]`: Generates a structured Finding and attaches the highlighted excerpt as Evidence #1.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-39`, & `F-40`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-24`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-39`, & `F-40`)
 
 - **Pentest-Phase Top Navigation & Two-Section Activity Bar (`OPS` vs. `HOST`)**:
   - **Top Navigation Bar**:
@@ -45,6 +45,11 @@ Highlighting text in any terminal session displays four quick-save targets:
 - **Global vs. Engagement Scoping for Port Forwarding (`F-13`) & Proxy Profiles / Proxychains (`F-14`)**:
   - Both Port Forwarding Rules (`-L`, `-R`, `-D`) and Proxy Profiles (`SSH Jump` / `SOCKS5`) can be saved as **Global (All Engagements)** for reusable infrastructure or scoped to a **Specific Engagement** so client-specific pivot routes and internal ports remain isolated and are included in `.daeng` archives (and cleaned up when an engagement is deleted).
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **Network Pivoting & Tunnel Manager (`ligolo-ng` / `chisel` — `F-24` / Pentest Module)**:
+  - Open via **Terminals ▾ &rarr; Pivoting Engine // ligolo & chisel (F-24)**, **Engagement ▾ &rarr; Pivoting Engine // ligolo & chisel (F-24)**, or the Command Palette (`Ctrl+K` &rarr; `ligolo` / `chisel` / `pivot`).
+  - **Configure & Launch (`ligolo-ng` & `chisel`)**: Automatically scans local `PATH` for `ligolo-proxy`/`proxy` and `chisel` binaries (or browse to a custom executable), configures bind address, listen port (`11601` / `8443`), TUN interface or Chisel SOCKS5 port (`1080`), target CIDR subnets (`10.10.20.0/24`), and engagement vs. global vault scoping.
+  - **Operator & Target Command Deck**: Selects local/VPN `LHOST` interfaces and builds copy/insert/run-ready Linux & Windows target agent commands (`./agent -connect ... -ignore-cert`, `./chisel client ... R:socks`), OS `ip tuntap` / `ip route add` commands, and `proxychains4` lines.
+  - **Active Pivots & Live Interactive Console**: Displays live process status (`RUNNING`, `ERROR`, `STOPPED`), PID, detected incoming agent joins, error diagnostics, streaming stdout/stderr logs, an interactive stdin bar for `ligolo-proxy` commands (`session`, `ifconfig`, `start --tun ligolo`), and 1-click process shutdown.
 - **File Transfer Helper & HTTP Staging Engine (`F-31` / Pentest Module)**:
   - Open **Recon & Exploit ▾ &rarr; File Transfer Helper // Staging (F-31)** or type `transfer` / `http` / `serve` in the Command Palette (`Ctrl+K`).
   - **Built-in Native HTTP Staging Server & Upload Receiver**: Pick any local directory, bind interface, and port (`80`, `443`, `8000`, `8080`, `8443`), optionally enable the `POST/PUT /upload` exfiltration receiver and HTTP Basic Auth, and start/stop the server in one click with a live request access log.

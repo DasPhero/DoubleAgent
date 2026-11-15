@@ -18,6 +18,10 @@ export function BroadcastInput(arg1, arg2) {
   return window['go']['main']['App']['BroadcastInput'](arg1, arg2);
 }
 
+export function BuildPivotCommands(arg1, arg2) {
+  return window['go']['main']['App']['BuildPivotCommands'](arg1, arg2);
+}
+
 export function CancelTransfer(arg1) {
   return window['go']['main']['App']['CancelTransfer'](arg1);
 }
@@ -98,6 +102,10 @@ export function DeleteListenerProfile(arg1) {
   return window['go']['main']['App']['DeleteListenerProfile'](arg1);
 }
 
+export function DeleteNetworkRoute(arg1) {
+  return window['go']['main']['App']['DeleteNetworkRoute'](arg1);
+}
+
 export function DeleteNote(arg1) {
   return window['go']['main']['App']['DeleteNote'](arg1);
 }
@@ -136,6 +144,10 @@ export function DeleteSnippetChainFromFile(arg1) {
 
 export function DeleteTotpRecord(arg1) {
   return window['go']['main']['App']['DeleteTotpRecord'](arg1);
+}
+
+export function DetectPivotBinaries() {
+  return window['go']['main']['App']['DetectPivotBinaries']();
 }
 
 export function DisconnectSession(arg1) {
@@ -220,6 +232,10 @@ export function GetActiveTunnels() {
 
 export function GetAllTotpCodes() {
   return window['go']['main']['App']['GetAllTotpCodes']();
+}
+
+export function GetDefaultNetworkRoutes() {
+  return window['go']['main']['App']['GetDefaultNetworkRoutes']();
 }
 
 export function GetDefaultProxychainsOptions() {
@@ -366,6 +382,10 @@ export function ListActiveManagedListeners() {
   return window['go']['main']['App']['ListActiveManagedListeners']();
 }
 
+export function ListActivePivotInstances() {
+  return window['go']['main']['App']['ListActivePivotInstances']();
+}
+
 export function ListActiveRemoteEdits() {
   return window['go']['main']['App']['ListActiveRemoteEdits']();
 }
@@ -404,6 +424,10 @@ export function ListListenerProfiles() {
 
 export function ListLocalDir(arg1) {
   return window['go']['main']['App']['ListLocalDir'](arg1);
+}
+
+export function ListNetworkRoutes() {
+  return window['go']['main']['App']['ListNetworkRoutes']();
 }
 
 export function ListNotes(arg1) {
@@ -558,6 +582,10 @@ export function SaveListenerProfile(arg1) {
   return window['go']['main']['App']['SaveListenerProfile'](arg1);
 }
 
+export function SaveNetworkRoute(arg1) {
+  return window['go']['main']['App']['SaveNetworkRoute'](arg1);
+}
+
 export function SaveNote(arg1) {
   return window['go']['main']['App']['SaveNote'](arg1);
 }
@@ -630,6 +658,10 @@ export function SelectFileDialog(arg1, arg2, arg3) {
   return window['go']['main']['App']['SelectFileDialog'](arg1, arg2, arg3);
 }
 
+export function SendPivotInput(arg1, arg2) {
+  return window['go']['main']['App']['SendPivotInput'](arg1, arg2);
+}
+
 export function SendSerialBreak(arg1) {
   return window['go']['main']['App']['SendSerialBreak'](arg1);
 }
@@ -678,6 +710,10 @@ export function StartManagedListener(arg1) {
   return window['go']['main']['App']['StartManagedListener'](arg1);
 }
 
+export function StartPivotInstance(arg1) {
+  return window['go']['main']['App']['StartPivotInstance'](arg1);
+}
+
 export function StartRawTcpListener(arg1) {
   return window['go']['main']['App']['StartRawTcpListener'](arg1);
 }
@@ -708,6 +744,10 @@ export function StopForwardTunnel(arg1) {
 
 export function StopManagedListener(arg1) {
   return window['go']['main']['App']['StopManagedListener'](arg1);
+}
+
+export function StopPivotInstance(arg1) {
+  return window['go']['main']['App']['StopPivotInstance'](arg1);
 }
 
 export function StopRawTcpListener(arg1) {

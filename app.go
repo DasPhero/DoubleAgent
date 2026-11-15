@@ -21,6 +21,7 @@ import (
 
 	"doubleagent/backend/core"
 	"doubleagent/backend/data"
+	"doubleagent/backend/pivot"
 	"doubleagent/backend/pty"
 	"doubleagent/backend/rawtcp"
 	"doubleagent/backend/serial"
@@ -64,6 +65,7 @@ type App struct {
 	chainsFilePath              string
 	managedListeners            map[string]*managedListenerInstance
 	fileServers                 map[string]*transfer.ManagedServer
+	pivotMgr                    *pivot.Manager
 }
 
 type managedListenerInstance struct {
@@ -203,6 +205,9 @@ func NewAppWithDependencies(
 	}
 	app.vaultStore = vaultStore
 	app.workspaceStore = data.NewWorkspaceStore(defaultWorkspacePath())
+	app.pivotMgr = pivot.NewManager(func(info core.PivotInstanceInfo) {
+		app.emit(app.ctx, "pivot:updated", info)
+	})
 	return app
 }
 
@@ -231,6 +236,9 @@ func (a *App) shutdown(ctx context.Context) {
 		if srv != nil {
 			_ = srv.Stop(ctx)
 		}
+	}
+	if a.pivotMgr != nil {
+		a.pivotMgr.StopAll()
 	}
 	if a.remoteEditMgr != nil {
 		a.remoteEditMgr.CloseAll()
@@ -5388,5 +5396,107 @@ func (a *App) HashHostedTransferFile(rootDir string, relPath string) (*core.Host
 func (a *App) GenerateFileTransferCommands(opts core.FileTransferCommandOptions) core.FileTransferCommandSet {
 	return core.GenerateTargetTransferCommands(opts)
 }
+
+// --- Ligolo-ng / Chisel Pivoting Engine (Pentest Module F-24) ---
+
+// GetDefaultNetworkRoutes returns starter pivot templates for ligolo-ng and chisel (F-24).
+func (a *App) GetDefaultNetworkRoutes() []core.NetworkRoute {
+	return core.DefaultBuiltinNetworkRoutes()
+}
+
+// ListNetworkRoutes returns all persisted pivot/network routes from the encrypted vault (F-24).
+func (a *App) ListNetworkRoutes() ([]core.NetworkRoute, error) {
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return nil, errors.New("vault store not available")
+	}
+	return st.ListNetworkRoutes()
+}
+
+// SaveNetworkRoute creates or updates a pivot route profile in the encrypted vault (F-24).
+func (a *App) SaveNetworkRoute(route core.NetworkRoute) error {
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return errors.New("vault store not available")
+	}
+	if err := st.SaveNetworkRoute(route); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DeleteNetworkRoute deletes a saved pivot route profile by ID (F-24).
+func (a *App) DeleteNetworkRoute(routeID string) error {
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok {
+		return errors.New("vault store not available")
+	}
+	if err := st.DeleteNetworkRoute(routeID); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DetectPivotBinaries checks local PATH for ligolo-ng proxy and chisel executables (F-24).
+func (a *App) DetectPivotBinaries() []core.PivotBinaryStatus {
+	return pivot.DetectBinaries()
+}
+
+// StartPivotInstance launches a supervised ligolo-ng proxy or chisel server subprocess (F-24).
+func (a *App) StartPivotInstance(route core.NetworkRoute) (*core.PivotInstanceInfo, error) {
+	if a.pivotMgr == nil {
+		a.pivotMgr = pivot.NewManager(func(info core.PivotInstanceInfo) {
+			a.emit(a.ctx, "pivot:updated", info)
+		})
+	}
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	info, err := a.pivotMgr.Start(ctx, route)
+	a.emit(a.ctx, "pivot:updated", info)
+	if err != nil {
+		return &info, err
+	}
+	return &info, nil
+}
+
+// StopPivotInstance terminates or dismisses a pivot instance by ID (F-24).
+func (a *App) StopPivotInstance(instanceID string) error {
+	if a.pivotMgr == nil {
+		return errors.New("pivot manager not initialized")
+	}
+	err := a.pivotMgr.Stop(instanceID)
+	a.emit(a.ctx, "pivot:updated", true)
+	return err
+}
+
+// SendPivotInput sends an interactive console line (e.g. session, ifconfig, start) to a running ligolo-proxy (F-24).
+func (a *App) SendPivotInput(instanceID string, input string) error {
+	if a.pivotMgr == nil {
+		return errors.New("pivot manager not initialized")
+	}
+	err := a.pivotMgr.SendInput(instanceID, input)
+	if err == nil {
+		a.emit(a.ctx, "pivot:updated", true)
+	}
+	return err
+}
+
+// ListActivePivotInstances returns all active and recently stopped/errored pivot processes (F-24).
+func (a *App) ListActivePivotInstances() []core.PivotInstanceInfo {
+	if a.pivotMgr == nil {
+		return []core.PivotInstanceInfo{}
+	}
+	return a.pivotMgr.List()
+}
+
+// BuildPivotCommands generates setup, routing, interactive console, agent one-liner, and proxychains snippets (F-24).
+func (a *App) BuildPivotCommands(route core.NetworkRoute, lhost string) core.PivotCommandSet {
+	return core.BuildPivotCommandSet(route, lhost)
+}
+
 
 

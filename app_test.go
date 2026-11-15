@@ -2727,5 +2727,76 @@ func TestApp_FileTransferHelper_F31(t *testing.T) {
 	}
 }
 
+func TestApp_PivotManager_F24(t *testing.T) {
+	vaultFile := filepath.Join(t.TempDir(), "test.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: vaultFile})
+	if err := store.Initialize(context.Background(), "master"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	app.ctx = context.Background()
+
+	// 1. Starter templates & binary scan
+	defaults := app.GetDefaultNetworkRoutes()
+	if len(defaults) == 0 {
+		t.Fatal("expected starter pivot presets")
+	}
+	bins := app.DetectPivotBinaries()
+	if len(bins) != 2 {
+		t.Fatalf("expected 2 binary checks (ligolo-ng, chisel), got %d", len(bins))
+	}
+
+	// 2. Vault CRUD for NetworkRoute
+	route := core.NetworkRoute{
+		ID:            "route-app-1",
+		EngagementID:  "eng-1",
+		Name:          "DC01 Ligolo Relay",
+		Tool:          "ligolo-ng",
+		BindAddress:   "0.0.0.0",
+		ListenPort:    11601,
+		InterfaceName: "ligolo_dc",
+		Subnets:       []string{"10.10.30.0/24"},
+		SelfCert:      true,
+		IgnoreCert:    true,
+	}
+	if err := app.SaveNetworkRoute(route); err != nil {
+		t.Fatalf("SaveNetworkRoute failed: %v", err)
+	}
+	saved, err := app.ListNetworkRoutes()
+	if err != nil || len(saved) != 1 || saved[0].ID != "route-app-1" {
+		t.Fatalf("expected 1 saved route, got %+v (err=%v)", saved, err)
+	}
+
+	// 3. Command generation
+	cmdSet := app.BuildPivotCommands(route, "10.10.14.9")
+	if !strings.Contains(cmdSet.LinuxAgentCmd, "10.10.14.9:11601") || len(cmdSet.RouteCommands) == 0 {
+		t.Fatalf("unexpected BuildPivotCommands result: %+v", cmdSet)
+	}
+
+	// 4. Starting with nonexistent custom binary surfaces error state in ListActivePivotInstances
+	route.BinaryPath = `Z:\nonexistent\ligolo-proxy-test.exe`
+	info, startErr := app.StartPivotInstance(route)
+	if startErr == nil || info == nil || info.Status != "error" {
+		t.Fatalf("expected error status for missing binary, got info=%+v err=%v", info, startErr)
+	}
+	if len(app.ListActivePivotInstances()) != 1 {
+		t.Fatalf("expected 1 active/error pivot instance, got %d", len(app.ListActivePivotInstances()))
+	}
+	if err := app.StopPivotInstance(info.ID); err != nil {
+		t.Fatalf("StopPivotInstance dismiss failed: %v", err)
+	}
+
+	// 5. Delete saved route
+	if err := app.DeleteNetworkRoute("route-app-1"); err != nil {
+		t.Fatalf("DeleteNetworkRoute failed: %v", err)
+	}
+	afterDel, err := app.ListNetworkRoutes()
+	if err != nil || len(afterDel) != 0 {
+		t.Fatalf("expected 0 routes after delete, got %+v", afterDel)
+	}
+}
+
+
 
 

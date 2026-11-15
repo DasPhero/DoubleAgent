@@ -80,6 +80,13 @@ import {
   FileTransferCommandOptions,
   FileTransferCommandSet,
 } from './types/fileTransfer';
+import { PivotManagerModal } from './components/PivotManagerModal';
+import {
+  NetworkRoute,
+  PivotBinaryStatus,
+  PivotCommandSet,
+  PivotInstanceInfo,
+} from './types/pivot';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -977,6 +984,16 @@ interface WailsAppBindings {
   ListHostedTransferFiles?: (dir: string) => Promise<HostedFileEntry[]>;
   HashHostedTransferFile?: (rootDir: string, relPath: string) => Promise<HostedFileEntry>;
   GenerateFileTransferCommands?: (opts: FileTransferCommandOptions) => Promise<FileTransferCommandSet>;
+  GetDefaultNetworkRoutes?: () => Promise<NetworkRoute[]>;
+  ListNetworkRoutes?: () => Promise<NetworkRoute[]>;
+  SaveNetworkRoute?: (route: NetworkRoute) => Promise<void>;
+  DeleteNetworkRoute?: (routeId: string) => Promise<void>;
+  DetectPivotBinaries?: () => Promise<PivotBinaryStatus[]>;
+  StartPivotInstance?: (route: NetworkRoute) => Promise<PivotInstanceInfo>;
+  StopPivotInstance?: (instanceId: string) => Promise<void>;
+  SendPivotInput?: (instanceId: string, input: string) => Promise<void>;
+  ListActivePivotInstances?: () => Promise<PivotInstanceInfo[]>;
+  BuildPivotCommands?: (route: NetworkRoute, lhost: string) => Promise<PivotCommandSet>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1298,6 +1315,8 @@ export function App({
   const [showListenerManagerModal, setShowListenerManagerModal] = useState<boolean>(false);
   // File Transfer Helper state (F-31)
   const [showFileTransferModal, setShowFileTransferModal] = useState<boolean>(false);
+  // Network Pivoting Manager state (F-24)
+  const [showPivotManagerModal, setShowPivotManagerModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
   const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
@@ -7958,6 +7977,14 @@ export function App({
         setShowFileTransferModal(true);
       },
     },
+    'pivot-manager': {
+      label: 'Pivoting Engine // ligolo-ng & chisel (F-24)',
+      shortLabel: 'Pivoting',
+      icon: 'tunnel',
+      action: () => {
+        setShowPivotManagerModal(true);
+      },
+    },
     'snippet-chains': {
       label: 'Snippet Chains // Multi-Stage Exploits (F-16)',
       shortLabel: 'Chains',
@@ -8466,6 +8493,7 @@ export function App({
                       activeTunnels.length > 0
                     )}
                     {renderDropdownRow('proxy-profiles', 'Proxy Profiles & Proxychains (F-14)', undefined, () => setShowProxyProfilesModal(true))}
+                  {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo & chisel (F-24)', undefined, () => setShowPivotManagerModal(true))}
                     <div className="nav-dropdown-divider" />
                     <div className="tools-sub-header">Engagement Archive (.daeng)</div>
                     {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', undefined, () => {
@@ -8533,6 +8561,7 @@ export function App({
                     activeTunnels.length > 0
                   )}
                   {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', undefined, () => setShowProxyProfilesModal(true))}
+                  {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo & chisel (F-24)', undefined, () => setShowPivotManagerModal(true))}
                   {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', undefined, () => setShowRawTcpModal(true))}
                   {renderDropdownRow(
                     'sftp',
@@ -10975,6 +11004,42 @@ export function App({
               })()}
 
               {(() => {
+                const q = paletteQuery.toLowerCase().trim();
+                const showPivot =
+                  !q ||
+                  'pivoting engine'.includes(q) ||
+                  'ligolo'.includes(q) ||
+                  'chisel'.includes(q) ||
+                  'tunnel'.includes(q) ||
+                  'socks'.includes(q) ||
+                  'route'.includes(q) ||
+                  'f-24'.includes(q);
+                if (!showPivot) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      setShowPivotManagerModal(true);
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <CyberIcon name="tunnel" size={14} />
+                        <span>Pivoting Engine // ligolo-ng &amp; chisel (F-24)</span>
+                      </strong>
+                      <span>Start/stop ligolo-ng TUN or chisel reverse SOCKS5 pivots, routes &amp; agent one-liners</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Open Pivot ↵</span>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {(() => {
                 const cleanQ = paletteQuery.trim();
                 const isNc = cleanQ.startsWith('nc ') || cleanQ.startsWith('tcp://');
                 if (!isNc) return null;
@@ -13203,6 +13268,89 @@ export function App({
             };
           }}
           onSelectDirectory={(t) => getWailsBindings()?.SelectDirectoryDialog?.(t) ?? Promise.resolve('')}
+        />
+      )}
+
+      {showPivotManagerModal && (
+        <PivotManagerModal
+          onClose={() => setShowPivotManagerModal(false)}
+          activeSessionId={sessionId}
+          activeEngagementId={activeEngagement?.id || null}
+          activeEngagementName={activeEngagement?.name || null}
+          onSendToTerminal={(sId, text) => {
+            void getWailsBindings()?.WriteTerminal?.(sId, text);
+          }}
+          onSpawnLocalTerminal={(initialCmd, tabTitle) => {
+            const api = getWailsBindings();
+            if (api?.OpenLocalTerminal) {
+              void api.OpenLocalTerminal('powershell', { cols: 120, rows: 34 }).then((sid) => {
+                openSessionTab(sid, tabTitle || 'Pivot Console', undefined, '#10b981');
+                setTimeout(() => {
+                  void api.WriteTerminal?.(sid, `${initialCmd}\n`);
+                }, 400);
+              });
+            } else {
+              void handleOpenLocalTerminal('powershell');
+            }
+          }}
+          getDefaultRoutes={async () => {
+            const api = getWailsBindings();
+            if (api?.GetDefaultNetworkRoutes) return api.GetDefaultNetworkRoutes();
+            return [];
+          }}
+          listRoutes={async () => {
+            const api = getWailsBindings();
+            if (api?.ListNetworkRoutes) return api.ListNetworkRoutes();
+            return [];
+          }}
+          saveRoute={async (route) => {
+            const api = getWailsBindings();
+            if (api?.SaveNetworkRoute) await api.SaveNetworkRoute(route);
+          }}
+          deleteRoute={async (routeId) => {
+            const api = getWailsBindings();
+            if (api?.DeleteNetworkRoute) await api.DeleteNetworkRoute(routeId);
+          }}
+          detectBinaries={async () => {
+            const api = getWailsBindings();
+            if (api?.DetectPivotBinaries) return api.DetectPivotBinaries();
+            return [];
+          }}
+          startPivot={async (route) => {
+            const api = getWailsBindings();
+            if (api?.StartPivotInstance) return api.StartPivotInstance(route);
+            throw new Error('StartPivotInstance API unavailable');
+          }}
+          stopPivot={async (instanceId) => {
+            const api = getWailsBindings();
+            if (api?.StopPivotInstance) await api.StopPivotInstance(instanceId);
+          }}
+          sendPivotInput={async (instanceId, input) => {
+            const api = getWailsBindings();
+            if (api?.SendPivotInput) await api.SendPivotInput(instanceId, input);
+          }}
+          listActivePivots={async () => {
+            const api = getWailsBindings();
+            if (api?.ListActivePivotInstances) return api.ListActivePivotInstances();
+            return [];
+          }}
+          buildCommands={async (route, lhost) => {
+            const api = getWailsBindings();
+            if (api?.BuildPivotCommands) return api.BuildPivotCommands(route, lhost);
+            return {
+              tool: route.tool,
+              lhost,
+              proxyCommand: `${route.tool} --listen ${route.listenPort}`,
+              linuxAgentCmd: '',
+              windowsAgentCmd: '',
+            };
+          }}
+          getLocalIPs={async () => {
+            const api = getWailsBindings();
+            if (api?.GetLocalNetworkIPs) return api.GetLocalNetworkIPs();
+            return [];
+          }}
+          onSelectBinaryFile={(t) => getWailsBindings()?.SelectFileDialog?.(t, '', '') ?? Promise.resolve('')}
         />
       )}
 

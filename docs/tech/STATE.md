@@ -1,10 +1,26 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** Pentest File Transfer Helper (`F-31`: Native HTTP Staging + Upload Receiver, External Server Generators, Target Download/Verify Commands, SHA-256/MD5 Hashing) — COMPLETED!
-- **Next Milestone:** `F-24` (`ligolo-ng`/`chisel` Pivoting) / `F-38` (Route Health Check) / `F-41` (WinRM Client) / `M-PRESETS` / `M-THEMES`
+- **Current Milestone:** `F-24` (`ligolo-ng` & `chisel` Pivoting Engine: Proxy/Relay Process Supervisor, Live Console & Stdin Control, Encrypted `NetworkRoute` Vault Storage, Agent & TUN Route Generators) — COMPLETED!
+- **Next Milestone:** `F-38` (Route Health Check) / `F-41` (WinRM Client) / `M-PRESETS` / `M-THEMES`
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Network Pivoting & Tunnel Manager (`F-24` / Pentest Spec Line 33, 57)**:
+  - **Backend Domain Logic & Security Boundaries (`backend/core/pivot.go`, `backend/core/pivot_test.go`)**:
+    - Defines `NetworkRoute` (persisted in encrypted vault), `PivotInstanceInfo`, `PivotBinaryStatus`, and `PivotCommandSet`.
+    - `ValidateNetworkRoute` validates profile names, `ligolo-ng`/`chisel` tools, listen ports, bind IPs, TUN interface names (`safeIfaceNameRe`), CIDR subnets (`net.ParseCIDR`), and rejects shell metacharacters.
+    - `BuildPivotArgs` constructs direct `exec.CommandContext` argument arrays (zero shell invocation) for `ligolo-proxy` (`-laddr`, `-selfcert`) and `chisel` (`server --host ... -p ... --reverse --socks5`).
+    - `BuildPivotCommandSet` generates Linux/Windows target agent one-liners (`./agent -connect ... -ignore-cert`, `./chisel client ... R:socks`), TUN interface/route commands (`ip tuntap`, `ip route add ... dev ligolo`), interactive console hints (`session`, `ifconfig`, `start --tun`), and `proxychains4` lines.
+    - `AnalyzePivotOpsec` evaluates noisy ports (`4444`, `1337`, `31337`), loopback vs `0.0.0.0` bind risks, `-ignore-cert` MITM caveats, unauthenticated Chisel tunnels, and missing CIDRs.
+  - **Supervised External Process Manager (`backend/pivot/manager.go`, `backend/pivot/manager_test.go`)**:
+    - `DetectBinaries` scans `PATH` for `ligolo-proxy`/`proxy`/`ligolo-ng` and `chisel`.
+    - `Manager.Start` spawns configured proxy processes without a shell, captures live stdout/stderr into a bounded 150-line console buffer, detects connected agent/session events, surfaces startup/exit errors clearly in `PivotInstanceInfo.ErrorMsg`, prevents duplicate port conflicts, and supports interactive `SendInput` (`ifconfig`, `session`, `start`, etc.) plus clean `Stop` / `StopAll` during `App.shutdown`.
+  - **Vault Persistence & Engagement Scoping (`backend/core/interfaces.go`, `backend/core/pentest.go`, `backend/vault/pentest.go`, `backend/vault/merge.go`)**:
+    - Added `NetworkRoutes []NetworkRoute` to `VaultPayload` and `EngagementPackage` with `ListNetworkRoutes`, `SaveNetworkRoute`, `DeleteNetworkRoute`, `.daeng` export/import, engagement deletion cleanup, and multi-device sync conflict detection.
+    - Verified in `TestNetworkRoutes_VaultStore_F24` and `TestApp_PivotManager_F24`.
+  - **Wails Bindings & Cyberpunk HUD UI (`app.go`, `frontend/src/types/pivot.ts`, `frontend/src/components/PivotManagerModal.tsx`, `PivotManagerModal.test.tsx`, `App.tsx`)**:
+    - Exported bindings: `GetDefaultNetworkRoutes`, `ListNetworkRoutes`, `SaveNetworkRoute`, `DeleteNetworkRoute`, `DetectPivotBinaries`, `StartPivotInstance`, `StopPivotInstance`, `SendPivotInput`, `ListActivePivotInstances`, and `BuildPivotCommands`.
+    - Three-tab Cyberpunk HUD modal (`Configure & Launch`, `Active Pivots & Console`, `Saved Routes & Presets`) wired into `Terminals ▾ > Hardware, Tunnels & Direct Links`, `Engagement ▾ > Tunnels & Routing`, and Command Palette (`Ctrl+K`).
 - **Pentest File Transfer Helper (`F-31` / Pentest Spec Line 31)**:
   - **Backend Domain Logic & Security Boundaries (`backend/core/file_transfer.go`, `backend/core/file_transfer_test.go`)**:
     - Pure domain models & command builders importing only Go stdlib (no crypto/net server imports in `core`, verified by `TestM0_0_CoreBoundaryNoForbiddenImports`).
