@@ -289,7 +289,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
       }
       return true;
     });
-  }, [chains, osFilter, hostFilter, searchQuery]);
+  }, [chainsList, osFilter, hostFilter, searchQuery]);
 
   return (
     <div className="cyber-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Snippet Chains Manager">

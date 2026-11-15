@@ -71,6 +71,15 @@ import {
 } from './types/payload';
 import { ListenerManagerModal } from './components/ListenerManagerModal';
 import { ListenerProfile, ManagedListenerInfo } from './types/listener';
+import { FileTransferModal } from './components/FileTransferModal';
+import {
+  FileTransferServerConfig,
+  FileTransferServerInfo,
+  HostedFileEntry,
+  NetworkInterfaceIP,
+  FileTransferCommandOptions,
+  FileTransferCommandSet,
+} from './types/fileTransfer';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -959,6 +968,15 @@ interface WailsAppBindings {
   StopManagedListener?: (listenerId: string) => Promise<void>;
   ListActiveManagedListeners?: () => Promise<ManagedListenerInfo[]>;
   GenerateListenerCommand?: (prof: ListenerProfile) => Promise<string>;
+  GetDefaultStagingDirectory?: () => Promise<string>;
+  GetLocalNetworkIPs?: () => Promise<NetworkInterfaceIP[]>;
+  ListFileTransferServers?: () => Promise<FileTransferServerInfo[]>;
+  StartFileTransferServer?: (cfg: FileTransferServerConfig) => Promise<FileTransferServerInfo>;
+  StopFileTransferServer?: (serverId: string) => Promise<void>;
+  GenerateFileServerCommand?: (cfg: FileTransferServerConfig) => Promise<string>;
+  ListHostedTransferFiles?: (dir: string) => Promise<HostedFileEntry[]>;
+  HashHostedTransferFile?: (rootDir: string, relPath: string) => Promise<HostedFileEntry>;
+  GenerateFileTransferCommands?: (opts: FileTransferCommandOptions) => Promise<FileTransferCommandSet>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1090,7 +1108,9 @@ export function App({
       if (typeof window !== 'undefined' && window.localStorage) {
         return window.localStorage.getItem('doubleagent_scratchpad') || '';
       }
-    } catch {}
+    } catch {
+      // ignore storage availability errors
+    }
     return '';
   });
   const [drawerListeners, setDrawerListeners] = useState<ManagedListenerInfo[]>([]);
@@ -1133,7 +1153,9 @@ export function App({
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem('doubleagent_scratchpad', scratchpadContent);
       }
-    } catch {}
+    } catch {
+      // ignore storage quota errors
+    }
   }, [scratchpadContent]);
 
   useEffect(() => {
@@ -1158,7 +1180,9 @@ export function App({
           if (active && Array.isArray(list)) {
             setTotpTokensList(list);
           }
-        } catch {}
+        } catch {
+          // ignore transient poll error
+        }
       }
       if (api?.GetAllTotpCodes) {
         try {
@@ -1170,7 +1194,9 @@ export function App({
             }
             setDrawerTotpCodes(map);
           }
-        } catch {}
+        } catch {
+          // ignore transient poll error
+        }
       }
     };
     void pollTotp();
@@ -1270,6 +1296,8 @@ export function App({
   const [showPayloadGeneratorModal, setShowPayloadGeneratorModal] = useState<boolean>(false);
   // Listener Manager state (F-32)
   const [showListenerManagerModal, setShowListenerManagerModal] = useState<boolean>(false);
+  // File Transfer Helper state (F-31)
+  const [showFileTransferModal, setShowFileTransferModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
   const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
@@ -7922,6 +7950,14 @@ export function App({
         setShowListenerManagerModal(true);
       },
     },
+    'file-transfer': {
+      label: 'File Transfer Helper // HTTP Staging & Hash Check (F-31)',
+      shortLabel: 'File Transfer',
+      icon: 'upload',
+      action: () => {
+        setShowFileTransferModal(true);
+      },
+    },
     'snippet-chains': {
       label: 'Snippet Chains // Multi-Stage Exploits (F-16)',
       shortLabel: 'Chains',
@@ -8548,6 +8584,7 @@ export function App({
                   <div className="tools-sub-header">Phase 2 // Delivery &amp; Catchers</div>
                   {renderDropdownRow('listener-manager', 'Listener Manager (F-32)', undefined, () => setShowListenerManagerModal(true))}
                   {renderDropdownRow('payload-generator', 'Payload Generator // Shells (F-33)', undefined, () => setShowPayloadGeneratorModal(true))}
+                  {renderDropdownRow('file-transfer', 'File Transfer Helper // Staging (F-31)', undefined, () => setShowFileTransferModal(true))}
 
                   <div className="nav-dropdown-divider" />
                   <div className="tools-sub-header">Phase 3 // Execution &amp; Post-Exploit</div>
@@ -10898,6 +10935,46 @@ export function App({
               })()}
 
               {(() => {
+                const q = paletteQuery.toLowerCase().trim();
+                const showTransfer =
+                  !q ||
+                  'file transfer helper'.includes(q) ||
+                  'transfer'.includes(q) ||
+                  'http'.includes(q) ||
+                  'serve'.includes(q) ||
+                  'upload'.includes(q) ||
+                  'download'.includes(q) ||
+                  'curl'.includes(q) ||
+                  'wget'.includes(q) ||
+                  'certutil'.includes(q) ||
+                  'updog'.includes(q) ||
+                  'hash'.includes(q);
+                if (!showTransfer) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      setShowFileTransferModal(true);
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <CyberIcon name="upload" size={14} />
+                        <span>File Transfer Helper // HTTP Staging (F-31)</span>
+                      </strong>
+                      <span>HTTP/SMB staging server, target download one-liners &amp; SHA-256/MD5 verifier</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Open Staging ↵</span>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {(() => {
                 const cleanQ = paletteQuery.trim();
                 const isNc = cleanQ.startsWith('nc ') || cleanQ.startsWith('tcp://');
                 if (!isNc) return null;
@@ -13051,6 +13128,81 @@ export function App({
           onOpenPayloadGenerator={() => {
             setShowPayloadGeneratorModal(true);
           }}
+        />
+      )}
+
+      {showFileTransferModal && (
+        <FileTransferModal
+          onClose={() => setShowFileTransferModal(false)}
+          activeSessionId={sessionId}
+          activeHostAddress={activeTab?.hostId ? vaultSummary.hosts.find((h) => h.id === activeTab.hostId)?.address : null}
+          onSendToTerminal={(sId, text) => {
+            void getWailsBindings()?.WriteTerminal?.(sId, text);
+          }}
+          onSpawnLocalTerminal={(initialCmd) => {
+            const api = getWailsBindings();
+            if (api?.OpenLocalTerminal) {
+              void api.OpenLocalTerminal('powershell', { cols: 120, rows: 34 }).then((sid) => {
+                openSessionTab(sid, 'File Staging Server', undefined, '#10b981');
+                setTimeout(() => {
+                  void api.WriteTerminal?.(sid, `${initialCmd}\n`);
+                }, 400);
+              });
+            } else {
+              void handleOpenLocalTerminal('powershell');
+            }
+          }}
+          getDefaultDir={async () => {
+            const api = getWailsBindings();
+            if (api?.GetDefaultStagingDirectory) return api.GetDefaultStagingDirectory();
+            return '.';
+          }}
+          getLocalIPs={async () => {
+            const api = getWailsBindings();
+            if (api?.GetLocalNetworkIPs) return api.GetLocalNetworkIPs();
+            return [];
+          }}
+          listServers={async () => {
+            const api = getWailsBindings();
+            if (api?.ListFileTransferServers) return api.ListFileTransferServers();
+            return [];
+          }}
+          startServer={async (cfg) => {
+            const api = getWailsBindings();
+            if (api?.StartFileTransferServer) return api.StartFileTransferServer(cfg);
+            throw new Error('StartFileTransferServer API unavailable');
+          }}
+          stopServer={async (id) => {
+            const api = getWailsBindings();
+            if (api?.StopFileTransferServer) await api.StopFileTransferServer(id);
+          }}
+          generateServerCommand={async (cfg) => {
+            const api = getWailsBindings();
+            if (api?.GenerateFileServerCommand) return api.GenerateFileServerCommand(cfg);
+            return `python3 -m http.server ${cfg.port || 8000}`;
+          }}
+          listFiles={async (dir) => {
+            const api = getWailsBindings();
+            if (api?.ListHostedTransferFiles) return api.ListHostedTransferFiles(dir);
+            return [];
+          }}
+          hashFile={async (rootDir, relPath) => {
+            const api = getWailsBindings();
+            if (api?.HashHostedTransferFile) return api.HashHostedTransferFile(rootDir, relPath);
+            throw new Error('HashHostedTransferFile API unavailable');
+          }}
+          generateCommands={async (opts) => {
+            const api = getWailsBindings();
+            if (api?.GenerateFileTransferCommands) return api.GenerateFileTransferCommands(opts);
+            return {
+              filename: opts.filename,
+              url: `http://${opts.localIp}:${opts.port}/${opts.filename}`,
+              localIp: opts.localIp,
+              port: opts.port,
+              methods: [],
+            };
+          }}
+          onSelectDirectory={(t) => getWailsBindings()?.SelectDirectoryDialog?.(t) ?? Promise.resolve('')}
         />
       )}
 

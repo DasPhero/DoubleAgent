@@ -186,6 +186,14 @@ export function ExportTotpTokens(arg1) {
   return window['go']['main']['App']['ExportTotpTokens'](arg1);
 }
 
+export function GenerateFileServerCommand(arg1) {
+  return window['go']['main']['App']['GenerateFileServerCommand'](arg1);
+}
+
+export function GenerateFileTransferCommands(arg1) {
+  return window['go']['main']['App']['GenerateFileTransferCommands'](arg1);
+}
+
 export function GenerateListenerCommand(arg1) {
   return window['go']['main']['App']['GenerateListenerCommand'](arg1);
 }
@@ -218,6 +226,10 @@ export function GetDefaultProxychainsOptions() {
   return window['go']['main']['App']['GetDefaultProxychainsOptions']();
 }
 
+export function GetDefaultStagingDirectory() {
+  return window['go']['main']['App']['GetDefaultStagingDirectory']();
+}
+
 export function GetEvidence(arg1) {
   return window['go']['main']['App']['GetEvidence'](arg1);
 }
@@ -248,6 +260,10 @@ export function GetIdentityPassword(arg1) {
 
 export function GetLiveSessionIDs() {
   return window['go']['main']['App']['GetLiveSessionIDs']();
+}
+
+export function GetLocalNetworkIPs() {
+  return window['go']['main']['App']['GetLocalNetworkIPs']();
 }
 
 export function GetNote(arg1) {
@@ -296,6 +312,10 @@ export function GetVaultSummary() {
 
 export function GetVaultSyncInfo() {
   return window['go']['main']['App']['GetVaultSyncInfo']();
+}
+
+export function HashHostedTransferFile(arg1, arg2) {
+  return window['go']['main']['App']['HashHostedTransferFile'](arg1, arg2);
 }
 
 export function HealthCheck() {
@@ -362,12 +382,20 @@ export function ListEvidence(arg1, arg2) {
   return window['go']['main']['App']['ListEvidence'](arg1, arg2);
 }
 
+export function ListFileTransferServers() {
+  return window['go']['main']['App']['ListFileTransferServers']();
+}
+
 export function ListFindings(arg1, arg2) {
   return window['go']['main']['App']['ListFindings'](arg1, arg2);
 }
 
 export function ListForwardRules() {
   return window['go']['main']['App']['ListForwardRules']();
+}
+
+export function ListHostedTransferFiles(arg1) {
+  return window['go']['main']['App']['ListHostedTransferFiles'](arg1);
 }
 
 export function ListListenerProfiles() {
@@ -638,6 +666,10 @@ export function StabilizeShell(arg1) {
   return window['go']['main']['App']['StabilizeShell'](arg1);
 }
 
+export function StartFileTransferServer(arg1) {
+  return window['go']['main']['App']['StartFileTransferServer'](arg1);
+}
+
 export function StartForwardTunnel(arg1, arg2) {
   return window['go']['main']['App']['StartForwardTunnel'](arg1, arg2);
 }
@@ -664,6 +696,10 @@ export function StartSftpDownload(arg1, arg2, arg3) {
 
 export function StartSftpUpload(arg1, arg2, arg3) {
   return window['go']['main']['App']['StartSftpUpload'](arg1, arg2, arg3);
+}
+
+export function StopFileTransferServer(arg1) {
+  return window['go']['main']['App']['StopFileTransferServer'](arg1);
 }
 
 export function StopForwardTunnel(arg1) {

@@ -95,6 +95,10 @@ export function ExportSprayList(arg1:core.SprayExportOptions):Promise<core.Spray
 
 export function ExportTotpTokens(arg1:string):Promise<string>;
 
+export function GenerateFileServerCommand(arg1:core.FileTransferServerConfig):Promise<string>;
+
+export function GenerateFileTransferCommands(arg1:core.FileTransferCommandOptions):Promise<core.FileTransferCommandSet>;
+
 export function GenerateListenerCommand(arg1:core.ListenerProfile):Promise<string>;
 
 export function GenerateProxychainsConfig(arg1:core.ProxychainsExportOptions):Promise<string>;
@@ -111,6 +115,8 @@ export function GetAllTotpCodes():Promise<Array<core.TotpCodeResponse>>;
 
 export function GetDefaultProxychainsOptions():Promise<core.ProxychainsExportOptions>;
 
+export function GetDefaultStagingDirectory():Promise<string>;
+
 export function GetEvidence(arg1:string):Promise<core.EvidenceItem>;
 
 export function GetEvidenceCategories(arg1:string):Promise<Array<string>>;
@@ -126,6 +132,8 @@ export function GetHostPassword(arg1:string):Promise<string>;
 export function GetIdentityPassword(arg1:string):Promise<string>;
 
 export function GetLiveSessionIDs():Promise<Array<string>>;
+
+export function GetLocalNetworkIPs():Promise<Array<core.NetworkInterfaceIP>>;
 
 export function GetNote(arg1:string):Promise<core.NotePage>;
 
@@ -150,6 +158,8 @@ export function GetTotpCode(arg1:string):Promise<core.TotpCodeResponse>;
 export function GetVaultSummary():Promise<core.VaultSummary>;
 
 export function GetVaultSyncInfo():Promise<core.VaultSyncInfo>;
+
+export function HashHostedTransferFile(arg1:string,arg2:string):Promise<core.HostedFileEntry>;
 
 export function HealthCheck():Promise<core.AppStatus>;
 
@@ -183,9 +193,13 @@ export function ListEngagements():Promise<Array<core.Engagement>>;
 
 export function ListEvidence(arg1:string,arg2:string):Promise<Array<core.EvidenceItem>>;
 
+export function ListFileTransferServers():Promise<Array<core.FileTransferServerInfo>>;
+
 export function ListFindings(arg1:string,arg2:string):Promise<Array<core.FindingItem>>;
 
 export function ListForwardRules():Promise<Array<core.ForwardRule>>;
+
+export function ListHostedTransferFiles(arg1:string):Promise<Array<core.HostedFileEntry>>;
 
 export function ListListenerProfiles():Promise<Array<core.ListenerProfile>>;
 
@@ -321,6 +335,8 @@ export function SetWorkspaceStore(arg1:data.WorkspaceStore):Promise<void>;
 
 export function StabilizeShell(arg1:core.ShellStabilizeRequest):Promise<void>;
 
+export function StartFileTransferServer(arg1:core.FileTransferServerConfig):Promise<core.FileTransferServerInfo>;
+
 export function StartForwardTunnel(arg1:string,arg2:string):Promise<string>;
 
 export function StartManagedListener(arg1:core.ListenerProfile):Promise<core.ManagedListenerInfo>;
@@ -334,6 +350,8 @@ export function StartSessionLogging(arg1:string):Promise<core.SessionLogStatus>;
 export function StartSftpDownload(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function StartSftpUpload(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function StopFileTransferServer(arg1:string):Promise<void>;
 
 export function StopForwardTunnel(arg1:string):Promise<void>;
 

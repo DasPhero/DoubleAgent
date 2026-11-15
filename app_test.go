@@ -2625,4 +2625,107 @@ func TestApp_ListenerManager_F32(t *testing.T) {
 	}
 }
 
+func TestApp_FileTransferHelper_F31(t *testing.T) {
+	vaultFile := filepath.Join(t.TempDir(), "test.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: vaultFile})
+	if err := store.Initialize(context.Background(), "master"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	app.ctx = context.Background()
+
+	stagingDir := t.TempDir()
+	toolFile := filepath.Join(stagingDir, "winpeas.exe")
+	if err := os.WriteFile(toolFile, []byte("MZ-dummy-payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Enumerate files in staging directory
+	files, err := app.ListHostedTransferFiles(stagingDir)
+	if err != nil {
+		t.Fatalf("ListHostedTransferFiles failed: %v", err)
+	}
+	if len(files) != 1 || files[0].Name != "winpeas.exe" {
+		t.Fatalf("unexpected hosted files: %+v", files)
+	}
+
+	// 2. Compute SHA-256 and MD5 checksums + ensure traversal blocked
+	hashed, err := app.HashHostedTransferFile(stagingDir, "winpeas.exe")
+	if err != nil {
+		t.Fatalf("HashHostedTransferFile failed: %v", err)
+	}
+	if len(hashed.SHA256) != 64 || len(hashed.MD5) != 32 {
+		t.Fatalf("expected valid SHA-256 and MD5 hashes, got %+v", hashed)
+	}
+	if _, err := app.HashHostedTransferFile(stagingDir, "../outside.txt"); err == nil {
+		t.Fatal("expected traversal attempt in HashHostedTransferFile to fail")
+	}
+
+	// 3. Start built-in HTTP staging server
+	info, err := app.StartFileTransferServer(core.FileTransferServerConfig{
+		Name:         "WinPEAS Server",
+		Kind:         core.FileServerKindBuiltin,
+		Directory:    stagingDir,
+		BindAddress:  "127.0.0.1",
+		Port:         19843,
+		EnableUpload: true,
+	})
+	if err != nil {
+		t.Fatalf("StartFileTransferServer failed: %v", err)
+	}
+	if info.Status != "running" || info.Port != 19843 {
+		t.Fatalf("unexpected server info: %+v", info)
+	}
+
+	active := app.ListFileTransferServers()
+	if len(active) != 1 || active[0].ID != info.ID {
+		t.Fatalf("expected 1 running file transfer server, got %+v", active)
+	}
+
+	// Duplicate port conflict prevented
+	if _, err := app.StartFileTransferServer(core.FileTransferServerConfig{
+		Kind:        core.FileServerKindBuiltin,
+		Directory:   stagingDir,
+		BindAddress: "127.0.0.1",
+		Port:        19843,
+	}); err == nil {
+		t.Fatal("expected duplicate port start to fail")
+	}
+
+	// 4. Generate target commands with embedded checksums
+	cmdSet := app.GenerateFileTransferCommands(core.FileTransferCommandOptions{
+		Filename:     "winpeas.exe",
+		LocalIP:      "10.10.14.8",
+		Port:         19843,
+		TargetOS:     "windows",
+		SHA256:       hashed.SHA256,
+		MD5:          hashed.MD5,
+		EnableUpload: true,
+	})
+	if cmdSet.URL != "http://10.10.14.8:19843/winpeas.exe" || len(cmdSet.Methods) == 0 {
+		t.Fatalf("unexpected command set: %+v", cmdSet)
+	}
+
+	// 5. External CLI preview generation
+	pyCmd := app.GenerateFileServerCommand(core.FileTransferServerConfig{
+		Kind:      core.FileServerKindUpdog,
+		Directory: stagingDir,
+		Port:      8443,
+		UseTLS:    true,
+	})
+	if !strings.Contains(pyCmd, "updog") || !strings.Contains(pyCmd, "--ssl") {
+		t.Fatalf("unexpected external server command preview: %s", pyCmd)
+	}
+
+	// 6. Stop staging server cleanly
+	if err := app.StopFileTransferServer(info.ID); err != nil {
+		t.Fatalf("StopFileTransferServer failed: %v", err)
+	}
+	if len(app.ListFileTransferServers()) != 0 {
+		t.Fatal("expected 0 active servers after stop")
+	}
+}
+
+
 

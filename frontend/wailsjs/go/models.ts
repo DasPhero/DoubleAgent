@@ -837,6 +837,228 @@ export namespace core {
 	        this.permissions = source["permissions"];
 	    }
 	}
+	export class FileTransferCommandOptions {
+	    filename: string;
+	    localIp: string;
+	    port: number;
+	    useTLS: boolean;
+	    targetOs: string;
+	    targetDestDir?: string;
+	    shareName?: string;
+	    sha256?: string;
+	    md5?: string;
+	    enableUpload: boolean;
+	    uploadFilePath?: string;
+	    basicAuthUser?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileTransferCommandOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filename = source["filename"];
+	        this.localIp = source["localIp"];
+	        this.port = source["port"];
+	        this.useTLS = source["useTLS"];
+	        this.targetOs = source["targetOs"];
+	        this.targetDestDir = source["targetDestDir"];
+	        this.shareName = source["shareName"];
+	        this.sha256 = source["sha256"];
+	        this.md5 = source["md5"];
+	        this.enableUpload = source["enableUpload"];
+	        this.uploadFilePath = source["uploadFilePath"];
+	        this.basicAuthUser = source["basicAuthUser"];
+	    }
+	}
+	export class TargetTransferMethod {
+	    id: string;
+	    tool: string;
+	    title: string;
+	    targetOs: string;
+	    category: string;
+	    command: string;
+	    notes?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TargetTransferMethod(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.tool = source["tool"];
+	        this.title = source["title"];
+	        this.targetOs = source["targetOs"];
+	        this.category = source["category"];
+	        this.command = source["command"];
+	        this.notes = source["notes"];
+	    }
+	}
+	export class FileTransferCommandSet {
+	    filename: string;
+	    url: string;
+	    localIp: string;
+	    port: number;
+	    sha256?: string;
+	    md5?: string;
+	    methods: TargetTransferMethod[];
+	    opsecWarnings?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FileTransferCommandSet(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filename = source["filename"];
+	        this.url = source["url"];
+	        this.localIp = source["localIp"];
+	        this.port = source["port"];
+	        this.sha256 = source["sha256"];
+	        this.md5 = source["md5"];
+	        this.methods = this.convertValues(source["methods"], TargetTransferMethod);
+	        this.opsecWarnings = source["opsecWarnings"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FileTransferEvent {
+	    timestamp: string;
+	    method: string;
+	    path: string;
+	    remoteAddr: string;
+	    status: number;
+	    bytes: number;
+	    note?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileTransferEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.timestamp = source["timestamp"];
+	        this.method = source["method"];
+	        this.path = source["path"];
+	        this.remoteAddr = source["remoteAddr"];
+	        this.status = source["status"];
+	        this.bytes = source["bytes"];
+	        this.note = source["note"];
+	    }
+	}
+	export class FileTransferServerConfig {
+	    id: string;
+	    name: string;
+	    kind: string;
+	    directory: string;
+	    bindAddress: string;
+	    port: number;
+	    enableUpload: boolean;
+	    useTLS: boolean;
+	    shareName?: string;
+	    basicAuthUser?: string;
+	    basicAuthPassword?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileTransferServerConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.directory = source["directory"];
+	        this.bindAddress = source["bindAddress"];
+	        this.port = source["port"];
+	        this.enableUpload = source["enableUpload"];
+	        this.useTLS = source["useTLS"];
+	        this.shareName = source["shareName"];
+	        this.basicAuthUser = source["basicAuthUser"];
+	        this.basicAuthPassword = source["basicAuthPassword"];
+	    }
+	}
+	export class FileTransferServerInfo {
+	    id: string;
+	    name: string;
+	    kind: string;
+	    directory: string;
+	    bindAddress: string;
+	    port: number;
+	    enableUpload: boolean;
+	    useTLS: boolean;
+	    shareName?: string;
+	    hasBasicAuth: boolean;
+	    status: string;
+	    startedAt?: string;
+	    servedCount: number;
+	    uploadCount: number;
+	    commandPreview: string;
+	    opsecWarnings?: string[];
+	    recentEvents?: FileTransferEvent[];
+	    errorMsg?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileTransferServerInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.directory = source["directory"];
+	        this.bindAddress = source["bindAddress"];
+	        this.port = source["port"];
+	        this.enableUpload = source["enableUpload"];
+	        this.useTLS = source["useTLS"];
+	        this.shareName = source["shareName"];
+	        this.hasBasicAuth = source["hasBasicAuth"];
+	        this.status = source["status"];
+	        this.startedAt = source["startedAt"];
+	        this.servedCount = source["servedCount"];
+	        this.uploadCount = source["uploadCount"];
+	        this.commandPreview = source["commandPreview"];
+	        this.opsecWarnings = source["opsecWarnings"];
+	        this.recentEvents = this.convertValues(source["recentEvents"], FileTransferEvent);
+	        this.errorMsg = source["errorMsg"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	export class ForwardTunnelStatus {
@@ -940,6 +1162,32 @@ export namespace core {
 	
 	
 	
+	export class HostedFileEntry {
+	    name: string;
+	    relPath: string;
+	    fullPath: string;
+	    size: number;
+	    isDir: boolean;
+	    modTime: string;
+	    sha256?: string;
+	    md5?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostedFileEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.relPath = source["relPath"];
+	        this.fullPath = source["fullPath"];
+	        this.size = source["size"];
+	        this.isDir = source["isDir"];
+	        this.modTime = source["modTime"];
+	        this.sha256 = source["sha256"];
+	        this.md5 = source["md5"];
+	    }
+	}
 	export class IdentityRecord {
 	    id: string;
 	    label: string;
@@ -1283,6 +1531,24 @@ export namespace core {
 		    }
 		    return a;
 		}
+	}
+	export class NetworkInterfaceIP {
+	    interface: string;
+	    ip: string;
+	    cidr: string;
+	    isVpn: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new NetworkInterfaceIP(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.interface = source["interface"];
+	        this.ip = source["ip"];
+	        this.cidr = source["cidr"];
+	        this.isVpn = source["isVpn"];
+	    }
 	}
 	export class NmapImportOptions {
 	    engagementId?: string;
@@ -2487,6 +2753,7 @@ export namespace core {
 		    return a;
 		}
 	}
+	
 	
 	export class TerminalSpawnOptions {
 	    mode: string;

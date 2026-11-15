@@ -25,6 +25,7 @@ import (
 	"doubleagent/backend/rawtcp"
 	"doubleagent/backend/serial"
 	"doubleagent/backend/ssh"
+	"doubleagent/backend/transfer"
 	"doubleagent/backend/vault"
 )
 
@@ -62,6 +63,7 @@ type App struct {
 	payloadFilePath             string
 	chainsFilePath              string
 	managedListeners            map[string]*managedListenerInstance
+	fileServers                 map[string]*transfer.ManagedServer
 }
 
 type managedListenerInstance struct {
@@ -186,6 +188,7 @@ func NewAppWithDependencies(
 		logMgr:           core.NewSessionLogManager(defaultLogsDir()),
 		remoteEditMgr:    core.NewRemoteEditManager(""),
 		managedListeners: make(map[string]*managedListenerInstance),
+		fileServers:      make(map[string]*transfer.ManagedServer),
 	}
 
 	if vaultStore == nil {
@@ -211,6 +214,26 @@ func (a *App) startup(ctx context.Context) {
 		_ = a.vaultStore.Initialize(ctx, "")
 	} else if a.vaultStore.IsLocked() && a.vaultStore.IsPasswordless() {
 		_ = a.vaultStore.Unlock(ctx, "")
+	}
+}
+
+// shutdown cleans up active HTTP file staging servers and remote edit staging files when closing.
+func (a *App) shutdown(ctx context.Context) {
+	a.mu.Lock()
+	servers := make([]*transfer.ManagedServer, 0, len(a.fileServers))
+	for _, srv := range a.fileServers {
+		servers = append(servers, srv)
+	}
+	a.fileServers = make(map[string]*transfer.ManagedServer)
+	a.mu.Unlock()
+
+	for _, srv := range servers {
+		if srv != nil {
+			_ = srv.Stop(ctx)
+		}
+	}
+	if a.remoteEditMgr != nil {
+		a.remoteEditMgr.CloseAll()
 	}
 }
 
@@ -5225,4 +5248,145 @@ func (a *App) ImportEngagementFile(filePath string, password string) (*core.Enga
 	}
 	return a.ImportEngagementPackage(string(data), password)
 }
+
+// --- File Transfer Helper & HTTP Staging Engine (Pentest Module F-31) ---
+
+// GetDefaultStagingDirectory returns a practical default directory for staging files (F-31).
+func (a *App) GetDefaultStagingDirectory() string {
+	if wd, err := os.Getwd(); err == nil && wd != "" {
+		return wd
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return home
+	}
+	return os.TempDir()
+}
+
+// GetLocalNetworkIPs returns non-loopback IPv4 interfaces (prioritizing VPN tun/tap/wg) for LHOST selection (F-31).
+func (a *App) GetLocalNetworkIPs() []core.NetworkInterfaceIP {
+	return core.ListLocalIPv4Interfaces()
+}
+
+// StartFileTransferServer launches a native built-in HTTP staging & optional upload catcher server (F-31).
+func (a *App) StartFileTransferServer(cfg core.FileTransferServerConfig) (*core.FileTransferServerInfo, error) {
+	if cfg.Port == 0 {
+		cfg.Port = 8000
+	}
+	if strings.TrimSpace(cfg.BindAddress) == "" {
+		cfg.BindAddress = "0.0.0.0"
+	}
+
+	a.mu.Lock()
+	for _, existing := range a.fileServers {
+		if existing != nil && existing.Port() == cfg.Port {
+			a.mu.Unlock()
+			return nil, fmt.Errorf("a file staging server is already running on port %d", cfg.Port)
+		}
+	}
+	a.mu.Unlock()
+
+	srv, err := transfer.StartServer(cfg, func(serverID string, evt core.FileTransferEvent) {
+		a.emit(a.ctx, "transfer:event", map[string]interface{}{
+			"serverId": serverID,
+			"event":    evt,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	a.mu.Lock()
+	if a.fileServers == nil {
+		a.fileServers = make(map[string]*transfer.ManagedServer)
+	}
+	a.fileServers[srv.ID()] = srv
+	a.mu.Unlock()
+
+	a.emit(a.ctx, "transfer:servers-updated", true)
+	info := srv.Info()
+	return &info, nil
+}
+
+// StopFileTransferServer stops an active HTTP staging server by ID (F-31).
+func (a *App) StopFileTransferServer(serverID string) error {
+	a.mu.Lock()
+	srv, ok := a.fileServers[serverID]
+	if ok {
+		delete(a.fileServers, serverID)
+	}
+	a.mu.Unlock()
+
+	if !ok || srv == nil {
+		return errors.New("file staging server not found")
+	}
+
+	if err := srv.Stop(context.Background()); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "transfer:servers-updated", true)
+	return nil
+}
+
+// ListFileTransferServers returns telemetry and recent access events for all active staging servers (F-31).
+func (a *App) ListFileTransferServers() []core.FileTransferServerInfo {
+	a.mu.Lock()
+	servers := make([]*transfer.ManagedServer, 0, len(a.fileServers))
+	for _, srv := range a.fileServers {
+		if srv != nil {
+			servers = append(servers, srv)
+		}
+	}
+	a.mu.Unlock()
+
+	list := make([]core.FileTransferServerInfo, 0, len(servers))
+	for _, srv := range servers {
+		list = append(list, srv.Info())
+	}
+	return list
+}
+
+// GenerateFileServerCommand builds the CLI launch command for external staging servers (python3, updog, impacket-smb, etc.) (F-31).
+func (a *App) GenerateFileServerCommand(cfg core.FileTransferServerConfig) string {
+	return core.BuildFileServerCommand(cfg)
+}
+
+// ListHostedTransferFiles enumerates files inside the configured staging directory (F-31).
+func (a *App) ListHostedTransferFiles(dir string) ([]core.HostedFileEntry, error) {
+	return core.ListHostedFiles(dir)
+}
+
+// HashHostedTransferFile computes streaming SHA-256 and MD5 checksums for a staged file inside rootDir (F-31).
+func (a *App) HashHostedTransferFile(rootDir string, relPath string) (*core.HostedFileEntry, error) {
+	safePath, err := core.ResolveSafeHostedPath(rootDir, relPath)
+	if err != nil {
+		return nil, err
+	}
+
+	sha, md5Hex, size, err := transfer.ComputeFileHashes(safePath)
+	if err != nil {
+		return nil, err
+	}
+
+	fi, err := os.Stat(safePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.HostedFileEntry{
+		Name:     fi.Name(),
+		RelPath:  filepath.ToSlash(strings.TrimLeft(relPath, "/\\")),
+		FullPath: safePath,
+		Size:     size,
+		IsDir:    false,
+		ModTime:  fi.ModTime().UTC().Format(time.RFC3339),
+		SHA256:   sha,
+		MD5:      md5Hex,
+	}, nil
+}
+
+// GenerateFileTransferCommands builds target-OS download, upload/exfil, in-memory, and hash verification commands (F-31).
+func (a *App) GenerateFileTransferCommands(opts core.FileTransferCommandOptions) core.FileTransferCommandSet {
+	return core.GenerateTargetTransferCommands(opts)
+}
+
 

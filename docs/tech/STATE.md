@@ -1,10 +1,30 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** UI/UX Polish & Behavioral Fixes (`F-08`, `F-15`, `F-16`, `F-17`, `F-20`, `F-36`) — COMPLETED!
-- **Next Milestone:** Comprehensive Presets Library (`M-PRESETS`) / Multi-Theme Cyberpunk Visual Designs (`M-THEMES`) / WinRM Client (`F-41`)
+- **Current Milestone:** Pentest File Transfer Helper (`F-31`: Native HTTP Staging + Upload Receiver, External Server Generators, Target Download/Verify Commands, SHA-256/MD5 Hashing) — COMPLETED!
+- **Next Milestone:** `F-24` (`ligolo-ng`/`chisel` Pivoting) / `F-38` (Route Health Check) / `F-41` (WinRM Client) / `M-PRESETS` / `M-THEMES`
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Pentest File Transfer Helper (`F-31` / Pentest Spec Line 31)**:
+  - **Backend Domain Logic & Security Boundaries (`backend/core/file_transfer.go`, `backend/core/file_transfer_test.go`)**:
+    - Pure domain models & command builders importing only Go stdlib (no crypto/net server imports in `core`, verified by `TestM0_0_CoreBoundaryNoForbiddenImports`).
+    - Supports engine selection: Built-in Go HTTP server (`builtin`), `python3 -m http.server`, `python2`, `updog` (with optional `--ssl`), `impacket-smbserver -smb2support`, `php -S`, and `ruby`.
+    - `ResolveSafeHostedPath` enforces strict root containment and rejects directory traversal (`../`) and null bytes.
+    - `ListLocalIPv4Interfaces` enumerates local IPv4 interfaces prioritizing VPN adapters (`tun*`, `wg*`, `tap*`, `utun*`, `tailscale`, `zerotier`) for 1-click `LHOST` selection.
+    - `GenerateTargetTransferCommands` builds sanitized target one-liners across Linux/macOS (`curl`, `wget`, `python3 urllib`, `curl | bash`, `smbclient`), Windows (`PowerShell iwr`, `Net.WebClient`, `certutil.exe`, `curl.exe`, `SMB copy`, `IEX DownloadString`), Exfil/Upload (`curl -F file=@...`, `Invoke-RestMethod -Method Put`), and Integrity Verification (`sha256sum -c`, `md5sum -c`, PowerShell `Get-FileHash`, `certutil -hashfile`).
+    - `AnalyzeFileTransferOpsec` surfaces cleartext HTTP, `0.0.0.0` exposure, loopback bind (`127.0.0.1`), noisy staging ports (`8000`/`8080`), SMB port 445, and unauthenticated endpoint warnings.
+  - **Native Go HTTP Staging & Upload Receiver (`backend/transfer/server.go`, `backend/transfer/hash.go`, `backend/transfer/server_test.go`)**:
+    - `StartServer` launches a non-blocking Go `net/http` staging server with Range support (`http.ServeFile`), `X-Content-Type-Options: nosniff`, traversal/symlink-escape blocking, optional HTTP Basic Auth (`crypto/subtle.ConstantTimeCompare`), and optional `POST /upload` / `PUT /upload/<name>` receiver (512 MiB cap, collision-safe filenames).
+    - `ComputeFileHashes` streams SHA-256 and MD5 checksums via `io.MultiWriter`.
+    - Tracks live `ServedCount`, `UploadCount`, and bounded request history (`RecentEvents`), and shuts down cleanly on `App.shutdown`.
+  - **Wails Backend Bindings (`app.go`, `main.go`, `app_test.go`)**:
+    - Exposed bindings: `GetDefaultStagingDirectory`, `GetLocalNetworkIPs`, `StartFileTransferServer`, `StopFileTransferServer`, `ListFileTransferServers`, `GenerateFileServerCommand`, `ListHostedTransferFiles`, `HashHostedTransferFile`, and `GenerateFileTransferCommands`.
+    - Verified in `TestApp_FileTransferHelper_F31` alongside clean shutdown wiring (`OnShutdown: app.shutdown`).
+  - **Cyberpunk HUD Modal (`frontend/src/types/fileTransfer.ts`, `frontend/src/components/FileTransferModal.tsx`, `FileTransferModal.test.tsx`, `App.tsx`)**:
+    - Two-column HUD console (`OPS-F31 // STAGING, EXFIL & INTEGRITY VERIFIER`) accessible from `Recon & Exploit ▾ > File Transfer Helper // Staging (F-31)` and `Ctrl+K` Command Palette.
+    - Left panel: Server launchpad (`Built-in Go HTTP`, `Python 3`, `Updog`, `Impacket SMB`, `PHP`), native `[ Browse ]` folder picker, quick port presets (`80`, `443`, `8000`, `8080`, `8443`), upload receiver toggle, optional Basic Auth, running servers telemetry cards with live request log, and clickable staged file browser (computes SHA-256 & MD5 on click).
+    - Right panel: Auto-detected local/VPN `LHOST` chips, target OS filter (`ALL`, `LINUX`, `WINDOWS`), category tabs (`Download`, `Hash Verify`, `Upload / Exfil`, `Fileless / Memory`), checksum copy strip, OPSEC alert bar, and 1-click `Copy`, `Insert`, and `Run` terminal actions.
+    - Verified in `frontend/src/components/FileTransferModal.test.tsx` (2 tests passing; 68/68 total frontend tests passing).
 - **UI/UX Polish & Behavioral Fixes (`F-08`, `F-15`, `F-16`, `F-17`, `F-20`, `F-36`)**:
   - **Snippet Editor & Search Bar Overhaul (`SnippetsManagerModal.tsx`, `F-15`)**:
     - Replaced unstyled browser-default gray `<textarea>` and search `<input>` with dark Cyberpunk HUD fields (`.cyber-hud-input`, `.cyber-hud-select`, search vector icon, clear `×` button, and `1rem` vertical spacing between form rows).

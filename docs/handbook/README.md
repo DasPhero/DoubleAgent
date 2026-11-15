@@ -35,7 +35,7 @@ Highlighting text in any terminal session displays four quick-save targets:
     - **Engagement Cluster**: Placed immediately after `View ▾` in the order `Select Active Engagement` dropdown $\to$ `+` (New Engagement) $\to$ `Engagement ▾` menu (`Target Scope & Hub`, `Credential Pool & Spray Lists`, `Evidence Vault & Findings`, `Port Forwarding & Tunnels`, `Proxy Profiles & Proxychains`, and `.daeng` Export/Import).
     - **Three Phase-Ordered Tool Menus**:
       - **`Terminals ▾`**: Local & Directory Shells, `Hardware Bus & UART Logic (F-23)` (Serial/UART/COM/Hardware buses), `Port Forwarding (-L, -R, -D)`, `Proxy Profiles (Jump, SOCKS5)`, `Raw TCP / Netcat (F-31)`, and `SFTP File Browser`.
-      - **`Recon & Exploit ▾`**: `Nmap XML Recon Ingest (F-39)`, `Listener Manager (F-32)`, `Payload Generator // Shells (F-33)`, `Command Snippets & Variables`, and `Snippet Chains & Exploits (F-16)`.
+      - **`Recon & Exploit ▾`**: `Nmap XML Recon Ingest (F-39)`, `Listener Manager (F-32)`, `Payload Generator // Shells (F-33)`, `File Transfer Helper // Staging (F-31)`, `Command Snippets & Variables`, and `Snippet Chains & Exploits (F-16)`.
       - **`Intel & Keys ▾`**: `Command Palette` (`Ctrl+K`), `Host Notes & Docs`, `Session Logs & Recordings`, `TOTP Authenticator Generator`, and `Keychain & SSH Keys`.
     - **Settings Modal + Pin to Terminal**: Clicking **Settings** opens a modal overlay first, with a **`Pin to Terminal`** button in the modal header to dock Settings into a full workspace tab.
   - **Bottom-Left Vault Lock / Unlock Pill**: Click the **`Vault Unlocked`** / **`Vault Locked`** pill in the bottom-left status bar at any time to lock or unlock the encrypted vault.
@@ -45,6 +45,12 @@ Highlighting text in any terminal session displays four quick-save targets:
 - **Global vs. Engagement Scoping for Port Forwarding (`F-13`) & Proxy Profiles / Proxychains (`F-14`)**:
   - Both Port Forwarding Rules (`-L`, `-R`, `-D`) and Proxy Profiles (`SSH Jump` / `SOCKS5`) can be saved as **Global (All Engagements)** for reusable infrastructure or scoped to a **Specific Engagement** so client-specific pivot routes and internal ports remain isolated and are included in `.daeng` archives (and cleaned up when an engagement is deleted).
 - **Standalone Native App (`M0-0`)**: Launches directly as a single executable on Windows (`DoubleAgent.exe`) and Linux without external runtime dependencies.
+- **File Transfer Helper & HTTP Staging Engine (`F-31` / Pentest Module)**:
+  - Open **Recon & Exploit ▾ &rarr; File Transfer Helper // Staging (F-31)** or type `transfer` / `http` / `serve` in the Command Palette (`Ctrl+K`).
+  - **Built-in Native HTTP Staging Server & Upload Receiver**: Pick any local directory, bind interface, and port (`80`, `443`, `8000`, `8080`, `8443`), optionally enable the `POST/PUT /upload` exfiltration receiver and HTTP Basic Auth, and start/stop the server in one click with a live request access log.
+  - **External Server Launch Commands**: Instantly generate ready-to-run commands for `python3 -m http.server`, `updog` (with optional `--ssl`), `impacket-smbserver -smb2support`, or `php -S` and launch them directly in a local terminal tab.
+  - **1-Click File Hashing & Verification Commands**: Click any file in your staged folder to compute its `SHA-256` and `MD5` checksums and automatically populate target verification commands (`sha256sum -c`, `md5sum -c`, PowerShell `Get-FileHash`, `certutil -hashfile`).
+  - **Target Download, Upload & Fileless One-Liners**: Automatically enumerates local/VPN `LHOST` IPs (`tun0`, `wg0`, LAN) and builds copy/insert/run-ready commands for Linux (`curl`, `wget`, `python3`, `smbclient`) and Windows (`iwr`, `Net.WebClient`, `certutil.exe`, `curl.exe`, `copy \\IP\share`).
 - **One-Click Shell Stabilization & PTY Upgrade (`F-34` / Pentest Module Wave 1)**:
   - Click **`🐚 Stabilize`** in the terminal command strip to upgrade any raw/dumb shell (such as an incoming reverse shell from the Raw TCP Listener or a nested `nc` session) into a full interactive PTY terminal.
   - **Session Topology Auto-Detection**:
