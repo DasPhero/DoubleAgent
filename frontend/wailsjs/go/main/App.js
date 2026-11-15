@@ -22,6 +22,10 @@ export function BuildPivotCommands(arg1, arg2) {
   return window['go']['main']['App']['BuildPivotCommands'](arg1, arg2);
 }
 
+export function BuildWinrmCLICommand(arg1) {
+  return window['go']['main']['App']['BuildWinrmCLICommand'](arg1);
+}
+
 export function CancelTransfer(arg1) {
   return window['go']['main']['App']['CancelTransfer'](arg1);
 }
@@ -64,6 +68,10 @@ export function ConnectSavedHost(arg1, arg2) {
 
 export function ConnectSerial(arg1) {
   return window['go']['main']['App']['ConnectSerial'](arg1);
+}
+
+export function ConnectWinrmSession(arg1) {
+  return window['go']['main']['App']['ConnectWinrmSession'](arg1);
 }
 
 export function CreateRemoteDir(arg1, arg2) {
@@ -146,12 +154,24 @@ export function DeleteTotpRecord(arg1) {
   return window['go']['main']['App']['DeleteTotpRecord'](arg1);
 }
 
+export function DeleteWinrmProfile(arg1) {
+  return window['go']['main']['App']['DeleteWinrmProfile'](arg1);
+}
+
 export function DetectPivotBinaries() {
   return window['go']['main']['App']['DetectPivotBinaries']();
 }
 
+export function DetectWinrmTools() {
+  return window['go']['main']['App']['DetectWinrmTools']();
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['main']['App']['DisconnectSession'](arg1);
+}
+
+export function DownloadWinrmFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DownloadWinrmFile'](arg1, arg2, arg3);
 }
 
 export function DuplicateSession(arg1, arg2) {
@@ -172,6 +192,10 @@ export function ExecuteSnippet(arg1, arg2, arg3) {
 
 export function ExecuteSnippetChainStep(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ExecuteSnippetChainStep'](arg1, arg2, arg3, arg4);
+}
+
+export function ExecuteWinrmCommand(arg1, arg2) {
+  return window['go']['main']['App']['ExecuteWinrmCommand'](arg1, arg2);
 }
 
 export function ExportEngagementFile(arg1, arg2, arg3) {
@@ -390,6 +414,10 @@ export function ListActiveRemoteEdits() {
   return window['go']['main']['App']['ListActiveRemoteEdits']();
 }
 
+export function ListActiveWinrmSessions() {
+  return window['go']['main']['App']['ListActiveWinrmSessions']();
+}
+
 export function ListCredentials(arg1, arg2) {
   return window['go']['main']['App']['ListCredentials'](arg1, arg2);
 }
@@ -472,6 +500,10 @@ export function ListSnippets() {
 
 export function ListTotpRecords() {
   return window['go']['main']['App']['ListTotpRecords']();
+}
+
+export function ListWinrmProfileSummaries() {
+  return window['go']['main']['App']['ListWinrmProfileSummaries']();
 }
 
 export function LoadWorkspace() {
@@ -634,6 +666,10 @@ export function SaveTotpRecord(arg1) {
   return window['go']['main']['App']['SaveTotpRecord'](arg1);
 }
 
+export function SaveWinrmProfile(arg1) {
+  return window['go']['main']['App']['SaveWinrmProfile'](arg1);
+}
+
 export function SaveWorkspace(arg1) {
   return window['go']['main']['App']['SaveWorkspace'](arg1);
 }
@@ -772,6 +808,10 @@ export function UnlockVault(arg1) {
 
 export function UnlockVaultWithHello() {
   return window['go']['main']['App']['UnlockVaultWithHello']();
+}
+
+export function UploadWinrmFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UploadWinrmFile'](arg1, arg2, arg3);
 }
 
 export function WriteTerminal(arg1, arg2) {

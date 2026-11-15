@@ -89,6 +89,16 @@ import {
 } from './types/pivot';
 import { RouteHealthModal } from './components/RouteHealthModal';
 import type { RouteCheckRequest, RouteHealthReport, SocksCandidateOption } from './types/routeHealth';
+import { WinrmManagerModal } from './components/WinrmManagerModal';
+import type {
+  WinrmConnectRequest,
+  WinrmExecResult,
+  WinrmProfilePayload,
+  WinrmProfileSummary,
+  WinrmSessionInfo,
+  WinrmToolStatus,
+  WinrmTransferResult,
+} from './types/winrm';
 import {
   CustomShortcutItem,
   SYSTEM_SHORTCUTS,
@@ -998,6 +1008,16 @@ interface WailsAppBindings {
   BuildPivotCommands?: (route: NetworkRoute, lhost: string) => Promise<PivotCommandSet>;
   RunRouteHealthCheck?: (req: RouteCheckRequest) => Promise<RouteHealthReport>;
   ParseRouteProbeTargets?: (raw: string) => Promise<string[]>;
+  ListWinrmProfileSummaries?: () => Promise<WinrmProfileSummary[]>;
+  SaveWinrmProfile?: (profile: WinrmProfilePayload) => Promise<void>;
+  DeleteWinrmProfile?: (id: string) => Promise<void>;
+  DetectWinrmTools?: () => Promise<WinrmToolStatus[]>;
+  BuildWinrmCLICommand?: (profile: WinrmProfilePayload) => Promise<string>;
+  ConnectWinrmSession?: (req: WinrmConnectRequest) => Promise<WinrmSessionInfo>;
+  ListActiveWinrmSessions?: () => Promise<WinrmSessionInfo[]>;
+  ExecuteWinrmCommand?: (sessionId: string, script: string) => Promise<WinrmExecResult>;
+  UploadWinrmFile?: (sessionId: string, localPath: string, remotePath: string) => Promise<WinrmTransferResult>;
+  DownloadWinrmFile?: (sessionId: string, remotePath: string, localPath: string) => Promise<WinrmTransferResult>;
 }
 
 export interface SerialAutoDetectResult {
@@ -1323,6 +1343,8 @@ export function App({
   const [showPivotManagerModal, setShowPivotManagerModal] = useState<boolean>(false);
   // Route Health Check state (F-38)
   const [showRouteHealthModal, setShowRouteHealthModal] = useState<boolean>(false);
+  // WinRM / PowerShell Remoting Client state (F-41)
+  const [showWinrmModal, setShowWinrmModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
   const [showEngagementHubModal, setShowEngagementHubModal] = useState<boolean>(false);
   const [activeEngagement, setActiveEngagement] = useState<Engagement | null>(null);
@@ -1332,7 +1354,7 @@ export function App({
   const [filterByEngagementScope, setFilterByEngagementScope] = useState<boolean>(true);
 
   useEffect(() => {
-    if (activeSidebarPanel === 'credentials') {
+    if (activeSidebarPanel === 'credentials' || showWinrmModal) {
       const api = getWailsBindings();
       if (api?.ListCredentials) {
         void api.ListCredentials(activeEngagement?.id || '', '').then((list) => {
@@ -1340,7 +1362,7 @@ export function App({
         }).catch(() => {});
       }
     }
-  }, [activeSidebarPanel, activeEngagement]);
+  }, [activeSidebarPanel, activeEngagement, showWinrmModal]);
 
   // Terminal Selection Context Menu & Quick Save State (F-19)
   const [terminalContextMenu, setTerminalContextMenu] = useState<{
@@ -7999,6 +8021,14 @@ export function App({
         setShowRouteHealthModal(true);
       },
     },
+    'winrm-client': {
+      label: 'WinRM / PowerShell Remoting (F-41)',
+      shortLabel: 'WinRM',
+      icon: 'terminal',
+      action: () => {
+        setShowWinrmModal(true);
+      },
+    },
     'snippet-chains': {
       label: 'Snippet Chains // Multi-Stage Exploits (F-16)',
       shortLabel: 'Chains',
@@ -8579,6 +8609,7 @@ export function App({
                   {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo & chisel (F-24)', undefined, () => setShowPivotManagerModal(true))}
                   {renderDropdownRow('route-health', 'Route Health Check // OPSEC (F-38)', undefined, () => setShowRouteHealthModal(true))}
                   {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', undefined, () => setShowRawTcpModal(true))}
+                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting (F-41)', undefined, () => setShowWinrmModal(true))}
                   {renderDropdownRow(
                     'sftp',
                     'SFTP File Browser',
@@ -8633,6 +8664,7 @@ export function App({
 
                   <div className="nav-dropdown-divider" />
                   <div className="tools-sub-header">Phase 3 // Execution &amp; Post-Exploit</div>
+                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting (F-41)', undefined, () => setShowWinrmModal(true))}
                   {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true))}
                   {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits (F-16)', undefined, () => {
                     setChainsHostFilter(activeTab?.hostId || null);
@@ -11090,6 +11122,42 @@ export function App({
               })()}
 
               {(() => {
+                const q = paletteQuery.toLowerCase();
+                const showWinrm =
+                  !q ||
+                  'winrm'.includes(q) ||
+                  'powershell'.includes(q) ||
+                  'evil-winrm'.includes(q) ||
+                  'remoting'.includes(q) ||
+                  'ntlm'.includes(q) ||
+                  'pth'.includes(q) ||
+                  'f-41'.includes(q);
+                if (!showWinrm) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      setShowWinrmModal(true);
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <CyberIcon name="terminal" size={14} />
+                        <span>WinRM // PowerShell Remoting Client (F-41)</span>
+                      </strong>
+                      <span>HTTP 5985 / HTTPS 5986 interactive Evil-WinRM parity shell, PtH &amp; file transfer</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Open WinRM ↵</span>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {(() => {
                 const cleanQ = paletteQuery.trim();
                 const isNc = cleanQ.startsWith('nc ') || cleanQ.startsWith('tcp://');
                 if (!isNc) return null;
@@ -13440,6 +13508,126 @@ export function App({
           onOpenPortForwarding={() => setShowPortForwardingModal(true)}
         />
       )}
+
+          {showWinrmModal && (
+            <WinrmManagerModal
+              onClose={() => setShowWinrmModal(false)}
+              activeEngagementId={activeEngagement?.id || null}
+              activeEngagementName={activeEngagement?.name || null}
+              hosts={vaultSummary.hosts.map((h) => ({
+                id: h.id,
+                label: h.label,
+                address: h.address,
+              }))}
+              identities={vaultSummary.identities.map((idn) => ({
+                id: idn.id,
+                label: idn.label,
+                username: idn.username,
+              }))}
+              credentials={(drawerCreds || []).map((c) => ({
+                id: c.id,
+                label: c.label,
+                username: c.username,
+                realm: c.realm,
+                category: c.category,
+              }))}
+              socksCandidates={(() => {
+                const list: { id: string; label: string; addr: string }[] = [];
+                for (const tun of activeTunnels) {
+                  if (tun.type === 'D' && tun.status === 'active') {
+                    const host =
+                      !tun.bindAddress || tun.bindAddress === '0.0.0.0' || tun.bindAddress === '::'
+                        ? '127.0.0.1'
+                        : tun.bindAddress;
+                    list.push({ id: tun.id, label: 'SSH -D', addr: `${host}:${tun.bindPort}` });
+                  }
+                }
+                for (const p of vaultSummary.proxyProfiles || []) {
+                  if (p.type === 'socks5' && p.socksAddress) {
+                    if (!list.some((x) => x.addr === p.socksAddress)) {
+                      list.push({ id: p.id, label: p.name, addr: p.socksAddress });
+                    }
+                  }
+                }
+                return list;
+              })()}
+              listProfiles={async () => {
+                const api = getWailsBindings();
+                return api?.ListWinrmProfileSummaries ? api.ListWinrmProfileSummaries() : [];
+              }}
+              saveProfile={async (prof) => {
+                const api = getWailsBindings();
+                if (api?.SaveWinrmProfile) {
+                  await api.SaveWinrmProfile(prof);
+                  return;
+                }
+                throw new Error('SaveWinrmProfile API unavailable');
+              }}
+              deleteProfile={async (id) => {
+                const api = getWailsBindings();
+                if (api?.DeleteWinrmProfile) {
+                  await api.DeleteWinrmProfile(id);
+                  return;
+                }
+                throw new Error('DeleteWinrmProfile API unavailable');
+              }}
+              detectTools={async () => {
+                const api = getWailsBindings();
+                return api?.DetectWinrmTools ? api.DetectWinrmTools() : [];
+              }}
+              buildCliCommand={async (prof) => {
+                const api = getWailsBindings();
+                if (api?.BuildWinrmCLICommand) return api.BuildWinrmCLICommand(prof);
+                return '';
+              }}
+              connectSession={async (req) => {
+                const api = getWailsBindings();
+                if (api?.ConnectWinrmSession) return api.ConnectWinrmSession(req);
+                throw new Error('ConnectWinrmSession API unavailable');
+              }}
+              listActiveSessions={async () => {
+                const api = getWailsBindings();
+                return api?.ListActiveWinrmSessions ? api.ListActiveWinrmSessions() : [];
+              }}
+              executeCommand={async (sid, script) => {
+                const api = getWailsBindings();
+                if (api?.ExecuteWinrmCommand) return api.ExecuteWinrmCommand(sid, script);
+                throw new Error('ExecuteWinrmCommand API unavailable');
+              }}
+              uploadFile={async (sid, localPath, remotePath) => {
+                const api = getWailsBindings();
+                if (api?.UploadWinrmFile) return api.UploadWinrmFile(sid, localPath, remotePath);
+                throw new Error('UploadWinrmFile API unavailable');
+              }}
+              downloadFile={async (sid, remotePath, localPath) => {
+                const api = getWailsBindings();
+                if (api?.DownloadWinrmFile) return api.DownloadWinrmFile(sid, remotePath, localPath);
+                throw new Error('DownloadWinrmFile API unavailable');
+              }}
+              disconnectSession={async (sid) => {
+                const api = getWailsBindings();
+                if (api?.DisconnectSession) {
+                  await api.DisconnectSession(sid);
+                  return;
+                }
+                throw new Error('DisconnectSession API unavailable');
+              }}
+              onSessionConnected={(sess) => {
+                openSessionTab(
+                  sess.sessionId,
+                  sess.name || `WinRM ${sess.host}`,
+                  sess.hostId || undefined,
+                  '#38bdf8'
+                );
+              }}
+              onFocusSession={(sid) => {
+                const matchTab = tabs.find((t) => collectPanes(t.rootNode).some((p) => p.sessionId === sid));
+                if (matchTab) {
+                  setActiveTabId(matchTab.id);
+                }
+              }}
+            />
+          )}
 
       {showChainsModal && (
         <SnippetChainsModal

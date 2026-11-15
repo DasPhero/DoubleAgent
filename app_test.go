@@ -3,8 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +19,7 @@ import (
 	"doubleagent/backend/core"
 	"doubleagent/backend/data"
 	"doubleagent/backend/vault"
+	"doubleagent/backend/winrm"
 )
 
 type fakeSshTransport struct {
@@ -2870,6 +2875,180 @@ func TestApp_RouteHealthCheck_F38(t *testing.T) {
 		t.Fatal("expected error when active probe traffic confirmation is missing")
 	}
 }
+
+type testPipeListener struct {
+	mu     sync.Mutex
+	closed bool
+	ch     chan net.Conn
+}
+
+func (l *testPipeListener) Accept() (net.Conn, error) {
+	c, ok := <-l.ch
+	if !ok {
+		return nil, net.ErrClosed
+	}
+	return c, nil
+}
+
+func (l *testPipeListener) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if !l.closed {
+		l.closed = true
+		close(l.ch)
+	}
+	return nil
+}
+
+func (l *testPipeListener) Addr() net.Addr {
+	return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 5985}
+}
+
+func (l *testPipeListener) DialContext(ctx context.Context, _ string, _ string) (net.Conn, error) {
+	l.mu.Lock()
+	closed := l.closed
+	l.mu.Unlock()
+	if closed {
+		return nil, errors.New("listener closed")
+	}
+	c, s := net.Pipe()
+	select {
+	case l.ch <- s:
+		return c, nil
+	case <-ctx.Done():
+		_ = c.Close()
+		_ = s.Close()
+		return nil, ctx.Err()
+	}
+}
+
+func TestApp_WinrmClient_F41(t *testing.T) {
+	ctx := context.Background()
+	tmp := filepath.Join(t.TempDir(), "winrm_app_test.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmp})
+	if err := store.Initialize(ctx, "TestMasterPass123!"); err != nil {
+		t.Fatalf("vault init failed: %v", err)
+	}
+
+	var eventsMu sync.Mutex
+	var emittedData strings.Builder
+	emit := func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "terminal:data" && len(optionalData) > 0 {
+			if ev, ok := optionalData[0].(core.TerminalDataEvent); ok {
+				eventsMu.Lock()
+				emittedData.WriteString(ev.Data)
+				eventsMu.Unlock()
+			}
+		}
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, emit)
+	defer app.shutdown(ctx)
+
+	// 1. Save a WinRM profile & verify summary strips raw password/hash
+	if err := app.SaveWinrmProfile(core.WinrmProfile{
+		ID:       "wp-app-1",
+		Name:     "Lab DC01",
+		Host:     "10.10.50.10",
+		Port:     5985,
+		UseTLS:   false,
+		AuthType: core.WinrmAuthBasic,
+		Username: "CORP\\Administrator",
+		Password: "SuperSecretPassword!",
+	}); err != nil {
+		t.Fatalf("SaveWinrmProfile failed: %v", err)
+	}
+
+	summaries, err := app.ListWinrmProfileSummaries()
+	if err != nil || len(summaries) != 1 || !summaries[0].HasPassword || summaries[0].HasNtHash {
+		t.Fatalf("unexpected summaries: %+v (err=%v)", summaries, err)
+	}
+
+	if cli := app.BuildWinrmCLICommand(core.WinrmProfile{
+		Host:     "10.10.50.10",
+		Port:     5986,
+		UseTLS:   true,
+		AuthType: core.WinrmAuthPtH,
+		Domain:   "CORP",
+		Username: "Administrator",
+		NtHash:   "31d6cfe0d16ae931b73c59d7e0c089c0",
+	}); !strings.Contains(cli, "<NT_HASH>") || strings.Contains(cli, "31d6cfe0") {
+		t.Fatalf("expected masked NT hash in CLI preview, got: %s", cli)
+	}
+
+	// 2. Spin up in-memory WS-Man Basic server using net.Pipe (sandbox-safe)
+	pl := &testPipeListener{ch: make(chan net.Conn, 8)}
+	defer func() { _ = pl.Close() }()
+
+	srv := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if auth := r.Header.Get("Authorization"); auth != "Basic "+base64.StdEncoding.EncodeToString([]byte(`CORP\Administrator:SuperSecretPassword!`)) {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			bodyBytes, _ := io.ReadAll(r.Body)
+			body := string(bodyBytes)
+			w.Header().Set("Content-Type", "application/soap+xml;charset=UTF-8")
+			switch {
+			case strings.Contains(body, "schemas.xmlsoap.org/ws/2004/09/transfer/Create"):
+				_, _ = io.WriteString(w, `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:w="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><s:Body><x:ResourceCreated xmlns:x="http://schemas.xmlsoap.org/ws/2004/09/transfer"><w:ReferenceParameters><w:SelectorSet><w:Selector Name="ShellId">SH-APP-1</w:Selector></w:SelectorSet></w:ReferenceParameters></x:ResourceCreated></s:Body></s:Envelope>`)
+			case strings.Contains(body, "schemas.microsoft.com/wbem/wsman/1/windows/shell/Command"):
+				_, _ = io.WriteString(w, `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell"><s:Body><rsp:CommandResponse><rsp:CommandId>CMD-APP-1</rsp:CommandId></rsp:CommandResponse></s:Body></s:Envelope>`)
+			case strings.Contains(body, "schemas.microsoft.com/wbem/wsman/1/windows/shell/Receive"):
+				out := base64.StdEncoding.EncodeToString([]byte("corp\\administrator\r\n"))
+				_, _ = fmt.Fprintf(w, `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:rsp="http://schemas.microsoft.com/wbem/wsman/1/windows/shell"><s:Body><rsp:ReceiveResponse><rsp:Stream Name="stdout" CommandId="CMD-APP-1">%s</rsp:Stream><rsp:CommandState State="http://schemas.microsoft.com/wbem/wsman/1/windows/shell/CommandState/Done"><rsp:ExitCode>0</rsp:ExitCode></rsp:CommandState></rsp:ReceiveResponse></s:Body></s:Envelope>`, out)
+			default:
+				_, _ = io.WriteString(w, `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body/></s:Envelope>`)
+			}
+		}),
+	}
+	go func() { _ = srv.Serve(pl) }()
+	defer func() { _ = srv.Close() }()
+
+	// Connect strictly by ProfileID — Vault resolves Password in Go!
+	info, err := app.connectWinrmWithConfig(core.WinrmConnectRequest{
+		ProfileID: "wp-app-1",
+	}, winrm.ClientConfig{DialContext: pl.DialContext})
+	if err != nil {
+		t.Fatalf("connectWinrmWithConfig failed: %v", err)
+	}
+	if !app.CheckSessionAlive(info.SessionID) {
+		t.Fatal("expected WinRM session to register as live session")
+	}
+
+	res, err := app.ExecuteWinrmCommand(info.SessionID, "whoami")
+	if err != nil || !strings.Contains(res.Stdout, `corp\administrator`) {
+		t.Fatalf("ExecuteWinrmCommand unexpected: %+v (err=%v)", res, err)
+	}
+
+	if err := app.WriteTerminal(info.SessionID, "whoami\r"); err != nil {
+		t.Fatalf("WriteTerminal into WinRM REPL failed: %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		eventsMu.Lock()
+		got := emittedData.String()
+		eventsMu.Unlock()
+		if strings.Contains(got, `corp\administrator`) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	eventsMu.Lock()
+	gotTerminal := emittedData.String()
+	eventsMu.Unlock()
+	if !strings.Contains(gotTerminal, `corp\administrator`) {
+		t.Fatalf("expected WinRM REPL output streamed to xterm, got %q", gotTerminal)
+	}
+
+	if err := app.DisconnectSession(info.SessionID); err != nil {
+		t.Fatalf("DisconnectSession failed: %v", err)
+	}
+	if app.CheckSessionAlive(info.SessionID) {
+		t.Fatal("expected WinRM session to be removed after DisconnectSession")
+	}
+}
+
 
 
 

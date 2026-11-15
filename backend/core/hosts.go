@@ -79,6 +79,7 @@ type VaultSummary struct {
 	TotpRecords   []TotpSummary         `json:"totpRecords"`
 	Notes         []NotePageSummary     `json:"notes"`
 	Listeners     []ListenerProfile     `json:"listeners"`
+	WinrmProfiles []WinrmProfileSummary `json:"winrmProfiles"`
 }
 
 // ResolveEffectiveHost computes the effective Port, Username, IdentityID, KeepaliveSecs, and SshAuthConfig
@@ -353,6 +354,11 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 	listeners := make([]ListenerProfile, len(payload.Listeners))
 	copy(listeners, payload.Listeners)
 
+	winrmProfiles := make([]WinrmProfileSummary, 0, len(payload.WinrmProfiles))
+	for _, wp := range payload.WinrmProfiles {
+		winrmProfiles = append(winrmProfiles, wp.ToSummary())
+	}
+
 	return VaultSummary{
 		Groups:        groups,
 		Hosts:         hosts,
@@ -364,6 +370,7 @@ func BuildVaultSummary(payload VaultPayload) VaultSummary {
 		TotpRecords:   totpSummaries,
 		Notes:         noteSummaries,
 		Listeners:     listeners,
+		WinrmProfiles: winrmProfiles,
 	}
 }
 

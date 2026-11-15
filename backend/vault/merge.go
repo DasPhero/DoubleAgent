@@ -610,6 +610,41 @@ func MergeVaultPayloads(local, remote core.VaultPayload) (core.VaultPayload, cor
 		}
 	}
 
+	// 16. WinrmProfiles (F-41 WinRM / PowerShell Remoting)
+	localWinrm := make(map[string]core.WinrmProfile, len(local.WinrmProfiles))
+	for _, wp := range local.WinrmProfiles {
+		localWinrm[wp.ID] = wp
+	}
+	remoteWinrm := make(map[string]core.WinrmProfile, len(remote.WinrmProfiles))
+	for _, wp := range remote.WinrmProfiles {
+		remoteWinrm[wp.ID] = wp
+	}
+	for _, lwp := range local.WinrmProfiles {
+		if rwp, exists := remoteWinrm[lwp.ID]; exists {
+			if jsonEqual(lwp, rwp) {
+				merged.WinrmProfiles = append(merged.WinrmProfiles, lwp)
+			} else {
+				report.HasConflicts = true
+				report.Conflicts = append(report.Conflicts, core.VaultConflictItem{
+					ID:            lwp.ID,
+					Type:          "winrm_profile",
+					Label:         fmt.Sprintf("WinRM %s (%s:%d)", lwp.Name, lwp.Host, lwp.Port),
+					LocalSummary:  fmt.Sprintf("%s (%s:%d)", lwp.Name, lwp.Host, lwp.Port),
+					RemoteSummary: fmt.Sprintf("%s (%s:%d)", rwp.Name, rwp.Host, rwp.Port),
+				})
+				merged.WinrmProfiles = append(merged.WinrmProfiles, lwp)
+			}
+		} else {
+			merged.WinrmProfiles = append(merged.WinrmProfiles, lwp)
+		}
+	}
+	for _, rwp := range remote.WinrmProfiles {
+		if _, exists := localWinrm[rwp.ID]; !exists {
+			merged.WinrmProfiles = append(merged.WinrmProfiles, rwp)
+			report.AutoMerged++
+		}
+	}
+
 	return ensureNonNilSlices(merged), report
 }
 
@@ -969,6 +1004,39 @@ func ResolveVaultConflicts(local, remote core.VaultPayload, resolutions map[stri
 		}
 	}
 	resolved.Listeners = finalListeners
+
+	// 11. WinrmProfiles (F-41 WinRM / PowerShell Remoting)
+	remoteWinrm := make(map[string]core.WinrmProfile, len(remote.WinrmProfiles))
+	for _, wp := range remote.WinrmProfiles {
+		remoteWinrm[wp.ID] = wp
+	}
+	var finalWinrm []core.WinrmProfile
+	for _, wp := range resolved.WinrmProfiles {
+		res, hasRes := resolutions[wp.ID]
+		if !hasRes {
+			finalWinrm = append(finalWinrm, wp)
+			continue
+		}
+		switch res {
+		case core.ResolutionKeepRemote:
+			if rwp, ok := remoteWinrm[wp.ID]; ok {
+				finalWinrm = append(finalWinrm, rwp)
+			} else {
+				finalWinrm = append(finalWinrm, wp)
+			}
+		case core.ResolutionKeepBoth:
+			finalWinrm = append(finalWinrm, wp)
+			if rwp, ok := remoteWinrm[wp.ID]; ok {
+				cloned := rwp
+				cloned.ID = fmt.Sprintf("%s-synced", rwp.ID)
+				cloned.Name = fmt.Sprintf("%s (Synced)", rwp.Name)
+				finalWinrm = append(finalWinrm, cloned)
+			}
+		default:
+			finalWinrm = append(finalWinrm, wp)
+		}
+	}
+	resolved.WinrmProfiles = finalWinrm
 
 	return ensureNonNilSlices(resolved)
 }

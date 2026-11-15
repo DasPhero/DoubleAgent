@@ -654,6 +654,54 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class WinrmProfile {
+	    id: string;
+	    engagementId?: string;
+	    hostId?: string;
+	    name: string;
+	    host: string;
+	    port: number;
+	    useTls: boolean;
+	    insecureSkipVerify?: boolean;
+	    authType: string;
+	    domain?: string;
+	    username?: string;
+	    password?: string;
+	    ntHash?: string;
+	    identityId?: string;
+	    credentialId?: string;
+	    socksProxyAddr?: string;
+	    timeoutSec?: number;
+	    notes?: string;
+	    createdAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WinrmProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.engagementId = source["engagementId"];
+	        this.hostId = source["hostId"];
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.useTls = source["useTls"];
+	        this.insecureSkipVerify = source["insecureSkipVerify"];
+	        this.authType = source["authType"];
+	        this.domain = source["domain"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.ntHash = source["ntHash"];
+	        this.identityId = source["identityId"];
+	        this.credentialId = source["credentialId"];
+	        this.socksProxyAddr = source["socksProxyAddr"];
+	        this.timeoutSec = source["timeoutSec"];
+	        this.notes = source["notes"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class NetworkRoute {
 	    id: string;
 	    engagementId?: string;
@@ -817,6 +865,7 @@ export namespace core {
 	    forwardRules?: ForwardRule[];
 	    proxyProfiles?: ProxyProfile[];
 	    networkRoutes?: NetworkRoute[];
+	    winrmProfiles?: WinrmProfile[];
 	    credentials?: CredentialEntry[];
 	    evidence?: EvidenceItem[];
 	    findings?: FindingItem[];
@@ -841,6 +890,7 @@ export namespace core {
 	        this.forwardRules = this.convertValues(source["forwardRules"], ForwardRule);
 	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfile);
 	        this.networkRoutes = this.convertValues(source["networkRoutes"], NetworkRoute);
+	        this.winrmProfiles = this.convertValues(source["winrmProfiles"], WinrmProfile);
 	        this.credentials = this.convertValues(source["credentials"], CredentialEntry);
 	        this.evidence = this.convertValues(source["evidence"], EvidenceItem);
 	        this.findings = this.convertValues(source["findings"], FindingItem);
@@ -3272,6 +3322,54 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class WinrmProfileSummary {
+	    id: string;
+	    engagementId?: string;
+	    hostId?: string;
+	    name: string;
+	    host: string;
+	    port: number;
+	    useTls: boolean;
+	    insecureSkipVerify?: boolean;
+	    authType: string;
+	    domain?: string;
+	    username?: string;
+	    hasPassword: boolean;
+	    hasNtHash: boolean;
+	    identityId?: string;
+	    credentialId?: string;
+	    socksProxyAddr?: string;
+	    timeoutSec?: number;
+	    notes?: string;
+	    createdAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WinrmProfileSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.engagementId = source["engagementId"];
+	        this.hostId = source["hostId"];
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.useTls = source["useTls"];
+	        this.insecureSkipVerify = source["insecureSkipVerify"];
+	        this.authType = source["authType"];
+	        this.domain = source["domain"];
+	        this.username = source["username"];
+	        this.hasPassword = source["hasPassword"];
+	        this.hasNtHash = source["hasNtHash"];
+	        this.identityId = source["identityId"];
+	        this.credentialId = source["credentialId"];
+	        this.socksProxyAddr = source["socksProxyAddr"];
+	        this.timeoutSec = source["timeoutSec"];
+	        this.notes = source["notes"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class VaultSummary {
 	    groups: GroupRecord[];
 	    hosts: HostSummary[];
@@ -3283,6 +3381,7 @@ export namespace core {
 	    totpRecords: TotpSummary[];
 	    notes: NotePageSummary[];
 	    listeners: ListenerProfile[];
+	    winrmProfiles: WinrmProfileSummary[];
 	
 	    static createFrom(source: any = {}) {
 	        return new VaultSummary(source);
@@ -3300,6 +3399,7 @@ export namespace core {
 	        this.totpRecords = this.convertValues(source["totpRecords"], TotpSummary);
 	        this.notes = this.convertValues(source["notes"], NotePageSummary);
 	        this.listeners = this.convertValues(source["listeners"], ListenerProfile);
+	        this.winrmProfiles = this.convertValues(source["winrmProfiles"], WinrmProfileSummary);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3342,6 +3442,164 @@ export namespace core {
 	        this.syncConflictFiles = source["syncConflictFiles"];
 	        this.detectedConflict = source["detectedConflict"];
 	        this.conflictCount = source["conflictCount"];
+	    }
+	}
+	export class WinrmConnectRequest {
+	    profileId?: string;
+	    hostId?: string;
+	    engagementId?: string;
+	    name?: string;
+	    host: string;
+	    port?: number;
+	    useTls: boolean;
+	    insecureSkipVerify?: boolean;
+	    authType: string;
+	    domain?: string;
+	    username?: string;
+	    password?: string;
+	    ntHash?: string;
+	    identityId?: string;
+	    credentialId?: string;
+	    socksProxyAddr?: string;
+	    timeoutSec?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WinrmConnectRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.profileId = source["profileId"];
+	        this.hostId = source["hostId"];
+	        this.engagementId = source["engagementId"];
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.useTls = source["useTls"];
+	        this.insecureSkipVerify = source["insecureSkipVerify"];
+	        this.authType = source["authType"];
+	        this.domain = source["domain"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.ntHash = source["ntHash"];
+	        this.identityId = source["identityId"];
+	        this.credentialId = source["credentialId"];
+	        this.socksProxyAddr = source["socksProxyAddr"];
+	        this.timeoutSec = source["timeoutSec"];
+	    }
+	}
+	export class WinrmExecResult {
+	    sessionId: string;
+	    shellId?: string;
+	    command: string;
+	    stdout: string;
+	    stderr: string;
+	    exitCode: number;
+	    durationMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WinrmExecResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.shellId = source["shellId"];
+	        this.command = source["command"];
+	        this.stdout = source["stdout"];
+	        this.stderr = source["stderr"];
+	        this.exitCode = source["exitCode"];
+	        this.durationMs = source["durationMs"];
+	    }
+	}
+	
+	
+	export class WinrmSessionInfo {
+	    sessionId: string;
+	    profileId?: string;
+	    hostId?: string;
+	    name: string;
+	    host: string;
+	    port: number;
+	    useTls: boolean;
+	    authType: string;
+	    domain?: string;
+	    username: string;
+	    shellId?: string;
+	    currentDir?: string;
+	    status: string;
+	    backendMode: string;
+	    socksProxy?: string;
+	    opsecWarnings?: string[];
+	    connectedAt: string;
+	    commandCount: number;
+	    errorMsg?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WinrmSessionInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.profileId = source["profileId"];
+	        this.hostId = source["hostId"];
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.useTls = source["useTls"];
+	        this.authType = source["authType"];
+	        this.domain = source["domain"];
+	        this.username = source["username"];
+	        this.shellId = source["shellId"];
+	        this.currentDir = source["currentDir"];
+	        this.status = source["status"];
+	        this.backendMode = source["backendMode"];
+	        this.socksProxy = source["socksProxy"];
+	        this.opsecWarnings = source["opsecWarnings"];
+	        this.connectedAt = source["connectedAt"];
+	        this.commandCount = source["commandCount"];
+	        this.errorMsg = source["errorMsg"];
+	    }
+	}
+	export class WinrmToolStatus {
+	    tool: string;
+	    found: boolean;
+	    path?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WinrmToolStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tool = source["tool"];
+	        this.found = source["found"];
+	        this.path = source["path"];
+	    }
+	}
+	export class WinrmTransferResult {
+	    sessionId: string;
+	    direction: string;
+	    localPath: string;
+	    remotePath: string;
+	    bytes: number;
+	    sha256?: string;
+	    durationMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WinrmTransferResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.direction = source["direction"];
+	        this.localPath = source["localPath"];
+	        this.remotePath = source["remotePath"];
+	        this.bytes = source["bytes"];
+	        this.sha256 = source["sha256"];
+	        this.durationMs = source["durationMs"];
 	    }
 	}
 	

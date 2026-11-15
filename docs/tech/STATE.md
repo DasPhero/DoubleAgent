@@ -1,10 +1,26 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-38` (OPSEC Route Health Check: On-Demand Passive & Throttled TCP/SOCKS5 Probes, Ligolo Session Inspection, Vault `LastCheck`/`Status` Persistence, & HUD Matrix UI) — COMPLETED!
-- **Next Milestone:** `F-41` (WinRM Client) / `M-PRESETS` / `M-THEMES`
+- **Current Milestone:** `F-41` (WinRM / PowerShell Remoting Client: Pure-Go WS-Management SOAP HTTP 5985 / HTTPS 5986, MS-NLMP NTLMv2 & Pass-the-Hash, Evil-WinRM Parity Interactive xterm.js REPL, Chunked Base64 + SHA-256 Transfer, & Encrypted Vault Profiles) — COMPLETED!
+- **Next Milestone:** `M-PRESETS` / `M-THEMES`
 - **Stage:** `2-flagship`
 
 ## What Works
+- **WinRM / PowerShell Remoting Client (`F-41` / Pentest Spec Line 38 & Core Spec Line 142)**:
+  - **Domain Models & Secret-Stripped Boundaries (`backend/core/winrm.go`, `backend/core/winrm_test.go`)**:
+    - Defines `WinrmProfile`, `WinrmProfileSummary` (`HasPassword`/`HasNtHash`, zero raw secrets exposed to WebView), `WinrmConnectRequest`, `WinrmSessionInfo`, `WinrmExecResult`, `WinrmTransferResult`, and `WinrmToolStatus`.
+    - `NormalizeWinrmAuthType`, `ParseNtHashHex` (accepts 32-hex NT or `LM:NT`), `ValidateWinrmProfile`, `EncodePowerShellUTF16Base64`, `AnalyzeWinrmOpsec`, and `BuildEvilWinrmCLI` (masks `<NT_HASH>` / `<PASSWORD>`).
+    - Keeps all crypto/network transport out of `backend/core` (`TestM0_0_CoreBoundaryNoForbiddenImports` clean).
+  - **Pure-Go NTLMv2 + PtH & WS-Management Client (`backend/winrm/ntlm.go`, `backend/winrm/wsman.go`, `backend/winrm/session.go`, `backend/winrm/winrm_test.go`)**:
+    - Zero new external dependencies (`go.mod` unchanged): implements MS-NLMP Type 1/2/3 NTLMv2 + raw 16-byte NT hash Pass-the-Hash (`golang.org/x/crypto/md4` + Go stdlib HMAC-MD5), Basic auth, Negotiate fallback, HTTPS 5986 TLS (`InsecureSkipVerify`), optional RFC 1928 SOCKS5 proxy dialing (`dialViaSocks5`), WS-Man SOAP Shell `Create`/`Command`/`Receive`/`Signal`/`Delete` + PowerShell `-EncodedCommand` + CLIXML noise cleanup (`cleanCLIXML`).
+    - Chunked Base64 PowerShell bidirectional `UploadFile` / `DownloadFile` with SHA-256 verification.
+    - `Manager` + `ManagedSession` provides an interactive `*Evil-WinRM* PS C:\>` REPL (`Reader()` + `Write([]byte)`) with built-in parity commands (`help`/`menu`, `upload`, `download`, `services`, `netuser`, `sysinfo`, `Bypass-4MSI`, `Set-Location` CWD tracking, `clear`, `exit`) wired directly into `xterm.js` tabs.
+    - Verified in-memory via `net.Pipe()` SOAP/NTLMv2 test harness inside sandbox (`backend/winrm/winrm_test.go` & `TestApp_WinrmClient_F41`).
+  - **Encrypted Vault & Engagement Packaging (`backend/core/interfaces.go`, `backend/core/hosts.go`, `backend/core/pentest.go`, `backend/vault/pentest.go`, `backend/vault/merge.go`)**:
+    - Persists `WinrmProfiles` in encrypted Vault + `.daeng` export/import + `VaultSummary.WinrmProfiles` (`WinrmProfileSummary`) + 3-way sync merge conflict handling (`TestWinrmProfiles_VaultStore_F41`).
+  - **Wails Bindings & HUD UI (`app.go`, `frontend/src/types/winrm.ts`, `frontend/src/components/WinrmManagerModal.tsx`, `WinrmManagerModal.test.tsx`, `frontend/src/App.tsx`)**:
+    - Bound methods: `ListWinrmProfileSummaries`, `SaveWinrmProfile`, `DeleteWinrmProfile`, `DetectWinrmTools`, `BuildWinrmCLICommand`, `ConnectWinrmSession`, `ListActiveWinrmSessions`, `ExecuteWinrmCommand`, `UploadWinrmFile`, and `DownloadWinrmFile`.
+    - `App.resolveWinrmConnectProfile` resolves saved Vault Profile secrets, `IdentityID`, `CredentialID`, and `HostID` strictly in Go memory and registers secrets for session-log masking (`RegisterSensitiveValue`).
+    - Wired into `Terminals ▾ > Hardware, Tunnels & Direct Links`, `Recon & Exploit ▾ > Phase 3 // Execution & Post-Exploit`, and Command Palette (`Ctrl+K`).
 - **OPSEC Route Health Check (`F-38` / Pentest Spec Line 34, 57, 72)**:
   - **Backend Domain Logic & OPSEC Guardrails (`backend/core/route_health.go`, `backend/core/route_health_test.go`)**:
     - Defines `RouteCheckRequest`, `ProbeTargetResult`, `RouteHealthEntry`, and `RouteHealthReport`.

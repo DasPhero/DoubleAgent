@@ -29,6 +29,7 @@ import (
 	"doubleagent/backend/ssh"
 	"doubleagent/backend/transfer"
 	"doubleagent/backend/vault"
+	"doubleagent/backend/winrm"
 )
 
 // EventEmitter abstracts Wails runtime event emission so App can be unit-tested without a live WebView.
@@ -67,6 +68,8 @@ type App struct {
 	managedListeners            map[string]*managedListenerInstance
 	fileServers                 map[string]*transfer.ManagedServer
 	pivotMgr                    *pivot.Manager
+	winrmMgr                    *winrm.Manager
+	winrmSessions               map[string]*winrm.ManagedSession
 }
 
 type managedListenerInstance struct {
@@ -192,6 +195,7 @@ func NewAppWithDependencies(
 		remoteEditMgr:    core.NewRemoteEditManager(""),
 		managedListeners: make(map[string]*managedListenerInstance),
 		fileServers:      make(map[string]*transfer.ManagedServer),
+		winrmSessions:    make(map[string]*winrm.ManagedSession),
 	}
 
 	if vaultStore == nil {
@@ -208,6 +212,9 @@ func NewAppWithDependencies(
 	app.workspaceStore = data.NewWorkspaceStore(defaultWorkspacePath())
 	app.pivotMgr = pivot.NewManager(func(info core.PivotInstanceInfo) {
 		app.emit(app.ctx, "pivot:updated", info)
+	})
+	app.winrmMgr = winrm.NewManager(func(info core.WinrmSessionInfo) {
+		app.emit(app.ctx, "winrm:updated", info)
 	})
 	return app
 }
@@ -240,6 +247,9 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 	if a.pivotMgr != nil {
 		a.pivotMgr.StopAll()
+	}
+	if a.winrmMgr != nil {
+		a.winrmMgr.CloseAll()
 	}
 	if a.remoteEditMgr != nil {
 		a.remoteEditMgr.CloseAll()
@@ -1635,6 +1645,7 @@ func (a *App) WriteTerminal(sessionID string, data string) error {
 	locSess, isLocal := a.localSessions[sessionID]
 	serPort, isSerial := a.serialSessions[sessionID]
 	rawSess, isRawTcp := a.rawTcpSessions[sessionID]
+	winrmSess, isWinrm := a.winrmSessions[sessionID]
 	streams, isSSH := a.activeStreams[sessionID]
 	a.mu.Unlock()
 
@@ -1648,6 +1659,10 @@ func (a *App) WriteTerminal(sessionID string, data string) error {
 	}
 	if isRawTcp && rawSess != nil {
 		_, err := rawSess.Write([]byte(data))
+		return err
+	}
+	if isWinrm && winrmSess != nil {
+		_, err := winrmSess.Write([]byte(data))
 		return err
 	}
 	if isSSH && streams != nil && streams.Stdin != nil {
@@ -1679,12 +1694,13 @@ func (a *App) ResizeTerminal(sessionID string, cols uint16, rows uint16) error {
 	locSess, isLocal := a.localSessions[sessionID]
 	_, isSerial := a.serialSessions[sessionID]
 	_, isRawTcp := a.rawTcpSessions[sessionID]
+	_, isWinrm := a.winrmSessions[sessionID]
 	a.mu.Unlock()
 
 	if isLocal && locSess != nil {
 		return locSess.Resize(core.TerminalSize{Cols: cols, Rows: rows})
 	}
-	if isSerial || isRawTcp {
+	if isSerial || isRawTcp || isWinrm {
 		return nil
 	}
 	return a.transport.ResizeShell(a.ctx, sessionID, core.TerminalSize{
@@ -1739,6 +1755,8 @@ func (a *App) DisconnectSession(sessionID string) error {
 	delete(a.serialSessions, sessionID)
 	rawSess, isRawTcp := a.rawTcpSessions[sessionID]
 	delete(a.rawTcpSessions, sessionID)
+	winrmSess, isWinrm := a.winrmSessions[sessionID]
+	delete(a.winrmSessions, sessionID)
 	delete(a.activeStreams, sessionID)
 	delete(a.sessionHostID, sessionID)
 	delete(a.sessionPasswords, sessionID)
@@ -1773,10 +1791,16 @@ func (a *App) DisconnectSession(sessionID string) error {
 	if isRawTcp && rawSess != nil {
 		return rawSess.Close()
 	}
+	if isWinrm && winrmSess != nil {
+		if a.winrmMgr != nil {
+			return a.winrmMgr.Close(sessionID)
+		}
+		return winrmSess.Close()
+	}
 	return a.transport.Disconnect(a.ctx, sessionID)
 }
 
-// CheckSessionAlive reports whether an SSH shell, local shell, serial, or raw TCP session is active.
+// CheckSessionAlive reports whether an SSH shell, local shell, serial, raw TCP, or WinRM session is active.
 func (a *App) CheckSessionAlive(sessionID string) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -1792,14 +1816,17 @@ func (a *App) CheckSessionAlive(sessionID string) bool {
 	if _, ok := a.rawTcpSessions[sessionID]; ok {
 		return true
 	}
+	if _, ok := a.winrmSessions[sessionID]; ok {
+		return true
+	}
 	return false
 }
 
-// GetLiveSessionIDs returns all currently active session IDs across SSH, local, serial, and raw TCP connections.
+// GetLiveSessionIDs returns all currently active session IDs across SSH, local, serial, raw TCP, and WinRM connections.
 func (a *App) GetLiveSessionIDs() []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	ids := make([]string, 0, len(a.activeStreams)+len(a.localSessions)+len(a.serialSessions)+len(a.rawTcpSessions))
+	ids := make([]string, 0, len(a.activeStreams)+len(a.localSessions)+len(a.serialSessions)+len(a.rawTcpSessions)+len(a.winrmSessions))
 	for id := range a.activeStreams {
 		ids = append(ids, id)
 	}
@@ -1810,6 +1837,9 @@ func (a *App) GetLiveSessionIDs() []string {
 		ids = append(ids, id)
 	}
 	for id := range a.rawTcpSessions {
+		ids = append(ids, id)
+	}
+	for id := range a.winrmSessions {
 		ids = append(ids, id)
 	}
 	return ids
@@ -1844,6 +1874,7 @@ func (a *App) streamReaderLoop(sessionID string, r io.Reader, emitExitOnEOF bool
 				delete(a.localSessions, sessionID)
 				delete(a.serialSessions, sessionID)
 				delete(a.rawTcpSessions, sessionID)
+				delete(a.winrmSessions, sessionID)
 				delete(a.sessionHostID, sessionID)
 				delete(a.sessionPasswords, sessionID)
 				delete(a.sessionRequests, sessionID)
@@ -5571,6 +5602,299 @@ func (a *App) RunRouteHealthCheck(req core.RouteCheckRequest) (*core.RouteHealth
 	a.emit(a.ctx, "route-health:updated", report)
 	return report, nil
 }
+
+// --- WinRM / PowerShell Remoting Client (Pentest Module F-41) ---
+
+// ListWinrmProfileSummaries returns all saved WinRM profiles without secret fields (F-41, Golden Rule 2).
+func (a *App) ListWinrmProfileSummaries() ([]core.WinrmProfileSummary, error) {
+	a.vaultStore.Touch()
+	if st, ok := a.vaultStore.(*vault.Store); ok && st != nil {
+		return st.ListWinrmProfileSummaries()
+	}
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	res := make([]core.WinrmProfileSummary, 0, len(payload.WinrmProfiles))
+	for _, wp := range payload.WinrmProfiles {
+		res = append(res, wp.ToSummary())
+	}
+	return res, nil
+}
+
+// SaveWinrmProfile persists a WinRM connection profile inside the encrypted vault (F-41).
+func (a *App) SaveWinrmProfile(profile core.WinrmProfile) error {
+	a.vaultStore.Touch()
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok || st == nil {
+		return errors.New("vault store does not support WinRM profile storage")
+	}
+	if err := st.SaveWinrmProfile(profile); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DeleteWinrmProfile removes a saved WinRM profile by ID from the encrypted vault (F-41).
+func (a *App) DeleteWinrmProfile(id string) error {
+	a.vaultStore.Touch()
+	st, ok := a.vaultStore.(*vault.Store)
+	if !ok || st == nil {
+		return errors.New("vault store does not support WinRM profile deletion")
+	}
+	if err := st.DeleteWinrmProfile(id); err != nil {
+		return err
+	}
+	a.emit(a.ctx, "vault:updated", true)
+	return nil
+}
+
+// DetectWinrmTools checks PATH for external WinRM helpers (evil-winrm, pwsh) as optional fallback info (F-41).
+func (a *App) DetectWinrmTools() []core.WinrmToolStatus {
+	return winrm.DetectTools()
+}
+
+// BuildWinrmCLICommand builds a masked Evil-WinRM CLI command preview for operator documentation/copy (F-41).
+func (a *App) BuildWinrmCLICommand(profile core.WinrmProfile) string {
+	return core.BuildEvilWinrmCLI(profile)
+}
+
+func (a *App) resolveWinrmConnectProfile(req core.WinrmConnectRequest) (core.WinrmProfile, error) {
+	prof := core.WinrmProfile{
+		ID:                 strings.TrimSpace(req.ProfileID),
+		EngagementID:       strings.TrimSpace(req.EngagementID),
+		HostID:             strings.TrimSpace(req.HostID),
+		Name:               strings.TrimSpace(req.Name),
+		Host:               strings.TrimSpace(req.Host),
+		Port:               req.Port,
+		UseTLS:             req.UseTLS,
+		InsecureSkipVerify: req.InsecureSkipVerify,
+		AuthType:           core.NormalizeWinrmAuthType(req.AuthType),
+		Domain:             strings.TrimSpace(req.Domain),
+		Username:           strings.TrimSpace(req.Username),
+		Password:           req.Password,
+		NtHash:             strings.TrimSpace(req.NtHash),
+		IdentityID:         strings.TrimSpace(req.IdentityID),
+		CredentialID:       strings.TrimSpace(req.CredentialID),
+		SocksProxyAddr:     strings.TrimSpace(req.SocksProxyAddr),
+		TimeoutSec:         req.TimeoutSec,
+	}
+
+	if a.vaultStore != nil {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			if prof.ID != "" {
+				for _, saved := range payload.WinrmProfiles {
+					if saved.ID == prof.ID {
+						if prof.Host == "" {
+							prof.Host = saved.Host
+						}
+						if prof.Name == "" {
+							prof.Name = saved.Name
+						}
+						if prof.Port == 0 {
+							prof.Port = saved.Port
+							prof.UseTLS = saved.UseTLS
+							prof.InsecureSkipVerify = saved.InsecureSkipVerify
+						}
+						if prof.HostID == "" {
+							prof.HostID = saved.HostID
+						}
+						if prof.EngagementID == "" {
+							prof.EngagementID = saved.EngagementID
+						}
+						if strings.TrimSpace(req.AuthType) == "" {
+							prof.AuthType = saved.AuthType
+						}
+						if prof.Domain == "" {
+							prof.Domain = saved.Domain
+						}
+						if prof.Username == "" {
+							prof.Username = saved.Username
+						}
+						if prof.Password == "" {
+							prof.Password = saved.Password
+						}
+						if prof.NtHash == "" {
+							prof.NtHash = saved.NtHash
+						}
+						if prof.IdentityID == "" {
+							prof.IdentityID = saved.IdentityID
+						}
+						if prof.CredentialID == "" {
+							prof.CredentialID = saved.CredentialID
+						}
+						if prof.SocksProxyAddr == "" {
+							prof.SocksProxyAddr = saved.SocksProxyAddr
+						}
+						if prof.TimeoutSec == 0 {
+							prof.TimeoutSec = saved.TimeoutSec
+						}
+						break
+					}
+				}
+			}
+			if prof.Host == "" && prof.HostID != "" {
+				for _, h := range payload.Hosts {
+					if h.ID == prof.HostID {
+						prof.Host = h.Address
+						if prof.Name == "" {
+							prof.Name = h.Label
+						}
+						break
+					}
+				}
+			}
+			if prof.IdentityID != "" {
+				for _, idRec := range payload.Identities {
+					if idRec.ID == prof.IdentityID {
+						if prof.Username == "" {
+							prof.Username = idRec.Username
+						}
+						if prof.Password == "" {
+							prof.Password = idRec.Password
+						}
+						break
+					}
+				}
+			}
+			if prof.CredentialID != "" {
+				for _, cred := range payload.Credentials {
+					if cred.ID == prof.CredentialID {
+						if prof.Domain == "" && cred.Realm != "" {
+							prof.Domain = cred.Realm
+						}
+						if prof.Username == "" && cred.Username != "" {
+							prof.Username = cred.Username
+						}
+						if cred.Category == core.CredCategoryHash || prof.AuthType == core.WinrmAuthPtH {
+							if prof.NtHash == "" {
+								prof.NtHash = cred.Secret
+							}
+						} else if prof.Password == "" {
+							prof.Password = cred.Secret
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	prof = core.NormalizeWinrmProfile(prof)
+	if prof.Name == "" && prof.Host != "" {
+		prof.Name = fmt.Sprintf("WinRM %s", prof.Host)
+	}
+	return prof, core.ValidateWinrmProfile(prof)
+}
+
+func (a *App) connectWinrmWithConfig(req core.WinrmConnectRequest, clientCfg winrm.ClientConfig) (*core.WinrmSessionInfo, error) {
+	a.vaultStore.Touch()
+	if a.winrmMgr == nil {
+		return nil, errors.New("winrm manager not initialized")
+	}
+
+	prof, err := a.resolveWinrmConnectProfile(req)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	sess, err := a.winrmMgr.Open(ctx, prof, clientCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	info := sess.Info()
+	a.mu.Lock()
+	a.winrmSessions[sess.ID()] = sess
+	if prof.HostID != "" {
+		a.sessionHostID[sess.ID()] = prof.HostID
+	}
+	a.mu.Unlock()
+
+	if a.logMgr != nil {
+		_, _ = a.logMgr.StartSession(sess.ID(), prof.HostID, prof.Name)
+		if prof.Password != "" {
+			a.logMgr.RegisterSensitiveValue(sess.ID(), prof.Password)
+		}
+		if prof.NtHash != "" {
+			a.logMgr.RegisterSensitiveValue(sess.ID(), prof.NtHash)
+		}
+	}
+
+	go a.streamReaderLoop(sess.ID(), sess.Reader(), true)
+	return &info, nil
+}
+
+// ConnectWinrmSession establishes an interactive pure-Go WS-Management WinRM session and attaches it to an xterm.js tab (F-41).
+func (a *App) ConnectWinrmSession(req core.WinrmConnectRequest) (*core.WinrmSessionInfo, error) {
+	return a.connectWinrmWithConfig(req, winrm.ClientConfig{})
+}
+
+// ListActiveWinrmSessions returns metadata for all open WinRM / PowerShell Remoting sessions (F-41).
+func (a *App) ListActiveWinrmSessions() []core.WinrmSessionInfo {
+	if a.winrmMgr == nil {
+		return []core.WinrmSessionInfo{}
+	}
+	return a.winrmMgr.List()
+}
+
+// ExecuteWinrmCommand executes a PowerShell script or command directly over an active WinRM session and returns structured output (F-41).
+func (a *App) ExecuteWinrmCommand(sessionID string, script string) (*core.WinrmExecResult, error) {
+	a.vaultStore.Touch()
+	if a.winrmMgr == nil {
+		return nil, errors.New("winrm manager not initialized")
+	}
+	sess, ok := a.winrmMgr.Get(sessionID)
+	if !ok {
+		return nil, core.ErrSessionNotFound
+	}
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return sess.Execute(ctx, script)
+}
+
+// UploadWinrmFile uploads a local file over an active WinRM session via chunked Base64 + SHA-256 verification (F-41).
+func (a *App) UploadWinrmFile(sessionID string, localPath string, remotePath string) (*core.WinrmTransferResult, error) {
+	a.vaultStore.Touch()
+	if a.winrmMgr == nil {
+		return nil, errors.New("winrm manager not initialized")
+	}
+	sess, ok := a.winrmMgr.Get(sessionID)
+	if !ok {
+		return nil, core.ErrSessionNotFound
+	}
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return sess.Upload(ctx, localPath, remotePath)
+}
+
+// DownloadWinrmFile downloads a remote file over an active WinRM session via Base64 streaming + SHA-256 verification (F-41).
+func (a *App) DownloadWinrmFile(sessionID string, remotePath string, localPath string) (*core.WinrmTransferResult, error) {
+	a.vaultStore.Touch()
+	if a.winrmMgr == nil {
+		return nil, errors.New("winrm manager not initialized")
+	}
+	sess, ok := a.winrmMgr.Get(sessionID)
+	if !ok {
+		return nil, core.ErrSessionNotFound
+	}
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return sess.Download(ctx, remotePath, localPath)
+}
+
 
 
 

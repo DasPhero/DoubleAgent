@@ -27,7 +27,13 @@ Highlighting text in any terminal session displays four quick-save targets:
 - `📝 Save to Notes (Recon)... [RECON]`: Directly logs recon logs and port scan matrices into Host or Engagement Notes.
 - `🎯 Create Finding from Selection... [REPORT]`: Generates a structured Finding and attaches the highlighted excerpt as Evidence #1.
 
-## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-24`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-38`, `F-39`, & `F-40`)
+## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-24`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-38`, `F-39`, `F-40`, & `F-41`)
+
+- **WinRM / PowerShell Remoting Client (`F-41`)**:
+  - Launch via **Terminals ▾ $\to$ WinRM / PowerShell Remoting (`F-41`)**, **Recon & Exploit ▾ $\to$ Phase 3 // Execution & Post-Exploit**, or the **Command Palette (`Ctrl+K`)**.
+  - Connects directly over **HTTP 5985** or **HTTPS 5986** (with optional self-signed certificate skip) using **NTLM**, **Pass-the-Hash (`32-hex` or `LM:NT`)**, **Kerberos**, or **Basic** authentication, optionally tunneled through any **SOCKS5** pivot/SSH `-D` proxy (`127.0.0.1:1080`).
+  - Save target profiles securely inside the encrypted Vault (binding either direct credentials or existing Vault Identities / Engagement Credentials—raw secrets stay strictly in the Go process).
+  - Opens an interactive `*Evil-WinRM* PS C:\>` terminal tab inside `xterm.js` with persistent working-directory tracking, built-in parity commands (`menu`, `help`, `upload`, `download`, `services`, `netuser`, `sysinfo`, `Bypass-4MSI`, `clear`, `exit`), structured ad-hoc PowerShell execution, and chunked Base64 bidirectional file transfers verified with **SHA-256** checksums.
 
 - **Pentest-Phase Top Navigation & Two-Section Activity Bar (`OPS` vs. `HOST`)**:
   - **Top Navigation Bar**:

@@ -13,6 +13,8 @@ export function BroadcastInput(arg1:Array<string>,arg2:string):Promise<void>;
 
 export function BuildPivotCommands(arg1:core.NetworkRoute,arg2:string):Promise<core.PivotCommandSet>;
 
+export function BuildWinrmCLICommand(arg1:core.WinrmProfile):Promise<string>;
+
 export function CancelTransfer(arg1:string):Promise<void>;
 
 export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;
@@ -34,6 +36,8 @@ export function ConnectSSH(arg1:core.ConnectRequest):Promise<string>;
 export function ConnectSavedHost(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
 export function ConnectSerial(arg1:core.SerialConfig):Promise<string>;
+
+export function ConnectWinrmSession(arg1:core.WinrmConnectRequest):Promise<core.WinrmSessionInfo>;
 
 export function CreateRemoteDir(arg1:string,arg2:string):Promise<void>;
 
@@ -75,9 +79,15 @@ export function DeleteSnippetChainFromFile(arg1:string):Promise<void>;
 
 export function DeleteTotpRecord(arg1:string):Promise<void>;
 
+export function DeleteWinrmProfile(arg1:string):Promise<void>;
+
 export function DetectPivotBinaries():Promise<Array<core.PivotBinaryStatus>>;
 
+export function DetectWinrmTools():Promise<Array<core.WinrmToolStatus>>;
+
 export function DisconnectSession(arg1:string):Promise<void>;
+
+export function DownloadWinrmFile(arg1:string,arg2:string,arg3:string):Promise<core.WinrmTransferResult>;
 
 export function DuplicateSession(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
@@ -88,6 +98,8 @@ export function ExecuteImport(arg1:core.ImportExecuteOptions):Promise<core.Impor
 export function ExecuteSnippet(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
 
 export function ExecuteSnippetChainStep(arg1:string,arg2:string,arg3:number,arg4:Record<string, string>):Promise<void>;
+
+export function ExecuteWinrmCommand(arg1:string,arg2:string):Promise<core.WinrmExecResult>;
 
 export function ExportEngagementFile(arg1:string,arg2:string,arg3:string):Promise<void>;
 
@@ -197,6 +209,8 @@ export function ListActivePivotInstances():Promise<Array<core.PivotInstanceInfo>
 
 export function ListActiveRemoteEdits():Promise<Array<core.RemoteEditSession>>;
 
+export function ListActiveWinrmSessions():Promise<Array<core.WinrmSessionInfo>>;
+
 export function ListCredentials(arg1:string,arg2:string):Promise<Array<core.CredentialEntry>>;
 
 export function ListEngagements():Promise<Array<core.Engagement>>;
@@ -238,6 +252,8 @@ export function ListSnippetChainsFromFile():Promise<Array<core.SnippetChain>>;
 export function ListSnippets():Promise<Array<core.Snippet>>;
 
 export function ListTotpRecords():Promise<Array<core.TotpSummary>>;
+
+export function ListWinrmProfileSummaries():Promise<Array<core.WinrmProfileSummary>>;
 
 export function LoadWorkspace():Promise<core.WorkspaceState>;
 
@@ -319,6 +335,8 @@ export function SaveSnippetChainToFile(arg1:core.SnippetChain):Promise<void>;
 
 export function SaveTotpRecord(arg1:core.TotpRecord):Promise<void>;
 
+export function SaveWinrmProfile(arg1:core.WinrmProfile):Promise<void>;
+
 export function SaveWorkspace(arg1:core.WorkspaceState):Promise<void>;
 
 export function ScanLocalPuTTYSessions():Promise<core.ImportScanResult>;
@@ -388,5 +406,7 @@ export function StopSessionLogging(arg1:string):Promise<core.SessionLogStatus>;
 export function UnlockVault(arg1:string):Promise<void>;
 
 export function UnlockVaultWithHello():Promise<void>;
+
+export function UploadWinrmFile(arg1:string,arg2:string,arg3:string):Promise<core.WinrmTransferResult>;
 
 export function WriteTerminal(arg1:string,arg2:string):Promise<void>;
