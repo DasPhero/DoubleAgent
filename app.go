@@ -25,6 +25,7 @@ import (
 	"doubleagent/backend/pivot"
 	"doubleagent/backend/pty"
 	"doubleagent/backend/rawtcp"
+	"doubleagent/backend/report"
 	"doubleagent/backend/serial"
 	"doubleagent/backend/ssh"
 	"doubleagent/backend/transfer"
@@ -5893,6 +5894,50 @@ func (a *App) DownloadWinrmFile(sessionID string, remotePath string, localPath s
 		ctx = context.Background()
 	}
 	return sess.Download(ctx, remotePath, localPath)
+}
+
+// GenerateEvidenceReport compiles an engagement/per-host Assessment & Evidence report (Markdown or HTML) with SHA-256 integrity digests (F-30).
+// When req.SplitByHost is true and req.OutputDir is provided, each host report + manifest.sha256 is written directly into OutputDir.
+func (a *App) GenerateEvidenceReport(req core.ReportExportRequest) (*core.ReportExportResult, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	return report.CompileAndExport(req, payload)
+}
+
+// ExportEvidenceReportToFile compiles the F-30 report and writes it deterministically to filePath with SHA-256 verification.
+func (a *App) ExportEvidenceReportToFile(req core.ReportExportRequest, filePath string) (*core.ReportExportResult, error) {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return nil, err
+	}
+	return report.ExportToFile(req, payload, filePath)
+}
+
+// SaveReportFileDialog opens a native Wails Save File dialog configured for Markdown or HTML reports (F-30).
+func (a *App) SaveReportFileDialog(defaultFilename string, format string) (string, error) {
+	if a.ctx == nil {
+		return "", errors.New("application context not initialized")
+	}
+	normalized := core.NormalizeReportFormat(format)
+	filters := []runtime.FileFilter{
+		{DisplayName: "Markdown Report (*.md)", Pattern: "*.md"},
+		{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+	}
+	if normalized == core.ReportFormatHTML {
+		filters = []runtime.FileFilter{
+			{DisplayName: "HTML Report (*.html;*.htm)", Pattern: "*.html;*.htm"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		}
+	}
+	return runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export Assessment Report",
+		DefaultFilename: strings.TrimSpace(defaultFilename),
+		Filters:         filters,
+	})
 }
 
 

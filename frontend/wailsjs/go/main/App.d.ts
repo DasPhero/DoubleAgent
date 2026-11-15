@@ -105,6 +105,8 @@ export function ExportEngagementFile(arg1:string,arg2:string,arg3:string):Promis
 
 export function ExportEngagementPackage(arg1:string,arg2:string):Promise<string>;
 
+export function ExportEvidenceReportToFile(arg1:core.ReportExportRequest,arg2:string):Promise<core.ReportExportResult>;
+
 export function ExportProxychainsConfig():Promise<string>;
 
 export function ExportSessionLog(arg1:string,arg2:string):Promise<void>;
@@ -112,6 +114,8 @@ export function ExportSessionLog(arg1:string,arg2:string):Promise<void>;
 export function ExportSprayList(arg1:core.SprayExportOptions):Promise<core.SprayExportResult>;
 
 export function ExportTotpTokens(arg1:string):Promise<string>;
+
+export function GenerateEvidenceReport(arg1:core.ReportExportRequest):Promise<core.ReportExportResult>;
 
 export function GenerateFileServerCommand(arg1:core.FileTransferServerConfig):Promise<string>;
 
@@ -326,6 +330,8 @@ export function SaveProxyProfile(arg1:core.ProxyProfile):Promise<void>;
 export function SaveProxychainsFile(arg1:string,arg2:string):Promise<void>;
 
 export function SaveRemoteEditContent(arg1:string,arg2:string,arg3:boolean):Promise<core.RemoteEditResult>;
+
+export function SaveReportFileDialog(arg1:string,arg2:string):Promise<string>;
 
 export function SaveSnippet(arg1:core.Snippet):Promise<void>;
 

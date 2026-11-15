@@ -29,6 +29,12 @@ Highlighting text in any terminal session displays four quick-save targets:
 
 ## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-24`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-38`, `F-39`, `F-40`, & `F-41`)
 
+- **Evidence-Vault Per-Host Markdown & HTML Reporting Export (`F-30`)**:
+  - Open **Engagement ▾ $\to$ Evidence Vault & Findings (`F-18`) $\to$ Assessment Report** tab.
+  - Compiles reproducible, byte-for-byte deterministic reports grouped **per target host** (`All Hosts` or scoped to a single host) across **Markdown (`.md`)** and print/PDF-ready **HTML5 (`.html`)** formats, complete with **SHA-256** integrity checksums per evidence artifact and per exported file.
+  - Toggle inclusion of **Open Ports**, **Standalone Evidence**, **Linked Killchain Notes**, and optionally **Internal-Only Vault Artifacts** (`inReport === false`, excluded by default).
+  - Preview rendered Markdown or sandboxed HTML5 live inside the modal, click **Export Report** for a single file, or click **Export 1 File Per Host** to write individual host report files plus a `manifest.sha256` into a chosen folder.
+
 - **WinRM / PowerShell Remoting Client (`F-41`)**:
   - Launch via **Terminals ▾ $\to$ WinRM / PowerShell Remoting (`F-41`)**, **Recon & Exploit ▾ $\to$ Phase 3 // Execution & Post-Exploit**, or the **Command Palette (`Ctrl+K`)**.
   - Connects directly over **HTTP 5985** or **HTTPS 5986** (with optional self-signed certificate skip) using **NTLM**, **Pass-the-Hash (`32-hex` or `LM:NT`)**, **Kerberos**, or **Basic** authentication, optionally tunneled through any **SOCKS5** pivot/SSH `-D` proxy (`127.0.0.1:1080`).

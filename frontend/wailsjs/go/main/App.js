@@ -206,6 +206,10 @@ export function ExportEngagementPackage(arg1, arg2) {
   return window['go']['main']['App']['ExportEngagementPackage'](arg1, arg2);
 }
 
+export function ExportEvidenceReportToFile(arg1, arg2) {
+  return window['go']['main']['App']['ExportEvidenceReportToFile'](arg1, arg2);
+}
+
 export function ExportProxychainsConfig() {
   return window['go']['main']['App']['ExportProxychainsConfig']();
 }
@@ -220,6 +224,10 @@ export function ExportSprayList(arg1) {
 
 export function ExportTotpTokens(arg1) {
   return window['go']['main']['App']['ExportTotpTokens'](arg1);
+}
+
+export function GenerateEvidenceReport(arg1) {
+  return window['go']['main']['App']['GenerateEvidenceReport'](arg1);
 }
 
 export function GenerateFileServerCommand(arg1) {
@@ -648,6 +656,10 @@ export function SaveProxychainsFile(arg1, arg2) {
 
 export function SaveRemoteEditContent(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveRemoteEditContent'](arg1, arg2, arg3);
+}
+
+export function SaveReportFileDialog(arg1, arg2) {
+  return window['go']['main']['App']['SaveReportFileDialog'](arg1, arg2);
 }
 
 export function SaveSnippet(arg1) {

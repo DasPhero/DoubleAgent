@@ -2491,6 +2491,103 @@ export namespace core {
 	        this.errorMessage = source["errorMessage"];
 	    }
 	}
+	export class ReportExportRequest {
+	    engagementId?: string;
+	    hostId?: string;
+	    format: string;
+	    splitByHost?: boolean;
+	    includeInternalEvidence?: boolean;
+	    includePortFindings: boolean;
+	    includeUnlinkedEvidence: boolean;
+	    includeLinkedNotes: boolean;
+	    outputDir?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReportExportRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.engagementId = source["engagementId"];
+	        this.hostId = source["hostId"];
+	        this.format = source["format"];
+	        this.splitByHost = source["splitByHost"];
+	        this.includeInternalEvidence = source["includeInternalEvidence"];
+	        this.includePortFindings = source["includePortFindings"];
+	        this.includeUnlinkedEvidence = source["includeUnlinkedEvidence"];
+	        this.includeLinkedNotes = source["includeLinkedNotes"];
+	        this.outputDir = source["outputDir"];
+	    }
+	}
+	export class ReportWrittenFile {
+	    hostId?: string;
+	    hostLabel: string;
+	    fileName: string;
+	    filePath: string;
+	    sha256: string;
+	    bytes: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReportWrittenFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hostId = source["hostId"];
+	        this.hostLabel = source["hostLabel"];
+	        this.fileName = source["fileName"];
+	        this.filePath = source["filePath"];
+	        this.sha256 = source["sha256"];
+	        this.bytes = source["bytes"];
+	    }
+	}
+	export class ReportExportResult {
+	    format: string;
+	    fileName: string;
+	    content: string;
+	    contentSha256: string;
+	    findingsCount: number;
+	    evidenceCount: number;
+	    hostCount: number;
+	    internalExcluded: number;
+	    writtenFiles?: ReportWrittenFile[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ReportExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = source["format"];
+	        this.fileName = source["fileName"];
+	        this.content = source["content"];
+	        this.contentSha256 = source["contentSha256"];
+	        this.findingsCount = source["findingsCount"];
+	        this.evidenceCount = source["evidenceCount"];
+	        this.hostCount = source["hostCount"];
+	        this.internalExcluded = source["internalExcluded"];
+	        this.writtenFiles = this.convertValues(source["writtenFiles"], ReportWrittenFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class RouteCheckRequest {
 	    routeIds?: string[];
 	    engagementId?: string;

@@ -1,10 +1,21 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-41` (WinRM / PowerShell Remoting Client: Pure-Go WS-Management SOAP HTTP 5985 / HTTPS 5986, MS-NLMP NTLMv2 & Pass-the-Hash, Evil-WinRM Parity Interactive xterm.js REPL, Chunked Base64 + SHA-256 Transfer, & Encrypted Vault Profiles) — COMPLETED!
+- **Current Milestone:** `F-30` (Evidence-Vault Reporting Export: Per-Host & Consolidated Reproducible Markdown / HTML5 Exporter with SHA-256 Checksums, Sandboxed Preview, & `SplitByHost` Batch Manifest) — COMPLETED!
 - **Next Milestone:** `M-PRESETS` / `M-THEMES`
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Evidence-Vault Reporting Export (`F-30` / Pentest Spec Line 37 & Line 74)**:
+  - **Deterministic Pure-Go Report Compiler (`backend/core/report.go`, `backend/core/report_test.go`)**:
+    - Defines `ReportExportRequest`, `CompiledReport`, `ReportHostSection`, `ReportFindingSection`, `ReportEvidenceArtifact`, `ReportWrittenFile`, and `ReportExportResult`.
+    - `BuildCompiledReport` deterministically groups Findings, attached & standalone `EvidenceItem`s (with `TableEvidenceContent` parsing), discovered `PortFinding`s, and linked `NotePage`s per target host (`HostID`) or `Engagement-Wide`, supports single-host filtering, excludes internal (`inReport == false`) evidence by default with explicit opt-in (`IncludeInternalEvidence`), and derives a deterministic UTC timestamp from included Vault records (`TestBuildCompiledReport_PerHostGroupingAndIntegrity_F30`).
+    - Keeps all `crypto/*` and I/O out of `backend/core` (`TestM0_0_CoreBoundaryNoForbiddenImports` clean).
+  - **Markdown & XSS-Safe HTML5 Exporter (`backend/report/exporter.go`, `backend/report/exporter_test.go`)**:
+    - `RenderMarkdown` and `RenderHTML` (Go `html/template` auto-escaping all untrusted titles/bodies/evidence with dark print/PDF-ready CSS) attach per-evidence `ContentSHA256` and overall `ContentSHA256` digests, UTC `CapturedAt`, and `Source` provenance.
+    - `CompileAndExport` and `ExportToFile` support single-file exports as well as `SplitByHost: true` batch directory exports writing one `<eng>-<host>.md`/`.html` per target host plus `manifest.sha256` with path-containment checks (`TestExporter_MarkdownAndHTMLPerHostReproducibility_F30`, `TestExporter_SplitByHostAndFileExport_F30`).
+  - **Wails Bindings & HUD Exporter (`app.go`, `app_test.go`, `frontend/src/types/pentest.ts`, `EvidenceVaultModal.tsx`, `EvidenceVaultModal.test.tsx`)**:
+    - Exported Wails methods: `GenerateEvidenceReport`, `ExportEvidenceReportToFile`, and `SaveReportFileDialog` (`TestApp_EvidenceReportingExport_F30`).
+    - Replaced `EvidenceVaultModal.tsx` Tab 3 (`Assessment Report`) with full host scope selector, `Markdown (.md)` / `HTML5 (.html)` format switcher, inclusion toggles (`Open Ports`, `Standalone Evidence`, `Linked Notes`, `Include Internal-Only`), SHA-256 integrity badge + copy button, `<iframe sandbox="" srcDoc={...} />` zero-script HTML preview, `Export Report` native save dialog, and `Export 1 File Per Host` batch folder workflow using strictly `<CyberIcon />` vectors.
 - **WinRM / PowerShell Remoting Client (`F-41` / Pentest Spec Line 38 & Core Spec Line 142)**:
   - **Domain Models & Secret-Stripped Boundaries (`backend/core/winrm.go`, `backend/core/winrm_test.go`)**:
     - Defines `WinrmProfile`, `WinrmProfileSummary` (`HasPassword`/`HasNtHash`, zero raw secrets exposed to WebView), `WinrmConnectRequest`, `WinrmSessionInfo`, `WinrmExecResult`, `WinrmTransferResult`, and `WinrmToolStatus`.

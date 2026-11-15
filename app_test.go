@@ -3049,6 +3049,155 @@ func TestApp_WinrmClient_F41(t *testing.T) {
 	}
 }
 
+func TestApp_EvidenceReportingExport_F30(t *testing.T) {
+	vaultFile := filepath.Join(t.TempDir(), "test.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: vaultFile})
+	if err := store.Initialize(context.Background(), "master"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	app.ctx = context.Background()
+
+	// Seed engagement, two hosts, findings, evidence (reported + internal), ports, and note
+	eng := core.Engagement{
+		ID:        "eng-f30",
+		Name:      "Operation Red Harbor",
+		Scope:     "10.50.0.0/16",
+		Timeframe: "2026-11",
+	}
+	if err := app.SaveEngagement(eng); err != nil {
+		t.Fatalf("SaveEngagement failed: %v", err)
+	}
+	h1 := core.HostRecord{ID: "h-1", Label: "DC01", Address: "10.50.1.10", Port: 22}
+	h2 := core.HostRecord{ID: "h-2", Label: "APP01", Address: "10.50.1.25", Port: 22}
+	if err := app.SaveHost(h1); err != nil {
+		t.Fatalf("SaveHost h1 failed: %v", err)
+	}
+	if err := app.SaveHost(h2); err != nil {
+		t.Fatalf("SaveHost h2 failed: %v", err)
+	}
+
+	ts := time.Date(2026, 11, 15, 18, 0, 0, 0, time.UTC)
+	if err := app.SaveFinding(core.FindingItem{
+		ID:           "find-1",
+		EngagementID: eng.ID,
+		HostID:       h1.ID,
+		Title:        "LDAP Signing Disabled",
+		Category:     "Active Directory",
+		Severity:     "high",
+		Status:       core.FindingStatusConfirmed,
+		CVSS:         "7.5",
+		Description:  "LDAP relay possible against DC01.",
+		EvidenceIDs:  []string{"ev-pub", "ev-priv"},
+		CreatedAt:    ts,
+		UpdatedAt:    ts,
+	}); err != nil {
+		t.Fatalf("SaveFinding failed: %v", err)
+	}
+	if err := app.SaveEvidence(core.EvidenceItem{
+		ID:           "ev-pub",
+		EngagementID: eng.ID,
+		FindingID:    "find-1",
+		HostID:       h1.ID,
+		Category:     "Active Directory",
+		Title:        "nxc ldap signing check",
+		Type:         core.EvidenceTypeText,
+		Content:      "Signing: False",
+		Source:       "netexec",
+		CapturedAt:   ts,
+		InReport:     true,
+	}); err != nil {
+		t.Fatalf("SaveEvidence ev-pub failed: %v", err)
+	}
+	if err := app.SaveEvidence(core.EvidenceItem{
+		ID:           "ev-priv",
+		EngagementID: eng.ID,
+		FindingID:    "find-1",
+		HostID:       h1.ID,
+		Category:     "Credentials",
+		Title:        "Internal Scratch Dump",
+		Type:         core.EvidenceTypeText,
+		Content:      "do-not-export",
+		Source:       "manual",
+		CapturedAt:   ts,
+		InReport:     false,
+	}); err != nil {
+		t.Fatalf("SaveEvidence ev-priv failed: %v", err)
+	}
+	if err := app.SaveEvidence(core.EvidenceItem{
+		ID:           "ev-app",
+		EngagementID: eng.ID,
+		HostID:       h2.ID,
+		Category:     "Web",
+		Title:        "Debug Route",
+		Type:         core.EvidenceTypeText,
+		Content:      "GET /debug -> 200 OK",
+		Source:       "curl",
+		CapturedAt:   ts,
+		InReport:     true,
+	}); err != nil {
+		t.Fatalf("SaveEvidence ev-app failed: %v", err)
+	}
+
+	// 1. Reproducible Markdown compile
+	md1, err := app.GenerateEvidenceReport(core.ReportExportRequest{
+		EngagementID:            eng.ID,
+		Format:                  core.ReportFormatMarkdown,
+		IncludePortFindings:     true,
+		IncludeUnlinkedEvidence: true,
+	})
+	if err != nil {
+		t.Fatalf("GenerateEvidenceReport markdown failed: %v", err)
+	}
+	md2, err := app.GenerateEvidenceReport(core.ReportExportRequest{
+		EngagementID:            eng.ID,
+		Format:                  core.ReportFormatMarkdown,
+		IncludePortFindings:     true,
+		IncludeUnlinkedEvidence: true,
+	})
+	if err != nil {
+		t.Fatalf("GenerateEvidenceReport markdown repeat failed: %v", err)
+	}
+	if md1.ContentSHA256 != md2.ContentSHA256 || md1.HostCount != 2 || md1.InternalExcluded != 1 {
+		t.Fatalf("unexpected reproducibility or counts: %+v vs %+v", md1.ContentSHA256, md2.ContentSHA256)
+	}
+
+	// 2. Single-host HTML ExportToFile
+	htmlOut := filepath.Join(t.TempDir(), "dc01.html")
+	resFile, err := app.ExportEvidenceReportToFile(core.ReportExportRequest{
+		EngagementID: eng.ID,
+		HostID:       h1.ID,
+		Format:       core.ReportFormatHTML,
+	}, htmlOut)
+	if err != nil {
+		t.Fatalf("ExportEvidenceReportToFile failed: %v", err)
+	}
+	rawHTML, err := os.ReadFile(htmlOut)
+	if err != nil {
+		t.Fatalf("read exported HTML file: %v", err)
+	}
+	if !strings.Contains(string(rawHTML), "LDAP Signing Disabled") || strings.Contains(string(rawHTML), "APP01") {
+		t.Fatalf("unexpected single-host HTML contents: %+v", resFile.FileName)
+	}
+
+	// 3. Batch SplitByHost export into directory
+	batchDir := t.TempDir()
+	batchRes, err := app.GenerateEvidenceReport(core.ReportExportRequest{
+		EngagementID:            eng.ID,
+		Format:                  core.ReportFormatMarkdown,
+		SplitByHost:             true,
+		IncludeUnlinkedEvidence: true,
+		OutputDir:               batchDir,
+	})
+	if err != nil {
+		t.Fatalf("batch SplitByHost export failed: %v", err)
+	}
+	if len(batchRes.WrittenFiles) != 3 {
+		t.Fatalf("expected 2 host files + manifest.sha256, got %d", len(batchRes.WrittenFiles))
+	}
+}
+
 
 
 

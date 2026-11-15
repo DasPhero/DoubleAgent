@@ -7,6 +7,9 @@ import {
   FindingItem,
   FindingStatus,
   TableEvidenceContent,
+  ReportFormat,
+  ReportExportRequest,
+  ReportExportResult,
 } from '../types/pentest';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { CyberIcon } from './CyberIcon';
@@ -110,6 +113,10 @@ interface WailsPentestEvidenceApi {
   SaveFinding?: (item: FindingItem) => Promise<void>;
   DeleteFinding?: (id: string) => Promise<void>;
   GetFindingTemplates?: () => Promise<FindingItem[]>;
+  GenerateEvidenceReport?: (req: ReportExportRequest) => Promise<ReportExportResult>;
+  ExportEvidenceReportToFile?: (req: ReportExportRequest, filePath: string) => Promise<ReportExportResult>;
+  SaveReportFileDialog?: (defaultFilename: string, format: string) => Promise<string>;
+  SelectDirectoryDialog?: (title: string) => Promise<string>;
 }
 
 function getEvidenceApi(): WailsPentestEvidenceApi | undefined {
@@ -176,6 +183,17 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
   const [findEditEvidenceIds, setFindEditEvidenceIds] = useState<string[]>([]);
   const [findEditTags, setFindEditTags] = useState('');
   const [selectedEvidenceToAttach, setSelectedEvidenceToAttach] = useState<string>('');
+
+  // Assessment Report Exporter State (Pentest F-30)
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('markdown');
+  const [reportHostScope, setReportHostScope] = useState<string>(activeHostId || 'all');
+  const [reportIncludePorts, setReportIncludePorts] = useState<boolean>(true);
+  const [reportIncludeUnlinked, setReportIncludeUnlinked] = useState<boolean>(true);
+  const [reportIncludeNotes, setReportIncludeNotes] = useState<boolean>(true);
+  const [reportIncludeInternal, setReportIncludeInternal] = useState<boolean>(false);
+  const [compiledReport, setCompiledReport] = useState<ReportExportResult | null>(null);
+  const [reportLoading, setReportLoading] = useState<boolean>(false);
+  const [reportPreviewView, setReportPreviewView] = useState<'rendered' | 'source'>('rendered');
 
   // Evidence Editor State
   const [isEditingEvidence, setIsEditingEvidence] = useState(false);
@@ -699,125 +717,265 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     setTableHeaders(updated);
   };
 
-  // Export report as Markdown — ONLY INCLUDE REPORTABLE EVIDENCES!
-  const handleExportMarkdownReport = () => {
+  const buildReportRequest = useCallback(
+    (splitByHost = false, outputDir = ''): ReportExportRequest => ({
+      engagementId: activeEngagement?.id || '',
+      hostId: splitByHost || reportHostScope === 'all' ? '' : reportHostScope,
+      format: reportFormat,
+      splitByHost,
+      includeInternalEvidence: reportIncludeInternal,
+      includePortFindings: reportIncludePorts,
+      includeUnlinkedEvidence: reportIncludeUnlinked,
+      includeLinkedNotes: reportIncludeNotes,
+      outputDir,
+    }),
+    [
+      activeEngagement?.id,
+      reportHostScope,
+      reportFormat,
+      reportIncludeInternal,
+      reportIncludePorts,
+      reportIncludeUnlinked,
+      reportIncludeNotes,
+    ]
+  );
+
+  // Client-side fallback compiler used only when running outside the Wails Go runtime (e.g. Vitest/browser).
+  const compileClientFallbackReport = useCallback((): ReportExportResult => {
+    const scopeFindings = findingsList
+      .filter((f) => reportHostScope === 'all' || f.hostId === reportHostScope || f.affectedHosts?.includes(reportHostScope))
+      .slice()
+      .sort((a, b) => a.title.localeCompare(b.title));
+
+    const groups = new Map<string, { label: string; findings: FindingItem[]; standalone: EvidenceItem[] }>();
+    const ensureGroup = (hId: string) => {
+      const key = hId || '__engagement_wide__';
+      let grp = groups.get(key);
+      if (!grp) {
+        const h = hId ? hostMap.get(hId) : undefined;
+        grp = {
+          label: h ? `${h.label} (${h.address})` : hId || 'Engagement-Wide',
+          findings: [],
+          standalone: [],
+        };
+        groups.set(key, grp);
+      }
+      return grp;
+    };
+
+    scopeFindings.forEach((f) => ensureGroup(f.hostId || '').findings.push(f));
+    if (reportIncludeUnlinked) {
+      evidenceList.forEach((ev) => {
+        if (!ev.findingId && (reportIncludeInternal || ev.inReport !== false)) {
+          if (reportHostScope === 'all' || ev.hostId === reportHostScope) {
+            ensureGroup(ev.hostId || '').standalone.push(ev);
+          }
+        }
+      });
+    }
+
     const lines: string[] = [];
-    lines.push(`# DoubleAgent — Pentest Assessment Report`);
-    lines.push(`**Generated:** ${new Date().toLocaleString()}`);
-    lines.push(`**Engagement:** ${activeEngagement?.name || 'Default Engagement'}`);
-    if (activeEngagement?.scope) {
-      lines.push(`**Scope:** ${activeEngagement.scope}`);
-    }
-    if (activeEngagement?.timeframe) {
-      lines.push(`**Timeframe:** ${activeEngagement.timeframe}`);
-    }
-    lines.push(``);
-    lines.push(`---`);
-    lines.push(``);
-    lines.push(`## 1. Executive Summary & Findings Overview`);
-    lines.push(``);
+    lines.push('# DoubleAgent — Assessment & Evidence Report');
+    lines.push('');
+    lines.push(`- **Engagement:** ${activeEngagement?.name || 'Default Engagement'}`);
+    if (activeEngagement?.scope) lines.push(`- **Scope:** ${activeEngagement.scope}`);
+    if (activeEngagement?.timeframe) lines.push(`- **Timeframe:** ${activeEngagement.timeframe}`);
+    lines.push('');
 
-    // Count by severity from Findings
-    const sevCount: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-    filteredFindings.forEach((f) => {
-      const s = (f.severity || 'info').toLowerCase();
-      sevCount[s] = (sevCount[s] || 0) + 1;
+    const sevLabel = ['critical', 'high', 'medium', 'low', 'info'];
+    lines.push('## 1. Executive Summary');
+    lines.push('');
+    lines.push('| Severity | Findings |');
+    lines.push('| :--- | ---: |');
+    sevLabel.forEach((sev) => {
+      const count = scopeFindings.filter((f) => (f.severity || 'info').toLowerCase() === sev).length;
+      lines.push(`| ${sev.toUpperCase()} | ${count} |`);
     });
+    lines.push(`| **Total** | **${scopeFindings.length}** |`);
+    lines.push('');
 
-    lines.push(`| Severity | Findings Count |`);
-    lines.push(`| :--- | :--- |`);
-    lines.push(`| 🔴 Critical | ${sevCount.critical} |`);
-    lines.push(`| 🟠 High | ${sevCount.high} |`);
-    lines.push(`| 🟡 Medium | ${sevCount.medium} |`);
-    lines.push(`| 🔵 Low | ${sevCount.low} |`);
-    lines.push(`| ℹ️ Informational | ${sevCount.info} |`);
-    lines.push(`| **Total Findings** | **${filteredFindings.length}** |`);
-    lines.push(``);
-    lines.push(`---`);
-    lines.push(``);
-    lines.push(`## 2. Detailed Vulnerabilities & Verified Evidence`);
-    lines.push(``);
+    const internalExcluded = reportIncludeInternal
+      ? 0
+      : evidenceList.filter((e) => e.inReport === false).length;
 
-    filteredFindings.forEach((finding, index) => {
-      const hostLabel = finding.hostId ? hostMap.get(finding.hostId)?.label || finding.hostId : 'Engagement-Wide';
-      lines.push(`### 2.${index + 1} [${finding.severity.toUpperCase()}] ${finding.title}`);
-      lines.push(``);
-      lines.push(`- **Category:** ${finding.category}`);
-      lines.push(`- **Status:** ${finding.status.toUpperCase()}`);
-      lines.push(`- **Target Host:** ${hostLabel}`);
-      if (finding.cve) lines.push(`- **CVE:** ${finding.cve}`);
-      if (finding.cvss) lines.push(`- **CVSS Score:** ${finding.cvss}${finding.cvssVector ? ` (${finding.cvssVector})` : ''}`);
-      if (finding.mitreAttack) lines.push(`- **MITRE ATT&CK:** ${finding.mitreAttack}`);
-      if (finding.tags && finding.tags.length > 0) lines.push(`- **Tags:** \`${finding.tags.join('`, `')}\``);
-      lines.push(``);
-
-      lines.push(`#### Description`);
-      lines.push(finding.description);
-      lines.push(``);
-
-      if (finding.impact) {
-        lines.push(`#### Impact`);
-        lines.push(finding.impact);
-        lines.push(``);
-      }
-
-      if (finding.remediation) {
-        lines.push(`#### Remediation`);
-        lines.push(finding.remediation);
-        lines.push(``);
-      }
-
-      // Supporting Evidence artifacts — ONLY include inReport === true
-      const attached = evidenceList.filter(
-        (ev) =>
-          (finding.evidenceIds?.includes(ev.id) || ev.findingId === finding.id) &&
-          ev.inReport !== false // Exclude internal only evidence!
-      );
-
-      if (attached.length > 0) {
-        lines.push(`#### Verified Proof Artifacts (${attached.length})`);
-        lines.push(``);
-        attached.forEach((ev, evIdx) => {
-          lines.push(`##### Evidence ${evIdx + 1}: ${ev.title}`);
+    let attachedCount = 0;
+    Array.from(groups.entries()).forEach(([, grp], hIdx) => {
+      lines.push(`## ${hIdx + 2}. Target Host: ${grp.label}`);
+      lines.push('');
+      grp.findings.forEach((f, fIdx) => {
+        lines.push(`### [${f.severity.toUpperCase()}] ${hIdx + 2}.${fIdx + 1} ${f.title}`);
+        lines.push(`- **Category:** ${f.category} | **Status:** ${f.status.toUpperCase()}`);
+        if (f.cvss) lines.push(`- **CVSS:** ${f.cvss}${f.cvssVector ? ` (${f.cvssVector})` : ''}`);
+        if (f.mitreAttack) lines.push(`- **MITRE ATT&CK:** ${f.mitreAttack}`);
+        lines.push('');
+        lines.push(f.description);
+        lines.push('');
+        const attached = evidenceList.filter(
+          (ev) =>
+            (f.evidenceIds?.includes(ev.id) || ev.findingId === f.id) &&
+            (reportIncludeInternal || ev.inReport !== false)
+        );
+        attachedCount += attached.length;
+        attached.forEach((ev, eIdx) => {
+          lines.push(`##### Evidence ${eIdx + 1}: ${ev.title}`);
           if (ev.source) lines.push(`- **Source:** ${ev.source}`);
-          lines.push(`- **Captured:** ${ev.capturedAt}`);
-          lines.push(``);
-
+          if (ev.capturedAt) lines.push(`- **Captured At (UTC):** ${ev.capturedAt}`);
+          lines.push('');
           if (ev.type === 'table') {
             try {
               const parsed = JSON.parse(ev.content) as TableEvidenceContent;
               if (parsed.headers && parsed.rows) {
                 lines.push(`| ${parsed.headers.join(' | ')} |`);
                 lines.push(`| ${parsed.headers.map(() => '---').join(' | ')} |`);
-                parsed.rows.forEach((row) => {
-                  lines.push(`| ${row.join(' | ')} |`);
-                });
-                lines.push(``);
+                parsed.rows.forEach((r) => lines.push(`| ${r.join(' | ')} |`));
+                lines.push('');
+                return;
               }
             } catch {
-              lines.push(`\`\`\`\n${ev.content}\n\`\`\`\n`);
+              // Fall through to code block
             }
-          } else {
-            lines.push(`\`\`\`text\n${ev.content}\n\`\`\``);
-            lines.push(``);
           }
+          lines.push('```text');
+          lines.push(ev.content);
+          lines.push('```');
+          lines.push('');
         });
-      }
-
-      lines.push(`---`);
-      lines.push(``);
+      });
+      grp.standalone.forEach((ev, sIdx) => {
+        attachedCount += 1;
+        lines.push(`#### Standalone Evidence ${sIdx + 1}: ${ev.title}`);
+        if (ev.source) lines.push(`- **Source:** ${ev.source}`);
+        if (ev.capturedAt) lines.push(`- **Captured At (UTC):** ${ev.capturedAt}`);
+        lines.push('');
+        lines.push('```text');
+        lines.push(ev.content);
+        lines.push('```');
+        lines.push('');
+      });
     });
 
-    const reportContent = lines.join('\n');
-    const blob = new Blob([reportContent], { type: 'text/markdown;charset=utf-8' });
+    const slug = (activeEngagement?.name || 'engagement').replace(/[^a-zA-Z0-9_-]/g, '_');
+    return {
+      format: reportFormat,
+      fileName: `${slug}.${reportFormat === 'html' ? 'html' : 'md'}`,
+      content: lines.join('\n'),
+      contentSha256: '',
+      findingsCount: scopeFindings.length,
+      evidenceCount: attachedCount,
+      hostCount: groups.size,
+      internalExcluded,
+    };
+  }, [
+    activeEngagement,
+    evidenceList,
+    findingsList,
+    hostMap,
+    reportFormat,
+    reportHostScope,
+    reportIncludeInternal,
+    reportIncludeUnlinked,
+  ]);
+
+  const compileReportPreview = useCallback(async () => {
+    const api = getEvidenceApi();
+    if (!api?.GenerateEvidenceReport) {
+      setCompiledReport(compileClientFallbackReport());
+      return;
+    }
+    setReportLoading(true);
+    try {
+      const res = await api.GenerateEvidenceReport(buildReportRequest(false, ''));
+      setCompiledReport(res);
+    } catch (err: unknown) {
+      setFeedbackMsg({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to compile assessment report',
+      });
+    } finally {
+      setReportLoading(false);
+    }
+  }, [buildReportRequest, compileClientFallbackReport]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'report') {
+      void compileReportPreview();
+    }
+  }, [isOpen, activeTab, compileReportPreview]);
+
+  const handleExportSingleReport = async () => {
+    const api = getEvidenceApi();
+    const req = buildReportRequest(false, '');
+    const engSlug = (activeEngagement?.name || 'engagement').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const hostLabel =
+      reportHostScope !== 'all'
+        ? (hostMap.get(reportHostScope)?.label || reportHostScope).replace(/[^a-zA-Z0-9_-]/g, '_')
+        : 'all-hosts';
+    const ext = reportFormat === 'html' ? 'html' : 'md';
+    const suggestedName = compiledReport?.fileName || `${engSlug}-${hostLabel}.${ext}`;
+
+    if (api?.SaveReportFileDialog && api?.ExportEvidenceReportToFile) {
+      try {
+        const targetPath = await api.SaveReportFileDialog(suggestedName, reportFormat);
+        if (!targetPath) return;
+        setReportLoading(true);
+        const saved = await api.ExportEvidenceReportToFile(req, targetPath);
+        setCompiledReport(saved);
+        setFeedbackMsg({
+          type: 'success',
+          text: `Report exported (${saved.format.toUpperCase()}, SHA-256 ${saved.contentSha256.slice(0, 12)}...) to ${targetPath}`,
+        });
+      } catch (err: unknown) {
+        setFeedbackMsg({
+          type: 'error',
+          text: err instanceof Error ? err.message : 'Failed to export report file',
+        });
+      } finally {
+        setReportLoading(false);
+      }
+      return;
+    }
+
+    const result = compiledReport || compileClientFallbackReport();
+    const mime = reportFormat === 'html' ? 'text/html;charset=utf-8' : 'text/markdown;charset=utf-8';
+    const blob = new Blob([result.content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pentest-report-${activeEngagement?.name.replace(/[^a-zA-Z0-9_-]/g, '_') || 'engagement'}.md`;
+    a.download = suggestedName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleBatchExportPerHost = async () => {
+    const api = getEvidenceApi();
+    if (!api?.SelectDirectoryDialog || !api?.GenerateEvidenceReport) {
+      setFeedbackMsg({
+        type: 'error',
+        text: 'Per-host directory export requires the native desktop runtime.',
+      });
+      return;
+    }
+    try {
+      const dirPath = await api.SelectDirectoryDialog('Select Folder for Per-Host Report Export');
+      if (!dirPath) return;
+      setReportLoading(true);
+      const batchRes = await api.GenerateEvidenceReport(buildReportRequest(true, dirPath));
+      setCompiledReport(batchRes);
+      const fileCount = batchRes.writtenFiles?.length || 0;
+      setFeedbackMsg({
+        type: 'success',
+        text: `Exported ${fileCount} per-host files + SHA-256 manifest to ${dirPath}`,
+      });
+    } catch (err: unknown) {
+      setFeedbackMsg({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Per-host batch export failed',
+      });
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   const getSeverityBadgeColor = (sev?: EvidenceSeverity) => {
@@ -927,38 +1085,41 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
           <button
             type="button"
             className={`cyber-btn ${activeTab === 'findings' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
-            style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+            style={{ fontSize: '0.78rem', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
             onClick={() => {
               setActiveTab('findings');
               setIsEditingFinding(false);
               setIsEditingEvidence(false);
             }}
           >
-            🎯 Findings ({filteredFindings.length})
+            <CyberIcon name="target" size={14} />
+            Findings ({filteredFindings.length})
           </button>
           <button
             type="button"
             className={`cyber-btn ${activeTab === 'evidence' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
-            style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+            style={{ fontSize: '0.78rem', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
             onClick={() => {
               setActiveTab('evidence');
               setIsEditingFinding(false);
               setIsEditingEvidence(false);
             }}
           >
-            🛡️ Evidence Vault ({filteredEvidence.length})
+            <CyberIcon name="shield" size={14} />
+            Evidence Vault ({filteredEvidence.length})
           </button>
           <button
             type="button"
             className={`cyber-btn ${activeTab === 'report' ? 'cyber-btn-primary' : 'cyber-btn-secondary'}`}
-            style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+            style={{ fontSize: '0.78rem', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
             onClick={() => {
               setActiveTab('report');
               setIsEditingFinding(false);
               setIsEditingEvidence(false);
             }}
           >
-            📄 Assessment Report
+            <CyberIcon name="file" size={14} />
+            Assessment Report
           </button>
         </div>
 
@@ -2302,140 +2463,325 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
           )}
 
           {/* ========================================================= */}
-          {/* TAB 3: ASSESSMENT REPORT LIVE PREVIEW & EXPORT            */}
+          {/* TAB 3: ASSESSMENT REPORT LIVE PREVIEW & EXPORT (F-30)     */}
           {/* ========================================================= */}
           {activeTab === 'report' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
-                  <h4 style={{ margin: 0, color: '#00f0ff' }}>📄 Client Assessment Report Preview</h4>
-                  <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
-                    Compiles {filteredFindings.length} findings with their reportable evidence artifacts.
+                  <h4 style={{ margin: 0, color: '#00f0ff', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <CyberIcon name="file" size={16} />
+                    Assessment Report Compiler &amp; Per-Host Exporter
+                  </h4>
+                  <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', marginTop: '3px' }}>
+                    {compiledReport
+                      ? `${compiledReport.hostCount} host section(s) · ${compiledReport.findingsCount} finding(s) · ${compiledReport.evidenceCount} artifact(s)`
+                      : `Compiles ${filteredFindings.length} finding(s) grouped deterministically per host.`}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="cyber-btn cyber-btn-primary"
-                  onClick={handleExportMarkdownReport}
-                >
-                  💾 Download Report (.md)
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-ghost"
+                    onClick={() => void compileReportPreview()}
+                    disabled={reportLoading}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <CyberIcon name="bolt" size={13} />
+                    {reportLoading ? 'Compiling...' : 'Recompile'}
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-primary"
+                    onClick={() => void handleExportSingleReport()}
+                    disabled={reportLoading}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <CyberIcon name="download" size={14} />
+                    Export Report ({reportFormat === 'html' ? '.html' : '.md'})
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-ghost"
+                    onClick={() => void handleBatchExportPerHost()}
+                    disabled={reportLoading}
+                    title="Writes one report file per target host plus manifest.sha256"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderColor: 'rgba(0, 240, 255, 0.4)', color: '#00f0ff' }}
+                  >
+                    <CyberIcon name="folder" size={14} />
+                    Export 1 File Per Host
+                  </button>
+                </div>
               </div>
 
-              {/* Informational banner about internal non-reportable evidences */}
-              {(() => {
-                const internalCount = evidenceList.filter((e) => e.inReport === false).length;
-                if (internalCount > 0) {
+              {/* Compiler Options Strip */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                  padding: '0.6rem 0.8rem',
+                  background: 'rgba(10, 18, 30, 0.75)',
+                  border: '1px solid rgba(0, 240, 255, 0.22)',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: '0.75rem',
+                }}
+              >
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#cbd5e1' }}>
+                  <span>Host Scope:</span>
+                  <select
+                    aria-label="Report Host Scope"
+                    value={reportHostScope}
+                    onChange={(e) => setReportHostScope(e.target.value)}
+                    style={{
+                      background: 'rgba(2, 6, 12, 0.9)',
+                      border: '1px solid rgba(0, 240, 255, 0.35)',
+                      color: '#e2e8f0',
+                      padding: '3px 8px',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    <option value="all">All Hosts (Grouped Per Host)</option>
+                    {hosts.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.label} ({h.address})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div style={{ display: 'inline-flex', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setReportFormat('markdown')}
+                    style={{
+                      background: reportFormat === 'markdown' ? 'rgba(0, 240, 255, 0.18)' : 'transparent',
+                      color: reportFormat === 'markdown' ? '#00f0ff' : '#94a3b8',
+                      border: 'none',
+                      padding: '4px 10px',
+                      cursor: 'pointer',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: '0.73rem',
+                      fontWeight: reportFormat === 'markdown' ? 700 : 400,
+                    }}
+                  >
+                    Markdown (.md)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportFormat('html')}
+                    style={{
+                      background: reportFormat === 'html' ? 'rgba(0, 240, 255, 0.18)' : 'transparent',
+                      color: reportFormat === 'html' ? '#00f0ff' : '#94a3b8',
+                      border: 'none',
+                      borderLeft: '1px solid rgba(0, 240, 255, 0.3)',
+                      padding: '4px 10px',
+                      cursor: 'pointer',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: '0.73rem',
+                      fontWeight: reportFormat === 'html' ? 700 : 400,
+                    }}
+                  >
+                    HTML5 (.html)
+                  </button>
+                </div>
+
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#cbd5e1', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={reportIncludePorts} onChange={(e) => setReportIncludePorts(e.target.checked)} />
+                  <span>Open Ports</span>
+                </label>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#cbd5e1', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={reportIncludeUnlinked} onChange={(e) => setReportIncludeUnlinked(e.target.checked)} />
+                  <span>Standalone Evidence</span>
+                </label>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#cbd5e1', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={reportIncludeNotes} onChange={(e) => setReportIncludeNotes(e.target.checked)} />
+                  <span>Linked Notes</span>
+                </label>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#fbbf24', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={reportIncludeInternal} onChange={(e) => setReportIncludeInternal(e.target.checked)} />
+                  <span>Include Internal-Only</span>
+                </label>
+
+                <div style={{ marginLeft: 'auto', display: 'inline-flex', border: '1px solid rgba(148, 163, 184, 0.3)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setReportPreviewView('rendered')}
+                    style={{
+                      background: reportPreviewView === 'rendered' ? 'rgba(56, 189, 248, 0.16)' : 'transparent',
+                      color: reportPreviewView === 'rendered' ? '#38bdf8' : '#94a3b8',
+                      border: 'none',
+                      padding: '3px 8px',
+                      cursor: 'pointer',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    Rendered
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportPreviewView('source')}
+                    style={{
+                      background: reportPreviewView === 'source' ? 'rgba(56, 189, 248, 0.16)' : 'transparent',
+                      color: reportPreviewView === 'source' ? '#38bdf8' : '#94a3b8',
+                      border: 'none',
+                      borderLeft: '1px solid rgba(148, 163, 184, 0.3)',
+                      padding: '3px 8px',
+                      cursor: 'pointer',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    Source
+                  </button>
+                </div>
+              </div>
+
+              {/* Integrity Digest & Exclusion Banner */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                {(() => {
+                  const excludedCount = compiledReport
+                    ? compiledReport.internalExcluded
+                    : (reportIncludeInternal ? 0 : evidenceList.filter((e) => e.inReport === false).length);
                   return (
                     <div
                       style={{
-                        background: 'rgba(56, 189, 248, 0.08)',
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        background: excludedCount > 0 ? 'rgba(56, 189, 248, 0.08)' : 'rgba(15, 23, 42, 0.5)',
                         border: '1px solid rgba(56, 189, 248, 0.3)',
-                        padding: '0.5rem 0.8rem',
-                        fontSize: '0.76rem',
+                        padding: '0.45rem 0.75rem',
+                        fontSize: '0.74rem',
                         color: '#38bdf8',
                         fontFamily: 'JetBrains Mono, monospace',
                       }}
                     >
-                      ℹ️ Note: {internalCount} internal vault evidence artifacts marked as non-reportable are automatically excluded from this report.
+                      <CyberIcon name="shield" size={14} />
+                      <span>
+                        {reportIncludeInternal
+                          ? 'Internal-only evidence artifacts are included and explicitly tagged as [INTERNAL VAULT ONLY].'
+                          : `${excludedCount} internal vault artifact(s) marked non-reportable are automatically excluded.`}
+                      </span>
                     </div>
                   );
-                }
-                return null;
-              })()}
+                })()}
 
-              <div
-                style={{
-                  background: 'rgba(2, 6, 12, 0.95)',
-                  border: '1px solid rgba(0, 240, 255, 0.3)',
-                  padding: '1.25rem',
-                  fontSize: '0.85rem',
-                  color: '#cbd5e1',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  maxHeight: '52vh',
-                  overflowY: 'auto',
-                }}
-              >
-                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
-                  <h2 style={{ color: '#00f0ff', margin: '0 0 0.5rem 0' }}>DoubleAgent — Pentest Assessment Report</h2>
-                  <div><strong>Engagement:</strong> {activeEngagement?.name || 'Default Engagement'}</div>
-                  {activeEngagement?.scope && <div><strong>Scope:</strong> {activeEngagement.scope}</div>}
-                  {activeEngagement?.timeframe && <div><strong>Timeframe:</strong> {activeEngagement.timeframe}</div>}
-                </div>
-
-                <div>
-                  <h3 style={{ color: '#38bdf8', margin: '0 0 0.5rem 0' }}>1. Executive Findings Summary</h3>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace' }}>
-                    <thead>
-                      <tr style={{ background: 'rgba(0, 240, 255, 0.1)', borderBottom: '1px solid #00f0ff' }}>
-                        <th style={{ padding: '6px', textAlign: 'left', color: '#00f0ff' }}>Finding Title</th>
-                        <th style={{ padding: '6px', textAlign: 'left', color: '#00f0ff' }}>Severity</th>
-                        <th style={{ padding: '6px', textAlign: 'left', color: '#00f0ff' }}>Category</th>
-                        <th style={{ padding: '6px', textAlign: 'left', color: '#00f0ff' }}>Reportable Evidences</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredFindings.map((f) => {
-                        const repEvs = evidenceList.filter(
-                          (e) => (f.evidenceIds?.includes(e.id) || e.findingId === f.id) && e.inReport !== false
-                        );
-                        return (
-                          <tr key={f.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                            <td style={{ padding: '6px' }}>{f.title}</td>
-                            <td style={{ padding: '6px', textTransform: 'uppercase', fontWeight: 700 }}>{f.severity}</td>
-                            <td style={{ padding: '6px' }}>{f.category}</td>
-                            <td style={{ padding: '6px' }}>🛡️ {repEvs.length}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div>
-                  <h3 style={{ color: '#38bdf8', margin: '1rem 0 0.5rem 0' }}>2. Detailed Findings</h3>
-                  {filteredFindings.map((f, i) => {
-                    const repEvs = evidenceList.filter(
-                      (e) => (f.evidenceIds?.includes(e.id) || e.findingId === f.id) && e.inReport !== false
-                    );
-                    return (
-                      <div key={f.id} style={{ marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
-                        <h4 style={{ color: '#f1f5f9', margin: '0 0 0.25rem 0' }}>
-                          2.{i + 1} [{f.severity.toUpperCase()}] {f.title}
-                        </h4>
-                        <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginBottom: '0.5rem' }}>
-                          Category: {f.category} | Status: {f.status.toUpperCase()}
-                        </div>
-                        <div style={{ marginBottom: '0.5rem' }}>
-                          <strong>Description:</strong>
-                          <div style={{ marginTop: '0.2rem' }}>{f.description}</div>
-                        </div>
-                        {f.remediation && (
-                          <div style={{ marginBottom: '0.5rem' }}>
-                            <strong>Remediation:</strong>
-                            <div style={{ marginTop: '0.2rem' }}>{f.remediation}</div>
-                          </div>
-                        )}
-                        {repEvs.length > 0 && (
-                          <div style={{ marginTop: '0.5rem' }}>
-                            <strong style={{ color: '#00f0ff' }}>Supporting Evidence Proofs ({repEvs.length}):</strong>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.3rem' }}>
-                              {repEvs.map((ev) => (
-                                <div key={ev.id} style={{ background: 'rgba(0,0,0,0.4)', padding: '0.4rem 0.6rem', border: '1px solid rgba(0, 240, 255, 0.15)' }}>
-                                  <div style={{ fontSize: '0.74rem', color: '#00f0ff', marginBottom: '2px' }}>🛡️ {ev.title}</div>
-                                  <pre style={{ margin: 0, fontSize: '0.72rem', whiteSpace: 'pre-wrap', color: '#cbd5e1' }}>{ev.content}</pre>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                {compiledReport?.contentSha256 && (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      background: 'rgba(16, 185, 129, 0.09)',
+                      border: '1px solid rgba(16, 185, 129, 0.35)',
+                      padding: '0.45rem 0.75rem',
+                      fontSize: '0.72rem',
+                      color: '#6ee7b7',
+                      fontFamily: 'JetBrains Mono, monospace',
+                    }}
+                    title={compiledReport.contentSha256}
+                  >
+                    <CyberIcon name="check" size={13} />
+                    <span>SHA-256: {compiledReport.contentSha256.slice(0, 16)}...</span>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyText(compiledReport.contentSha256, 'report-sha256')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: copiedId === 'report-sha256' ? '#00f0ff' : '#a7f3d0',
+                        cursor: 'pointer',
+                        padding: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                      }}
+                      title="Copy full SHA-256 digest"
+                    >
+                      <CyberIcon name={copiedId === 'report-sha256' ? 'check' : 'copy'} size={12} />
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {/* Per-Host Batch Export Manifest Summary */}
+              {compiledReport?.writtenFiles && compiledReport.writtenFiles.length > 0 && (
+                <div
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.07)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    padding: '0.6rem 0.85rem',
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '0.73rem',
+                    color: '#a7f3d0',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <CyberIcon name="folder" size={13} />
+                    <span>Written Per-Host Artifacts ({compiledReport.writtenFiles.length})</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '110px', overflowY: 'auto' }}>
+                    {compiledReport.writtenFiles.map((wf) => (
+                      <div key={wf.filePath} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                        <span>{wf.fileName}</span>
+                        <span style={{ color: '#64748b' }}>{wf.sha256.slice(0, 16)}... ({wf.bytes} B)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Live Preview Canvas */}
+              {compiledReport && reportFormat === 'html' && reportPreviewView === 'rendered' ? (
+                <iframe
+                  title="Assessment Report HTML Preview"
+                  sandbox=""
+                  srcDoc={compiledReport.content}
+                  style={{
+                    width: '100%',
+                    height: '50vh',
+                    border: '1px solid rgba(0, 240, 255, 0.3)',
+                    background: '#0b0f17',
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    background: 'rgba(2, 6, 12, 0.95)',
+                    border: '1px solid rgba(0, 240, 255, 0.3)',
+                    padding: '1.1rem',
+                    fontSize: '0.84rem',
+                    color: '#cbd5e1',
+                    maxHeight: '50vh',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {compiledReport && reportPreviewView === 'source' ? (
+                    <pre
+                      style={{
+                        margin: 0,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontSize: '0.76rem',
+                        color: '#cbd5e1',
+                      }}
+                    >
+                      {compiledReport.content}
+                    </pre>
+                  ) : compiledReport && reportFormat === 'markdown' ? (
+                    <MarkdownRenderer content={compiledReport.content} />
+                  ) : (
+                    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.78rem', color: '#94a3b8' }}>
+                      {reportLoading ? 'Compiling deterministic report...' : 'Click Recompile to render preview.'}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
