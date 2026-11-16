@@ -38,7 +38,7 @@ import { SessionLogRecord, SessionLogStatus } from './types/sessionLog';
 import { SessionLogsModal } from './components/SessionLogsModal';
 import { BroadcastScope, BroadcastState } from './types/broadcast';
 import { WorkspaceState, ReconnectState, PersistedTabItem, PersistedWorkspaceNode } from './types/workspace';
-import { CyberIcon, CyberIconName } from './components/CyberIcon';
+import { CyberIcon } from './components/CyberIcon';
 import { NetworkMapView } from './components/NetworkMapView';
 import { RemoteEditorView } from './components/RemoteEditorView';
 import { RemoteEditSession, RemoteConflictInfo } from './types/remoteEdit';
@@ -1730,63 +1730,6 @@ export function App({
   );
   const [groupTabsByHost, setGroupTabsByHost] = useState<boolean>(false);
   const [collapsedHostGroups, setCollapsedHostGroups] = useState<Set<string>>(new Set());
-
-  // Pinned Quick Tools in Top Bar
-  const [pinnedQuickTools, setPinnedQuickTools] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('doubleagent_pinned_tools');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    return ['tunnels'];
-  });
-  const [draggedPinnedIndex, setDraggedPinnedIndex] = useState<number | null>(null);
-
-  const togglePinTool = (toolId: string): void => {
-    setPinnedQuickTools((prev) => {
-      let next: string[];
-      if (prev.includes(toolId)) {
-        next = prev.filter((id) => id !== toolId);
-      } else {
-        next = [...prev, toolId];
-      }
-      try {
-        localStorage.setItem('doubleagent_pinned_tools', JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  };
-
-  const handlePinnedDragStart = (index: number): void => {
-    setDraggedPinnedIndex(index);
-  };
-
-  const handlePinnedDragOver = (e: React.DragEvent, index: number): void => {
-    e.preventDefault();
-    if (draggedPinnedIndex === null || draggedPinnedIndex === index) return;
-    setPinnedQuickTools((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(draggedPinnedIndex, 1);
-      next.splice(index, 0, moved);
-      try {
-        localStorage.setItem('doubleagent_pinned_tools', JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-    setDraggedPinnedIndex(index);
-  };
-
-  const handlePinnedDragEnd = (): void => {
-    setDraggedPinnedIndex(null);
-  };
 
   const toggleHostGroupCollapse = (groupKey: string): void => {
     setCollapsedHostGroups((prev) => {
@@ -8100,403 +8043,6 @@ export function App({
     });
   }, [vaultSummary.hosts, activeEngagement, filterByEngagementScope, selectedHostTag, searchQuery]);
 
-  // Pinnable Tools & Views Registry for Cyberpunk HUD Top Bar
-  const pinnableRegistry: Record<
-    string,
-    {
-      label: string;
-      shortLabel?: string;
-      title?: string;
-      ariaLabel?: string;
-      icon: CyberIconName;
-      action: () => void;
-      disabled?: boolean;
-      active?: boolean;
-    }
-  > = {
-    // Terminals & Consoles
-    powershell: {
-      label: 'Local Shell (PowerShell)',
-      shortLabel: 'PowerShell',
-      icon: 'bolt',
-      action: () => {
-        void handleOpenLocalTerminal('powershell');
-      },
-    },
-    cmd: {
-      label: 'Local Shell (Command Prompt)',
-      shortLabel: 'CMD',
-      icon: 'terminal',
-      action: () => {
-        void handleOpenLocalTerminal('cmd');
-      },
-    },
-    wsl: {
-      label: 'Local Shell (WSL Linux)',
-      shortLabel: 'WSL',
-      icon: 'terminal',
-      action: () => {
-        void handleOpenLocalTerminal('wsl');
-      },
-    },
-    'dir-default': {
-      label: 'New in Default Directory',
-      shortLabel: 'Default Dir',
-      icon: 'home',
-      action: () => {
-        void handleOpenTerminalDirectory('default');
-      },
-    },
-    'dir-cwd': {
-      label: 'New in Current Directory (CWD)',
-      shortLabel: 'CWD',
-      icon: 'folder',
-      action: () => {
-        void handleOpenTerminalDirectory('current');
-      },
-    },
-    'dir-root': {
-      label: 'New Root Shell in Current Directory',
-      shortLabel: 'Root Shell',
-      icon: 'bolt',
-      action: () => {
-        void handleOpenTerminalDirectory('root');
-      },
-    },
-    serial: {
-      label: 'Hardware Bus & UART Logic',
-      shortLabel: 'Hardware Bus',
-      icon: 'serial',
-      action: () => {
-        void handleOpenSerialModal();
-      },
-    },
-
-    // Tools & Utilities
-    palette: {
-      label: 'Command Palette',
-      shortLabel: 'Palette',
-      icon: 'search',
-      action: () => {
-        setPaletteQuery('');
-        setShowCommandPalette(true);
-      },
-    },
-    totp: {
-      label: 'TOTP Authenticator Generator',
-      shortLabel: 'TOTP 2FA',
-      icon: 'shield',
-      action: () => {
-        setShowTotpModal(true);
-      },
-    },
-    keychain: {
-      label: 'Keychain',
-      shortLabel: 'Keychain',
-      icon: 'key',
-      action: () => {
-        setModalError('');
-        setShowKeychainModal(true);
-      },
-    },
-    broadcast: {
-      label: broadcastState.enabled ? 'Disarm Broadcast' : 'Broadcast Input Mode',
-      shortLabel: 'Broadcast',
-      icon: 'broadcast',
-      active: broadcastState.enabled,
-      action: () => {
-        handleToggleBroadcast();
-      },
-    },
-    notes: {
-      label: 'Host Notes & Docs',
-      shortLabel: 'Notes',
-      icon: 'note',
-      action: () => {
-        setNotesModalHostId(activeTab?.hostId);
-        setNotesModalInitialNoteId(null);
-        setShowNotesModal(true);
-      },
-    },
-    'session-logs': {
-      label: 'Session Logs & Recordings',
-      shortLabel: 'Session Logs',
-      icon: 'terminal',
-      action: () => {
-        void refreshSessionLogs();
-        setShowSessionLogsModal(true);
-      },
-    },
-    snippets: {
-      label: 'Command Snippets & Variables',
-      shortLabel: 'Snippets',
-      icon: 'bolt',
-      action: () => {
-        setShowSnippetsModal(true);
-      },
-    },
-    tunnels: {
-      label: 'Port Forwarding (-L, -R, -D)',
-      shortLabel: activeTunnels.length > 0 ? `${activeTunnels.length} Tunnels` : 'Tunnels',
-      ariaLabel: 'Port Forwarding',
-      icon: 'network',
-      active: activeTunnels.length > 0,
-      action: () => {
-        setShowPortForwardingModal(true);
-      },
-    },
-    'proxy-profiles': {
-      label: 'Proxy Profiles (Jump, SOCKS5)',
-      shortLabel: 'Proxies',
-      icon: 'shield',
-      action: () => {
-        setShowProxyProfilesModal(true);
-      },
-    },
-    'network-map': {
-      label: 'Interactive Network Topology Map',
-      shortLabel: 'Network Map',
-      icon: 'network',
-      action: () => {
-        openNetworkMapTab();
-      },
-    },
-    sftp: {
-      label: 'SFTP File Browser',
-      shortLabel: 'SFTP',
-      icon: 'folder',
-      disabled: !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-'),
-      action: () => {
-        if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
-          openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
-        }
-      },
-    },
-    'ssh-config': {
-      label: 'Import ssh_config',
-      shortLabel: 'Import Config',
-      icon: 'gear',
-      action: () => {
-        setModalError('');
-        setSshConfigResult(null);
-        setShowSSHConfigModal(true);
-      },
-    },
-    'import-putty-termius': {
-      label: 'Import PuTTY / Termius',
-      shortLabel: 'PuTTY / Termius',
-      icon: 'folder',
-      action: () => {
-        setShowImportModal(true);
-      },
-    },
-    'raw-tcp': {
-      label: 'Raw TCP / Netcat',
-      shortLabel: 'Raw TCP',
-      icon: 'bolt',
-      action: () => {
-        setShowRawTcpModal(true);
-      },
-    },
-    'cred-store': {
-      label: 'Credential Pool & Spray Lists',
-      shortLabel: 'Credentials',
-      icon: 'shield',
-      action: () => {
-        setShowCredStoreModal(true);
-      },
-    },
-    'evidence-vault': {
-      label: 'Evidence Vault & Findings',
-      shortLabel: 'Evidence',
-      icon: 'shield',
-      action: () => {
-        setShowEvidenceModal(true);
-      },
-    },
-    'nmap-import': {
-      label: 'Nmap XML Recon Ingest',
-      shortLabel: 'Nmap Ingest',
-      icon: 'radar',
-      action: () => {
-        setShowNmapImportModal(true);
-      },
-    },
-    'payload-generator': {
-      label: 'Payload Generator // Reverse & Bind Shells',
-      shortLabel: 'Payloads',
-      icon: 'target',
-      action: () => {
-        setShowPayloadGeneratorModal(true);
-      },
-    },
-    'listener-manager': {
-      label: 'Listener Manager // Reverse & Bind Catchers',
-      shortLabel: 'Listeners',
-      icon: 'radar',
-      action: () => {
-        setShowListenerManagerModal(true);
-      },
-    },
-    'file-transfer': {
-      label: 'File Transfer Helper // HTTP Staging & Hash Check',
-      shortLabel: 'File Transfer',
-      icon: 'upload',
-      action: () => {
-        setShowFileTransferModal(true);
-      },
-    },
-    'pivot-manager': {
-      label: 'Pivoting Engine // ligolo-ng & chisel',
-      shortLabel: 'Pivoting',
-      icon: 'tunnel',
-      action: () => {
-        setShowPivotManagerModal(true);
-      },
-    },
-    'route-health': {
-      label: 'Route Health Check Dashboard',
-      shortLabel: 'Route Health',
-      icon: 'shield',
-      action: () => {
-        openRouteHealthTab();
-      },
-    },
-    'winrm-client': {
-      label: 'WinRM / PowerShell Remoting',
-      shortLabel: 'WinRM',
-      icon: 'terminal',
-      action: () => {
-        openWinrmTab();
-      },
-    },
-    'snippet-chains': {
-      label: 'Snippet Chains // Multi-Stage Exploits',
-      shortLabel: 'Chains',
-      icon: 'chain',
-      action: () => {
-        setChainsHostFilter(activeTab?.hostId || null);
-        setShowChainsModal(true);
-      },
-    },
-    proxychains: {
-      label: 'Export proxychains.conf',
-      shortLabel: 'Proxychains',
-      icon: 'shield',
-      action: () => {
-        void handleOpenProxychainsExport();
-      },
-    },
-
-    // View Options
-    'sidebar-toggle': {
-      label: sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar',
-      shortLabel: 'Sidebar',
-      icon: 'chevron-left',
-      action: () => {
-        setSidebarCollapsed((prev) => !prev);
-      },
-    },
-    'new-tab': {
-      label: 'New Connection Tab',
-      shortLabel: '+ Tab',
-      icon: 'plus',
-      action: () => {
-        handleOpenNewConnectionTab();
-      },
-    },
-    'new-split': {
-      label: 'New Connection Split',
-      shortLabel: '+ Split',
-      icon: 'split-h',
-      action: () => {
-        handleOpenNewConnectionSplit('right');
-      },
-    },
-    'view-map': {
-      label: 'Network Topology Map',
-      shortLabel: 'Network Map',
-      icon: 'network',
-      action: () => {
-        openNetworkMapTab();
-      },
-    },
-    'split-h': {
-      label: 'Split Horizontal',
-      shortLabel: 'Split H',
-      icon: 'split-h',
-      action: () => {
-        void handleSplitPane('horizontal');
-      },
-    },
-    'split-v': {
-      label: 'Split Vertical',
-      shortLabel: 'Split V',
-      icon: 'split-v',
-      action: () => {
-        void handleSplitPane('vertical');
-      },
-    },
-    find: {
-      label: 'Find in Terminal',
-      shortLabel: 'Find',
-      icon: 'search',
-      disabled: !activePane,
-      action: () => {
-        if (activePane) {
-          togglePaneSearch(activePane.sessionId);
-        }
-      },
-    },
-    'group-tabs': {
-      label: 'Group Tabs by Host',
-      shortLabel: groupTabsByHost ? 'Grouped' : 'Ungrouped',
-      icon: 'folder',
-      active: groupTabsByHost,
-      action: () => {
-        setGroupTabsByHost((prev) => !prev);
-      },
-    },
-    'zoom-in': {
-      label: 'Zoom In Pane',
-      shortLabel: 'Zoom +',
-      icon: 'plus',
-      disabled: !activePane,
-      action: () => {
-        if (activePane) {
-          const next = changeTerminalFontSize(activePane.sessionId, +1);
-          setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
-        }
-      },
-    },
-    'zoom-out': {
-      label: 'Zoom Out Pane',
-      shortLabel: 'Zoom -',
-      icon: 'minus',
-      disabled: !activePane,
-      action: () => {
-        if (activePane) {
-          const next = changeTerminalFontSize(activePane.sessionId, -1);
-          setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
-        }
-      },
-    },
-    'zoom-reset': {
-      label: 'Reset Pane Zoom',
-      shortLabel: 'Zoom 100%',
-      icon: 'gear',
-      disabled: !activePane,
-      action: () => {
-        if (activePane) {
-          resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
-          setPaneFontSizes((prev) =>
-            new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
-          );
-        }
-      },
-    },
-  };
-
   const renderDropdownRow = (
     toolId: string,
     label: string,
@@ -8504,38 +8050,23 @@ export function App({
     action?: () => void,
     disabled?: boolean,
     active?: boolean
-  ) => {
-    const isPinned = pinnedQuickTools.includes(toolId);
-    return (
-      <div key={toolId} className="nav-dropdown-row">
-        <button
-          type="button"
-          role="menuitem"
-          className={`nav-dropdown-item ${active ? 'active' : ''}`}
-          disabled={disabled}
-          onClick={() => {
-            setActiveDropdownMenu(null);
-            action?.();
-          }}
-        >
-          <span>{label}</span>
-          {shortcut && <span className="nav-dropdown-shortcut">{shortcut}</span>}
-        </button>
-        <button
-          type="button"
-          className={`nav-pin-btn ${isPinned ? 'pinned' : ''}`}
-          title={isPinned ? `Unpin ${label} from top bar` : `Pin ${label} to top bar`}
-          aria-label={isPinned ? `Unpin ${label}` : `Pin ${label}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            togglePinTool(toolId);
-          }}
-        >
-          <CyberIcon name="pin" size={11} />
-        </button>
-      </div>
-    );
-  };
+  ) => (
+    <div key={toolId} className="nav-dropdown-row">
+      <button
+        type="button"
+        role="menuitem"
+        className={`nav-dropdown-item ${active ? 'active' : ''}`}
+        disabled={disabled}
+        onClick={() => {
+          setActiveDropdownMenu(null);
+          action?.();
+        }}
+      >
+        <span>{label}</span>
+        {shortcut && <span className="nav-dropdown-shortcut">{shortcut}</span>}
+      </button>
+    </div>
+  );
 
   const renderWinrmManager = (isEmbedded: boolean, onCloseAction: () => void, tabId?: string) => (
     <WinrmManagerModal
@@ -8672,55 +8203,24 @@ export function App({
       aria-label="DoubleAgent Workspace"
     >
       <header className="app-header">
-        <div className="brand-group">
-          <img
-            src={brandLogoText}
-            alt="DoubleAgent Logo"
-            className="brand-logo-wordmark-img"
-            onClick={() => {
-              setSettingsActiveTab('about');
-              setShowGlobalSettingsModal(true);
-            }}
-            title="DoubleAgent SSH Client (Click for About info)"
-            style={{ cursor: 'pointer' }}
-          />
-          <h1 className="sr-only">DoubleAgent</h1>
-          {leaderArmed && (
-            <span
-              className="leader-status-pill"
-              title="Leader Key Mode armed. Next keystroke will trigger command or press leader key again to send raw key to terminal."
-            >
-              ⌨️ LEADER ({globalSettings.leaderKey || 'Ctrl+B'})
-            </span>
-          )}
-          {broadcastState.enabled && (
-            <div
-              className="broadcast-status-pill"
-              role="status"
-              aria-label="Broadcast Input Mode Active"
-              title="Broadcast Input ACTIVE: keystrokes will be sent to all participating terminals. Click to disarm."
-            >
-              <span className="broadcast-pulse-dot" />
-              <span className="broadcast-banner-label">
-                📡 BROADCAST ({getBroadcastTargetSessionIds().length} sessions)
-              </span>
-              <button
-                type="button"
-                className="broadcast-disarm-btn"
-                onClick={() => handleToggleBroadcast()}
-                title="Disarm Broadcast Mode (Esc / Alt+B)"
-                aria-label="Disarm Broadcast Mode"
+        <h1 className="sr-only">DoubleAgent</h1>
+        {(leaderArmed || vaultLocked) && (
+          <div className="brand-group">
+            {leaderArmed && (
+              <span
+                className="leader-status-pill"
+                title="Leader Key Mode armed. Next keystroke will trigger command or press leader key again to send raw key to terminal."
               >
-                ✕ Disarm
+                LEADER ({globalSettings.leaderKey || 'Ctrl+B'})
+              </span>
+            )}
+            {vaultLocked && (
+              <button type="button" className="btn-primary" onClick={handleOpenVaultButton}>
+                {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
               </button>
-            </div>
-          )}
-          {vaultLocked && (
-            <button type="button" className="btn-primary" onClick={handleOpenVaultButton}>
-              {vaultInitialized ? 'Unlock Vault' : 'Set Up Vault'}
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <nav className="nav-menu-bar" aria-label="Application Menu">
             {/* 1. View Dropdown (First Button) */}
@@ -8806,8 +8306,8 @@ export function App({
               <span className="cyber-glitch-slashes">//</span>
             </div>
 
-            {/* 2. Engagement Section: Engagement Selector -> + Button -> Engagement Dropdown */}
-            <div className="nav-engagement-controls-cluster" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            {/* 2. Engagement Section: Engagement Selector -> Engagement Dropdown */}
+            <div className="nav-engagement-controls-cluster">
               {/* Engagement Selector Custom HUD Dropdown */}
               <div
                 className="nav-menu-container"
@@ -8827,16 +8327,6 @@ export function App({
                     )
                   }
                   style={{
-                    height: '32px',
-                    minWidth: '205px',
-                    maxWidth: '280px',
-                    fontSize: '0.75rem',
-                    padding: '0 10px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '8px',
-                    boxSizing: 'border-box',
                     borderColor: activeEngagement ? 'rgba(0, 240, 255, 0.55)' : undefined,
                     color: activeEngagement ? '#00f0ff' : '#cbd5e1',
                   }}
@@ -8948,31 +8438,6 @@ export function App({
                 )}
               </div>
 
-              {/* + Button (to add a new engagement) */}
-              <button
-                type="button"
-                className="nav-menu-trigger nav-engagement-btn"
-                onClick={() => {
-                  setEditingEngagement(null);
-                  setShowNewEngagementModal(true);
-                }}
-                style={{
-                  height: '32px',
-                  width: '32px',
-                  fontSize: '0.85rem',
-                  padding: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#00f0ff',
-                  boxSizing: 'border-box',
-                }}
-                title="Create a new encapsulated target engagement"
-                aria-label="+ New Engagement"
-              >
-                <CyberIcon name="plus" size={13} />
-              </button>
-
               {/* Engagement Dropdown */}
               <div
                 className="nav-menu-container"
@@ -8988,7 +8453,6 @@ export function App({
                   onClick={() =>
                     setActiveDropdownMenu((prev) => (prev === 'engagement-tools' ? null : 'engagement-tools'))
                   }
-                  style={{ height: '32px', fontSize: '0.74rem', padding: '0 10px', boxSizing: 'border-box' }}
                 >
                   <CyberIcon name="target" size={12} />
                   <span>Engagement</span>
@@ -9220,46 +8684,6 @@ export function App({
                 </div>
               )}
             </div>
-
-            {/* Cyberpunk delimiter before Pinned Tools */}
-            <div className="nav-cyber-divider" aria-hidden="true">
-              <span className="cyber-glitch-slashes">//</span>
-            </div>
-
-            {/* Pinned Quick-Tool Buttons */}
-            {pinnedQuickTools.map((toolId, index) => {
-              const item = pinnableRegistry[toolId];
-              if (!item) return null;
-              return (
-                <button
-                  key={toolId}
-                  type="button"
-                  className={`nav-menu-trigger nav-pinned-btn ${item.active ? 'active' : ''} ${
-                    draggedPinnedIndex === index ? 'dragging' : ''
-                  }`}
-                  draggable
-                  onDragStart={() => handlePinnedDragStart(index)}
-                  onDragOver={(e) => handlePinnedDragOver(e, index)}
-                  onDragEnd={handlePinnedDragEnd}
-                  onClick={item.action}
-                  title={`${item.title || item.label} (Drag to reorder, unpin in dropdown menu)`}
-                  aria-label={item.ariaLabel || item.label}
-                  disabled={item.disabled}
-                  style={
-                    item.active
-                      ? {
-                          color: 'var(--color-primary-green, #10b981)',
-                          borderColor: 'rgba(16, 185, 129, 0.4)',
-                        }
-                      : undefined
-                  }
-                >
-                  <span className="pinned-drag-grip" aria-hidden="true">⋮</span>
-                  <CyberIcon name={item.icon} size={11} />
-                  <span>{item.shortLabel || item.label}</span>
-                </button>
-              );
-            })}
 
             {/* Sync Warning / Conflict Pill */}
             {syncInfo?.detectedConflict && (
@@ -12387,10 +11811,26 @@ export function App({
             </span>
           )}
           {broadcastState.enabled && (
-            <span className="hud-status-pill danger">
+            <div
+              className="hud-status-pill danger broadcast-bottom-pill"
+              role="status"
+              aria-label="Broadcast Input Mode Active"
+              title="Broadcast Input ACTIVE: keystrokes will be sent to all participating terminals."
+            >
+              <span className="broadcast-pulse-dot" />
               <CyberIcon name="broadcast" size={11} />
-              <span>BROADCAST ({getBroadcastTargetSessionIds().length})</span>
-            </span>
+              <span>BROADCAST ({getBroadcastTargetSessionIds().length} sessions)</span>
+              <button
+                type="button"
+                className="broadcast-disarm-btn"
+                onClick={() => handleToggleBroadcast()}
+                title="Disarm Broadcast Mode (Esc / Alt+B)"
+                aria-label="Disarm Broadcast Mode"
+              >
+                <CyberIcon name="close" size={10} />
+                <span>Disarm</span>
+              </button>
+            </div>
           )}
           {activeLogSessions.size > 0 && (
             <span className="hud-status-pill rec">

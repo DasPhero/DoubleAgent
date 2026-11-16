@@ -778,10 +778,11 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Verify session tab opened
       expect(await screen.findByRole('tab', { name: /Tab root@192.168.1.50:22/i })).toBeInTheDocument();
 
-      // 2. Open Port Forwarding modal via Tunnels button in nav
-      const tunnelsNavBtn = screen.getByRole('button', { name: /Port Forwarding/i });
-      expect(tunnelsNavBtn).toBeInTheDocument();
-      fireEvent.click(tunnelsNavBtn);
+      // 2. Open Port Forwarding modal via Networking & Pivoting -> Port Forwarding
+      fireEvent.click(screen.getByRole('button', { name: /Networking & Pivoting/i }));
+      const tunnelsNavItem = screen.getByRole('menuitem', { name: 'Port Forwarding' });
+      expect(tunnelsNavItem).toBeInTheDocument();
+      fireEvent.click(tunnelsNavItem);
 
       // Verify Port Forwarding modal opens
       expect(screen.getByRole('heading', { name: /Port Forwarding & Tunnels/i })).toBeInTheDocument();
@@ -963,9 +964,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Wait for vault hosts to load
       expect(await screen.findByText('Production Web')).toBeInTheDocument();
 
-      // Open Port Forwarding modal
-      const tunnelsBtn = screen.getByRole('button', { name: /Port Forwarding/i });
-      fireEvent.click(tunnelsBtn);
+      // Open Port Forwarding modal via Networking & Pivoting menu
+      fireEvent.click(screen.getByRole('button', { name: /Networking & Pivoting/i }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Port Forwarding' }));
       const forwardModal = screen.getByRole('dialog', { name: 'Port Forwarding & Tunnels' });
       expect(forwardModal).toBeInTheDocument();
 
@@ -1412,11 +1413,11 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Press Ctrl+B to arm leader mode
       fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
       // Verify visual leader status pill appears in header
-      expect(screen.getByText(/⌨️ LEADER \(Ctrl\+B\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/LEADER \(Ctrl\+B\)/i)).toBeInTheDocument();
 
       // Press Escape to cancel leader mode
       fireEvent.keyDown(window, { key: 'Escape' });
-      expect(screen.queryByText(/⌨️ LEADER \(Ctrl\+B\)/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/LEADER \(Ctrl\+B\)/i)).not.toBeInTheDocument();
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }
@@ -1825,10 +1826,13 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     // 3. Toggle Broadcast Input via Alt+B shortcut
     fireEvent.keyDown(window, { key: 'b', altKey: true });
 
-    // 4. Verify Broadcast status pill in top header
+    // 4. Verify Broadcast status pill is in the bottom bar (not in top header)
     const broadcastStatusPill = await screen.findByRole('status', { name: 'Broadcast Input Mode Active' });
     expect(broadcastStatusPill).toBeInTheDocument();
     expect(broadcastStatusPill).toHaveTextContent(/BROADCAST \(2 sessions\)/i);
+    const topHeader = document.querySelector('header.app-header');
+    expect(topHeader).not.toBeNull();
+    expect(within(topHeader as HTMLElement).queryByRole('status', { name: 'Broadcast Input Mode Active' })).not.toBeInTheDocument();
 
     // 5. Verify glowing indicators and badges on both participating panes
     const currentPane1 = screen.getByLabelText('Pane Cluster Node');
@@ -3136,8 +3140,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       const engElements = await screen.findAllByText(/Megacorp Security Audit/i);
       expect(engElements.length).toBeGreaterThanOrEqual(2);
 
-      const newEngBtn = screen.getByRole('button', { name: /\+ New Engagement/i });
-      expect(newEngBtn).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /\+ New Engagement/i })).not.toBeInTheDocument();
 
       const engToolsMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
       expect(engToolsMenuBtn).toBeInTheDocument();
@@ -3148,8 +3151,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(screen.getByText(/Export \.daeng Package/i)).toBeInTheDocument();
       expect(screen.queryByText(/Edit Scope & Lockout Policy/i)).toBeNull();
 
-      // 3. Open New Engagement Modal
-      fireEvent.click(newEngBtn);
+      // 3. Open New Engagement Modal from Engagement Selector dropdown
+      fireEvent.click(engagementSelect);
+      fireEvent.click(screen.getByRole('menuitem', { name: /New Engagement/i }));
       expect(await screen.findByText(/New Pentest Engagement/i)).toBeInTheDocument();
       expect(screen.getByPlaceholderText(/Acme Corp External Penetration Test/i)).toBeInTheDocument();
       expect(screen.getByPlaceholderText(/Target subnets, IPs, hostnames/i)).toBeInTheDocument();
@@ -3273,6 +3277,13 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
       render(<App />);
       expect(await screen.findByLabelText('DoubleAgent Workspace')).toBeInTheDocument();
+
+      // Top bar has no DoubleAgent wordmark logo, no + button beside Engagement selector, and no pinning UI
+      const headerEl = document.querySelector('header.app-header') as HTMLElement;
+      expect(within(headerEl).queryByAltText('DoubleAgent Logo')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /\+ New Engagement/i })).not.toBeInTheDocument();
+      expect(document.querySelectorAll('.nav-pin-btn').length).toBe(0);
+      expect(document.querySelectorAll('.nav-pinned-btn').length).toBe(0);
 
       // 1. Engagement dropdown has no tunnels & routing items
       fireEvent.click(screen.getByRole('button', { name: /Engagement ▾/i }));

@@ -6,11 +6,12 @@
 
 ## What Works
 - **UI Navigation, View & Sidebar Reorganization**:
-  - **Clean Dropdown Structure (`frontend/src/App.tsx`, `frontend/src/types/workspace.ts`)**:
+  - **Clean Dropdown Structure & Responsive Top Bar (`frontend/src/App.tsx`, `frontend/src/styles.css`, `frontend/src/types/workspace.ts`)**:
     - Removed `Tunnels & Routing` items from the `Engagement` dropdown.
     - Removed `Port Forwarding`, `Proxy Profiles`, `Pivoting Engine`, `Route Health Check`, and `SFTP` from the `Terminals` dropdown (leaving local shells, directory shells, `Hardware Bus & UART Logic`, `Raw TCP / Netcat`, and `WinRM / PowerShell Remoting`).
     - Added the **Networking & Pivoting** dropdown immediately after `Recon & Exploit`, containing `Port Forwarding`, `Proxy Profiles`, and `Pivoting Engine`.
     - Moved `SFTP File Browser` and `Route Health Check Dashboard` into the **View** menu.
+    - Removed the top-bar DoubleAgent logo, `+` button beside the Engagement Selector, top-bar Broadcast pill (consolidated cleanly with interactive Disarm into the bottom HUD status bar), and the Top Bar tool pinning feature; added fluid `clamp()` sizing, flex-wrap, and `@media (max-width: 1080px / 820px)` compression in `styles.css` so the header stays readable on narrower windows.
     - Stripped all internal `(F-XX)` / `OPS-FXX` / `F-XX //` milestone references across all user-facing UI strings (`App.tsx`, modals, views, tooltips, and labels).
   - **Route Health Check Workspace View (`RouteHealthModal.tsx`, `App.tsx`, `RouteHealthModal.test.tsx`)**:
     - Converted Route Health Check & Active Listeners Dashboard from a modal dialog into a full workspace view tab (`tabType: 'route-health'`, `isView={true}` rendering without backdrop as `role="region"`, similar to `NetworkMapView`).
