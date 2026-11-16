@@ -226,7 +226,7 @@ export function SaveSelectionCredModal({
             <span className="cyber-hazard-stripes">///</span>
             <div>
               <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                🔑 Save Terminal Selection as Credential (F-19)
+                🔑 Save Terminal Selection as Credential
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 CREDENTIAL-INGEST // AUTO-ASSOCIATE HOST &amp; ENGAGEMENT POOL
@@ -310,7 +310,7 @@ export function SaveSelectionCredModal({
 
               <div>
                 <label className="cyber-label" htmlFor="cred-scope-host">
-                  Associated Host (F-19)
+                  Associated Host
                 </label>
                 <select
                   id="cred-scope-host"
@@ -606,7 +606,7 @@ export function SaveSelectionEvidenceModal({
             <span className="cyber-hazard-stripes">///</span>
             <div>
               <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                🛡️ Save Terminal Selection as Evidence (F-19)
+                🛡️ Save Terminal Selection as Evidence
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 EVIDENCE-STORE // LOG PROOF &amp; ASSOCIATE WITH ENGAGEMENT TARGET
@@ -690,7 +690,7 @@ export function SaveSelectionEvidenceModal({
 
               <div>
                 <label className="cyber-label" htmlFor="ev-host">
-                  Associated Target Host (F-19)
+                  Associated Target Host
                 </label>
                 <select
                   id="ev-host"
@@ -978,7 +978,7 @@ export function SaveSelectionNoteModal({
                   letterSpacing: '0.04em',
                 }}
               >
-                DOCUMENTATION // RECON &amp; SCAN SCRATCHPAD (F-17)
+                DOCUMENTATION // RECON &amp; SCAN SCRATCHPAD
               </div>
             </div>
           </div>
@@ -1293,7 +1293,7 @@ export function SaveSelectionFindingModal({
                   letterSpacing: '0.04em',
                 }}
               >
-                VULNERABILITY-INGEST // ATTACHES SELECTION AS PRIMARY EVIDENCE (F-18)
+                VULNERABILITY-INGEST // ATTACHES SELECTION AS PRIMARY EVIDENCE
               </div>
             </div>
           </div>

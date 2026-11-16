@@ -1033,7 +1033,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <h3 id="evidence-dialog-title" style={{ margin: 0, fontSize: '1.05rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                  🛡️ Evidence Vault &amp; Findings (F-18)
+                  🛡️ Evidence Vault &amp; Findings
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '0.74rem', color: '#00f0ff', fontWeight: 700 }}>ENGAGEMENT:</span>

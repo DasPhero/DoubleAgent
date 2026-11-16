@@ -238,13 +238,13 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
           <div className="cyber-hud-title-block">
             <div className="cyber-hud-tag-line">
               <span className="cyber-hazard-stripes">///</span>
-              <span className="cyber-hud-tag">OPS-F32</span>
+              <span className="cyber-hud-tag">OPS-CATCHER</span>
               <span className="cyber-hud-delim">//</span>
               <span className="cyber-hud-subtag">C2 CATCHER ENGINE</span>
             </div>
             <h2 className="cyber-hud-title" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <CyberIcon name="radar" size={20} />
-              <span>LISTENER MANAGER // REVERSE &amp; BIND CATCHERS (F-32)</span>
+              <span>LISTENER MANAGER // REVERSE &amp; BIND CATCHERS</span>
             </h2>
             <div className="cyber-telemetry-strip">
               <span className="cyber-telemetry-chip chip-cyan" title="Currently active listeners">
@@ -622,10 +622,10 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
                                         onStabilizeSession(sess.id);
                                         onClose();
                                       }}
-                                      title="Upgrade shell to full interactive PTY (F-34)"
+                                      title="Upgrade shell to full interactive PTY"
                                     >
                                       <CyberIcon name="stabilize" size={12} />
-                                      <span style={{ marginLeft: '0.3rem' }}>Stabilize (F-34)</span>
+                                      <span style={{ marginLeft: '0.3rem' }}>Stabilize</span>
                                     </button>
                                   )}
                                 </div>
@@ -658,7 +658,7 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
                               title="Open Payload Generator pre-configured for this listener"
                             >
                               <CyberIcon name="target" size={12} />
-                              <span style={{ marginLeft: '0.3rem' }}>Payload (F-33)</span>
+                              <span style={{ marginLeft: '0.3rem' }}>Payload</span>
                             </button>
                           )}
 

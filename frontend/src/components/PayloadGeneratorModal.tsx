@@ -138,10 +138,10 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
       const file = onSelectFile
         ? await onSelectFile('Select Payload Templates JSON File', 'JSON Files', '*.json')
         : await (window as unknown as { go?: { main?: { App?: { SelectFileDialog: (t: string, fn: string, fp: string) => Promise<string> } } } }).go?.main?.App?.SelectFileDialog?.(
-            'Select Payload Templates JSON File',
-            'JSON Files',
-            '*.json'
-          );
+          'Select Payload Templates JSON File',
+          'JSON Files',
+          '*.json'
+        );
       if (file && file.trim()) {
         const updated = await setFilePath(file.trim());
         setFileConfig(updated);
@@ -158,8 +158,8 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
       const folder = onSelectDirectory
         ? await onSelectDirectory('Select Payload Templates Folder')
         : await (window as unknown as { go?: { main?: { App?: { SelectDirectoryDialog: (t: string) => Promise<string> } } } }).go?.main?.App?.SelectDirectoryDialog?.(
-            'Select Payload Templates Folder'
-          );
+          'Select Payload Templates Folder'
+        );
       if (folder && folder.trim()) {
         const updated = await setFilePath(folder.trim());
         setFileConfig(updated);
@@ -375,13 +375,13 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
           <div className="cyber-hud-title-block">
             <div className="cyber-hud-tag-line">
               <span className="cyber-hazard-stripes">///</span>
-              <span className="cyber-hud-tag">OPS-F33</span>
+              <span className="cyber-hud-tag">OPS-PAYLOAD</span>
               <span className="cyber-hud-delim">//</span>
               <span className="cyber-hud-subtag">SHELL SYNTHESIS MATRIX</span>
             </div>
             <h2 className="cyber-hud-title" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <CyberIcon name="target" size={20} />
-              <span>PAYLOAD GENERATOR // REVERSE &amp; BIND SHELLS (F-33)</span>
+              <span>PAYLOAD GENERATOR // REVERSE &amp; BIND SHELLS</span>
             </h2>
             <div className="cyber-telemetry-strip">
               <span className="cyber-telemetry-chip chip-green" title="Loaded external payload templates">
@@ -934,13 +934,12 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
           >
             {currentTemplate ? (
               <div
-                className={`cyber-totp-card ${
-                  currentTemplate.opsecRisk === 'high' || isHighRiskPort
+                className={`cyber-totp-card ${currentTemplate.opsecRisk === 'high' || isHighRiskPort
                     ? 'card-urgent'
                     : currentTemplate.opsecRisk === 'medium'
-                    ? 'card-warning'
-                    : ''
-                }`}
+                      ? 'card-warning'
+                      : ''
+                  }`}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
               >
                 <div className="card-reticle card-reticle-tl" />
@@ -972,20 +971,20 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                           currentTemplate.opsecRisk === 'high'
                             ? '#ff2a6d'
                             : currentTemplate.opsecRisk === 'medium'
-                            ? '#f59e0b'
-                            : '#10b981',
+                              ? '#f59e0b'
+                              : '#10b981',
                         color:
                           currentTemplate.opsecRisk === 'high'
                             ? '#ff2a6d'
                             : currentTemplate.opsecRisk === 'medium'
-                            ? '#f59e0b'
-                            : '#10b981',
+                              ? '#f59e0b'
+                              : '#10b981',
                         background:
                           currentTemplate.opsecRisk === 'high'
                             ? 'rgba(255, 42, 109, 0.14)'
                             : currentTemplate.opsecRisk === 'medium'
-                            ? 'rgba(245, 158, 11, 0.14)'
-                            : 'rgba(16, 185, 129, 0.14)',
+                              ? 'rgba(245, 158, 11, 0.14)'
+                              : 'rgba(16, 185, 129, 0.14)',
                       }}
                     >
                       <span className="pill-pulse" />
@@ -1159,9 +1158,8 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                         {Array.from({ length: 10 }).map((_, idx) => (
                           <span
                             key={idx}
-                            className={`seg-cell ${idx < (isStealthPort ? 10 : 7) ? 'seg-active' : 'seg-inactive'} ${
-                              isHighRiskPort ? 'seg-urgent' : !isStealthPort ? 'seg-warning' : ''
-                            }`}
+                            className={`seg-cell ${idx < (isStealthPort ? 10 : 7) ? 'seg-active' : 'seg-inactive'} ${isHighRiskPort ? 'seg-urgent' : !isStealthPort ? 'seg-warning' : ''
+                              }`}
                           />
                         ))}
                       </div>
@@ -1192,7 +1190,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                     >
                       <CyberIcon name="save" size={13} />
                       <span style={{ marginLeft: '0.35rem' }}>
-                        {savingSnippet ? 'Saving...' : 'Save as Snippet (F-15)'}
+                        {savingSnippet ? 'Saving...' : 'Save as Snippet'}
                       </span>
                     </button>
 

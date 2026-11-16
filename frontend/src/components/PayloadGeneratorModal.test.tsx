@@ -84,7 +84,7 @@ describe('PayloadGeneratorModal (F-33)', () => {
       />
     );
 
-    expect(screen.getByText(/PAYLOAD GENERATOR \/\/ REVERSE & BIND SHELLS \(F-33\)/i)).toBeDefined();
+    expect(screen.getByText(/PAYLOAD GENERATOR \/\/ REVERSE & BIND SHELLS/i)).toBeDefined();
 
     await waitFor(() => {
       expect(screen.getAllByText('Bash Interactive TCP').length).toBeGreaterThan(0);
@@ -199,10 +199,10 @@ describe('PayloadGeneratorModal (F-33)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Save as Snippet (F-15)')).toBeDefined();
+      expect(screen.getByText('Save as Snippet')).toBeDefined();
     });
 
-    const saveSnippetBtn = screen.getByText('Save as Snippet (F-15)');
+    const saveSnippetBtn = screen.getByText('Save as Snippet');
     fireEvent.click(saveSnippetBtn);
 
     await waitFor(() => {

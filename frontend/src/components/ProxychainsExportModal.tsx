@@ -181,7 +181,7 @@ export function ProxychainsExportModal({
             <span className="cyber-hazard-stripes">///</span>
             <div>
               <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CyberIcon name="chain" size={16} /> Export proxychains.conf (F-14)
+                <CyberIcon name="chain" size={16} /> Export proxychains.conf
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 CHAIN-ROUTER // RFC-COMPLIANT CONFIGURATION FOR PROXYCHAINS-NG

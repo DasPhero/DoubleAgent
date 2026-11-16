@@ -904,7 +904,6 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
         <div className="network-map-title-group">
           <CyberIcon name="network" size={16} />
           <strong className="network-map-title">Network Topology Map</strong>
-          <span className="network-map-f-id">F-37</span>
         </div>
 
         {/* Search & Mode Toggles */}

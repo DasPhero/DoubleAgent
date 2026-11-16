@@ -778,7 +778,7 @@ export function SftpBrowserView({
                 {!(selectedRemoteItem.IsDir ?? selectedRemoteItem.isDir) && (
                   <>
                     <button
-                      title="Edit Remote File (F-28)"
+                      title="Edit Remote File"
                       onClick={() => void handleStartRemoteEdit(selectedRemoteItem)}
                       style={{
                         padding: '2px 10px',
@@ -1036,10 +1036,10 @@ export function SftpBrowserView({
                   task.status === 'completed'
                     ? '#3fb950'
                     : task.status === 'failed'
-                    ? '#f85149'
-                    : task.status === 'cancelled'
-                    ? '#d29922'
-                    : '#58a6ff';
+                      ? '#f85149'
+                      : task.status === 'cancelled'
+                        ? '#d29922'
+                        : '#58a6ff';
 
                 return (
                   <div

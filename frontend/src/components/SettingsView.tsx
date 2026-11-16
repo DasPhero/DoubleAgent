@@ -350,7 +350,7 @@ export function SettingsView({
           <span className="cyber-hazard-stripes">///</span>
           <div>
             <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CyberIcon name="gear" size={16} /> Global Settings &amp; Preferences (F-18, F-29)
+              <CyberIcon name="gear" size={16} /> Global Settings &amp; Preferences
             </h3>
             <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
               SYSTEM CONFIGURATION // THEMES · VAULT SECURITY · CLOUD SYNC · MIGRATION
@@ -1246,7 +1246,7 @@ export function SettingsView({
           <section className="settings-section storage-sync-card">
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <CyberIcon name="shield" size={15} />
-              <span>Active Vault Location &amp; Sync State (F-29)</span>
+              <span>Active Vault Location &amp; Sync State</span>
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
               DoubleAgent stores all hosts, credentials, SSH keys, port forwarding rules, notes, and 2FA tokens
@@ -1435,7 +1435,7 @@ export function SettingsView({
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '1.2rem' }}>📥</span>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#00f0ff' }}>PuTTY &amp; Termius Sessions (F-30)</h4>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#00f0ff' }}>PuTTY &amp; Termius Sessions</h4>
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
                     Scan Windows Registry or .reg exports for saved PuTTY sessions, or import JSON session backups exported from Termius.

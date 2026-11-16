@@ -5,6 +5,17 @@
 - **Stage:** `2-flagship`
 
 ## What Works
+- **UI Navigation, View & Sidebar Reorganization**:
+  - **Clean Dropdown Structure (`frontend/src/App.tsx`, `frontend/src/types/workspace.ts`)**:
+    - Removed `Tunnels & Routing` items from the `Engagement` dropdown.
+    - Removed `Port Forwarding`, `Proxy Profiles`, `Pivoting Engine`, `Route Health Check`, and `SFTP` from the `Terminals` dropdown (leaving local shells, directory shells, `Hardware Bus & UART Logic`, `Raw TCP / Netcat`, and `WinRM / PowerShell Remoting`).
+    - Added the **Networking & Pivoting** dropdown immediately after `Recon & Exploit`, containing `Port Forwarding`, `Proxy Profiles`, and `Pivoting Engine`.
+    - Moved `SFTP File Browser` and `Route Health Check Dashboard` into the **View** menu.
+    - Stripped all internal `(F-XX)` / `OPS-FXX` / `F-XX //` milestone references across all user-facing UI strings (`App.tsx`, modals, views, tooltips, and labels).
+  - **Route Health Check Workspace View (`RouteHealthModal.tsx`, `App.tsx`, `RouteHealthModal.test.tsx`)**:
+    - Converted Route Health Check & Active Listeners Dashboard from a modal dialog into a full workspace view tab (`tabType: 'route-health'`, `isView={true}` rendering without backdrop as `role="region"`, similar to `NetworkMapView`).
+  - **Sidebar File Transfer Helper Panel (`App.tsx`)**:
+    - Added a dedicated `File Transfer` (`activeSidebarPanel === 'transfer'`) panel to the left `OPS` activity bar with staging server engine selector (`Built-in Go HTTP`, `Python 3`, `Updog`, `Impacket SMB`, `PHP`), folder picker (`SelectDirectoryDialog`), live active server telemetry & request feed + `Stop` controls, interactive folder/file browser (`.. Up`, click directory to navigate, click file to SHA-256/MD5 hash), and instant Linux/Windows download one-liner with `Copy` / `Insert` / `Run`.
 - **Evidence-Vault Reporting Export (`F-30` / Pentest Spec Line 37 & Line 74)**:
   - **Deterministic Pure-Go Report Compiler (`backend/core/report.go`, `backend/core/report_test.go`)**:
     - Defines `ReportExportRequest`, `CompiledReport`, `ReportHostSection`, `ReportFindingSection`, `ReportEvidenceArtifact`, `ReportWrittenFile`, and `ReportExportResult`.

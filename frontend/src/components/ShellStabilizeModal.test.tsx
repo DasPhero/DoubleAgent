@@ -23,7 +23,7 @@ describe('F-34 Shell Stabilization & PTY Upgrade', () => {
       />
     );
 
-    expect(screen.getByRole('dialog', { name: /Shell Stabilization & PTY Upgrade \(F-34\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /Shell Stabilization & PTY Upgrade/i })).toBeInTheDocument();
     expect(screen.getByText(/140×42/)).toBeInTheDocument();
 
     const modeSelect = screen.getByLabelText(/Session Topology Mode/i) as HTMLSelectElement;

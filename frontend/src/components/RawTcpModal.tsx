@@ -125,7 +125,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
             <span className="cyber-hazard-stripes">///</span>
             <div>
               <h3 id="rawtcp-dialog-title" style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                ⚡ Raw TCP Socket &amp; Listener (F-31)
+                ⚡ Raw TCP Socket &amp; Listener
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 SEC-NETCAT // RAW TCP SOCKET ENGINE &amp; REVERSE CATCHER

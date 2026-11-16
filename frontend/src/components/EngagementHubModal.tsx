@@ -355,7 +355,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 🎯 PENTEST ENGAGEMENT HUB &amp; SCOPE
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
-                F-36 // STANDALONE CUSTOMER ASSIGNMENTS · ARTIFACT VAULT · ENCRYPTED .DAENG PACKAGES
+                STANDALONE CUSTOMER ASSIGNMENTS · ARTIFACT VAULT · ENCRYPTED .DAENG PACKAGES
               </div>
             </div>
           </div>
@@ -624,7 +624,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     🖥️ ENCLOSED IN-SCOPE HOSTS ({inScopeHostsList.length})
                   </span>
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                    Strict customer encapsulation (F-36)
+                    Strict customer encapsulation
                   </span>
                 </div>
 

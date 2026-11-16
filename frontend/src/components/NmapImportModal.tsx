@@ -196,7 +196,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
             <span className="cyber-hazard-stripes">///</span>
             <div>
               <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <CyberIcon name="radar" size={16} /> NMAP XML RECON INGEST (F-39)
+                <CyberIcon name="radar" size={16} /> NMAP XML RECON INGEST
               </h3>
               <div
                 style={{
@@ -573,7 +573,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                           onChange={(e) => setCreatePortNotes(e.target.checked)}
                           style={{ accentColor: '#00f0ff' }}
                         />
-                        <span>Generate Note Subpages per Port (F-39)</span>
+                        <span>Generate Note Subpages per Port</span>
                       </label>
 
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.75rem', color: '#e2e8f0', cursor: 'pointer' }}>
@@ -593,7 +593,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                           onChange={(e) => setCreatePortFindings(e.target.checked)}
                           style={{ accentColor: '#00f0ff' }}
                         />
-                        <span>Create Structured Port Findings (F-39)</span>
+                        <span>Create Structured Port Findings</span>
                       </label>
 
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.75rem', color: '#e2e8f0', cursor: 'pointer' }}>

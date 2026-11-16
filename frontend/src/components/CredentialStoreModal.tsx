@@ -501,7 +501,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
             <span className="cyber-hazard-stripes">///</span>
             <div>
               <h3 id="credstore-dialog-title" style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                ⚔️ CREDENTIAL STORE &amp; SPRAY LISTS (F-36 / F-40)
+                ⚔️ CREDENTIAL STORE &amp; SPRAY LISTS
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 PENTEST MODULE // ENGAGEMENT POOL &amp; LOCKOUT GUARD
@@ -1004,7 +1004,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
-                      🛡️ DEFENSIVE LOCKOUT POLICY &amp; SPRAY GUARD (F-40)
+                      🛡️ DEFENSIVE LOCKOUT POLICY &amp; SPRAY GUARD
                     </span>
                     {selectedEngagementId ? (
                       <span style={{ fontSize: '0.68rem', color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -1097,7 +1097,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                   </span>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.84rem' }}>
-                      LOCKOUT GUARD WARNING (F-40)
+                      LOCKOUT GUARD WARNING
                     </div>
                     <div style={{ fontSize: '0.75rem', marginTop: '2px', lineHeight: '1.4' }}>
                       {sprayResult.warning.message}

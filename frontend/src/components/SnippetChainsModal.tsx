@@ -311,7 +311,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
             </span>
             <div>
               <div style={{ fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-primary-cyan, #00f0ff)' }}>
-                SNIPPET CHAINS // MULTI-STAGE SEQUENCES (F-16)
+                SNIPPET CHAINS // MULTI-STAGE SEQUENCES
               </div>
               <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                 Multi-step exploit, privesc & pivot chains with step-by-step confirmation and host scoping

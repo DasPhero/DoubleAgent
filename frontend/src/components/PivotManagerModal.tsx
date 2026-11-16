@@ -159,7 +159,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
     const timer = setInterval(() => {
       void listActivePivots()
         .then((list) => setActivePivots(list || []))
-        .catch(() => {});
+        .catch(() => { });
     }, 2000);
     return () => clearInterval(timer);
   }, [isOpen, refreshAll, listActivePivots]);
@@ -220,7 +220,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
       .then((res) => {
         if (mounted) setCommandSet(res);
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       mounted = false;
     };
@@ -455,13 +455,13 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
           <div className="cyber-hud-title-block">
             <div className="cyber-hud-tag-line">
               <span className="cyber-hazard-stripes">///</span>
-              <span className="cyber-hud-tag">OPS-F24</span>
+              <span className="cyber-hud-tag">OPS-PIVOT</span>
               <span className="cyber-hud-delim">//</span>
               <span className="cyber-hud-subtag">LIGOLO-NG TUN &amp; CHISEL RELAY ORCHESTRATOR</span>
             </div>
             <h2 className="cyber-hud-title" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <CyberIcon name="tunnel" size={20} />
-              <span>NETWORK PIVOTING &amp; TUNNEL MANAGER (F-24)</span>
+              <span>NETWORK PIVOTING &amp; TUNNEL MANAGER</span>
             </h2>
             <div className="cyber-telemetry-strip">
               <span className={`cyber-telemetry-chip ${runningCount > 0 ? 'chip-green' : 'chip-cyan'}`}>
@@ -492,10 +492,10 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                   onClose();
                   onOpenRouteHealth();
                 }}
-                title="Run OPSEC Route Health Check (F-38)"
+                title="Run OPSEC Route Health Check"
               >
                 <CyberIcon name="shield" size={13} />
-                <span>Health Check (F-38)</span>
+                <span>Health Check</span>
               </button>
             )}
             <button
@@ -1164,13 +1164,12 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                     key={inst.id}
                     style={{
                       background: 'rgba(6, 13, 26, 0.9)',
-                      border: `1px solid ${
-                        inst.status === 'running'
-                          ? 'rgba(16, 185, 129, 0.5)'
-                          : inst.status === 'error'
-                            ? 'rgba(239, 68, 68, 0.55)'
-                            : 'rgba(148, 163, 184, 0.35)'
-                      }`,
+                      border: `1px solid ${inst.status === 'running'
+                        ? 'rgba(16, 185, 129, 0.5)'
+                        : inst.status === 'error'
+                          ? 'rgba(239, 68, 68, 0.55)'
+                          : 'rgba(148, 163, 184, 0.35)'
+                        }`,
                       borderRadius: '4px',
                       padding: '0.9rem',
                       display: 'flex',

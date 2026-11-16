@@ -84,7 +84,7 @@ describe('NmapImportModal (F-39)', () => {
       />
     );
 
-    expect(screen.getByText(/NMAP XML RECON INGEST \(F-39\)/i)).toBeDefined();
+    expect(screen.getByText(/NMAP XML RECON INGEST/i)).toBeDefined();
 
     // Open textarea and trigger scan
     const details = screen.getByText(/Paste Raw XML Directly/i);

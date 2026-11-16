@@ -375,7 +375,7 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
             <div className="modal-header">
               <div className="conflict-badge">
                 <CyberIcon name="shield" size={16} />
-                <h3>Parallel Conflict Detected! (F-28)</h3>
+                <h3>Parallel Conflict Detected!</h3>
               </div>
               <button
                 type="button"

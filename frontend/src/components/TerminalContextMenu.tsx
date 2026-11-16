@@ -77,7 +77,7 @@ export function TerminalContextMenu({
     >
       <div className="menu-header">
         <span className="cyber-hazard-stripes">///</span>
-        <span className="menu-title">TERMINAL CONTEXT (F-19)</span>
+        <span className="menu-title">TERMINAL CONTEXT</span>
       </div>
 
       <div className="menu-preview-row font-mono" title={selectedText.trim()}>

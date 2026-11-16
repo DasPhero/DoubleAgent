@@ -90,7 +90,7 @@ describe('ListenerManagerModal (F-32)', () => {
       />
     );
 
-    expect(screen.getByText(/LISTENER MANAGER \/\/ REVERSE & BIND CATCHERS \(F-32\)/i)).toBeDefined();
+    expect(screen.getByText(/LISTENER MANAGER \/\/ REVERSE & BIND CATCHERS/i)).toBeDefined();
 
     await waitFor(() => {
       expect(screen.getByText('Default Stealth HTTPS Catcher')).toBeDefined();

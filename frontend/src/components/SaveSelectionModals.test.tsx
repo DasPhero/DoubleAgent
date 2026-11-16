@@ -71,7 +71,7 @@ describe('F-19 Terminal Selection & Quick Save to Vault', () => {
 
       // Verify menu elements
       expect(screen.getByRole('menu', { name: /Terminal Selection Context Menu/i })).toBeInTheDocument();
-      expect(screen.getByText(/TERMINAL CONTEXT \(F-19\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/TERMINAL CONTEXT/i)).toBeInTheDocument();
       expect(screen.getByText(/Web-Gateway/i)).toBeInTheDocument();
 
       // Test Copy
@@ -119,7 +119,7 @@ describe('F-19 Terminal Selection & Quick Save to Vault', () => {
       expect(screen.getByDisplayValue('SecretPass123!')).toBeInTheDocument();
 
       // Verify associated host & engagement are preselected
-      const hostSelect = screen.getByLabelText(/Associated Host \(F-19\)/i) as HTMLSelectElement;
+      const hostSelect = screen.getByLabelText(/Associated Host/i) as HTMLSelectElement;
       expect(hostSelect.value).toBe('host-target-1');
 
       const engSelect = screen.getByLabelText(/Pentest Engagement/i) as HTMLSelectElement;
@@ -180,7 +180,7 @@ describe('F-19 Terminal Selection & Quick Save to Vault', () => {
       expect(screen.getByRole('dialog', { name: /Save Terminal Selection as Evidence Finding/i })).toBeInTheDocument();
       expect(screen.getByDisplayValue('uid=0(root) gid=0(root) groups=0(root)')).toBeInTheDocument();
 
-      const hostSelect = screen.getByLabelText(/Associated Target Host \(F-19\)/i) as HTMLSelectElement;
+      const hostSelect = screen.getByLabelText(/Associated Target Host/i) as HTMLSelectElement;
       expect(hostSelect.value).toBe('host-target-1');
 
       // Check inReport checkbox defaults to checked

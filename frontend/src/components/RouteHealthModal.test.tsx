@@ -219,4 +219,25 @@ describe('RouteHealthModal (F-38)', () => {
     fireEvent.click(stopButtons[0]);
     await waitFor(() => expect(onStopEndpoint).toHaveBeenCalledWith('shell-listener', 'lst-4444'));
   });
+
+  it('renders as an embedded workspace view without modal backdrop when isView is true', () => {
+    const onClose = vi.fn();
+    const onOpenPivotManager = vi.fn();
+
+    render(
+      <RouteHealthModal
+        isView={true}
+        onClose={onClose}
+        runHealthCheck={vi.fn().mockResolvedValue(passiveReport)}
+        onOpenPivotManager={onOpenPivotManager}
+      />
+    );
+
+    expect(screen.getByRole('region', { name: 'Route Health Check' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Pivots' })[0]);
+    expect(onOpenPivotManager).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

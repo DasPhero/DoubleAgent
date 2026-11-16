@@ -410,13 +410,13 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
           <div className="cyber-hud-title-block">
             <div className="cyber-hud-tag-line">
               <span className="cyber-hazard-stripes">///</span>
-              <span className="cyber-hud-tag">OPS-F31</span>
+              <span className="cyber-hud-tag">OPS-TRANSFER</span>
               <span className="cyber-hud-delim">//</span>
               <span className="cyber-hud-subtag">STAGING, EXFIL &amp; INTEGRITY VERIFIER</span>
             </div>
             <h2 className="cyber-hud-title" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <CyberIcon name="upload" size={20} />
-              <span>FILE TRANSFER HELPER // HTTP STAGING &amp; HASH CHECK (F-31)</span>
+              <span>FILE TRANSFER HELPER // HTTP STAGING &amp; HASH CHECK</span>
             </h2>
             <div className="cyber-telemetry-strip">
               <span className="cyber-telemetry-chip chip-cyan">

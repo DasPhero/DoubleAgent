@@ -155,7 +155,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
             <span className="cyber-hazard-stripes">///</span>
             <div>
               <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                ⏺ Session Logs &amp; Transcripts (F-21)
+                ⏺ Session Logs &amp; Transcripts
               </h3>
               <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 AUDIT-TELEMETRY // TIMESTAMPED RECORDINGS &amp; PASSWORD-ECHO REDACTED

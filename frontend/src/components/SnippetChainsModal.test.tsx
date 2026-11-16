@@ -71,7 +71,7 @@ describe('SnippetChainsModal (F-16)', () => {
       />
     );
 
-    expect(screen.getByText(/SNIPPET CHAINS \/\/ MULTI-STAGE SEQUENCES \(F-16\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/SNIPPET CHAINS \/\/ MULTI-STAGE SEQUENCES/i)).toBeInTheDocument();
     expect(screen.getByText('Linux Stabilization Chain')).toBeInTheDocument();
     expect(screen.getByText('Windows Token Impersonation')).toBeInTheDocument();
     expect(screen.getByText('NO-PROMPT AUTO')).toBeInTheDocument();

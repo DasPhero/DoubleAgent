@@ -144,7 +144,7 @@ export function ShellStabilizeModal({
       className="modal-backdrop cyber-modal-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Shell Stabilization & PTY Upgrade (F-34)"
+      aria-label="Shell Stabilization & PTY Upgrade"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isRunning) onClose();
       }}
@@ -173,7 +173,7 @@ export function ShellStabilizeModal({
             <span className="cyber-hazard-stripes">///</span>
             <div>
               <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <CyberIcon name="stabilize" size={16} /> Shell Stabilization &amp; PTY Upgrade (F-34)
+                <CyberIcon name="stabilize" size={16} /> Shell Stabilization &amp; PTY Upgrade
               </h3>
               <div
                 style={{

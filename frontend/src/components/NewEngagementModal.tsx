@@ -214,7 +214,7 @@ export const NewEngagementModal: React.FC<NewEngagementModalProps> = ({
             }}
           >
             <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.04em' }}>
-              🛡️ DEFENSIVE LOCKOUT POLICY DEFAULTS (F-40)
+              🛡️ DEFENSIVE LOCKOUT POLICY DEFAULTS
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>

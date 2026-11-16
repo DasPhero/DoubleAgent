@@ -195,7 +195,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             <div>
               <h3>SESSION MIGRATION &amp; IMPORT</h3>
               <div className="dialog-subtitle">
-                F-30 // PUTTY REGISTRY &amp; TERMIUS EXPORT PARSER
+                PUTTY REGISTRY &amp; TERMIUS EXPORT PARSER
               </div>
             </div>
           </div>

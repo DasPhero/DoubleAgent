@@ -223,7 +223,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
           </button>
           <span className="cyber-hazard-stripes" style={{ marginRight: '6px' }}>///</span>
           <h2 className="notes-header-title" style={{ color: '#00f0ff', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <CyberIcon name="note" size={16} /> Host Notes &amp; Documentation (F-17)
+            <CyberIcon name="note" size={16} /> Host Notes &amp; Documentation
           </h2>
           <span className="notes-count-badge" style={{ background: 'rgba(0, 240, 255, 0.15)', color: '#00f0ff', border: '1px solid rgba(0, 240, 255, 0.4)' }}>{filteredNotes.length} items</span>
         </div>

@@ -78,7 +78,7 @@ export const VaultConflictModal: React.FC<VaultConflictModalProps> = ({
             <div>
               <h3>VAULT SYNC CONFLICT RESOLVER</h3>
               <div className="dialog-subtitle">
-                F-29 // CLOUD SYNC &amp; EXTERNAL VAULT MERGE ENGINE
+                CLOUD SYNC &amp; EXTERNAL VAULT MERGE ENGINE
               </div>
             </div>
           </div>
