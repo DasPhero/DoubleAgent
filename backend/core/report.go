@@ -12,13 +12,14 @@ import (
 const (
 	ReportFormatMarkdown = "markdown"
 	ReportFormatHTML     = "html"
+	ReportFormatDOCX     = "docx"
 )
 
-// ReportExportRequest configures a reproducible Markdown or HTML Evidence-Vault export (Pentest F-30).
+// ReportExportRequest configures a reproducible Markdown, HTML, or Word (.docx) Evidence-Vault export (Pentest F-30).
 type ReportExportRequest struct {
 	EngagementID            string `json:"engagementId,omitempty"`
 	HostID                  string `json:"hostId,omitempty"` // "" exports all hosts grouped per-host
-	Format                  string `json:"format"`           // "markdown" | "html"
+	Format                  string `json:"format"`           // "markdown" | "html" | "docx"
 	SplitByHost             bool   `json:"splitByHost,omitempty"`
 	IncludeInternalEvidence bool   `json:"includeInternalEvidence,omitempty"`
 	IncludePortFindings     bool   `json:"includePortFindings"`
@@ -34,6 +35,8 @@ func NormalizeReportFormat(raw string) string {
 		return ReportFormatMarkdown
 	case "htm", "html":
 		return ReportFormatHTML
+	case "doc", "docx", "word":
+		return ReportFormatDOCX
 	default:
 		return strings.ToLower(strings.TrimSpace(raw))
 	}
@@ -42,10 +45,10 @@ func NormalizeReportFormat(raw string) string {
 // ValidateReportExportRequest ensures format and options are valid.
 func ValidateReportExportRequest(req ReportExportRequest) error {
 	switch NormalizeReportFormat(req.Format) {
-	case ReportFormatMarkdown, ReportFormatHTML:
+	case ReportFormatMarkdown, ReportFormatHTML, ReportFormatDOCX:
 		return nil
 	default:
-		return fmt.Errorf("unsupported report format %q (expected markdown or html)", req.Format)
+		return fmt.Errorf("unsupported report format %q (expected markdown, html, or docx)", req.Format)
 	}
 }
 
@@ -170,6 +173,7 @@ type ReportExportResult struct {
 	Format           string              `json:"format"`
 	FileName         string              `json:"fileName"`
 	Content          string              `json:"content"`
+	ContentBase64    string              `json:"contentBase64,omitempty"`
 	ContentSHA256    string              `json:"contentSha256"`
 	FindingsCount    int                 `json:"findingsCount"`
 	EvidenceCount    int                 `json:"evidenceCount"`

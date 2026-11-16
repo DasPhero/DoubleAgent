@@ -18,11 +18,13 @@ import (
 
 // Snapshot aggregates current routes, tunnels, pivots, and proxy profiles for an on-demand health check (F-38).
 type Snapshot struct {
-	Routes        []core.NetworkRoute
-	ActivePivots  []core.PivotInstanceInfo
-	ForwardRules  []core.ForwardRule
-	ActiveTunnels []core.ForwardTunnelStatus
-	ProxyProfiles []core.ProxyProfile
+	Routes            []core.NetworkRoute
+	ActivePivots      []core.PivotInstanceInfo
+	ForwardRules      []core.ForwardRule
+	ActiveTunnels     []core.ForwardTunnelStatus
+	ProxyProfiles     []core.ProxyProfile
+	ActiveListeners   []core.ManagedListenerInfo
+	ActiveFileServers []core.FileTransferServerInfo
 	// DialContext optionally overrides net.Dialer.DialContext (used by sandboxed unit tests; nil uses real TCP sockets).
 	DialContext func(ctx context.Context, network, addr string) (net.Conn, error) `json:"-"`
 }
@@ -236,6 +238,22 @@ func RunCheck(ctx context.Context, rawReq core.RouteCheckRequest, snap Snapshot)
 		report.Entries = append(report.Entries, entry)
 	}
 
+	// 3b. Active Shell Listeners (F-32: nc / rlwrap / ncat / socat / rawtcp)
+	for _, lst := range snap.ActiveListeners {
+		if !includesRoute(req.RouteIDs, lst.ID) {
+			continue
+		}
+		report.Entries = append(report.Entries, inspectManagedListener(lst))
+	}
+
+	// 3c. Active File Transfer Staging Servers (F-31)
+	for _, srv := range snap.ActiveFileServers {
+		if !includesRoute(req.RouteIDs, srv.ID) {
+			continue
+		}
+		report.Entries = append(report.Entries, inspectFileTransferServer(ctx, srv, timeout, dialFn))
+	}
+
 	// 4. Explicit Custom TCP Connect Targets (only in throttled_tcp + ConfirmActiveTraffic)
 	if req.CheckMode == core.RouteCheckModeThrottled && len(req.CustomTargets) > 0 {
 		customEntry := core.RouteHealthEntry{
@@ -308,6 +326,66 @@ func RunCheck(ctx context.Context, rawReq core.RouteCheckRequest, snap Snapshot)
 	report.DurationMs = time.Since(started).Milliseconds()
 	report.OpsecWarnings = core.AnalyzeRouteHealthOpsec(req, report.Entries)
 	return report, nil
+}
+
+func inspectManagedListener(lst core.ManagedListenerInfo) core.RouteHealthEntry {
+	nowStr := time.Now().UTC().Format(time.RFC3339)
+	bindEP := net.JoinHostPort(localBindHost(lst.BindAddress), strconv.Itoa(int(lst.BindPort)))
+	status := "down"
+	switch strings.ToLower(strings.TrimSpace(lst.Status)) {
+	case "listening", "active", "running":
+		status = "healthy"
+	case "error":
+		status = "error"
+	}
+	return core.RouteHealthEntry{
+		ID:           lst.ID,
+		SourceType:   "shell-listener",
+		Name:         lst.Name,
+		Kind:         fmt.Sprintf("%s (%s)", lst.Tool, lst.Kind),
+		BindEndpoint: bindEP,
+		Status:       status,
+		RuntimeState: lst.Status,
+		MetaSummary:  fmt.Sprintf("Catches: %d · Active Sessions: %d", lst.CatchCount, len(lst.ActiveSessions)),
+		ErrorMsg:     lst.ErrorMsg,
+		LastCheck:    nowStr,
+	}
+}
+
+func inspectFileTransferServer(
+	ctx context.Context,
+	srv core.FileTransferServerInfo,
+	timeout time.Duration,
+	dialFn func(ctx context.Context, network, addr string) (net.Conn, error),
+) core.RouteHealthEntry {
+	nowStr := time.Now().UTC().Format(time.RFC3339)
+	bindEP := net.JoinHostPort(localBindHost(srv.BindAddress), strconv.Itoa(int(srv.Port)))
+	entry := core.RouteHealthEntry{
+		ID:             srv.ID,
+		SourceType:     "transfer-server",
+		Name:           srv.Name,
+		Kind:           srv.Kind,
+		BindEndpoint:   bindEP,
+		TargetEndpoint: srv.Directory,
+		RuntimeState:   srv.Status,
+		MetaSummary:    fmt.Sprintf("Served: %d · Uploads: %d", srv.ServedCount, srv.UploadCount),
+		LastCheck:      nowStr,
+	}
+	if strings.ToLower(strings.TrimSpace(srv.Status)) != "running" {
+		entry.Status = "down"
+		return entry
+	}
+	probe := probeDirectTCP(ctx, bindEP, timeout, dialFn)
+	probe.RouteID = entry.ID
+	probe.RouteName = entry.Name
+	probe.RouteKind = "http-staging"
+	entry.Probes = []core.ProbeTargetResult{probe}
+	if probe.Reachable {
+		entry.Status = "healthy"
+	} else {
+		entry.Status = "degraded"
+	}
+	return entry
 }
 
 func inspectNetworkRoute(

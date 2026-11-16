@@ -22,7 +22,10 @@ export interface SocksCandidate {
 
 export interface WinrmManagerModalProps {
   isOpen?: boolean;
+  isEmbedded?: boolean;
   onClose: () => void;
+  onPinToTab?: () => void;
+  onPopOutModal?: () => void;
   activeEngagementId?: string | null;
   activeEngagementName?: string | null;
   hosts?: WinrmHostCandidate[];
@@ -60,7 +63,10 @@ function formatBytes(n: number): string {
 
 export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
   isOpen = true,
+  isEmbedded = false,
   onClose,
+  onPinToTab,
+  onPopOutModal,
   activeEngagementId = null,
   activeEngagementName = null,
   hosts = [],
@@ -89,6 +95,7 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
   // Form state
   const [editingId, setEditingId] = useState<string>('');
   const [scopeToEngagement, setScopeToEngagement] = useState<boolean>(Boolean(activeEngagementId));
+  const [profileListFilter, setProfileListFilter] = useState<'scoped' | 'all'>(activeEngagementId ? 'scoped' : 'all');
   const [hostId, setHostId] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [host, setHost] = useState<string>('');
@@ -146,10 +153,10 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
 
   const filteredProfiles = useMemo(() => {
     return profiles.filter((p) => {
-      if (!activeEngagementId || !scopeToEngagement) return true;
+      if (!activeEngagementId || profileListFilter === 'all') return true;
       return !p.engagementId || p.engagementId === activeEngagementId;
     });
-  }, [profiles, activeEngagementId, scopeToEngagement]);
+  }, [profiles, activeEngagementId, profileListFilter]);
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.sessionId === selectedSessionId) || sessions[0] || null,
@@ -429,17 +436,30 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
     }
   };
 
-  return (
-    <div className="cyber-modal-overlay" role="dialog" aria-modal="true" aria-label="WinRM PowerShell Remoting Client">
+  const content = (
       <div
         className="cyber-modal-content"
-        style={{
-          width: 'min(1200px, 95vw)',
-          height: 'min(840px, 90vh)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
+        style={
+          isEmbedded
+            ? {
+                width: '100%',
+                height: '100%',
+                maxWidth: 'none',
+                maxHeight: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                borderRadius: 0,
+                border: 'none',
+              }
+            : {
+                width: 'min(1200px, 95vw)',
+                height: 'min(840px, 90vh)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }
+        }
       >
         {/* Header */}
         <div
@@ -495,12 +515,36 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
                 {t.tool}: {t.found ? 'READY' : 'NATIVE WS-MAN'}
               </span>
             ))}
+            {!isEmbedded && onPinToTab && (
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-secondary"
+                style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem' }}
+                onClick={onPinToTab}
+                title="Open WinRM Manager as a full Workspace View tab"
+              >
+                <CyberIcon name="pin" size={12} />
+                <span>Pin View</span>
+              </button>
+            )}
+            {isEmbedded && onPopOutModal && (
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-secondary"
+                style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem' }}
+                onClick={onPopOutModal}
+                title="Pop out as overlay modal"
+              >
+                <CyberIcon name="undock" size={12} />
+                <span>Pop Out</span>
+              </button>
+            )}
             <button
               type="button"
               className="cyber-btn-close"
               onClick={onClose}
-              aria-label="Close WinRM Client"
-              title="Close WinRM Client"
+              aria-label={isEmbedded ? 'Close WinRM View' : 'Close WinRM Client'}
+              title={isEmbedded ? 'Close WinRM View' : 'Close WinRM Client'}
             >
               <CyberIcon name="close" size={14} />
             </button>
@@ -563,19 +607,33 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
           {/* Left Panel: Connection Builder + Vault Profiles */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', overflowY: 'auto', paddingRight: '0.2rem' }}>
             <div className="cyber-hud-panel" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.06em' }}>
                   {editingId ? 'EDIT WINRM TARGET PROFILE' : 'NEW WINRM / PSREMOTING TARGET'}
                 </span>
                 {activeEngagementId && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: '#cbd5e1', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={scopeToEngagement}
-                      onChange={(e) => setScopeToEngagement(e.target.checked)}
-                    />
-                    <span>{activeEngagementName || 'Active Engagement'}</span>
-                  </label>
+                  <div
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                    title="Choose whether saving this target binds it strictly to the active engagement (.daeng isolated) or saves it globally across engagements."
+                  >
+                    <span style={{ fontSize: '0.66rem', color: '#94a3b8' }}>Save Scope:</span>
+                    <button
+                      type="button"
+                      className={`cyber-pill-btn ${scopeToEngagement ? 'active' : ''}`}
+                      style={{ padding: '2px 7px', fontSize: '0.65rem' }}
+                      onClick={() => setScopeToEngagement(true)}
+                    >
+                      {activeEngagementName || 'Engagement'}
+                    </button>
+                    <button
+                      type="button"
+                      className={`cyber-pill-btn ${!scopeToEngagement ? 'active' : ''}`}
+                      style={{ padding: '2px 7px', fontSize: '0.65rem' }}
+                      onClick={() => setScopeToEngagement(false)}
+                    >
+                      Global
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -831,10 +889,30 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
 
             {/* Saved Vault Profiles */}
             <div className="cyber-hud-panel" style={{ padding: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
                 <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em' }}>
                   SAVED WINRM PROFILES ({filteredProfiles.length})
                 </span>
+                {activeEngagementId && (
+                  <div style={{ display: 'inline-flex', gap: '0.25rem' }}>
+                    <button
+                      type="button"
+                      className={`cyber-pill-btn ${profileListFilter === 'scoped' ? 'active' : ''}`}
+                      style={{ padding: '1px 6px', fontSize: '0.64rem' }}
+                      onClick={() => setProfileListFilter('scoped')}
+                    >
+                      Engagement
+                    </button>
+                    <button
+                      type="button"
+                      className={`cyber-pill-btn ${profileListFilter === 'all' ? 'active' : ''}`}
+                      style={{ padding: '1px 6px', fontSize: '0.64rem' }}
+                      onClick={() => setProfileListFilter('all')}
+                    >
+                      All
+                    </button>
+                  </div>
+                )}
               </div>
 
               {filteredProfiles.length === 0 ? (
@@ -998,16 +1076,28 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
                     { label: 'sysinfo', cmd: 'systeminfo' },
                     { label: 'services', cmd: 'Get-CimInstance Win32_Service | Select Name,State,PathName | Format-Table -AutoSize' },
                     { label: 'netuser', cmd: 'net user' },
-                    { label: 'Bypass-4MSI Info', cmd: 'Write-Output "[*] Use explicit operator verification for AMSI telemetry inside authorized lab sessions."' },
+                    { label: 'ipconfig /all', cmd: 'ipconfig /all' },
+                    { label: 'netstat -ano', cmd: 'netstat -ano' },
+                    { label: 'env', cmd: 'Get-ChildItem Env: | Format-Table -AutoSize' },
+                    { label: 'Bypass-4MSI', cmd: 'Write-Output "[*] Active PowerShell host: $PSVersionTable.PSVersion · LanguageMode: $($ExecutionContext.SessionState.LanguageMode)"' },
                   ].map((preset) => (
                     <button
                       key={preset.label}
                       type="button"
-                      className="cyber-pill-btn"
-                      disabled={!activeSession || isBusy}
+                      className={`cyber-pill-btn ${psCommand.trim() === preset.cmd ? 'active' : ''}`}
+                      disabled={isBusy}
+                      title={
+                        activeSession
+                          ? `Execute ${preset.label} in active WinRM session`
+                          : `Load "${preset.cmd}" into command box (connect a WinRM session above to execute)`
+                      }
                       onClick={() => {
                         setPsCommand(preset.cmd);
-                        void handleExecutePS(preset.cmd);
+                        if (activeSession) {
+                          void handleExecutePS(preset.cmd);
+                        } else {
+                          setStatusMessage(`Loaded "${preset.label}" into PowerShell runner — connect or select a WinRM session above to execute.`);
+                        }
                       }}
                     >
                       {preset.label}
@@ -1154,6 +1244,23 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
           </div>
         </div>
       </div>
+  );
+
+  if (isEmbedded) {
+    return content;
+  }
+
+  return (
+    <div
+      className="cyber-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="WinRM PowerShell Remoting Client"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      {content}
     </div>
   );
 };

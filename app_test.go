@@ -2421,7 +2421,16 @@ func TestApp_PayloadGenerator_F33(t *testing.T) {
 		t.Fatalf("store.Initialize failed: %v", err)
 	}
 
-	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	var app *App
+	app = NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
 	app.ctx = context.Background()
 
 	// 1. Configure external payload templates path
@@ -2562,7 +2571,16 @@ func TestApp_ListenerManager_F32(t *testing.T) {
 		t.Fatalf("store.Initialize failed: %v", err)
 	}
 
-	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	var app *App
+	app = NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
 	app.ctx = context.Background()
 
 	// 1. Initial list returns default profiles when vault has none
@@ -2637,7 +2655,16 @@ func TestApp_FileTransferHelper_F31(t *testing.T) {
 		t.Fatalf("Initialize failed: %v", err)
 	}
 
-	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	var app *App
+	app = NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
 	app.ctx = context.Background()
 
 	stagingDir := t.TempDir()
@@ -2739,7 +2766,16 @@ func TestApp_PivotManager_F24(t *testing.T) {
 		t.Fatalf("Initialize failed: %v", err)
 	}
 
-	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	var app *App
+	app = NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
 	app.ctx = context.Background()
 
 	// 1. Starter templates & binary scan
@@ -2748,8 +2784,8 @@ func TestApp_PivotManager_F24(t *testing.T) {
 		t.Fatal("expected starter pivot presets")
 	}
 	bins := app.DetectPivotBinaries()
-	if len(bins) != 2 {
-		t.Fatalf("expected 2 binary checks (ligolo-ng, chisel), got %d", len(bins))
+	if len(bins) != 3 {
+		t.Fatalf("expected 3 binary checks (ligolo-ng, chisel, sshuttle), got %d", len(bins))
 	}
 
 	// 2. Vault CRUD for NetworkRoute
@@ -2802,6 +2838,72 @@ func TestApp_PivotManager_F24(t *testing.T) {
 	}
 }
 
+func TestApp_TwoStepSshPivot_F24(t *testing.T) {
+	vaultFile := filepath.Join(t.TempDir(), "test.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: vaultFile})
+	if err := store.Initialize(context.Background(), "master"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	var app *App
+	app = NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
+	app.ctx = context.Background()
+
+	id := core.IdentityRecord{ID: "id-jump", Label: "Jump User", Username: "kali", Password: "pw"}
+	if err := app.SaveIdentity(id); err != nil {
+		t.Fatalf("SaveIdentity failed: %v", err)
+	}
+	jumpHost := core.HostRecord{
+		ID:         "host-jump",
+		Label:      "DMZ Jump",
+		Address:    "10.10.20.5",
+		Port:       22,
+		IdentityID: "id-jump",
+	}
+	if err := app.SaveHost(jumpHost); err != nil {
+		t.Fatalf("SaveHost failed: %v", err)
+	}
+
+	// Launch 2-Step Native SSH Local Forward to internal target (auto-connects relay host)
+	tun, err := app.LaunchTwoStepSshPivot(core.TwoStepSshPivotRequest{
+		RelayHostID: "host-jump",
+		Mode:        "local",
+		BindAddress: "127.0.0.1",
+		LocalPort:   13389,
+		TargetHost:  "10.10.20.10",
+		TargetPort:  3389,
+		SaveRule:    true,
+	})
+	if err != nil {
+		t.Fatalf("LaunchTwoStepSshPivot failed: %v", err)
+	}
+	if tun.Status != "active" || tun.BindPort != 13389 || tun.TargetHost != "10.10.20.10" {
+		t.Fatalf("unexpected tunnel status: %+v", tun)
+	}
+	if len(app.GetActiveTunnels()) != 1 {
+		t.Fatalf("expected 1 active tunnel, got %d", len(app.GetActiveTunnels()))
+	}
+
+	// Verify sshuttle command generation through App binding
+	cmdSet := app.BuildPivotCommands(core.NetworkRoute{
+		Name:      "sshuttle DMZ",
+		Tool:      "sshuttle",
+		SshTarget: "kali@10.10.20.5",
+		Subnets:   []string{"10.10.20.0/24"},
+	}, "")
+	if !strings.Contains(cmdSet.LinuxAgentCmd, "sshuttle -r kali@10.10.20.5 10.10.20.0/24") {
+		t.Fatalf("unexpected sshuttle BuildPivotCommands output: %+v", cmdSet)
+	}
+}
+
 func TestApp_RouteHealthCheck_F38(t *testing.T) {
 	vaultFile := filepath.Join(t.TempDir(), "test.vault")
 	store := vault.NewStore(vault.StoreOptions{FilePath: vaultFile})
@@ -2809,7 +2911,16 @@ func TestApp_RouteHealthCheck_F38(t *testing.T) {
 		t.Fatalf("Initialize failed: %v", err)
 	}
 
-	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	var app *App
+	app = NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
 	app.ctx = context.Background()
 
 	// Seed a NetworkRoute and a ForwardRule in the vault
@@ -3056,7 +3167,16 @@ func TestApp_EvidenceReportingExport_F30(t *testing.T) {
 		t.Fatalf("Initialize failed: %v", err)
 	}
 
-	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, nil)
+	var app *App
+	app = NewAppWithDependencies(newFakeSshTransport(), nil, store, func(_ context.Context, eventName string, optionalData ...interface{}) {
+		if eventName == "ssh:hostkey-prompt" && len(optionalData) > 0 {
+			if info, ok := optionalData[0].(core.HostKeyInfo); ok {
+				go func() {
+					_ = app.ResolveHostKeyPrompt(info.HostPattern, info.Port, true)
+				}()
+			}
+		}
+	})
 	app.ctx = context.Background()
 
 	// Seed engagement, two hosts, findings, evidence (reported + internal), ports, and note

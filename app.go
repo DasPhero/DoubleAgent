@@ -5531,6 +5531,127 @@ func (a *App) BuildPivotCommands(route core.NetworkRoute, lhost string) core.Piv
 	return core.BuildPivotCommandSet(route, lhost)
 }
 
+// LaunchTwoStepSshPivot starts a native pure-Go SSH port forward (-L target or -D SOCKS5) through a reachable Vault relay host (F-24, F-13).
+// If no live SSH session exists for RelayHostID, it connects automatically in the background first.
+func (a *App) LaunchTwoStepSshPivot(req core.TwoStepSshPivotRequest) (*core.ForwardTunnelStatus, error) {
+	a.vaultStore.Touch()
+	relayID := strings.TrimSpace(req.RelayHostID)
+	if relayID == "" {
+		return nil, errors.New("select a reachable SSH relay host first")
+	}
+	if req.LocalPort == 0 {
+		return nil, errors.New("local forward port must be between 1 and 65535")
+	}
+
+	mode := strings.ToLower(strings.TrimSpace(req.Mode))
+	if mode == "" {
+		mode = "local"
+	}
+	bindAddr := strings.TrimSpace(req.BindAddress)
+	if bindAddr == "" {
+		bindAddr = "127.0.0.1"
+	}
+
+	if mode != "socks" {
+		if strings.TrimSpace(req.TargetHost) == "" || req.TargetPort == 0 {
+			return nil, errors.New("internal target host and port are required for 2-step SSH local forwarding")
+		}
+	}
+
+	// Reuse an existing live SSH session to the relay host when available; otherwise connect cleanly.
+	var relaySessionID string
+	a.mu.Lock()
+	for sid, hid := range a.sessionHostID {
+		if hid == relayID {
+			if _, alive := a.activeStreams[sid]; alive {
+				relaySessionID = sid
+				break
+			}
+		}
+	}
+	a.mu.Unlock()
+
+	if relaySessionID == "" {
+		var err error
+		relaySessionID, err = a.ConnectSavedHost(relayID, core.TerminalSize{Cols: 80, Rows: 24})
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect SSH relay host: %w", err)
+		}
+	}
+
+	ruleID := fmt.Sprintf("2step-%d", time.Now().UnixNano())
+	fwdType := core.ForwardLocal
+	if mode == "socks" {
+		fwdType = core.ForwardDynamic
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		if fwdType == core.ForwardDynamic {
+			name = fmt.Sprintf("2-Step SOCKS5 :%d", req.LocalPort)
+		} else {
+			name = fmt.Sprintf("2-Step %s:%d -> :%d", req.TargetHost, req.TargetPort, req.LocalPort)
+		}
+	}
+
+	if req.SaveRule {
+		rule := core.ForwardRule{
+			ID:           ruleID,
+			HostID:       relayID,
+			EngagementID: strings.TrimSpace(req.EngagementID),
+			Label:        name,
+			Type:         fwdType,
+			BindAddress:  bindAddr,
+			BindPort:     req.LocalPort,
+			TargetHost:   strings.TrimSpace(req.TargetHost),
+			TargetPort:   req.TargetPort,
+		}
+		if err := a.SaveForwardRule(rule); err != nil {
+			return nil, err
+		}
+		tunID, err := a.StartForwardTunnel(relaySessionID, rule.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, st := range a.GetActiveTunnels() {
+			if st.ID == tunID {
+				cp := st
+				return &cp, nil
+			}
+		}
+		return &core.ForwardTunnelStatus{
+			ID:          tunID,
+			RuleID:      rule.ID,
+			SessionID:   relaySessionID,
+			Type:        fwdType,
+			BindAddress: bindAddr,
+			BindPort:    req.LocalPort,
+			TargetHost:  strings.TrimSpace(req.TargetHost),
+			TargetPort:  req.TargetPort,
+			Status:      "active",
+		}, nil
+	}
+
+	var (
+		tunnel core.ForwardTunnel
+		err    error
+	)
+	if fwdType == core.ForwardDynamic {
+		tunnel, err = a.transport.StartForwardDynamic(a.ctx, relaySessionID, ruleID, bindAddr, req.LocalPort)
+	} else {
+		tunnel, err = a.transport.StartForwardLocal(a.ctx, relaySessionID, ruleID, bindAddr, req.LocalPort, strings.TrimSpace(req.TargetHost), req.TargetPort)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	st := tunnel.GetStatus()
+	a.mu.Lock()
+	a.activeTunnels[st.ID] = tunnel
+	a.mu.Unlock()
+	a.emit(a.ctx, "forward:tunnels-updated", a.GetActiveTunnels())
+	return &st, nil
+}
+
 // --- Route Health Check (Pentest Module F-38) ---
 
 // ParseRouteProbeTargets parses and validates host:port probe targets using OPSEC bounds (max 25, F-38).
@@ -5542,8 +5663,10 @@ func (a *App) ParseRouteProbeTargets(raw string) ([]string, error) {
 // pivots (ligolo-ng/chisel), SSH tunnels (-L/-R/-D), proxy profiles, and optional target probes (F-38).
 func (a *App) RunRouteHealthCheck(req core.RouteCheckRequest) (*core.RouteHealthReport, error) {
 	snap := health.Snapshot{
-		ActivePivots:  a.ListActivePivotInstances(),
-		ActiveTunnels: a.GetActiveTunnels(),
+		ActivePivots:      a.ListActivePivotInstances(),
+		ActiveTunnels:     a.GetActiveTunnels(),
+		ActiveListeners:   a.ListActiveManagedListeners(),
+		ActiveFileServers: a.ListFileTransferServers(),
 	}
 
 	if st, ok := a.vaultStore.(*vault.Store); ok && st != nil {
@@ -5930,6 +6053,11 @@ func (a *App) SaveReportFileDialog(defaultFilename string, format string) (strin
 	if normalized == core.ReportFormatHTML {
 		filters = []runtime.FileFilter{
 			{DisplayName: "HTML Report (*.html;*.htm)", Pattern: "*.html;*.htm"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		}
+	} else if normalized == core.ReportFormatDOCX {
+		filters = []runtime.FileFilter{
+			{DisplayName: "Word Pentest Report (*.docx)", Pattern: "*.docx"},
 			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
 		}
 	}

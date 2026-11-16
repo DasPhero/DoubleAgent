@@ -720,6 +720,10 @@ export namespace core {
 	    ignoreCert: boolean;
 	    binaryPath?: string;
 	    extraArgs?: string;
+	    sshTarget?: string;
+	    relayHostId?: string;
+	    forwardMode?: string;
+	    forwardTarget?: string;
 	    status?: string;
 	    lastCheck?: string;
 	    notes?: string;
@@ -748,6 +752,10 @@ export namespace core {
 	        this.ignoreCert = source["ignoreCert"];
 	        this.binaryPath = source["binaryPath"];
 	        this.extraArgs = source["extraArgs"];
+	        this.sshTarget = source["sshTarget"];
+	        this.relayHostId = source["relayHostId"];
+	        this.forwardMode = source["forwardMode"];
+	        this.forwardTarget = source["forwardTarget"];
 	        this.status = source["status"];
 	        this.lastCheck = source["lastCheck"];
 	        this.notes = source["notes"];
@@ -2545,6 +2553,7 @@ export namespace core {
 	    format: string;
 	    fileName: string;
 	    content: string;
+	    contentBase64?: string;
 	    contentSha256: string;
 	    findingsCount: number;
 	    evidenceCount: number;
@@ -2561,6 +2570,7 @@ export namespace core {
 	        this.format = source["format"];
 	        this.fileName = source["fileName"];
 	        this.content = source["content"];
+	        this.contentBase64 = source["contentBase64"];
 	        this.contentSha256 = source["contentSha256"];
 	        this.findingsCount = source["findingsCount"];
 	        this.evidenceCount = source["evidenceCount"];
@@ -2625,6 +2635,7 @@ export namespace core {
 	    hops?: string[];
 	    status: string;
 	    runtimeState: string;
+	    metaSummary?: string;
 	    ligoloAgents?: string[];
 	    bytesTransferred?: number;
 	    errorMsg?: string;
@@ -2647,6 +2658,7 @@ export namespace core {
 	        this.hops = source["hops"];
 	        this.status = source["status"];
 	        this.runtimeState = source["runtimeState"];
+	        this.metaSummary = source["metaSummary"];
 	        this.ligoloAgents = source["ligoloAgents"];
 	        this.bytesTransferred = source["bytesTransferred"];
 	        this.errorMsg = source["errorMsg"];
@@ -3363,6 +3375,34 @@ export namespace core {
 	        this.speedBytesPerSec = source["speedBytesPerSec"];
 	        this.status = source["status"];
 	        this.error = source["error"];
+	    }
+	}
+	export class TwoStepSshPivotRequest {
+	    relayHostId: string;
+	    engagementId?: string;
+	    mode: string;
+	    bindAddress?: string;
+	    localPort: number;
+	    targetHost?: string;
+	    targetPort?: number;
+	    name?: string;
+	    saveRule: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TwoStepSshPivotRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.relayHostId = source["relayHostId"];
+	        this.engagementId = source["engagementId"];
+	        this.mode = source["mode"];
+	        this.bindAddress = source["bindAddress"];
+	        this.localPort = source["localPort"];
+	        this.targetHost = source["targetHost"];
+	        this.targetPort = source["targetPort"];
+	        this.name = source["name"];
+	        this.saveRule = source["saveRule"];
 	    }
 	}
 	export class VaultConflictItem {

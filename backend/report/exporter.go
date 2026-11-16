@@ -3,6 +3,7 @@ package report
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -571,14 +572,27 @@ func RenderHTML(doc *core.CompiledReport) (string, string, error) {
 	return out, sha256Hex([]byte(out)), nil
 }
 
-func renderReportContent(doc *core.CompiledReport, format string) (string, string, string, error) {
+func renderReportArtifact(doc *core.CompiledReport, format string) (previewContent string, rawBytes []byte, b64 string, digest string, ext string, err error) {
 	switch core.NormalizeReportFormat(format) {
 	case core.ReportFormatHTML:
-		content, digest, err := RenderHTML(doc)
-		return content, digest, ".html", err
+		content, sum, renderErr := RenderHTML(doc)
+		if renderErr != nil {
+			return "", nil, "", "", ".html", renderErr
+		}
+		raw := []byte(content)
+		return content, raw, "", sum, ".html", nil
+	case core.ReportFormatDOCX:
+		raw, sum, renderErr := RenderDOCX(doc)
+		if renderErr != nil {
+			return "", nil, "", "", ".docx", renderErr
+		}
+		mdPreview, _ := RenderMarkdown(doc)
+		banner := fmt.Sprintf("> **Word Pentest Report Scaffold (.docx)** — %d bytes · SHA-256: `%s`\n> Includes Cover & Document Control, Editable Executive Summary & Risk Matrix, Scope & Methodology, Attack Path Narrative, Per-Host Findings & Proof Artifacts, Port Discovery Appendix, and SHA-256 Provenance Manifest.\n\n", len(raw), sum)
+		return banner + mdPreview, raw, base64.StdEncoding.EncodeToString(raw), sum, ".docx", nil
 	default:
-		content, digest := RenderMarkdown(doc)
-		return content, digest, ".md", nil
+		content, sum := RenderMarkdown(doc)
+		raw := []byte(content)
+		return content, raw, "", sum, ".md", nil
 	}
 }
 
@@ -602,7 +616,7 @@ func writeContainedFile(baseDir string, filename string, data []byte) (string, e
 	return target, nil
 }
 
-// CompileAndExport builds a report (Markdown/HTML) and optionally writes consolidated or per-host files to OutputDir (F-30).
+// CompileAndExport builds a report (Markdown/HTML/DOCX) and optionally writes consolidated or per-host files to OutputDir (F-30).
 func CompileAndExport(req core.ReportExportRequest, payload core.VaultPayload) (*core.ReportExportResult, error) {
 	req.Format = core.NormalizeReportFormat(req.Format)
 	doc, err := core.BuildCompiledReport(req, payload)
@@ -610,7 +624,7 @@ func CompileAndExport(req core.ReportExportRequest, payload core.VaultPayload) (
 		return nil, err
 	}
 
-	content, digest, ext, err := renderReportContent(doc, req.Format)
+	previewContent, rawBytes, b64, digest, ext, err := renderReportArtifact(doc, req.Format)
 	if err != nil {
 		return nil, err
 	}
@@ -624,7 +638,8 @@ func CompileAndExport(req core.ReportExportRequest, payload core.VaultPayload) (
 	res := &core.ReportExportResult{
 		Format:           req.Format,
 		FileName:         defaultFilename,
-		Content:          content,
+		Content:          previewContent,
+		ContentBase64:    b64,
 		ContentSHA256:    digest,
 		FindingsCount:    doc.TotalFindings,
 		EvidenceCount:    doc.TotalEvidence,
@@ -651,7 +666,7 @@ func CompileAndExport(req core.ReportExportRequest, payload core.VaultPayload) (
 			if hErr != nil {
 				return nil, hErr
 			}
-			hContent, hDigest, _, hRenderErr := renderReportContent(hostDoc, req.Format)
+			_, hRaw, _, hDigest, _, hRenderErr := renderReportArtifact(hostDoc, req.Format)
 			if hRenderErr != nil {
 				return nil, hRenderErr
 			}
@@ -663,8 +678,7 @@ func CompileAndExport(req core.ReportExportRequest, payload core.VaultPayload) (
 			seenNames[nameStem]++
 			fname := nameStem + ext
 
-			rawBytes := []byte(hContent)
-			writtenPath, wErr := writeContainedFile(outDir, fname, rawBytes)
+			writtenPath, wErr := writeContainedFile(outDir, fname, hRaw)
 			if wErr != nil {
 				return nil, wErr
 			}
@@ -674,7 +688,7 @@ func CompileAndExport(req core.ReportExportRequest, payload core.VaultPayload) (
 				FileName:  fname,
 				FilePath:  writtenPath,
 				SHA256:    hDigest,
-				Bytes:     len(rawBytes),
+				Bytes:     len(hRaw),
 			})
 			manifest.WriteString(fmt.Sprintf("%s  %s\n", hDigest, fname))
 		}
@@ -693,7 +707,6 @@ func CompileAndExport(req core.ReportExportRequest, payload core.VaultPayload) (
 		return res, nil
 	}
 
-	rawBytes := []byte(content)
 	writtenPath, err := writeContainedFile(outDir, defaultFilename, rawBytes)
 	if err != nil {
 		return nil, err
@@ -715,29 +728,41 @@ func ExportToFile(req core.ReportExportRequest, payload core.VaultPayload, fileP
 	if trimmed == "" {
 		return nil, errors.New("destination file path cannot be empty")
 	}
-	req.OutputDir = ""
-	res, err := CompileAndExport(req, payload)
+	doc, err := core.BuildCompiledReport(req, payload)
+	if err != nil {
+		return nil, err
+	}
+	previewContent, raw, b64, digest, _, err := renderReportArtifact(doc, req.Format)
 	if err != nil {
 		return nil, err
 	}
 	if err := os.MkdirAll(filepath.Dir(trimmed), 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create parent directory: %w", err)
 	}
-	raw := []byte(res.Content)
 	if err := os.WriteFile(trimmed, raw, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write report file: %w", err)
 	}
-	res.FileName = filepath.Base(trimmed)
-	res.WrittenFiles = []core.ReportWrittenFile{
-		{
-			HostID:    req.HostID,
-			HostLabel: res.FileName,
-			FileName:  res.FileName,
-			FilePath:  trimmed,
-			SHA256:    res.ContentSHA256,
-			Bytes:     len(raw),
+	fname := filepath.Base(trimmed)
+	return &core.ReportExportResult{
+		Format:           core.NormalizeReportFormat(req.Format),
+		FileName:         fname,
+		Content:          previewContent,
+		ContentBase64:    b64,
+		ContentSHA256:    digest,
+		FindingsCount:    doc.TotalFindings,
+		EvidenceCount:    doc.TotalEvidence,
+		HostCount:        len(doc.HostSections),
+		InternalExcluded: doc.InternalExcludedCount,
+		WrittenFiles: []core.ReportWrittenFile{
+			{
+				HostID:    req.HostID,
+				HostLabel: fname,
+				FileName:  fname,
+				FilePath:  trimmed,
+				SHA256:    digest,
+				Bytes:     len(raw),
+			},
 		},
-	}
-	return res, nil
+	}, nil
 }
 

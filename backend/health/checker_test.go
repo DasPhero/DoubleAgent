@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -188,5 +189,62 @@ func handleMockSocks5Pipe(c net.Conn, allowTarget string) {
 		_, _ = c.Write([]byte{0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0, 0})
 	} else {
 		_, _ = c.Write([]byte{0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+	}
+}
+
+func TestRunCheck_IncludesActiveShellListenersAndFileServers_F38(t *testing.T) {
+	snap := Snapshot{
+		ActiveListeners: []core.ManagedListenerInfo{
+			{
+				ID:          "lst-4444",
+				Name:        "Reverse Catcher",
+				Kind:        "reverse",
+				Tool:        "rawtcp",
+				BindAddress: "0.0.0.0",
+				BindPort:    4444,
+				Status:      "listening",
+				CatchCount:  2,
+			},
+		},
+		ActiveFileServers: []core.FileTransferServerInfo{
+			{
+				ID:          "srv-8000",
+				Name:        "Payload Stage :8000",
+				Kind:        "builtin",
+				Directory:   "/tmp/tools",
+				BindAddress: "127.0.0.1",
+				Port:        8000,
+				Status:      "running",
+				ServedCount: 5,
+				UploadCount: 1,
+			},
+		},
+		DialContext: func(_ context.Context, _ string, addr string) (net.Conn, error) {
+			c1, c2 := net.Pipe()
+			_ = c2.Close()
+			return c1, nil
+		},
+	}
+
+	report, err := RunCheck(context.Background(), core.RouteCheckRequest{
+		CheckMode: core.RouteCheckModePassive,
+	}, snap)
+	if err != nil {
+		t.Fatalf("RunCheck failed: %v", err)
+	}
+	if report.TotalRoutes != 2 || report.HealthyRoutes != 2 {
+		t.Fatalf("expected 2 healthy dashboard entries, got %+v", report)
+	}
+	var sawListener, sawServer bool
+	for _, e := range report.Entries {
+		if e.SourceType == "shell-listener" && strings.Contains(e.MetaSummary, "Catches: 2") {
+			sawListener = true
+		}
+		if e.SourceType == "transfer-server" && strings.Contains(e.MetaSummary, "Served: 5") {
+			sawServer = true
+		}
+	}
+	if !sawListener || !sawServer {
+		t.Fatalf("expected both shell-listener and transfer-server entries with telemetry, got %+v", report.Entries)
 	}
 }

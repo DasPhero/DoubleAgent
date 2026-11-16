@@ -1,4 +1,4 @@
-export type PivotTool = 'ligolo-ng' | 'chisel';
+export type PivotTool = 'ligolo-ng' | 'chisel' | 'sshuttle' | 'ssh-forward';
 
 export interface NetworkRoute {
   id: string;
@@ -18,10 +18,26 @@ export interface NetworkRoute {
   ignoreCert: boolean;
   binaryPath?: string;
   extraArgs?: string;
+  sshTarget?: string;
+  relayHostId?: string;
+  forwardMode?: 'local' | 'socks';
+  forwardTarget?: string;
   status?: string;
   lastCheck?: string;
   notes?: string;
   createdAt?: string;
+}
+
+export interface TwoStepSshPivotRequest {
+  relayHostId: string;
+  engagementId?: string;
+  mode: 'local' | 'socks';
+  bindAddress?: string;
+  localPort: number;
+  targetHost?: string;
+  targetPort?: number;
+  name?: string;
+  saveRule: boolean;
 }
 
 export interface PivotInstanceInfo {

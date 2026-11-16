@@ -1,8 +1,13 @@
 package report_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/xml"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -245,5 +250,96 @@ func TestExporter_SplitByHostAndFileExport_F30(t *testing.T) {
 	}
 	if strings.Contains(string(diskBytes), "WEB01") {
 		t.Fatalf("single-host filtered export unexpectedly included WEB01")
+	}
+}
+
+func TestExporter_DocxScaffoldReproducibilityAndXML_F30(t *testing.T) {
+	payload := buildF30TestPayload(true)
+	req := core.ReportExportRequest{
+		EngagementID:            "eng-1",
+		Format:                  core.ReportFormatDOCX,
+		IncludePortFindings:     true,
+		IncludeUnlinkedEvidence: true,
+		IncludeLinkedNotes:      true,
+	}
+
+	d1, err := report.CompileAndExport(req, payload)
+	if err != nil {
+		t.Fatalf("CompileAndExport docx 1 failed: %v", err)
+	}
+	d2, err := report.CompileAndExport(req, payload)
+	if err != nil {
+		t.Fatalf("CompileAndExport docx 2 failed: %v", err)
+	}
+	if d1.ContentSHA256 == "" || d1.ContentSHA256 != d2.ContentSHA256 || d1.ContentBase64 != d2.ContentBase64 {
+		t.Fatalf("expected deterministic byte-for-byte reproducible docx export: sha1=%s sha2=%s", d1.ContentSHA256, d2.ContentSHA256)
+	}
+
+	rawZip, err := base64.StdEncoding.DecodeString(d1.ContentBase64)
+	if err != nil {
+		t.Fatalf("decode ContentBase64 failed: %v", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(rawZip), int64(len(rawZip)))
+	if err != nil {
+		t.Fatalf("invalid OOXML zip container: %v", err)
+	}
+
+	var docXML string
+	for _, f := range zr.File {
+		if f.Name == "word/document.xml" {
+			rc, oErr := f.Open()
+			if oErr != nil {
+				t.Fatalf("open word/document.xml: %v", oErr)
+			}
+			b, rErr := io.ReadAll(rc)
+			_ = rc.Close()
+			if rErr != nil {
+				t.Fatalf("read word/document.xml: %v", rErr)
+			}
+			docXML = string(b)
+		}
+	}
+	if docXML == "" {
+		t.Fatal("missing word/document.xml in generated .docx package")
+	}
+
+	// Verify XML well-formedness strictly with encoding/xml decoder
+	dec := xml.NewDecoder(strings.NewReader(docXML))
+	for {
+		if _, err := dec.Token(); err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Fatalf("malformed XML in word/document.xml: %v", err)
+		}
+	}
+
+	for _, want := range []string{
+		"1. Executive Summary",
+		"2. Assessment Scope",
+		"3. Attack Path",
+		"4. Detailed Technical Findings",
+		"5. Appendix A",
+		"6. Appendix B",
+		"[AUTHOR NOTE",
+		"DC01",
+		"GetUserSPNs Proof",
+		"&lt;script&gt;alert(1)&lt;/script&gt;",
+	} {
+		if !strings.Contains(docXML, want) {
+			t.Fatalf("word/document.xml missing expected section/content %q", want)
+		}
+	}
+
+	outPath := filepath.Join(t.TempDir(), "customer-report.docx")
+	if _, err := report.ExportToFile(req, payload, outPath); err != nil {
+		t.Fatalf("ExportToFile .docx failed: %v", err)
+	}
+	diskBytes, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read written .docx file: %v", err)
+	}
+	if !bytes.Equal(diskBytes, rawZip) {
+		t.Fatalf("written .docx bytes on disk differed from compiled Base64 artifact")
 	}
 }

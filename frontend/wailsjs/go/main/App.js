@@ -410,6 +410,10 @@ export function InjectTotpCode(arg1, arg2) {
   return window['go']['main']['App']['InjectTotpCode'](arg1, arg2);
 }
 
+export function LaunchTwoStepSshPivot(arg1) {
+  return window['go']['main']['App']['LaunchTwoStepSshPivot'](arg1);
+}
+
 export function ListActiveManagedListeners() {
   return window['go']['main']['App']['ListActiveManagedListeners']();
 }

@@ -178,4 +178,45 @@ describe('RouteHealthModal (F-38)', () => {
     expect(screen.getByText('SOCKS5 CONNECT OK (14ms)')).toBeInTheDocument();
     expect(screen.getByText('10.10.20.10:3389')).toBeInTheDocument();
   });
+
+  it('displays live Shell Listeners and File Servers in the unified Ops Dashboard with Stop action without auto-probing', async () => {
+    const runHealthCheck = vi.fn().mockResolvedValue(passiveReport);
+    const onStopEndpoint = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <RouteHealthModal
+        onClose={vi.fn()}
+        runHealthCheck={runHealthCheck}
+        onStopEndpoint={onStopEndpoint}
+        activeDashboardItems={[
+          {
+            id: 'lst-4444',
+            sourceType: 'shell-listener',
+            name: 'Reverse Shell :4444',
+            kind: 'rawtcp (reverse)',
+            endpoint: '0.0.0.0:4444',
+            status: 'listening',
+            metaSummary: 'Catches: 1',
+          },
+          {
+            id: 'srv-8000',
+            sourceType: 'transfer-server',
+            name: 'HTTP Staging :8000',
+            kind: 'builtin',
+            endpoint: '0.0.0.0:8000',
+            status: 'running',
+            metaSummary: 'Served: 3 · Uploads: 0',
+          },
+        ]}
+      />
+    );
+
+    expect(runHealthCheck).not.toHaveBeenCalled();
+    expect(screen.getByText('Reverse Shell :4444')).toBeInTheDocument();
+    expect(screen.getByText('HTTP Staging :8000')).toBeInTheDocument();
+
+    const stopButtons = screen.getAllByRole('button', { name: 'Stop' });
+    fireEvent.click(stopButtons[0]);
+    await waitFor(() => expect(onStopEndpoint).toHaveBeenCalledWith('shell-listener', 'lst-4444'));
+  });
 });

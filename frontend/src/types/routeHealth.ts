@@ -26,7 +26,7 @@ export interface ProbeTargetResult {
 
 export interface RouteHealthEntry {
   id: string;
-  sourceType: 'pivot' | 'ssh-tunnel' | 'forward-rule' | 'proxy-profile' | 'custom' | string;
+  sourceType: 'pivot' | 'ssh-tunnel' | 'forward-rule' | 'proxy-profile' | 'shell-listener' | 'transfer-server' | 'custom' | string;
   name: string;
   kind: string;
   bindEndpoint?: string;
@@ -34,7 +34,8 @@ export interface RouteHealthEntry {
   subnets?: string[];
   hops?: string[];
   status: 'healthy' | 'degraded' | 'down' | 'idle' | 'error' | string;
-  runtimeState: 'running' | 'active' | 'stopped' | 'configured' | 'error' | string;
+  runtimeState: 'running' | 'active' | 'listening' | 'stopped' | 'configured' | 'error' | string;
+  metaSummary?: string;
   ligoloAgents?: string[];
   bytesTransferred?: number;
   errorMsg?: string;

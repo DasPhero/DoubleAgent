@@ -9,6 +9,16 @@ import {
 } from '../types/routeHealth';
 import { CyberIcon } from './CyberIcon';
 
+export interface DashboardListenerSnapshot {
+  id: string;
+  sourceType: 'shell-listener' | 'transfer-server' | 'pivot' | 'ssh-tunnel';
+  name: string;
+  kind: string;
+  endpoint: string;
+  status: string;
+  metaSummary?: string;
+}
+
 export interface RouteHealthModalProps {
   isOpen?: boolean;
   onClose: () => void;
@@ -16,6 +26,8 @@ export interface RouteHealthModalProps {
   activeEngagementName?: string | null;
   socksCandidates?: SocksCandidateOption[];
   suggestedTargetHosts?: string[];
+  activeDashboardItems?: DashboardListenerSnapshot[];
+  onStopEndpoint?: (sourceType: string, id: string) => Promise<void>;
   runHealthCheck: (req: RouteCheckRequest) => Promise<RouteHealthReport>;
   onOpenPivotManager?: () => void;
   onOpenPortForwarding?: () => void;
@@ -81,6 +93,8 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
   activeEngagementName,
   socksCandidates = [],
   suggestedTargetHosts = [],
+  activeDashboardItems = [],
+  onStopEndpoint,
   runHealthCheck,
   onOpenPivotManager,
   onOpenPortForwarding,
@@ -95,9 +109,10 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
   const [confirmActiveTraffic, setConfirmActiveTraffic] = useState<boolean>(false);
   const [scopeOnly, setScopeOnly] = useState<boolean>(Boolean(activeEngagementId));
 
-  const [entryFilter, setEntryFilter] = useState<'all' | 'issues' | 'pivot' | 'ssh' | 'custom'>('all');
+  const [entryFilter, setEntryFilter] = useState<'all' | 'issues' | 'listeners' | 'transfer' | 'pivot' | 'ssh' | 'custom'>('all');
   const [report, setReport] = useState<RouteHealthReport | null>(null);
   const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [stoppingKey, setStoppingKey] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   const parsedTargets = useMemo(() => splitTargetLines(targetsRaw), [targetsRaw]);
@@ -108,6 +123,8 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
       if (entryFilter === 'issues') {
         return entry.status === 'degraded' || entry.status === 'down' || entry.status === 'error';
       }
+      if (entryFilter === 'listeners') return entry.sourceType === 'shell-listener';
+      if (entryFilter === 'transfer') return entry.sourceType === 'transfer-server';
       if (entryFilter === 'pivot') return entry.sourceType === 'pivot';
       if (entryFilter === 'ssh') {
         return entry.sourceType === 'forward-rule' || entry.sourceType === 'ssh-tunnel' || entry.sourceType === 'proxy-profile';
@@ -116,6 +133,23 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
       return true;
     });
   }, [report, entryFilter]);
+
+  const handleStopItem = async (sourceType: string, id: string) => {
+    if (!onStopEndpoint) return;
+    const key = `${sourceType}:${id}`;
+    setStoppingKey(key);
+    setError('');
+    try {
+      await onStopEndpoint(sourceType, id);
+      if (report) {
+        await handleRunCheck();
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setStoppingKey('');
+    }
+  };
 
   const handleRunCheck = async () => {
     setError('');
@@ -186,15 +220,18 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
               <span className="cyber-hazard-stripes">///</span>
               <span className="cyber-hud-tag">OPS-F38</span>
               <span className="cyber-hud-delim">//</span>
-              <span className="cyber-hud-subtag">ON-DEMAND THROTTLED OPSEC ROUTE &amp; TUNNEL HEALTH CHECK</span>
+              <span className="cyber-hud-subtag">ACTIVE LISTENERS, PIVOTS &amp; OPSEC ROUTE HEALTH DASHBOARD</span>
             </div>
             <h2 className="cyber-hud-title" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <CyberIcon name="shield" size={20} />
-              <span>ROUTE &amp; TUNNEL HEALTH CHECK (F-38)</span>
+              <span>OPS LISTENERS &amp; ROUTE HEALTH DASHBOARD (F-38)</span>
             </h2>
             <div className="cyber-telemetry-strip">
               <span className="cyber-telemetry-chip chip-cyan">
-                <span className="chip-dot" /> POLICY: <strong>MANUAL ONLY / ZERO AUTO-SCAN</strong>
+                <span className="chip-dot" /> ACTIVE ENDPOINTS: <strong>{activeDashboardItems.length}</strong>
+              </span>
+              <span className="cyber-telemetry-chip chip-cyan">
+                <span className="chip-dot" /> POLICY: <strong>MANUAL PROBES / ZERO AUTO-SCAN</strong>
               </span>
               {report && (
                 <>
@@ -519,17 +556,19 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
               <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                {(['all', 'issues', 'pivot', 'ssh', 'custom'] as const).map((tab) => (
+                {(['all', 'listeners', 'transfer', 'pivot', 'ssh', 'issues', 'custom'] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
                     className={`cyber-pill-btn ${entryFilter === tab ? 'active' : ''}`}
                     onClick={() => setEntryFilter(tab)}
                   >
-                    {tab === 'all' && 'All Routes'}
+                    {tab === 'all' && 'All'}
+                    {tab === 'listeners' && 'Shell Listeners'}
+                    {tab === 'transfer' && 'File Servers'}
+                    {tab === 'pivot' && 'Pivots'}
+                    {tab === 'ssh' && 'SSH Tunnels'}
                     {tab === 'issues' && 'Issues Only'}
-                    {tab === 'pivot' && 'Ligolo / Chisel'}
-                    {tab === 'ssh' && 'SSH Tunnels & Proxies'}
                     {tab === 'custom' && 'Target Probes'}
                   </button>
                 ))}
@@ -542,34 +581,100 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
             </div>
 
             {!report ? (
-              <div
-                className="cyber-hud-panel"
-                style={{
-                  padding: '2rem',
-                  textAlign: 'center',
-                  color: '#94a3b8',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.6rem',
-                }}
-              >
-                <CyberIcon name="radar" size={28} />
-                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#e2e8f0' }}>
-                  No Health Check Executed Yet
-                </div>
-                <div style={{ fontSize: '0.75rem', maxWidth: '460px' }}>
-                  DoubleAgent never scans in the background. Click <strong>Run Health Check</strong> on the left to inspect active SSH tunnels, SOCKS5 listeners, and Ligolo/Chisel sessions, or switch to Throttled TCP Connect to probe internal targets.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {activeDashboardItems.length > 0 && (
+                  <div className="cyber-hud-panel" style={{ padding: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.06em' }}>
+                        LIVE LISTENERS, PIVOTS &amp; SERVERS ({activeDashboardItems.length})
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>In-memory status (0 probes sent)</span>
+                    </div>
+                    {activeDashboardItems
+                      .filter((item) => {
+                        if (entryFilter === 'listeners') return item.sourceType === 'shell-listener';
+                        if (entryFilter === 'transfer') return item.sourceType === 'transfer-server';
+                        if (entryFilter === 'pivot') return item.sourceType === 'pivot';
+                        if (entryFilter === 'ssh') return item.sourceType === 'ssh-tunnel';
+                        return true;
+                      })
+                      .map((item) => (
+                        <div
+                          key={`${item.sourceType}-${item.id}`}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.45rem 0.65rem',
+                            background: 'rgba(15, 23, 42, 0.55)',
+                            border: '1px solid rgba(56, 189, 248, 0.25)',
+                            borderRadius: 4,
+                            fontFamily: 'monospace',
+                            fontSize: '0.73rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#34d399', fontWeight: 700 }}>[{item.status.toUpperCase()}]</span>
+                            <strong style={{ color: '#e2e8f0' }}>{item.name}</strong>
+                            <span style={{ color: '#38bdf8' }}>({item.kind})</span>
+                            <span style={{ color: '#94a3b8' }}>{item.endpoint}</span>
+                            {item.metaSummary && <span style={{ color: '#fcd34d' }}>· {item.metaSummary}</span>}
+                          </div>
+                          {onStopEndpoint && (
+                            <button
+                              type="button"
+                              className="cyber-btn cyber-btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.68rem', color: '#f87171' }}
+                              disabled={stoppingKey === `${item.sourceType}:${item.id}`}
+                              onClick={() => void handleStopItem(item.sourceType, item.id)}
+                            >
+                              Stop
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                <div
+                  className="cyber-hud-panel"
+                  style={{
+                    padding: '1.6rem',
+                    textAlign: 'center',
+                    color: '#94a3b8',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                  }}
+                >
+                  <CyberIcon name="radar" size={28} />
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#e2e8f0' }}>
+                    {activeDashboardItems.length > 0
+                      ? 'Verify Live Sockets & Reachability'
+                      : 'No Health Check Executed Yet'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', maxWidth: '480px' }}>
+                    DoubleAgent never scans in the background. Click <strong>Run Health Check</strong> on the left to test active Shell Listeners, File Servers, SSH tunnels, SOCKS5 listeners, and Ligolo/Chisel sessions, or switch to Throttled TCP Connect to probe internal targets.
+                  </div>
                 </div>
               </div>
             ) : filteredEntries.length === 0 ? (
               <div className="cyber-hud-panel" style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-                No matching routes or probes in this filter view.
+                No matching listeners, routes, or probes in this filter view.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
                 {filteredEntries.map((entry: RouteHealthEntry) => {
                   const badge = statusBadgeStyle(entry.status);
+                  const canStop =
+                    Boolean(onStopEndpoint) &&
+                    (entry.sourceType === 'shell-listener' ||
+                      entry.sourceType === 'transfer-server' ||
+                      entry.sourceType === 'pivot' ||
+                      entry.sourceType === 'ssh-tunnel') &&
+                    (entry.runtimeState === 'running' || entry.runtimeState === 'active' || entry.runtimeState === 'listening');
                   return (
                     <div
                       key={`${entry.sourceType}-${entry.id}`}
@@ -602,12 +707,28 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
                           <span style={{ fontSize: '0.7rem', color: '#2dd4bf', fontFamily: 'monospace' }}>
                             [{entry.kind}]
                           </span>
+                          {entry.metaSummary && (
+                            <span style={{ fontSize: '0.7rem', color: '#fcd34d', fontFamily: 'monospace' }}>
+                              · {entry.metaSummary}
+                            </span>
+                          )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.71rem', color: '#94a3b8', fontFamily: 'monospace' }}>
                           {entry.bindEndpoint && <span>BIND {entry.bindEndpoint}</span>}
                           {entry.targetEndpoint && <span>-&gt; {entry.targetEndpoint}</span>}
                           {typeof entry.bytesTransferred === 'number' && entry.bytesTransferred > 0 && (
                             <span>TX/RX {formatBytesShort(entry.bytesTransferred)}</span>
+                          )}
+                          {canStop && (
+                            <button
+                              type="button"
+                              className="cyber-btn cyber-btn-secondary"
+                              style={{ padding: '0.18rem 0.45rem', fontSize: '0.67rem', color: '#f87171' }}
+                              disabled={stoppingKey === `${entry.sourceType}:${entry.id}`}
+                              onClick={() => void handleStopItem(entry.sourceType, entry.id)}
+                            >
+                              Stop
+                            </button>
                           )}
                         </div>
                       </div>

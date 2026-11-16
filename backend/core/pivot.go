@@ -32,10 +32,27 @@ type NetworkRoute struct {
 	IgnoreCert    bool     `json:"ignoreCert"`              // Ligolo agent: -ignore-cert in generated target snippet
 	BinaryPath    string   `json:"binaryPath,omitempty"`    // Optional explicit binary path
 	ExtraArgs     string   `json:"extraArgs,omitempty"`     // Optional extra CLI flags (shell metacharacters rejected)
+	SshTarget     string   `json:"sshTarget,omitempty"`     // sshuttle / 2-step SSH relay host (e.g. user@jump[:port])
+	RelayHostID   string   `json:"relayHostId,omitempty"`   // Saved Vault Host ID for reachable SSH relay
+	ForwardMode   string   `json:"forwardMode,omitempty"`   // "local" (-L) or "socks" (-D) for 2-step SSH forward
+	ForwardTarget string   `json:"forwardTarget,omitempty"` // Internal target host:port for 2-step -L forwarding
 	Status        string   `json:"status,omitempty"`        // "configured", "running", "stopped", "error"
 	LastCheck     string   `json:"lastCheck,omitempty"`     // ISO-8601 timestamp (F-38)
 	Notes         string   `json:"notes,omitempty"`
 	CreatedAt     string   `json:"createdAt,omitempty"`
+}
+
+// TwoStepSshPivotRequest launches a native Go chained SSH tunnel via a reachable Vault relay host (F-24, F-13).
+type TwoStepSshPivotRequest struct {
+	RelayHostID  string `json:"relayHostId"`
+	EngagementID string `json:"engagementId,omitempty"`
+	Mode         string `json:"mode"` // "local" (-L) | "socks" (-D)
+	BindAddress  string `json:"bindAddress,omitempty"`
+	LocalPort    uint16 `json:"localPort"`
+	TargetHost   string `json:"targetHost,omitempty"`
+	TargetPort   uint16 `json:"targetPort,omitempty"`
+	Name         string `json:"name,omitempty"`
+	SaveRule     bool   `json:"saveRule"`
 }
 
 // PivotInstanceInfo describes the live operational state of a running or recently stopped pivot process (F-24).
@@ -84,7 +101,7 @@ type PivotCommandSet struct {
 	OpsecWarnings    []string `json:"opsecWarnings,omitempty"`
 }
 
-// NormalizePivotTool maps aliases like "ligolo" to canonical "ligolo-ng".
+// NormalizePivotTool maps aliases like "ligolo" to canonical tool names.
 func NormalizePivotTool(tool string) string {
 	t := strings.ToLower(strings.TrimSpace(tool))
 	switch t {
@@ -92,6 +109,10 @@ func NormalizePivotTool(tool string) string {
 		return "ligolo-ng"
 	case "chisel":
 		return "chisel"
+	case "sshuttle":
+		return "sshuttle"
+	case "ssh-forward", "ssh_forward", "2step-ssh", "twostep-ssh", "ssh":
+		return "ssh-forward"
 	default:
 		return t
 	}
@@ -104,11 +125,11 @@ func ValidateNetworkRoute(route NetworkRoute) error {
 	}
 
 	tool := NormalizePivotTool(route.Tool)
-	if tool != "ligolo-ng" && tool != "chisel" {
-		return fmt.Errorf("unsupported pivot tool %q (supported: ligolo-ng, chisel)", route.Tool)
+	if tool != "ligolo-ng" && tool != "chisel" && tool != "sshuttle" && tool != "ssh-forward" {
+		return fmt.Errorf("unsupported pivot tool %q (supported: ligolo-ng, chisel, sshuttle, ssh-forward)", route.Tool)
 	}
 
-	if route.ListenPort == 0 {
+	if tool != "sshuttle" && route.ListenPort == 0 {
 		return errors.New("listen port must be between 1 and 65535")
 	}
 
@@ -132,6 +153,21 @@ func ValidateNetworkRoute(route NetworkRoute) error {
 		}
 		if _, _, err := net.ParseCIDR(sub); err != nil {
 			return fmt.Errorf("invalid target subnet CIDR %q: %w", sub, err)
+		}
+	}
+
+	if shellMetaRe.MatchString(route.SshTarget) {
+		return errors.New("SSH relay target contains disallowed shell metacharacters")
+	}
+	if shellMetaRe.MatchString(route.ForwardTarget) {
+		return errors.New("forward target contains disallowed shell metacharacters")
+	}
+	if tool == "ssh-forward" && strings.ToLower(strings.TrimSpace(route.ForwardMode)) != "socks" {
+		ft := strings.TrimSpace(route.ForwardTarget)
+		if ft != "" {
+			if _, _, err := net.SplitHostPort(ft); err != nil {
+				return fmt.Errorf("invalid 2-step forward target %q (expected host:port): %w", ft, err)
+			}
 		}
 	}
 
@@ -227,6 +263,41 @@ func BuildPivotArgs(route NetworkRoute) (binCandidates []string, args []string, 
 			args = append(args, "--reverse")
 		}
 		args = append(args, "--socks5")
+	case "sshuttle":
+		binCandidates = []string{"sshuttle"}
+		sshTarget := strings.TrimSpace(route.SshTarget)
+		if sshTarget == "" {
+			sshTarget = "user@jump-host"
+		}
+		args = append(args, "-r", sshTarget)
+		subs := route.Subnets
+		if len(subs) == 0 {
+			subs = []string{"10.10.20.0/24"}
+		}
+		for _, sub := range subs {
+			if t := strings.TrimSpace(sub); t != "" {
+				args = append(args, t)
+			}
+		}
+	case "ssh-forward":
+		binCandidates = []string{"ssh", "ssh.exe"}
+		bindHost := addr
+		if bindHost == "0.0.0.0" || bindHost == "::" {
+			bindHost = "127.0.0.1"
+		}
+		sshTarget := strings.TrimSpace(route.SshTarget)
+		if sshTarget == "" {
+			sshTarget = "user@relay-host"
+		}
+		if strings.ToLower(strings.TrimSpace(route.ForwardMode)) == "socks" {
+			args = append(args, "-N", "-D", net.JoinHostPort(bindHost, strconv.Itoa(int(port))), sshTarget)
+		} else {
+			fwdTarget := strings.TrimSpace(route.ForwardTarget)
+			if fwdTarget == "" {
+				fwdTarget = "10.10.20.10:3389"
+			}
+			args = append(args, "-N", "-L", fmt.Sprintf("%s:%d:%s", bindHost, port, fwdTarget), sshTarget)
+		}
 	default: // "ligolo-ng"
 		binCandidates = []string{"ligolo-proxy", "proxy", "ligolo-ng", "ligolo-proxy.exe", "proxy.exe"}
 		args = append(args, "-laddr", net.JoinHostPort(addr, strconv.Itoa(int(port))))
@@ -273,6 +344,92 @@ func BuildPivotCommandSet(route NetworkRoute, lhost string) PivotCommandSet {
 
 	_, _, proxyCmd := BuildPivotArgs(route)
 	warnings := AnalyzePivotOpsec(route)
+
+	if tool == "sshuttle" {
+		sshTarget := strings.TrimSpace(route.SshTarget)
+		if sshTarget == "" {
+			sshTarget = "user@jump-host"
+		}
+		subs := make([]string, 0, len(route.Subnets))
+		for _, sub := range route.Subnets {
+			if t := strings.TrimSpace(sub); t != "" {
+				subs = append(subs, t)
+			}
+		}
+		if len(subs) == 0 {
+			subs = append(subs, "10.10.20.0/24")
+		}
+		subsJoined := strings.Join(subs, " ")
+		return PivotCommandSet{
+			Tool:         "sshuttle",
+			LHOST:        host,
+			ProxyCommand: proxyCmd,
+			SetupCommands: []string{
+				"# No target binary upload needed — requires Python 3 on the SSH jump host",
+				fmt.Sprintf("ssh %s python3 --version", sshTarget),
+			},
+			RouteCommands: []string{
+				fmt.Sprintf("nmap -sT -Pn %s", subs[0]),
+			},
+			ConsoleCommands: []string{},
+			LinuxAgentCmd:   fmt.Sprintf("sshuttle -r %s %s --dns", sshTarget, subsJoined),
+			WindowsAgentCmd: fmt.Sprintf("wsl sshuttle -r %s %s --dns", sshTarget, subsJoined),
+			OpsecWarnings:   warnings,
+		}
+	}
+
+	if tool == "ssh-forward" {
+		bindHost := strings.TrimSpace(route.BindAddress)
+		if bindHost == "" || bindHost == "0.0.0.0" || bindHost == "::" {
+			bindHost = "127.0.0.1"
+		}
+		localPort := route.ListenPort
+		if localPort == 0 {
+			localPort = 1080
+		}
+		sshTarget := strings.TrimSpace(route.SshTarget)
+		if sshTarget == "" {
+			sshTarget = "user@relay-host"
+		}
+		isSocks := strings.ToLower(strings.TrimSpace(route.ForwardMode)) == "socks"
+		fwdTarget := strings.TrimSpace(route.ForwardTarget)
+		if fwdTarget == "" {
+			fwdTarget = "10.10.20.10:3389"
+		}
+
+		var cliCmd string
+		var proxychainsLine string
+		var routeCmds []string
+		if isSocks {
+			cliCmd = fmt.Sprintf("ssh -N -D %s:%d %s", bindHost, localPort, sshTarget)
+			proxychainsLine = fmt.Sprintf("socks5 %s %d", bindHost, localPort)
+			sub := "10.10.20.0/24"
+			if len(route.Subnets) > 0 && strings.TrimSpace(route.Subnets[0]) != "" {
+				sub = strings.TrimSpace(route.Subnets[0])
+			}
+			routeCmds = []string{
+				fmt.Sprintf("proxychains4 -q nmap -sT -Pn %s", sub),
+			}
+		} else {
+			cliCmd = fmt.Sprintf("ssh -N -L %s:%d:%s %s", bindHost, localPort, fwdTarget, sshTarget)
+			routeCmds = []string{
+				fmt.Sprintf("# Connect directly to %s:%d -> forwarded via %s to %s", bindHost, localPort, sshTarget, fwdTarget),
+			}
+		}
+
+		return PivotCommandSet{
+			Tool:            "ssh-forward",
+			LHOST:           host,
+			ProxyCommand:    proxyCmd,
+			SetupCommands:   []string{"# Pure-Go native SSH forwarding inside DoubleAgent (no external pivot binary required on target)"},
+			RouteCommands:   routeCmds,
+			ConsoleCommands: []string{},
+			LinuxAgentCmd:   cliCmd,
+			WindowsAgentCmd: cliCmd,
+			ProxychainsLine: proxychainsLine,
+			OpsecWarnings:   warnings,
+		}
+	}
 
 	if tool == "chisel" {
 		socksPort := route.SocksPort
@@ -380,6 +537,23 @@ func AnalyzePivotOpsec(route NetworkRoute) []string {
 	var warnings []string
 	tool := NormalizePivotTool(route.Tool)
 
+	if tool == "sshuttle" {
+		if strings.TrimSpace(route.SshTarget) == "" {
+			warnings = append(warnings, "Specify the reachable SSH jump target (e.g. user@10.10.14.5) to run sshuttle.")
+		}
+		if len(route.Subnets) == 0 {
+			warnings = append(warnings, "Add at least one internal CIDR subnet (e.g. 10.10.20.0/24) to route through sshuttle.")
+		}
+		return warnings
+	}
+
+	if tool == "ssh-forward" {
+		if strings.TrimSpace(route.BindAddress) == "" || route.BindAddress == "0.0.0.0" {
+			warnings = append(warnings, "Recommend binding local forward listener to 127.0.0.1 unless LAN clients need access.")
+		}
+		return warnings
+	}
+
 	if route.ListenPort == 4444 || route.ListenPort == 1337 || route.ListenPort == 31337 {
 		warnings = append(warnings, fmt.Sprintf("Port %d is a common signatured CTF/offsec port; prefer 443, 8443, or 11601 with TLS.", route.ListenPort))
 	}
@@ -468,6 +642,32 @@ func DefaultBuiltinNetworkRoutes() []NetworkRoute {
 			Status:      "configured",
 			Notes:       "Forwards remote internal port (e.g. SMB 445) back to operator 127.0.0.1:1445 without proxychains.",
 			CreatedAt:   now,
+		},
+		{
+			ID:        "pivot-preset-sshuttle",
+			Name:      "sshuttle Agentless VPN Pivot (No Remote Binary)",
+			Kind:      "sshuttle",
+			Tool:      "sshuttle",
+			SshTarget: "user@10.10.20.5",
+			Subnets:   []string{"10.10.20.0/24"},
+			Status:    "configured",
+			Notes:     "Transparent CIDR routing over SSH without uploading ligolo/chisel binaries (requires Python on jump host).",
+			CreatedAt: now,
+		},
+		{
+			ID:            "pivot-preset-2step-ssh-forward",
+			Name:          "Two-Step Native SSH Target Forward (127.0.0.1:3389 -> Internal)",
+			Kind:          "ssh-forward",
+			Tool:          "ssh-forward",
+			BindAddress:   "127.0.0.1",
+			ListenPort:    3389,
+			ForwardMode:   "local",
+			ForwardTarget: "10.10.20.10:3389",
+			SshTarget:     "user@relay-host",
+			Subnets:       []string{"10.10.20.0/24"},
+			Status:        "configured",
+			Notes:         "Uses an existing reachable SSH host as a relay to reach an internal target port via pure Go x/crypto/ssh.",
+			CreatedAt:     now,
 		},
 	}
 }

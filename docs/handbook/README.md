@@ -29,17 +29,20 @@ Highlighting text in any terminal session displays four quick-save targets:
 
 ## Current Capabilities (`M0`, `M1-1`, `M1-2`, `M1-3`, `F-08`, `F-10`, `F-12`, `F-13`, `F-14`, `F-15`, `F-16`, `F-17`, `F-18`, `F-19`, `F-20`, `F-21`, `F-23`, `F-24`, `F-26`, `F-27`, `F-28`, `F-29`, `F-30`, `F-31`, `F-32`, `F-33`, `F-36`, `F-37`, `F-38`, `F-39`, `F-40`, & `F-41`)
 
-- **Evidence-Vault Per-Host Markdown & HTML Reporting Export (`F-30`)**:
+- **Evidence-Vault Per-Host Word (`.docx`), Markdown, & HTML Reporting Export (`F-30`)**:
   - Open **Engagement ▾ $\to$ Evidence Vault & Findings (`F-18`) $\to$ Assessment Report** tab.
-  - Compiles reproducible, byte-for-byte deterministic reports grouped **per target host** (`All Hosts` or scoped to a single host) across **Markdown (`.md`)** and print/PDF-ready **HTML5 (`.html`)** formats, complete with **SHA-256** integrity checksums per evidence artifact and per exported file.
+  - Compiles reproducible, byte-for-byte deterministic reports grouped **per target host** (`All Hosts` or scoped to a single host) across **Word Pentest Report Scaffold (`.docx`)** (Cover & Document Control, Editable Executive Summary & Risk Matrix, Scope & Methodology, Attack Path Narrative, Per-Host Findings & Proofs, Port Matrix Appendix, and SHA-256 Integrity Manifest — ready to finish in Word/LibreOffice and save as PDF), **Markdown (`.md`)**, and **HTML5 (`.html`)** formats.
   - Toggle inclusion of **Open Ports**, **Standalone Evidence**, **Linked Killchain Notes**, and optionally **Internal-Only Vault Artifacts** (`inReport === false`, excluded by default).
-  - Preview rendered Markdown or sandboxed HTML5 live inside the modal, click **Export Report** for a single file, or click **Export 1 File Per Host** to write individual host report files plus a `manifest.sha256` into a chosen folder.
+  - Preview Markdown / `.docx` scaffold outline or sandboxed HTML5 live inside the modal, click **Export Report** for a single file, or click **Export 1 File Per Host** to write individual host report files plus a `manifest.sha256` into a chosen folder.
 
-- **WinRM / PowerShell Remoting Client (`F-41`)**:
-  - Launch via **Terminals ▾ $\to$ WinRM / PowerShell Remoting (`F-41`)**, **Recon & Exploit ▾ $\to$ Phase 3 // Execution & Post-Exploit**, or the **Command Palette (`Ctrl+K`)**.
-  - Connects directly over **HTTP 5985** or **HTTPS 5986** (with optional self-signed certificate skip) using **NTLM**, **Pass-the-Hash (`32-hex` or `LM:NT`)**, **Kerberos**, or **Basic** authentication, optionally tunneled through any **SOCKS5** pivot/SSH `-D` proxy (`127.0.0.1:1080`).
-  - Save target profiles securely inside the encrypted Vault (binding either direct credentials or existing Vault Identities / Engagement Credentials—raw secrets stay strictly in the Go process).
-  - Opens an interactive `*Evil-WinRM* PS C:\>` terminal tab inside `xterm.js` with persistent working-directory tracking, built-in parity commands (`menu`, `help`, `upload`, `download`, `services`, `netuser`, `sysinfo`, `Bypass-4MSI`, `clear`, `exit`), structured ad-hoc PowerShell execution, and chunked Base64 bidirectional file transfers verified with **SHA-256** checksums.
+- **WinRM / PowerShell Remoting Client View (`F-41`)**:
+  - Opens directly as a dockable **WinRM Workspace View** tab (with a **Pop Out** button for modal overlay mode) via **Terminals ▾ $\to$ WinRM / PowerShell Remoting (`F-41`)**, **Recon & Exploit ▾**, or `Ctrl+K`.
+  - Use the explicit **Save Scope (`<Engagement>` vs `Global`)** and **Saved Profiles Filter (`Engagement` vs `All`)** pills to control whether targets stay isolated in `.daeng` engagement archives or are reused globally.
+  - Click any PowerShell Execution & Evil-WinRM parity helper pill (`whoami /all`, `sysinfo`, `services`, `netuser`, `ipconfig /all`, `netstat -ano`, `env`, `Bypass-4MSI`) at any time to load into the runner input (and execute immediately when a WinRM session is active).
+
+- **Sidebar Pivot Launcher (`F-24`), `sshuttle`, Native 2-Step SSH Forward & Unified Ops Dashboard (`F-38`)**:
+  - Use the **Pivot** icon in the left `OPS` sidebar for 1-click launching on top (`Ligolo-ng`, `Chisel`, agentless **`sshuttle`**, and pure-Go **Two-Step SSH Forward** `-L`/`-D` through any reachable Vault SSH relay) and copy/insert/run target commands below.
+  - Open the **Ops Listeners & Route Health Dashboard (`F-38`)** via **Terminals ▾**, the **Dashboard** button inside the **Active Listeners** sidebar drawer, or `Ctrl+K` to view and stop active **Shell Listeners (`F-32`)**, **File Staging Servers (`F-31`)**, **Pivots (`F-24`)**, and **SSH Forwards (`F-13`)**, or run manual OPSEC-throttled TCP reachability checks.
 
 - **Pentest-Phase Top Navigation & Two-Section Activity Bar (`OPS` vs. `HOST`)**:
   - **Top Navigation Bar**:

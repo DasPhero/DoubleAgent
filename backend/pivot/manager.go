@@ -122,6 +122,10 @@ func DetectBinaries() []core.PivotBinaryStatus {
 			tool:       "chisel",
 			candidates: []string{"chisel", "chisel.exe"},
 		},
+		{
+			tool:       "sshuttle",
+			candidates: []string{"sshuttle"},
+		},
 	}
 
 	results := make([]core.PivotBinaryStatus, 0, len(checks))
@@ -181,7 +185,7 @@ func (m *Manager) Start(ctx context.Context, route core.NetworkRoute) (core.Pivo
 		addr = "0.0.0.0"
 	}
 	port := route.ListenPort
-	if port == 0 {
+	if port == 0 && tool != "sshuttle" {
 		if tool == "chisel" {
 			port = 8443
 		} else {
@@ -192,7 +196,7 @@ func (m *Manager) Start(ctx context.Context, route core.NetworkRoute) (core.Pivo
 	m.mu.Lock()
 	for _, existing := range m.instances {
 		snap := existing.snapshot()
-		if snap.Status == "running" && snap.ListenPort == port {
+		if port > 0 && snap.Status == "running" && snap.ListenPort == port {
 			m.mu.Unlock()
 			return core.PivotInstanceInfo{}, fmt.Errorf("a pivot instance (%s) is already running on port %d", snap.Name, port)
 		}

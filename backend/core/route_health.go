@@ -49,15 +49,16 @@ type ProbeTargetResult struct {
 // RouteHealthEntry summarizes runtime + probe health for one route, pivot, tunnel, or proxy profile.
 type RouteHealthEntry struct {
 	ID               string              `json:"id"`
-	SourceType       string              `json:"sourceType"` // "pivot", "ssh-tunnel", "forward-rule", "proxy-profile", "custom"
+	SourceType       string              `json:"sourceType"` // "pivot", "ssh-tunnel", "forward-rule", "proxy-profile", "shell-listener", "transfer-server", "custom"
 	Name             string              `json:"name"`
-	Kind             string              `json:"kind"` // "ligolo-ng", "chisel", "L", "R", "D", "socks5", etc.
+	Kind             string              `json:"kind"` // "ligolo-ng", "chisel", "L", "R", "D", "socks5", "nc", "builtin", etc.
 	BindEndpoint     string              `json:"bindEndpoint,omitempty"`
 	TargetEndpoint   string              `json:"targetEndpoint,omitempty"`
 	Subnets          []string            `json:"subnets,omitempty"`
 	Hops             []string            `json:"hops,omitempty"`
 	Status           string              `json:"status"`       // "healthy", "degraded", "down", "idle", "error"
-	RuntimeState     string              `json:"runtimeState"` // "running", "active", "stopped", "configured", "error"
+	RuntimeState     string              `json:"runtimeState"` // "running", "active", "listening", "stopped", "configured", "error"
+	MetaSummary      string              `json:"metaSummary,omitempty"`
 	LigoloAgents     []string            `json:"ligoloAgents,omitempty"`
 	BytesTransferred int64               `json:"bytesTransferred,omitempty"`
 	ErrorMsg         string              `json:"errorMsg,omitempty"`

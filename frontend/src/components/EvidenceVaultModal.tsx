@@ -910,7 +910,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       reportHostScope !== 'all'
         ? (hostMap.get(reportHostScope)?.label || reportHostScope).replace(/[^a-zA-Z0-9_-]/g, '_')
         : 'all-hosts';
-    const ext = reportFormat === 'html' ? 'html' : 'md';
+    const ext = reportFormat === 'html' ? 'html' : reportFormat === 'docx' ? 'docx' : 'md';
     const suggestedName = compiledReport?.fileName || `${engSlug}-${hostLabel}.${ext}`;
 
     if (api?.SaveReportFileDialog && api?.ExportEvidenceReportToFile) {
@@ -936,8 +936,20 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     }
 
     const result = compiledReport || compileClientFallbackReport();
-    const mime = reportFormat === 'html' ? 'text/html;charset=utf-8' : 'text/markdown;charset=utf-8';
-    const blob = new Blob([result.content], { type: mime });
+    let blob: Blob;
+    if (reportFormat === 'docx' && result.contentBase64) {
+      const binStr = atob(result.contentBase64);
+      const bytes = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i += 1) {
+        bytes[i] = binStr.charCodeAt(i);
+      }
+      blob = new Blob([bytes], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+    } else {
+      const mime = reportFormat === 'html' ? 'text/html;charset=utf-8' : 'text/markdown;charset=utf-8';
+      blob = new Blob([result.content], { type: mime });
+    }
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -2498,7 +2510,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
                   >
                     <CyberIcon name="download" size={14} />
-                    Export Report ({reportFormat === 'html' ? '.html' : '.md'})
+                    Export Report ({reportFormat === 'html' ? '.html' : reportFormat === 'docx' ? '.docx' : '.md'})
                   </button>
                   <button
                     type="button"
@@ -2555,11 +2567,29 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                 <div style={{ display: 'inline-flex', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
                   <button
                     type="button"
+                    onClick={() => setReportFormat('docx')}
+                    title="Editable Customer Pentest Report Scaffold (open in Word/LibreOffice & Export PDF)"
+                    style={{
+                      background: reportFormat === 'docx' ? 'rgba(0, 240, 255, 0.18)' : 'transparent',
+                      color: reportFormat === 'docx' ? '#00f0ff' : '#94a3b8',
+                      border: 'none',
+                      padding: '4px 10px',
+                      cursor: 'pointer',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: '0.73rem',
+                      fontWeight: reportFormat === 'docx' ? 700 : 400,
+                    }}
+                  >
+                    Word (.docx)
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setReportFormat('markdown')}
                     style={{
                       background: reportFormat === 'markdown' ? 'rgba(0, 240, 255, 0.18)' : 'transparent',
                       color: reportFormat === 'markdown' ? '#00f0ff' : '#94a3b8',
                       border: 'none',
+                      borderLeft: '1px solid rgba(0, 240, 255, 0.3)',
                       padding: '4px 10px',
                       cursor: 'pointer',
                       fontFamily: 'JetBrains Mono, monospace',
@@ -2773,7 +2803,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     >
                       {compiledReport.content}
                     </pre>
-                  ) : compiledReport && reportFormat === 'markdown' ? (
+                  ) : compiledReport && (reportFormat === 'markdown' || reportFormat === 'docx') ? (
                     <MarkdownRenderer content={compiledReport.content} />
                   ) : (
                     <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.78rem', color: '#94a3b8' }}>

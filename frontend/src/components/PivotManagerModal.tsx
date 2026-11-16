@@ -5,9 +5,18 @@ import {
   PivotCommandSet,
   PivotInstanceInfo,
   PivotTool,
+  TwoStepSshPivotRequest,
 } from '../types/pivot';
 import { NetworkInterfaceIP } from '../types/fileTransfer';
 import { CyberIcon } from './CyberIcon';
+
+export interface PivotRelayHostOption {
+  id: string;
+  label: string;
+  address: string;
+  username?: string;
+  port?: number;
+}
 
 export interface PivotManagerModalProps {
   isOpen?: boolean;
@@ -15,9 +24,11 @@ export interface PivotManagerModalProps {
   activeSessionId?: string | null;
   activeEngagementId?: string | null;
   activeEngagementName?: string | null;
+  hosts?: PivotRelayHostOption[];
   onSendToTerminal?: (sessionId: string, text: string) => void;
   onSpawnLocalTerminal?: (initialCommand: string, title?: string) => void;
   onOpenRouteHealth?: () => void;
+  onLaunchTwoStepSshPivot?: (req: TwoStepSshPivotRequest) => Promise<void>;
   // Wails Bindings
   getDefaultRoutes: () => Promise<NetworkRoute[]>;
   listRoutes: () => Promise<NetworkRoute[]>;
@@ -46,9 +57,11 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
   activeSessionId,
   activeEngagementId,
   activeEngagementName,
+  hosts = [],
   onSendToTerminal,
   onSpawnLocalTerminal,
   onOpenRouteHealth,
+  onLaunchTwoStepSshPivot,
   getDefaultRoutes,
   listRoutes,
   saveRoute,
@@ -91,6 +104,10 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
     activeEngagementId ? 'engagement' : 'global'
   );
   const [lhost, setLhost] = useState<string>('10.10.14.1');
+  const [sshTarget, setSshTarget] = useState<string>('user@10.10.20.5');
+  const [relayHostId, setRelayHostId] = useState<string>(hosts[0]?.id || '');
+  const [forwardMode, setForwardMode] = useState<'local' | 'socks'>('local');
+  const [forwardTarget, setForwardTarget] = useState<string>('10.10.20.10:3389');
 
   // Generated commands & console interaction
   const [commandSet, setCommandSet] = useState<PivotCommandSet | null>(null);
@@ -152,10 +169,10 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
       id: editingRouteId || '',
       engagementId: scopeMode === 'engagement' && activeEngagementId ? activeEngagementId : '',
       name: name.trim() || `${tool} pivot`,
-      kind: tool === 'chisel' ? 'chisel' : 'ligolo',
+      kind: tool === 'ligolo-ng' ? 'ligolo' : tool,
       tool,
-      bindAddress: bindAddress.trim() || '0.0.0.0',
-      listenPort: Number(listenPort) || (tool === 'chisel' ? 8443 : 11601),
+      bindAddress: bindAddress.trim() || (tool === 'ssh-forward' ? '127.0.0.1' : '0.0.0.0'),
+      listenPort: tool === 'sshuttle' ? 0 : Number(listenPort) || (tool === 'chisel' ? 8443 : tool === 'ssh-forward' ? 13389 : 11601),
       socksPort: Number(socksPort) || 1080,
       interfaceName: interfaceName.trim() || 'ligolo',
       subnets: parseSubnetsInput(subnetsInput),
@@ -165,6 +182,10 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
       ignoreCert,
       binaryPath: binaryPath.trim() || undefined,
       extraArgs: extraArgs.trim() || undefined,
+      sshTarget: sshTarget.trim() || undefined,
+      relayHostId: relayHostId || undefined,
+      forwardMode,
+      forwardTarget: forwardTarget.trim() || undefined,
       notes: notes.trim() || undefined,
     }),
     [
@@ -184,6 +205,10 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
       ignoreCert,
       binaryPath,
       extraArgs,
+      sshTarget,
+      relayHostId,
+      forwardMode,
+      forwardTarget,
       notes,
     ]
   );
@@ -221,21 +246,44 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
 
   const handleSelectTool = (nextTool: PivotTool) => {
     setTool(nextTool);
-    if (nextTool === 'chisel' && listenPort === 11601) {
-      setListenPort(8443);
+    if (nextTool === 'chisel') {
+      if (listenPort === 11601 || listenPort === 13389 || listenPort === 0) setListenPort(8443);
+      if (bindAddress === '127.0.0.1') setBindAddress('0.0.0.0');
       if (name === 'Internal AD Ligolo Pivot') setName('Chisel Reverse SOCKS5 Pivot');
-    } else if (nextTool === 'ligolo-ng' && (listenPort === 8443 || listenPort === 8000)) {
-      setListenPort(11601);
+    } else if (nextTool === 'ligolo-ng') {
+      if (listenPort === 8443 || listenPort === 8000 || listenPort === 13389 || listenPort === 0) setListenPort(11601);
+      if (bindAddress === '127.0.0.1') setBindAddress('0.0.0.0');
       if (name === 'Chisel Reverse SOCKS5 Pivot') setName('Internal AD Ligolo Pivot');
+    } else if (nextTool === 'sshuttle') {
+      setListenPort(0);
+      if (!sshTarget && hosts.length > 0) {
+        const h = hosts[0];
+        setSshTarget(`${h.username || 'user'}@${h.address}`);
+      }
+    } else if (nextTool === 'ssh-forward') {
+      setBindAddress('127.0.0.1');
+      if (listenPort === 11601 || listenPort === 8443 || listenPort === 0) setListenPort(13389);
+      if (!relayHostId && hosts.length > 0) {
+        setRelayHostId(hosts[0].id);
+        setSshTarget(`${hosts[0].username || 'user'}@${hosts[0].address}`);
+      }
     }
   };
 
   const loadRouteIntoForm = (r: NetworkRoute, isPreset: boolean) => {
+    const normalizedTool: PivotTool =
+      r.tool === 'chisel' || r.tool === 'sshuttle' || r.tool === 'ssh-forward'
+        ? (r.tool as PivotTool)
+        : 'ligolo-ng';
     setEditingRouteId(isPreset ? '' : r.id);
     setName(r.name);
-    setTool((r.tool === 'chisel' ? 'chisel' : 'ligolo-ng') as PivotTool);
-    setBindAddress(r.bindAddress || '0.0.0.0');
-    setListenPort(r.listenPort || (r.tool === 'chisel' ? 8443 : 11601));
+    setTool(normalizedTool);
+    setBindAddress(r.bindAddress || (normalizedTool === 'ssh-forward' ? '127.0.0.1' : '0.0.0.0'));
+    setListenPort(
+      normalizedTool === 'sshuttle'
+        ? 0
+        : r.listenPort || (normalizedTool === 'chisel' ? 8443 : normalizedTool === 'ssh-forward' ? 13389 : 11601)
+    );
     setSocksPort(r.socksPort || 1080);
     setInterfaceName(r.interfaceName || 'ligolo');
     setSubnetsInput((r.subnets || []).join(', '));
@@ -245,6 +293,10 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
     setIgnoreCert(Boolean(r.ignoreCert));
     setBinaryPath(r.binaryPath || '');
     setExtraArgs(r.extraArgs || '');
+    if (r.sshTarget) setSshTarget(r.sshTarget);
+    if (r.relayHostId) setRelayHostId(r.relayHostId);
+    if (r.forwardMode) setForwardMode(r.forwardMode);
+    if (r.forwardTarget) setForwardTarget(r.forwardTarget);
     setNotes(r.notes || '');
     setScopeMode(r.engagementId ? 'engagement' : 'global');
     setActiveTab('launch');
@@ -255,11 +307,33 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
     setIsStarting(true);
     setError('');
     try {
+      if (routeToRun.tool === 'ssh-forward') {
+        if (!onLaunchTwoStepSshPivot) {
+          throw new Error('Two-step native SSH forward launcher is unavailable.');
+        }
+        const effectiveRelayId = relayHostId || routeToRun.relayHostId || hosts[0]?.id || '';
+        const mode = forwardMode;
+        const [tHost, tPortRaw] = (routeToRun.forwardTarget || forwardTarget).split(':');
+        await onLaunchTwoStepSshPivot({
+          relayHostId: effectiveRelayId,
+          engagementId: scopeMode === 'engagement' && activeEngagementId ? activeEngagementId : '',
+          mode,
+          bindAddress: routeToRun.bindAddress || '127.0.0.1',
+          localPort: Number(routeToRun.listenPort) || (mode === 'socks' ? 1080 : 13389),
+          targetHost: mode === 'socks' ? '' : (tHost || '').trim(),
+          targetPort: mode === 'socks' ? 0 : Number(tPortRaw) || 0,
+          name: routeToRun.name,
+          saveRule: true,
+        });
+        flashInfo(`Two-step native SSH ${mode === 'socks' ? 'SOCKS5' : '-L'} tunnel started via relay host.`);
+        return;
+      }
+
       const info = await startPivot(routeToRun);
       const list = await listActivePivots().catch(() => []);
       setActivePivots(list || [info]);
       setActiveTab('active');
-      flashInfo(`Started ${info.tool} pivot "${info.name}" on port ${info.listenPort} (PID ${info.pid}).`);
+      flashInfo(`Started ${info.tool} pivot "${info.name}"${info.listenPort ? ` on port ${info.listenPort}` : ''} (PID ${info.pid}).`);
     } catch (err: unknown) {
       const list = await listActivePivots().catch(() => []);
       setActivePivots(list || []);
@@ -526,7 +600,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.08em' }}>
                       /// 1. PIVOT RELAY CONFIGURATION
                     </span>
-                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                       <button
                         type="button"
                         className={`cyber-pill-btn ${tool === 'ligolo-ng' ? 'active' : ''}`}
@@ -540,6 +614,22 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                         onClick={() => handleSelectTool('chisel')}
                       >
                         chisel
+                      </button>
+                      <button
+                        type="button"
+                        className={`cyber-pill-btn ${tool === 'sshuttle' ? 'active' : ''}`}
+                        onClick={() => handleSelectTool('sshuttle')}
+                        title="Transparent CIDR routing via SSH (zero executable uploaded to target)"
+                      >
+                        sshuttle
+                      </button>
+                      <button
+                        type="button"
+                        className={`cyber-pill-btn ${tool === 'ssh-forward' ? 'active' : ''}`}
+                        onClick={() => handleSelectTool('ssh-forward')}
+                        title="Native Go Two-Step SSH Forward (-L / -D) through reachable SSH host"
+                      >
+                        2-step ssh
                       </button>
                     </div>
                   </div>
@@ -578,62 +668,187 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Bind Address & Port */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px', gap: '0.5rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                        Bind IP Address
-                      </label>
-                      <input
-                        type="text"
-                        className="cyber-hud-input"
-                        value={bindAddress}
-                        onChange={(e) => setBindAddress(e.target.value)}
-                        placeholder="0.0.0.0"
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                        Listen Port
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={65535}
-                        className="cyber-hud-input"
-                        value={listenPort}
-                        onChange={(e) => setListenPort(Number(e.target.value) || 0)}
-                      />
-                    </div>
-                    {tool === 'ligolo-ng' ? (
+                  {tool === 'sshuttle' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {hosts.length > 0 && (
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                            Quick-Pick Reachable SSH Jump Host
+                          </label>
+                          <select
+                            className="cyber-hud-select"
+                            value=""
+                            onChange={(e) => {
+                              const picked = hosts.find((h) => h.id === e.target.value);
+                              if (picked) {
+                                setSshTarget(`${picked.username || 'user'}@${picked.address}`);
+                              }
+                            }}
+                          >
+                            <option value="">-- Select Vault Host --</option>
+                            {hosts.map((h) => (
+                              <option key={h.id} value={h.id}>
+                                {h.label} ({h.username || 'user'}@{h.address})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                          TUN Interface
+                          SSH Jump Target (-r user@host[:port])
                         </label>
                         <input
                           type="text"
                           className="cyber-hud-input"
-                          value={interfaceName}
-                          onChange={(e) => setInterfaceName(e.target.value)}
-                          placeholder="ligolo"
+                          value={sshTarget}
+                          onChange={(e) => setSshTarget(e.target.value)}
+                          placeholder="kali@10.10.20.5"
                         />
                       </div>
-                    ) : (
+                      <div style={{ fontSize: '0.7rem', color: '#6ee7b7', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.45rem 0.6rem', borderRadius: 4 }}>
+                        No remote agent binary required on target (requires Python 3 on SSH jump host; on Windows run via WSL or use 2-Step SSH below).
+                      </div>
+                    </div>
+                  )}
+
+                  {tool === 'ssh-forward' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                          SOCKS5 Port
+                          Step 1: Reachable SSH Relay Host (auto-connects if offline)
+                        </label>
+                        <select
+                          className="cyber-hud-select"
+                          aria-label="Step 1 Reachable SSH Relay Host"
+                          value={relayHostId}
+                          onChange={(e) => {
+                            setRelayHostId(e.target.value);
+                            const picked = hosts.find((h) => h.id === e.target.value);
+                            if (picked) {
+                              setSshTarget(`${picked.username || 'user'}@${picked.address}`);
+                            }
+                          }}
+                        >
+                          <option value="">-- Select Reachable SSH Host from Vault --</option>
+                          {hosts.map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {h.label} ({h.username || 'user'}@{h.address}:{h.port || 22})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 1fr', gap: '0.5rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                            Step 2: Forward Mode
+                          </label>
+                          <select
+                            className="cyber-hud-select"
+                            value={forwardMode}
+                            onChange={(e) => setForwardMode(e.target.value as 'local' | 'socks')}
+                          >
+                            <option value="local">Direct Port (-L)</option>
+                            <option value="socks">Dynamic SOCKS5 (-D)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                            Local Port
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={65535}
+                            className="cyber-hud-input"
+                            value={listenPort || (forwardMode === 'socks' ? 1080 : 13389)}
+                            onChange={(e) => setListenPort(Number(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                            {forwardMode === 'local' ? 'Internal Target (host:port)' : 'Bind IP'}
+                          </label>
+                          {forwardMode === 'local' ? (
+                            <input
+                              type="text"
+                              className="cyber-hud-input"
+                              value={forwardTarget}
+                              onChange={(e) => setForwardTarget(e.target.value)}
+                              placeholder="10.10.20.10:3389"
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              className="cyber-hud-input"
+                              value={bindAddress}
+                              onChange={(e) => setBindAddress(e.target.value)}
+                              placeholder="127.0.0.1"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bind Address & Port (Ligolo / Chisel) */}
+                  {(tool === 'ligolo-ng' || tool === 'chisel') && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px', gap: '0.5rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                          Bind IP Address
+                        </label>
+                        <input
+                          type="text"
+                          className="cyber-hud-input"
+                          value={bindAddress}
+                          onChange={(e) => setBindAddress(e.target.value)}
+                          placeholder="0.0.0.0"
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                          Listen Port
                         </label>
                         <input
                           type="number"
                           min={1}
                           max={65535}
                           className="cyber-hud-input"
-                          value={socksPort}
-                          onChange={(e) => setSocksPort(Number(e.target.value) || 1080)}
+                          value={listenPort}
+                          onChange={(e) => setListenPort(Number(e.target.value) || 0)}
                         />
                       </div>
-                    )}
-                  </div>
+                      {tool === 'ligolo-ng' ? (
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                            TUN Interface
+                          </label>
+                          <input
+                            type="text"
+                            className="cyber-hud-input"
+                            value={interfaceName}
+                            onChange={(e) => setInterfaceName(e.target.value)}
+                            placeholder="ligolo"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                            SOCKS5 Port
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={65535}
+                            className="cyber-hud-input"
+                            value={socksPort}
+                            onChange={(e) => setSocksPort(Number(e.target.value) || 1080)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Target Subnets CIDR & Chisel Specs */}
                   <div>

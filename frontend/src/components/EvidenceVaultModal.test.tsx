@@ -165,6 +165,16 @@ describe('Evidence-Vault Per-Host Markdown & HTML Reporting (F-30)', () => {
       expect(iframe.getAttribute('srcDoc') || iframe.getAttribute('srcdoc')).toContain('DC01 Report');
     });
 
+    fireEvent.click(screen.getByText('Word (.docx)'));
+    await waitFor(() => {
+      expect(generateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostId: 'h-dc',
+          format: 'docx',
+        })
+      );
+    });
+
     fireEvent.click(screen.getByText('Export 1 File Per Host'));
     await waitFor(() => {
       expect(selectDirMock).toHaveBeenCalled();

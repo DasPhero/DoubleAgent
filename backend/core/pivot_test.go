@@ -123,3 +123,45 @@ func TestAnalyzePivotOpsecAndParseSubnets_F24(t *testing.T) {
 		t.Fatalf("expected opsec warnings for port 4444, loopback bind, and selfcert; got %v", warns)
 	}
 }
+
+func TestSshuttleAndTwoStepSshForward_F24(t *testing.T) {
+	shuttleRoute := NetworkRoute{
+		ID:        "r-shuttle",
+		Name:      "Agentless sshuttle Pivot",
+		Tool:      "sshuttle",
+		SshTarget: "ops@10.10.20.5",
+		Subnets:   []string{"10.10.20.0/24", "172.16.5.0/24"},
+	}
+	if err := ValidateNetworkRoute(shuttleRoute); err != nil {
+		t.Fatalf("expected valid sshuttle route with ListenPort 0, got error: %v", err)
+	}
+	bins, args, display := BuildPivotArgs(shuttleRoute)
+	if bins[0] != "sshuttle" || !slices.Equal(args, []string{"-r", "ops@10.10.20.5", "10.10.20.0/24", "172.16.5.0/24"}) {
+		t.Fatalf("unexpected sshuttle args: bins=%v args=%v (%s)", bins, args, display)
+	}
+	shuttleCmds := BuildPivotCommandSet(shuttleRoute, "10.10.14.9")
+	if !strings.Contains(shuttleCmds.LinuxAgentCmd, "sshuttle -r ops@10.10.20.5 10.10.20.0/24 172.16.5.0/24") {
+		t.Fatalf("unexpected sshuttle linux cmd: %q", shuttleCmds.LinuxAgentCmd)
+	}
+	if !strings.Contains(shuttleCmds.WindowsAgentCmd, "wsl sshuttle") {
+		t.Fatalf("expected wsl hint for Windows sshuttle cmd: %q", shuttleCmds.WindowsAgentCmd)
+	}
+
+	sshFwdRoute := NetworkRoute{
+		ID:            "r-2step",
+		Name:          "2-Step RDP Relay",
+		Tool:          "ssh-forward",
+		BindAddress:   "127.0.0.1",
+		ListenPort:    13389,
+		ForwardMode:   "local",
+		ForwardTarget: "10.10.20.10:3389",
+		SshTarget:     "bastion@192.168.10.5",
+	}
+	if err := ValidateNetworkRoute(sshFwdRoute); err != nil {
+		t.Fatalf("expected valid 2-step ssh-forward route, got: %v", err)
+	}
+	fwdCmds := BuildPivotCommandSet(sshFwdRoute, "")
+	if !strings.Contains(fwdCmds.ProxyCommand, "-L 127.0.0.1:13389:10.10.20.10:3389 bastion@192.168.10.5") {
+		t.Fatalf("unexpected 2-step ssh forward command: %q", fwdCmds.ProxyCommand)
+	}
+}

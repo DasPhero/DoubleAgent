@@ -86,8 +86,10 @@ import {
   PivotBinaryStatus,
   PivotCommandSet,
   PivotInstanceInfo,
+  PivotTool,
+  TwoStepSshPivotRequest,
 } from './types/pivot';
-import { RouteHealthModal } from './components/RouteHealthModal';
+import { RouteHealthModal, type DashboardListenerSnapshot } from './components/RouteHealthModal';
 import type { RouteCheckRequest, RouteHealthReport, SocksCandidateOption } from './types/routeHealth';
 import { WinrmManagerModal } from './components/WinrmManagerModal';
 import type {
@@ -335,7 +337,7 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm';
   sftpSessionId?: string;
   notesHostId?: string;
   notesInitialNoteId?: string | null;
@@ -1006,6 +1008,7 @@ interface WailsAppBindings {
   SendPivotInput?: (instanceId: string, input: string) => Promise<void>;
   ListActivePivotInstances?: () => Promise<PivotInstanceInfo[]>;
   BuildPivotCommands?: (route: NetworkRoute, lhost: string) => Promise<PivotCommandSet>;
+  LaunchTwoStepSshPivot?: (req: TwoStepSshPivotRequest) => Promise<ForwardTunnelStatus>;
   RunRouteHealthCheck?: (req: RouteCheckRequest) => Promise<RouteHealthReport>;
   ParseRouteProbeTargets?: (raw: string) => Promise<string[]>;
   ListWinrmProfileSummaries?: () => Promise<WinrmProfileSummary[]>;
@@ -1051,7 +1054,7 @@ export interface SerialPortInfo {
   isConnected?: boolean;
 }
 
-export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'listeners' | 'notes' | 'totp' | 'credentials';
+export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'pivot' | 'listeners' | 'notes' | 'totp' | 'credentials';
 export type NavDropdownMenu = 'view' | 'engagement-selector' | 'engagement-tools' | 'terminals' | 'offense' | 'intel';
 
 interface WailsRuntime {
@@ -1156,6 +1159,19 @@ export function App({
   });
   const [drawerListeners, setDrawerListeners] = useState<ManagedListenerInfo[]>([]);
   const [drawerCreds, setDrawerCreds] = useState<CredentialEntry[]>([]);
+  const [drawerPivots, setDrawerPivots] = useState<PivotInstanceInfo[]>([]);
+  const [sidebarPivotTool, setSidebarPivotTool] = useState<PivotTool>('ligolo-ng');
+  const [sidebarPivotPort, setSidebarPivotPort] = useState<number>(11601);
+  const [sidebarPivotSubnets, setSidebarPivotSubnets] = useState<string>('10.10.20.0/24');
+  const [sidebarPivotLhost, setSidebarPivotLhost] = useState<string>('10.10.14.1');
+  const [sidebarPivotLocalIPs, setSidebarPivotLocalIPs] = useState<NetworkInterfaceIP[]>([]);
+  const [sidebarPivotSshTarget, setSidebarPivotSshTarget] = useState<string>('user@10.10.20.5');
+  const [sidebarPivotRelayHostId, setSidebarPivotRelayHostId] = useState<string>('');
+  const [sidebarPivotForwardMode, setSidebarPivotForwardMode] = useState<'local' | 'socks'>('local');
+  const [sidebarPivotForwardTarget, setSidebarPivotForwardTarget] = useState<string>('10.10.20.10:3389');
+  const [sidebarPivotCommands, setSidebarPivotCommands] = useState<PivotCommandSet | null>(null);
+  const [sidebarPivotBusy, setSidebarPivotBusy] = useState<boolean>(false);
+  const [sidebarPivotTargetOs, setSidebarPivotTargetOs] = useState<'linux' | 'windows'>('linux');
 
   const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -1205,6 +1221,23 @@ export function App({
       if (api?.ListActiveManagedListeners) {
         void api.ListActiveManagedListeners().then((list) => {
           if (list) setDrawerListeners(list);
+        }).catch(() => {});
+      }
+    }
+    if (activeSidebarPanel === 'pivot') {
+      const api = getWailsBindings();
+      if (api?.ListActivePivotInstances) {
+        void api.ListActivePivotInstances().then((list) => {
+          if (list) setDrawerPivots(list);
+        }).catch(() => {});
+      }
+      if (api?.GetLocalNetworkIPs) {
+        void api.GetLocalNetworkIPs().then((ips) => {
+          if (ips && ips.length > 0) {
+            setSidebarPivotLocalIPs(ips);
+            const vpn = ips.find((i) => i.isVpn) || ips[0];
+            setSidebarPivotLhost((curr) => (curr === '10.10.14.1' ? vpn.ip : curr));
+          }
         }).catch(() => {});
       }
     }
@@ -1343,6 +1376,21 @@ export function App({
   const [showPivotManagerModal, setShowPivotManagerModal] = useState<boolean>(false);
   // Route Health Check state (F-38)
   const [showRouteHealthModal, setShowRouteHealthModal] = useState<boolean>(false);
+  const [dashboardFileServers, setDashboardFileServers] = useState<FileTransferServerInfo[]>([]);
+
+  useEffect(() => {
+    if (!showRouteHealthModal) return;
+    const api = getWailsBindings();
+    if (api?.ListActiveManagedListeners) {
+      void api.ListActiveManagedListeners().then((l) => setDrawerListeners(l || [])).catch(() => {});
+    }
+    if (api?.ListActivePivotInstances) {
+      void api.ListActivePivotInstances().then((p) => setDrawerPivots(p || [])).catch(() => {});
+    }
+    if (api?.ListFileTransferServers) {
+      void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => {});
+    }
+  }, [showRouteHealthModal]);
   // WinRM / PowerShell Remoting Client state (F-41)
   const [showWinrmModal, setShowWinrmModal] = useState<boolean>(false);
   // Pentest Engagement Hub state (F-36)
@@ -1363,6 +1411,93 @@ export function App({
       }
     }
   }, [activeSidebarPanel, activeEngagement, showWinrmModal]);
+
+  useEffect(() => {
+    if (activeSidebarPanel !== 'pivot') return;
+    const api = getWailsBindings();
+    const subs = sidebarPivotSubnets.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+    const route: NetworkRoute = {
+      id: '',
+      engagementId: activeEngagement?.id || '',
+      name: `Sidebar ${sidebarPivotTool}`,
+      kind: sidebarPivotTool === 'ligolo-ng' ? 'ligolo' : sidebarPivotTool,
+      tool: sidebarPivotTool,
+      bindAddress: sidebarPivotTool === 'ssh-forward' ? '127.0.0.1' : '0.0.0.0',
+      listenPort: sidebarPivotTool === 'sshuttle' ? 0 : Number(sidebarPivotPort) || (sidebarPivotTool === 'chisel' ? 8443 : sidebarPivotTool === 'ssh-forward' ? 13389 : 11601),
+      socksPort: sidebarPivotForwardMode === 'socks' ? Number(sidebarPivotPort) || 1080 : 1080,
+      interfaceName: 'ligolo',
+      subnets: subs,
+      reverse: true,
+      selfCert: true,
+      ignoreCert: true,
+      sshTarget: sidebarPivotSshTarget.trim() || undefined,
+      relayHostId: sidebarPivotRelayHostId || undefined,
+      forwardMode: sidebarPivotForwardMode,
+      forwardTarget: sidebarPivotForwardTarget.trim() || undefined,
+    };
+    if (api?.BuildPivotCommands) {
+      let active = true;
+      void api.BuildPivotCommands(route, sidebarPivotLhost.trim() || '10.10.14.1').then((res) => {
+        if (active && res) setSidebarPivotCommands(res);
+      }).catch(() => {});
+      return () => { active = false; };
+    }
+    const targetSub = subs[0] || '10.10.20.0/24';
+    const fallbackLhost = sidebarPivotLhost.trim() || '10.10.14.1';
+    if (sidebarPivotTool === 'sshuttle') {
+      const jt = sidebarPivotSshTarget.trim() || 'user@10.10.20.5';
+      setSidebarPivotCommands({
+        tool: 'sshuttle',
+        lhost: fallbackLhost,
+        proxyCommand: `sshuttle -r ${jt} ${subs.join(' ') || targetSub}`,
+        linuxAgentCmd: `sshuttle -r ${jt} ${subs.join(' ') || targetSub} --dns`,
+        windowsAgentCmd: `wsl sshuttle -r ${jt} ${subs.join(' ') || targetSub} --dns`,
+      });
+    } else if (sidebarPivotTool === 'ssh-forward') {
+      const jt = sidebarPivotSshTarget.trim() || 'user@relay-host';
+      const lp = Number(sidebarPivotPort) || 13389;
+      const ft = sidebarPivotForwardTarget.trim() || '10.10.20.10:3389';
+      const cmd = sidebarPivotForwardMode === 'socks'
+        ? `ssh -N -D 127.0.0.1:${lp} ${jt}`
+        : `ssh -N -L 127.0.0.1:${lp}:${ft} ${jt}`;
+      setSidebarPivotCommands({
+        tool: 'ssh-forward',
+        lhost: fallbackLhost,
+        proxyCommand: cmd,
+        linuxAgentCmd: cmd,
+        windowsAgentCmd: cmd,
+        proxychainsLine: sidebarPivotForwardMode === 'socks' ? `socks5 127.0.0.1 ${lp}` : undefined,
+      });
+    } else if (sidebarPivotTool === 'chisel') {
+      setSidebarPivotCommands({
+        tool: 'chisel',
+        lhost: fallbackLhost,
+        proxyCommand: `chisel server --host 0.0.0.0 -p ${sidebarPivotPort} --reverse --socks5`,
+        linuxAgentCmd: `./chisel client ${fallbackLhost}:${sidebarPivotPort} R:socks`,
+        windowsAgentCmd: `.\\chisel.exe client ${fallbackLhost}:${sidebarPivotPort} R:socks`,
+        proxychainsLine: 'socks5 127.0.0.1 1080',
+      });
+    } else {
+      setSidebarPivotCommands({
+        tool: 'ligolo-ng',
+        lhost: fallbackLhost,
+        proxyCommand: `ligolo-proxy -laddr 0.0.0.0:${sidebarPivotPort} -selfcert`,
+        linuxAgentCmd: `./agent -connect ${fallbackLhost}:${sidebarPivotPort} -ignore-cert`,
+        windowsAgentCmd: `.\\agent.exe -connect ${fallbackLhost}:${sidebarPivotPort} -ignore-cert`,
+      });
+    }
+  }, [
+    activeSidebarPanel,
+    activeEngagement?.id,
+    sidebarPivotTool,
+    sidebarPivotPort,
+    sidebarPivotSubnets,
+    sidebarPivotLhost,
+    sidebarPivotSshTarget,
+    sidebarPivotRelayHostId,
+    sidebarPivotForwardMode,
+    sidebarPivotForwardTarget,
+  ]);
 
   // Terminal Selection Context Menu & Quick Save State (F-19)
   const [terminalContextMenu, setTerminalContextMenu] = useState<{
@@ -1980,6 +2115,35 @@ export function App({
           sessionId: `netmap-${seq}`,
           title: 'Network Topology Map',
           paneType: 'network-map',
+        },
+        activePaneId: paneId,
+      };
+      setActiveTabId(tabId);
+      return [...prev, newTab];
+    });
+  }, []);
+
+  const openWinrmTab = useCallback((): void => {
+    setTabs((prev) => {
+      const existingTab = prev.find((t) => t.tabType === 'winrm');
+      if (existingTab) {
+        setActiveTabId(existingTab.id);
+        return prev;
+      }
+      tabCounterRef.current += 1;
+      const seq = tabCounterRef.current;
+      const tabId = `winrm-tab-${seq}`;
+      const paneId = `winrm-pane-${seq}-1`;
+      const newTab: TabItem = {
+        id: tabId,
+        title: 'WinRM // PSRemoting',
+        color: '#38bdf8',
+        tabType: 'winrm',
+        rootNode: {
+          type: 'pane',
+          id: paneId,
+          sessionId: `winrm-${seq}`,
+          title: 'WinRM PowerShell Remoting',
         },
         activePaneId: paneId,
       };
@@ -4601,6 +4765,7 @@ export function App({
       activeTab.tabType === 'settings' ||
       activeTab.tabType === 'sftp' ||
       activeTab.tabType === 'network-map' ||
+      activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
@@ -5272,6 +5437,7 @@ export function App({
       activeTab.tabType === 'settings' ||
       activeTab.tabType === 'sftp' ||
       activeTab.tabType === 'network-map' ||
+      activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'editor'
     ) {
       await handleConnectSavedHost(host);
@@ -5358,7 +5524,8 @@ export function App({
         activeTab.tabType === 'notes' ||
         activeTab.tabType === 'settings' ||
         activeTab.tabType === 'sftp' ||
-        activeTab.tabType === 'network-map'
+        activeTab.tabType === 'network-map' ||
+        activeTab.tabType === 'winrm'
       ) {
         await handleOpenLocalTerminal(shellType);
         return;
@@ -5479,6 +5646,7 @@ export function App({
       activeTab.tabType === 'settings' ||
       activeTab.tabType === 'sftp' ||
       activeTab.tabType === 'network-map' ||
+      activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
@@ -8026,7 +8194,7 @@ export function App({
       shortLabel: 'WinRM',
       icon: 'terminal',
       action: () => {
-        setShowWinrmModal(true);
+        openWinrmTab();
       },
     },
     'snippet-chains': {
@@ -8195,6 +8363,135 @@ export function App({
       </div>
     );
   };
+
+  const renderWinrmManager = (isEmbedded: boolean, onCloseAction: () => void, tabId?: string) => (
+    <WinrmManagerModal
+      isEmbedded={isEmbedded}
+      onClose={onCloseAction}
+      onPinToTab={() => {
+        setShowWinrmModal(false);
+        openWinrmTab();
+      }}
+      onPopOutModal={() => {
+        if (tabId) void handleCloseTab(tabId);
+        setShowWinrmModal(true);
+      }}
+      activeEngagementId={activeEngagement?.id || null}
+      activeEngagementName={activeEngagement?.name || null}
+      hosts={vaultSummary.hosts.map((h) => ({
+        id: h.id,
+        label: h.label,
+        address: h.address,
+      }))}
+      identities={vaultSummary.identities.map((idn) => ({
+        id: idn.id,
+        label: idn.label,
+        username: idn.username,
+      }))}
+      credentials={(drawerCreds || []).map((c) => ({
+        id: c.id,
+        label: c.label,
+        username: c.username,
+        realm: c.realm,
+        category: c.category,
+      }))}
+      socksCandidates={(() => {
+        const list: { id: string; label: string; addr: string }[] = [];
+        for (const tun of activeTunnels) {
+          if (tun.type === 'D' && tun.status === 'active') {
+            const host =
+              !tun.bindAddress || tun.bindAddress === '0.0.0.0' || tun.bindAddress === '::'
+                ? '127.0.0.1'
+                : tun.bindAddress;
+            list.push({ id: tun.id, label: 'SSH -D', addr: `${host}:${tun.bindPort}` });
+          }
+        }
+        for (const p of vaultSummary.proxyProfiles || []) {
+          if (p.type === 'socks5' && p.socksAddress) {
+            if (!list.some((x) => x.addr === p.socksAddress)) {
+              list.push({ id: p.id, label: p.name, addr: p.socksAddress });
+            }
+          }
+        }
+        return list;
+      })()}
+      listProfiles={async () => {
+        const api = getWailsBindings();
+        return api?.ListWinrmProfileSummaries ? api.ListWinrmProfileSummaries() : [];
+      }}
+      saveProfile={async (prof) => {
+        const api = getWailsBindings();
+        if (api?.SaveWinrmProfile) {
+          await api.SaveWinrmProfile(prof);
+          return;
+        }
+        throw new Error('SaveWinrmProfile API unavailable');
+      }}
+      deleteProfile={async (id) => {
+        const api = getWailsBindings();
+        if (api?.DeleteWinrmProfile) {
+          await api.DeleteWinrmProfile(id);
+          return;
+        }
+        throw new Error('DeleteWinrmProfile API unavailable');
+      }}
+      detectTools={async () => {
+        const api = getWailsBindings();
+        return api?.DetectWinrmTools ? api.DetectWinrmTools() : [];
+      }}
+      buildCliCommand={async (prof) => {
+        const api = getWailsBindings();
+        if (api?.BuildWinrmCLICommand) return api.BuildWinrmCLICommand(prof);
+        return '';
+      }}
+      connectSession={async (req) => {
+        const api = getWailsBindings();
+        if (api?.ConnectWinrmSession) return api.ConnectWinrmSession(req);
+        throw new Error('ConnectWinrmSession API unavailable');
+      }}
+      listActiveSessions={async () => {
+        const api = getWailsBindings();
+        return api?.ListActiveWinrmSessions ? api.ListActiveWinrmSessions() : [];
+      }}
+      executeCommand={async (sid, script) => {
+        const api = getWailsBindings();
+        if (api?.ExecuteWinrmCommand) return api.ExecuteWinrmCommand(sid, script);
+        throw new Error('ExecuteWinrmCommand API unavailable');
+      }}
+      uploadFile={async (sid, localPath, remotePath) => {
+        const api = getWailsBindings();
+        if (api?.UploadWinrmFile) return api.UploadWinrmFile(sid, localPath, remotePath);
+        throw new Error('UploadWinrmFile API unavailable');
+      }}
+      downloadFile={async (sid, remotePath, localPath) => {
+        const api = getWailsBindings();
+        if (api?.DownloadWinrmFile) return api.DownloadWinrmFile(sid, remotePath, localPath);
+        throw new Error('DownloadWinrmFile API unavailable');
+      }}
+      disconnectSession={async (sid) => {
+        const api = getWailsBindings();
+        if (api?.DisconnectSession) {
+          await api.DisconnectSession(sid);
+          return;
+        }
+        throw new Error('DisconnectSession API unavailable');
+      }}
+      onSessionConnected={(sess) => {
+        openSessionTab(
+          sess.sessionId,
+          sess.name || `WinRM ${sess.host}`,
+          sess.hostId || undefined,
+          '#38bdf8'
+        );
+      }}
+      onFocusSession={(sid) => {
+        const matchTab = tabs.find((t) => collectPanes(t.rootNode).some((p) => p.sessionId === sid));
+        if (matchTab) {
+          setActiveTabId(matchTab.id);
+        }
+      }}
+    />
+  );
 
   return (
     <main
@@ -8537,8 +8834,7 @@ export function App({
                       activeTunnels.length > 0
                     )}
                     {renderDropdownRow('proxy-profiles', 'Proxy Profiles & Proxychains (F-14)', undefined, () => setShowProxyProfilesModal(true))}
-                  {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo & chisel (F-24)', undefined, () => setShowPivotManagerModal(true))}
-                  {renderDropdownRow('route-health', 'Route Health Check // OPSEC (F-38)', undefined, () => setShowRouteHealthModal(true))}
+                  {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo, chisel, sshuttle & SSH (F-24)', undefined, () => setShowPivotManagerModal(true))}
                     <div className="nav-dropdown-divider" />
                     <div className="tools-sub-header">Engagement Archive (.daeng)</div>
                     {renderDropdownRow('eng-export', 'Export .daeng Package (F-36)', undefined, () => {
@@ -8609,7 +8905,7 @@ export function App({
                   {renderDropdownRow('pivot-manager', 'Pivoting Engine // ligolo & chisel (F-24)', undefined, () => setShowPivotManagerModal(true))}
                   {renderDropdownRow('route-health', 'Route Health Check // OPSEC (F-38)', undefined, () => setShowRouteHealthModal(true))}
                   {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat (F-31)', undefined, () => setShowRawTcpModal(true))}
-                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting (F-41)', undefined, () => setShowWinrmModal(true))}
+                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting (F-41)', undefined, () => openWinrmTab())}
                   {renderDropdownRow(
                     'sftp',
                     'SFTP File Browser',
@@ -8664,7 +8960,7 @@ export function App({
 
                   <div className="nav-dropdown-divider" />
                   <div className="tools-sub-header">Phase 3 // Execution &amp; Post-Exploit</div>
-                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting (F-41)', undefined, () => setShowWinrmModal(true))}
+                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting (F-41)', undefined, () => openWinrmTab())}
                   {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true))}
                   {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits (F-16)', undefined, () => {
                     setChainsHostFilter(activeTab?.hostId || null);
@@ -8891,7 +9187,30 @@ export function App({
               )}
             </button>
 
-            {/* 4. Active Listeners (F-32) */}
+            {/* 4. Network Pivoting & Relay Launcher (F-24) */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'pivot' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'pivot' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('pivot');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Network Pivoting & Tunnel Launcher (F-24)"
+              aria-label="Network Pivoting Panel"
+            >
+              <CyberIcon name="tunnel" size={18} />
+              {(drawerPivots.filter((p) => p.status === 'running').length + activeTunnels.length) > 0 && (
+                <span className="activity-bar-badge" style={{ background: '#00f0ff', color: '#020617' }}>
+                  {drawerPivots.filter((p) => p.status === 'running').length + activeTunnels.length}
+                </span>
+              )}
+            </button>
+
+            {/* 5. Active Listeners (F-32) */}
             <button
               type="button"
               className={`activity-bar-btn ${activeSidebarPanel === 'listeners' && !sidebarCollapsed ? 'active' : ''}`}
@@ -9432,11 +9751,475 @@ export function App({
                 </div>
               )}
 
+              {activeSidebarPanel === 'pivot' && (
+                <div className="drawer-panel drawer-pivot-panel">
+                  <div className="sidebar-header">
+                    <h2>Network Pivoting</h2>
+                    <div className="sidebar-actions">
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setShowPivotManagerModal(true)}
+                        title="Open Full Network Pivoting Manager (F-24)"
+                      >
+                        Full View
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TOP: Quick Pivot Launcher */}
+                  <div
+                    style={{
+                      padding: '0.65rem 0.75rem',
+                      borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.45rem',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em' }}>
+                      PIVOT LAUNCHER
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem' }}>
+                      {(
+                        [
+                          { id: 'ligolo-ng', label: 'Ligolo' },
+                          { id: 'chisel', label: 'Chisel' },
+                          { id: 'sshuttle', label: 'sshuttle' },
+                          { id: 'ssh-forward', label: '2-Step' },
+                        ] as { id: PivotTool; label: string }[]
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          className={`cyber-pill-btn ${sidebarPivotTool === opt.id ? 'active' : ''}`}
+                          style={{ padding: '0.25rem 0.3rem', fontSize: '0.66rem', textAlign: 'center' }}
+                          onClick={() => {
+                            setSidebarPivotTool(opt.id);
+                            if (opt.id === 'ligolo-ng') setSidebarPivotPort(11601);
+                            else if (opt.id === 'chisel') setSidebarPivotPort(8443);
+                            else if (opt.id === 'ssh-forward') {
+                              setSidebarPivotPort(sidebarPivotForwardMode === 'socks' ? 1080 : 13389);
+                              if (!sidebarPivotRelayHostId && vaultSummary.hosts.length > 0) {
+                                const h = vaultSummary.hosts[0];
+                                setSidebarPivotRelayHostId(h.id);
+                                setSidebarPivotSshTarget(`${h.effectiveUser || 'user'}@${h.address}`);
+                              }
+                            }
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {sidebarPivotTool === 'sshuttle' ? (
+                      <>
+                        {vaultSummary.hosts.length > 0 && (
+                          <select
+                            className="cyber-hud-select"
+                            aria-label="Sidebar sshuttle Jump Host"
+                            value=""
+                            onChange={(e) => {
+                              const picked = vaultSummary.hosts.find((h) => h.id === e.target.value);
+                              if (picked) {
+                                setSidebarPivotSshTarget(`${picked.effectiveUser || 'user'}@${picked.address}`);
+                              }
+                            }}
+                          >
+                            <option value="">-- Pick SSH Jump Host --</option>
+                            {vaultSummary.hosts.map((h) => (
+                              <option key={h.id} value={h.id}>
+                                {h.label} ({h.effectiveUser || 'user'}@{h.address})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <input
+                          type="text"
+                          className="cyber-hud-input"
+                          aria-label="sshuttle SSH target"
+                          placeholder="user@jump-host"
+                          value={sidebarPivotSshTarget}
+                          onChange={(e) => setSidebarPivotSshTarget(e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          className="cyber-hud-input"
+                          aria-label="sshuttle subnets"
+                          placeholder="Subnets CIDR (e.g. 10.10.20.0/24)"
+                          value={sidebarPivotSubnets}
+                          onChange={(e) => setSidebarPivotSubnets(e.target.value)}
+                        />
+                      </>
+                    ) : sidebarPivotTool === 'ssh-forward' ? (
+                      <>
+                        <select
+                          className="cyber-hud-select"
+                          aria-label="2-Step SSH Relay Host"
+                          value={sidebarPivotRelayHostId}
+                          onChange={(e) => {
+                            setSidebarPivotRelayHostId(e.target.value);
+                            const picked = vaultSummary.hosts.find((h) => h.id === e.target.value);
+                            if (picked) {
+                              setSidebarPivotSshTarget(`${picked.effectiveUser || 'user'}@${picked.address}`);
+                            }
+                          }}
+                        >
+                          <option value="">-- Step 1: Reachable SSH Relay --</option>
+                          {vaultSummary.hosts.map((h) => (
+                            <option key={h.id} value={h.id}>
+                              {h.label} ({h.address})
+                            </option>
+                          ))}
+                        </select>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 82px', gap: '0.3rem' }}>
+                          <select
+                            className="cyber-hud-select"
+                            aria-label="2-Step Forward Mode"
+                            value={sidebarPivotForwardMode}
+                            onChange={(e) => {
+                              const m = e.target.value as 'local' | 'socks';
+                              setSidebarPivotForwardMode(m);
+                              setSidebarPivotPort(m === 'socks' ? 1080 : 13389);
+                            }}
+                          >
+                            <option value="local">Direct Port (-L)</option>
+                            <option value="socks">Dynamic SOCKS5 (-D)</option>
+                          </select>
+                          <input
+                            type="number"
+                            className="cyber-hud-input"
+                            aria-label="Local forward port"
+                            value={sidebarPivotPort}
+                            onChange={(e) => setSidebarPivotPort(Number(e.target.value) || 0)}
+                          />
+                        </div>
+                        {sidebarPivotForwardMode === 'local' ? (
+                          <input
+                            type="text"
+                            className="cyber-hud-input"
+                            aria-label="Internal Target Host and Port"
+                            placeholder="Target IP:Port (e.g. 10.10.20.10:3389)"
+                            value={sidebarPivotForwardTarget}
+                            onChange={(e) => setSidebarPivotForwardTarget(e.target.value)}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            className="cyber-hud-input"
+                            aria-label="Internal Target Subnets"
+                            placeholder="Target Subnet CIDR (10.10.20.0/24)"
+                            value={sidebarPivotSubnets}
+                            onChange={(e) => setSidebarPivotSubnets(e.target.value)}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '84px 1fr', gap: '0.3rem' }}>
+                          <input
+                            type="number"
+                            className="cyber-hud-input"
+                            aria-label="Pivot listen port"
+                            placeholder="Port"
+                            value={sidebarPivotPort}
+                            onChange={(e) => setSidebarPivotPort(Number(e.target.value) || 0)}
+                          />
+                          <input
+                            type="text"
+                            className="cyber-hud-input"
+                            aria-label="Pivot subnets CIDR"
+                            placeholder="10.10.20.0/24"
+                            value={sidebarPivotSubnets}
+                            onChange={(e) => setSidebarPivotSubnets(e.target.value)}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                          {sidebarPivotLocalIPs.slice(0, 3).map((ipItem) => (
+                            <button
+                              key={`${ipItem.interface}-${ipItem.ip}`}
+                              type="button"
+                              className={`cyber-pill-btn ${sidebarPivotLhost === ipItem.ip ? 'active' : ''}`}
+                              style={{ fontSize: '0.62rem', padding: '2px 5px' }}
+                              onClick={() => setSidebarPivotLhost(ipItem.ip)}
+                            >
+                              {ipItem.isVpn ? ipItem.interface : ipItem.ip}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="text"
+                          className="cyber-hud-input"
+                          aria-label="Callback LHOST"
+                          placeholder="Callback LHOST (e.g. 10.10.14.1)"
+                          value={sidebarPivotLhost}
+                          onChange={(e) => setSidebarPivotLhost(e.target.value)}
+                        />
+                      </>
+                    )}
+
+                    <button
+                      type="button"
+                      className="cyber-hud-btn btn-primary btn-sm"
+                      disabled={sidebarPivotBusy}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', width: '100%' }}
+                      onClick={() => {
+                        void (async () => {
+                          const api = getWailsBindings();
+                          if (!api) return;
+                          setSidebarPivotBusy(true);
+                          try {
+                            if (sidebarPivotTool === 'ssh-forward') {
+                              if (!api.LaunchTwoStepSshPivot) return;
+                              const relayId = sidebarPivotRelayHostId || vaultSummary.hosts[0]?.id || '';
+                              const [tHost, tPortRaw] = sidebarPivotForwardTarget.split(':');
+                              await api.LaunchTwoStepSshPivot({
+                                relayHostId: relayId,
+                                engagementId: activeEngagement?.id || '',
+                                mode: sidebarPivotForwardMode,
+                                bindAddress: '127.0.0.1',
+                                localPort: Number(sidebarPivotPort) || (sidebarPivotForwardMode === 'socks' ? 1080 : 13389),
+                                targetHost: sidebarPivotForwardMode === 'socks' ? '' : (tHost || '').trim(),
+                                targetPort: sidebarPivotForwardMode === 'socks' ? 0 : Number(tPortRaw) || 0,
+                                name: `2-Step ${sidebarPivotForwardMode === 'socks' ? 'SOCKS5' : sidebarPivotForwardTarget}`,
+                                saveRule: true,
+                              });
+                              if (api.GetActiveTunnels) {
+                                const tunList = await api.GetActiveTunnels();
+                                setActiveTunnels(tunList || []);
+                              }
+                              setStatusMessage('Launched 2-Step SSH relay tunnel.');
+                            } else {
+                              if (!api.StartPivotInstance) return;
+                              const subs = sidebarPivotSubnets.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+                              await api.StartPivotInstance({
+                                id: '',
+                                engagementId: activeEngagement?.id || '',
+                                name: `Quick ${sidebarPivotTool}`,
+                                kind: sidebarPivotTool === 'ligolo-ng' ? 'ligolo' : sidebarPivotTool,
+                                tool: sidebarPivotTool,
+                                bindAddress: '0.0.0.0',
+                                listenPort: sidebarPivotTool === 'sshuttle' ? 0 : Number(sidebarPivotPort) || 11601,
+                                socksPort: 1080,
+                                interfaceName: 'ligolo',
+                                subnets: subs,
+                                reverse: true,
+                                selfCert: true,
+                                ignoreCert: true,
+                                sshTarget: sidebarPivotTool === 'sshuttle' ? sidebarPivotSshTarget.trim() : undefined,
+                              });
+                              if (api.ListActivePivotInstances) {
+                                const list = await api.ListActivePivotInstances();
+                                setDrawerPivots(list || []);
+                              }
+                              setStatusMessage(`Started ${sidebarPivotTool} pivot.`);
+                            }
+                          } catch (err: unknown) {
+                            setStatusMessage(err instanceof Error ? err.message : String(err));
+                          } finally {
+                            setSidebarPivotBusy(false);
+                          }
+                        })();
+                      }}
+                    >
+                      <CyberIcon name="play" size={12} />
+                      <span>
+                        {sidebarPivotBusy
+                          ? 'Starting...'
+                          : sidebarPivotTool === 'ssh-forward'
+                          ? 'Start 2-Step SSH Tunnel'
+                          : sidebarPivotTool === 'sshuttle'
+                          ? 'Launch sshuttle'
+                          : `Launch ${sidebarPivotTool}`}
+                      </span>
+                    </button>
+
+                    {/* Active Pivot & Forward Tunnels Strip */}
+                    {(drawerPivots.some((p) => p.status === 'running') || activeTunnels.some((t) => t.status === 'active')) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.15rem' }}>
+                        {drawerPivots
+                          .filter((p) => p.status === 'running')
+                          .map((p) => (
+                            <div
+                              key={p.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                border: '1px solid rgba(16, 185, 129, 0.35)',
+                                padding: '3px 6px',
+                                fontSize: '0.67rem',
+                                color: '#6ee7b7',
+                              }}
+                            >
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {p.tool} {p.listenPort ? `:${p.listenPort}` : ''} (PID {p.pid})
+                              </span>
+                              <button
+                                type="button"
+                                className="drawer-action-btn"
+                                style={{ color: '#f87171', padding: '1px 5px' }}
+                                onClick={() => {
+                                  void getWailsBindings()?.StopPivotInstance?.(p.id).then(() => {
+                                    void getWailsBindings()?.ListActivePivotInstances?.().then((l) => setDrawerPivots(l || []));
+                                  });
+                                }}
+                              >
+                                Stop
+                              </button>
+                            </div>
+                          ))}
+                        {activeTunnels
+                          .filter((t) => t.status === 'active')
+                          .map((t) => (
+                            <div
+                              key={t.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: 'rgba(56, 189, 248, 0.1)',
+                                border: '1px solid rgba(56, 189, 248, 0.35)',
+                                padding: '3px 6px',
+                                fontSize: '0.67rem',
+                                color: '#7dd3fc',
+                              }}
+                            >
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                SSH -{t.type} :{t.bindPort}{t.targetHost ? ` -> ${t.targetHost}:${t.targetPort}` : ''}
+                              </span>
+                              <button
+                                type="button"
+                                className="drawer-action-btn"
+                                style={{ color: '#f87171', padding: '1px 5px' }}
+                                onClick={() => {
+                                  void getWailsBindings()?.StopForwardTunnel?.(t.id).then(() => {
+                                    void getWailsBindings()?.GetActiveTunnels?.().then((l) => setActiveTunnels(l || []));
+                                  });
+                                }}
+                              >
+                                Stop
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* BOTTOM: Target / Relay Command */}
+                  <div style={{ padding: '0.65rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', flex: 1, overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.07em' }}>
+                        TARGET COMMAND
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.2rem' }}>
+                        <button
+                          type="button"
+                          className={`cyber-pill-btn ${sidebarPivotTargetOs === 'linux' ? 'active' : ''}`}
+                          style={{ padding: '1px 6px', fontSize: '0.63rem' }}
+                          onClick={() => setSidebarPivotTargetOs('linux')}
+                        >
+                          Linux
+                        </button>
+                        <button
+                          type="button"
+                          className={`cyber-pill-btn ${sidebarPivotTargetOs === 'windows' ? 'active' : ''}`}
+                          style={{ padding: '1px 6px', fontSize: '0.63rem' }}
+                          onClick={() => setSidebarPivotTargetOs('windows')}
+                        >
+                          Windows
+                        </button>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const targetCmd =
+                        sidebarPivotTargetOs === 'windows'
+                          ? sidebarPivotCommands?.windowsAgentCmd || ''
+                          : sidebarPivotCommands?.linuxAgentCmd || '';
+                      return (
+                        <div className="drawer-card" style={{ padding: '0.5rem' }}>
+                          <pre
+                            style={{
+                              margin: '0 0 0.45rem 0',
+                              fontSize: '0.69rem',
+                              fontFamily: 'JetBrains Mono, monospace',
+                              color: '#e2e8f0',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-all',
+                              background: 'rgba(2, 6, 23, 0.75)',
+                              padding: '0.4rem',
+                              border: '1px solid rgba(0, 240, 255, 0.18)',
+                            }}
+                          >
+                            {targetCmd || 'Configure pivot above to generate command...'}
+                          </pre>
+                          <div className="drawer-card-actions">
+                            <button
+                              type="button"
+                              className="drawer-action-btn"
+                              onClick={() => {
+                                if (targetCmd && navigator.clipboard?.writeText) {
+                                  void navigator.clipboard.writeText(targetCmd);
+                                  setStatusMessage('Copied pivot command to clipboard.');
+                                }
+                              }}
+                            >
+                              <CyberIcon name="copy" size={11} />
+                              <span>Copy</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="drawer-action-btn"
+                              disabled={!sessionId}
+                              onClick={() => {
+                                if (sessionId && targetCmd) void getWailsBindings()?.WriteTerminal?.(sessionId, targetCmd);
+                              }}
+                            >
+                              <CyberIcon name="terminal" size={11} />
+                              <span>Insert</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="drawer-action-btn"
+                              disabled={!sessionId}
+                              onClick={() => {
+                                if (sessionId && targetCmd) void getWailsBindings()?.WriteTerminal?.(sessionId, `${targetCmd}\n`);
+                              }}
+                            >
+                              <CyberIcon name="play" size={11} />
+                              <span>Run</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {sidebarPivotCommands?.proxychainsLine && (
+                      <div style={{ fontSize: '0.67rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>
+                        <span style={{ color: '#64748b' }}>Proxychains: </span>
+                        <code style={{ color: '#6ee7b7' }}>{sidebarPivotCommands.proxychainsLine}</code>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {activeSidebarPanel === 'listeners' && (
                 <div className="drawer-panel drawer-listeners-panel">
                   <div className="sidebar-header">
                     <h2>Active Listeners</h2>
-                    <div className="sidebar-actions">
+                    <div className="sidebar-actions" style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => setShowRouteHealthModal(true)}
+                        title="Open Unified Listeners & Route Health Dashboard (F-38)"
+                      >
+                        Dashboard
+                      </button>
                       <button
                         type="button"
                         className="btn-primary btn-sm"
@@ -10571,6 +11354,8 @@ export function App({
                         onDeleteNote={handleDeleteNote}
                         onClose={() => void handleCloseTab(tab.id)}
                       />
+                    ) : tab.tabType === 'winrm' ? (
+                      renderWinrmManager(true, () => void handleCloseTab(tab.id), tab.id)
                     ) : tab.tabType === 'network-map' ? (
                       <NetworkMapView
                         hosts={vaultSummary.hosts}
@@ -11140,7 +11925,7 @@ export function App({
                     onClick={() => {
                       setShowCommandPalette(false);
                       setPaletteQuery('');
-                      setShowWinrmModal(true);
+                      openWinrmTab();
                     }}
                   >
                     <div className="palette-item-main">
@@ -13395,6 +14180,24 @@ export function App({
           activeSessionId={sessionId}
           activeEngagementId={activeEngagement?.id || null}
           activeEngagementName={activeEngagement?.name || null}
+          hosts={vaultSummary.hosts.map((h) => ({
+            id: h.id,
+            label: h.label,
+            address: h.address,
+            username: h.effectiveUser,
+            port: h.effectivePort,
+          }))}
+          onLaunchTwoStepSshPivot={async (req) => {
+            const api = getWailsBindings();
+            if (!api?.LaunchTwoStepSshPivot) {
+              throw new Error('LaunchTwoStepSshPivot API unavailable');
+            }
+            await api.LaunchTwoStepSshPivot(req);
+            if (api.GetActiveTunnels) {
+              const tuns = await api.GetActiveTunnels();
+              setActiveTunnels(tuns || []);
+            }
+          }}
           onSendToTerminal={(sId, text) => {
             void getWailsBindings()?.WriteTerminal?.(sId, text);
           }}
@@ -13499,6 +14302,76 @@ export function App({
             return list;
           })()}
           suggestedTargetHosts={vaultSummary.hosts.map((h) => h.address).filter(Boolean)}
+          activeDashboardItems={(() => {
+            const items: DashboardListenerSnapshot[] = [];
+            for (const l of drawerListeners) {
+              items.push({
+                id: l.id,
+                sourceType: 'shell-listener',
+                name: l.name,
+                kind: `${l.tool} (${l.kind})`,
+                endpoint: `${l.bindAddress}:${l.bindPort}`,
+                status: l.status,
+                metaSummary: `Catches: ${l.catchCount || 0}`,
+              });
+            }
+            for (const srv of dashboardFileServers) {
+              items.push({
+                id: srv.id,
+                sourceType: 'transfer-server',
+                name: srv.name,
+                kind: srv.kind,
+                endpoint: `${srv.bindAddress}:${srv.port}`,
+                status: srv.status,
+                metaSummary: `Served: ${srv.servedCount || 0} · Uploads: ${srv.uploadCount || 0}`,
+              });
+            }
+            for (const p of drawerPivots) {
+              if (p.status === 'running') {
+                items.push({
+                  id: p.id,
+                  sourceType: 'pivot',
+                  name: p.name,
+                  kind: p.tool,
+                  endpoint: p.listenPort ? `${p.bindAddress}:${p.listenPort}` : p.tool,
+                  status: p.status,
+                });
+              }
+            }
+            for (const t of activeTunnels) {
+              if (t.status === 'active') {
+                items.push({
+                  id: t.id,
+                  sourceType: 'ssh-tunnel',
+                  name: `SSH -${t.type} :${t.bindPort}`,
+                  kind: `-${t.type}`,
+                  endpoint: `${t.bindAddress || '127.0.0.1'}:${t.bindPort}`,
+                  status: t.status,
+                });
+              }
+            }
+            return items;
+          })()}
+          onStopEndpoint={async (sourceType, id) => {
+            const api = getWailsBindings();
+            if (!api) return;
+            if (sourceType === 'shell-listener' && api.StopManagedListener) {
+              await api.StopManagedListener(id);
+              setDrawerListeners((prev) => prev.filter((x) => x.id !== id));
+            } else if (sourceType === 'transfer-server' && api.StopFileTransferServer) {
+              await api.StopFileTransferServer(id);
+              setDashboardFileServers((prev) => prev.filter((x) => x.id !== id));
+            } else if (sourceType === 'pivot' && api.StopPivotInstance) {
+              await api.StopPivotInstance(id);
+              setDrawerPivots((prev) => prev.filter((x) => x.id !== id));
+            } else if (sourceType === 'ssh-tunnel' && api.StopForwardTunnel) {
+              await api.StopForwardTunnel(id);
+              if (api.GetActiveTunnels) {
+                const tuns = await api.GetActiveTunnels();
+                setActiveTunnels(tuns || []);
+              }
+            }
+          }}
           runHealthCheck={async (req) => {
             const api = getWailsBindings();
             if (api?.RunRouteHealthCheck) return api.RunRouteHealthCheck(req);
@@ -13509,125 +14382,7 @@ export function App({
         />
       )}
 
-          {showWinrmModal && (
-            <WinrmManagerModal
-              onClose={() => setShowWinrmModal(false)}
-              activeEngagementId={activeEngagement?.id || null}
-              activeEngagementName={activeEngagement?.name || null}
-              hosts={vaultSummary.hosts.map((h) => ({
-                id: h.id,
-                label: h.label,
-                address: h.address,
-              }))}
-              identities={vaultSummary.identities.map((idn) => ({
-                id: idn.id,
-                label: idn.label,
-                username: idn.username,
-              }))}
-              credentials={(drawerCreds || []).map((c) => ({
-                id: c.id,
-                label: c.label,
-                username: c.username,
-                realm: c.realm,
-                category: c.category,
-              }))}
-              socksCandidates={(() => {
-                const list: { id: string; label: string; addr: string }[] = [];
-                for (const tun of activeTunnels) {
-                  if (tun.type === 'D' && tun.status === 'active') {
-                    const host =
-                      !tun.bindAddress || tun.bindAddress === '0.0.0.0' || tun.bindAddress === '::'
-                        ? '127.0.0.1'
-                        : tun.bindAddress;
-                    list.push({ id: tun.id, label: 'SSH -D', addr: `${host}:${tun.bindPort}` });
-                  }
-                }
-                for (const p of vaultSummary.proxyProfiles || []) {
-                  if (p.type === 'socks5' && p.socksAddress) {
-                    if (!list.some((x) => x.addr === p.socksAddress)) {
-                      list.push({ id: p.id, label: p.name, addr: p.socksAddress });
-                    }
-                  }
-                }
-                return list;
-              })()}
-              listProfiles={async () => {
-                const api = getWailsBindings();
-                return api?.ListWinrmProfileSummaries ? api.ListWinrmProfileSummaries() : [];
-              }}
-              saveProfile={async (prof) => {
-                const api = getWailsBindings();
-                if (api?.SaveWinrmProfile) {
-                  await api.SaveWinrmProfile(prof);
-                  return;
-                }
-                throw new Error('SaveWinrmProfile API unavailable');
-              }}
-              deleteProfile={async (id) => {
-                const api = getWailsBindings();
-                if (api?.DeleteWinrmProfile) {
-                  await api.DeleteWinrmProfile(id);
-                  return;
-                }
-                throw new Error('DeleteWinrmProfile API unavailable');
-              }}
-              detectTools={async () => {
-                const api = getWailsBindings();
-                return api?.DetectWinrmTools ? api.DetectWinrmTools() : [];
-              }}
-              buildCliCommand={async (prof) => {
-                const api = getWailsBindings();
-                if (api?.BuildWinrmCLICommand) return api.BuildWinrmCLICommand(prof);
-                return '';
-              }}
-              connectSession={async (req) => {
-                const api = getWailsBindings();
-                if (api?.ConnectWinrmSession) return api.ConnectWinrmSession(req);
-                throw new Error('ConnectWinrmSession API unavailable');
-              }}
-              listActiveSessions={async () => {
-                const api = getWailsBindings();
-                return api?.ListActiveWinrmSessions ? api.ListActiveWinrmSessions() : [];
-              }}
-              executeCommand={async (sid, script) => {
-                const api = getWailsBindings();
-                if (api?.ExecuteWinrmCommand) return api.ExecuteWinrmCommand(sid, script);
-                throw new Error('ExecuteWinrmCommand API unavailable');
-              }}
-              uploadFile={async (sid, localPath, remotePath) => {
-                const api = getWailsBindings();
-                if (api?.UploadWinrmFile) return api.UploadWinrmFile(sid, localPath, remotePath);
-                throw new Error('UploadWinrmFile API unavailable');
-              }}
-              downloadFile={async (sid, remotePath, localPath) => {
-                const api = getWailsBindings();
-                if (api?.DownloadWinrmFile) return api.DownloadWinrmFile(sid, remotePath, localPath);
-                throw new Error('DownloadWinrmFile API unavailable');
-              }}
-              disconnectSession={async (sid) => {
-                const api = getWailsBindings();
-                if (api?.DisconnectSession) {
-                  await api.DisconnectSession(sid);
-                  return;
-                }
-                throw new Error('DisconnectSession API unavailable');
-              }}
-              onSessionConnected={(sess) => {
-                openSessionTab(
-                  sess.sessionId,
-                  sess.name || `WinRM ${sess.host}`,
-                  sess.hostId || undefined,
-                  '#38bdf8'
-                );
-              }}
-              onFocusSession={(sid) => {
-                const matchTab = tabs.find((t) => collectPanes(t.rootNode).some((p) => p.sessionId === sid));
-                if (matchTab) {
-                  setActiveTabId(matchTab.id);
-                }
-              }}
-            />
-          )}
+          {showWinrmModal && renderWinrmManager(false, () => setShowWinrmModal(false))}
 
       {showChainsModal && (
         <SnippetChainsModal

@@ -207,6 +207,8 @@ export function InjectSessionPassword(arg1:string):Promise<void>;
 
 export function InjectTotpCode(arg1:string,arg2:string):Promise<void>;
 
+export function LaunchTwoStepSshPivot(arg1:core.TwoStepSshPivotRequest):Promise<core.ForwardTunnelStatus>;
+
 export function ListActiveManagedListeners():Promise<Array<core.ManagedListenerInfo>>;
 
 export function ListActivePivotInstances():Promise<Array<core.PivotInstanceInfo>>;

@@ -148,4 +148,38 @@ describe('WinrmManagerModal (F-41)', () => {
     );
     expect(await screen.findByText('deadbeef1234')).toBeTruthy();
   });
+
+  it('keeps PowerShell parity helper pills clickable before session connect and supports embedded View mode', async () => {
+    render(
+      <WinrmManagerModal
+        isOpen
+        isEmbedded
+        onClose={vi.fn()}
+        onPopOutModal={vi.fn()}
+        activeEngagementId="eng-1"
+        activeEngagementName="Corp Red Team"
+        listProfiles={vi.fn().mockResolvedValue([sampleProfile])}
+        saveProfile={vi.fn().mockResolvedValue(undefined)}
+        deleteProfile={vi.fn().mockResolvedValue(undefined)}
+        detectTools={vi.fn().mockResolvedValue([])}
+        buildCliCommand={vi.fn().mockResolvedValue('evil-winrm')}
+        connectSession={vi.fn()}
+        listActiveSessions={vi.fn().mockResolvedValue([])}
+        executeCommand={vi.fn()}
+        uploadFile={vi.fn()}
+        downloadFile={vi.fn()}
+        disconnectSession={vi.fn()}
+        onSessionConnected={vi.fn()}
+      />
+    );
+
+    await screen.findByText('DC01 Evil-WinRM');
+    expect(screen.getByText('Pop Out')).toBeTruthy();
+
+    // Even before connecting a session, clicking sysinfo populates the PowerShell input box
+    const sysinfoBtn = screen.getByRole('button', { name: 'sysinfo' });
+    expect((sysinfoBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(sysinfoBtn);
+    expect((screen.getByLabelText('PowerShell Command Input') as HTMLInputElement).value).toBe('systeminfo');
+  });
 });
