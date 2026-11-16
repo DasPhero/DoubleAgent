@@ -3318,6 +3318,125 @@ func TestApp_EvidenceReportingExport_F30(t *testing.T) {
 	}
 }
 
+func TestApp_ManagedFilesAndExternalTemplates(t *testing.T) {
+	tmpVault := filepath.Join(t.TempDir(), "test_managed_files.vault")
+	store := vault.NewStore(vault.StoreOptions{FilePath: tmpVault})
+	if err := store.Initialize(context.Background(), ""); err != nil {
+		t.Fatalf("store.Initialize failed: %v", err)
+	}
+	app := NewAppWithDependencies(newFakeSshTransport(), nil, store, func(context.Context, string, ...interface{}) {})
+	app.ctx = context.Background()
+
+	dir := t.TempDir()
+	for _, id := range []string{
+		"payload_templates",
+		"snippet_chains",
+		"command_snippets",
+		"finding_templates",
+		"evidence_templates",
+		"report_templates",
+		"staging_dir",
+	} {
+		target := dir
+		if id != "staging_dir" {
+			target = filepath.Join(dir, id+".json")
+		}
+		info, err := app.SetManagedFilePath(id, target)
+		if err != nil {
+			t.Fatalf("SetManagedFilePath(%s) failed: %v", id, err)
+		}
+		if !info.Exists {
+			t.Fatalf("expected managed file %s to exist at %s", id, info.FilePath)
+		}
+	}
+
+	// Custom Finding template persists to finding_templates.json
+	if err := app.SaveFindingTemplateToFile(core.FindingItem{
+		ID:          "tpl-find-redis",
+		Title:       "Unauthenticated Redis Instance",
+		Category:    "Database",
+		Severity:    "high",
+		Description: "Redis bound to 0.0.0.0 without AUTH.",
+	}); err != nil {
+		t.Fatalf("SaveFindingTemplateToFile failed: %v", err)
+	}
+	findings := app.GetFindingTemplates()
+	foundRedis := false
+	for _, f := range findings {
+		if f.ID == "tpl-find-redis" {
+			foundRedis = true
+		}
+	}
+	if !foundRedis {
+		t.Fatalf("expected saved finding template in GetFindingTemplates")
+	}
+
+	// Custom Report template populates GenerateEvidenceReport via TemplateID
+	if err := app.SaveReportTemplateToFile(core.ReportTemplate{
+		ID:                    "tpl-rep-custom-acme",
+		Name:                  "ACME Custom Deliverable",
+		TitlePrefix:           "ACME Quarterly Pentest",
+		Author:                "Operator Alpha",
+		Classification:        "STRICTLY CONFIDENTIAL",
+		ExecutiveSummaryIntro: "Custom intro narrative for ACME report.",
+		ConclusionText:        "Patch all external services within 14 days.",
+	}); err != nil {
+		t.Fatalf("SaveReportTemplateToFile failed: %v", err)
+	}
+	eng := core.Engagement{ID: "eng-managed-1", Name: "ACME Q4", Scope: "10.0.0.0/8", Timeframe: "2026-11"}
+	if err := app.SaveEngagement(eng); err != nil {
+		t.Fatalf("SaveEngagement failed: %v", err)
+	}
+	res, err := app.GenerateEvidenceReport(core.ReportExportRequest{
+		EngagementID: eng.ID,
+		Format:       core.ReportFormatMarkdown,
+		TemplateID:   "tpl-rep-custom-acme",
+	})
+	if err != nil {
+		t.Fatalf("GenerateEvidenceReport with TemplateID failed: %v", err)
+	}
+	for _, want := range []string{"ACME Quarterly Pentest", "Operator Alpha", "Custom intro narrative for ACME report.", "Patch all external services within 14 days."} {
+		if !strings.Contains(res.Content, want) {
+			t.Fatalf("expected compiled markdown report to include %q", want)
+		}
+	}
+
+	// Reset defaults restores seeded report templates
+	resetInfo, err := app.ResetManagedFileDefaults("report_templates")
+	if err != nil {
+		t.Fatalf("ResetManagedFileDefaults failed: %v", err)
+	}
+	if resetInfo.ItemCount < 4 {
+		t.Fatalf("expected at least 4 seeded report templates after reset, got %d", resetInfo.ItemCount)
+	}
+
+	// External command snippet saves to command_snippets.json & resolves via ResolveSnippetTemplate
+	if err := app.SaveSnippetToFile(core.Snippet{
+		ID:               "ext-snip-1",
+		Name:             "External Curl Check",
+		Body:             "curl -I http://{{HOST}}:{{PORT=8080}}",
+		Tags:             []string{"linux"},
+		ConfirmBeforeRun: true,
+	}); err != nil {
+		t.Fatalf("SaveSnippetToFile failed: %v", err)
+	}
+	resolvedSnip, err := app.ResolveSnippetTemplate("ext-snip-1", "", map[string]string{"HOST": "10.0.0.5", "PORT": "8443"})
+	if err != nil {
+		t.Fatalf("ResolveSnippetTemplate on external snippet failed: %v", err)
+	}
+	if resolvedSnip != "curl -I http://10.0.0.5:8443" {
+		t.Fatalf("unexpected resolved external snippet: %q", resolvedSnip)
+	}
+
+	allFiles, err := app.ListManagedFiles()
+	if err != nil {
+		t.Fatalf("ListManagedFiles failed: %v", err)
+	}
+	if len(allFiles) < 8 {
+		t.Fatalf("expected at least 8 managed files in overview, got %d", len(allFiles))
+	}
+}
+
 
 
 

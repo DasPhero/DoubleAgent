@@ -65,3 +65,10 @@ export interface SnippetChainsFileConfig {
   lastModified?: string;
 }
 
+export interface SnippetsFileConfig {
+  filePath: string;
+  snippetCount: number;
+  exists: boolean;
+  lastModified?: string;
+}
+

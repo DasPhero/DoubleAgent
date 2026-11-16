@@ -8,6 +8,7 @@ import {
   FindingStatus,
   TableEvidenceContent,
   ReportFormat,
+  ReportTemplate,
   ReportExportRequest,
   ReportExportResult,
 } from '../types/pentest';
@@ -97,6 +98,7 @@ interface EvidenceVaultModalProps {
   onClose: () => void;
   hosts: HostOption[];
   activeHostId?: string;
+  onOpenFileManager?: () => void;
 }
 
 interface WailsPentestEvidenceApi {
@@ -113,6 +115,8 @@ interface WailsPentestEvidenceApi {
   SaveFinding?: (item: FindingItem) => Promise<void>;
   DeleteFinding?: (id: string) => Promise<void>;
   GetFindingTemplates?: () => Promise<FindingItem[]>;
+  SaveFindingTemplateToFile?: (item: FindingItem) => Promise<void>;
+  ListReportTemplates?: () => Promise<ReportTemplate[]>;
   GenerateEvidenceReport?: (req: ReportExportRequest) => Promise<ReportExportResult>;
   ExportEvidenceReportToFile?: (req: ReportExportRequest, filePath: string) => Promise<ReportExportResult>;
   SaveReportFileDialog?: (defaultFilename: string, format: string) => Promise<string>;
@@ -129,12 +133,15 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
   onClose,
   hosts,
   activeHostId,
+  onOpenFileManager,
 }) => {
   // Navigation Tabs: Findings (Vulnerabilities), Evidence Vault (Proof Artifacts), Assessment Report
   const [activeTab, setActiveTab] = useState<'findings' | 'evidence' | 'report'>('findings');
 
   const [findingsList, setFindingsList] = useState<FindingItem[]>([]);
   const [findingTemplates, setFindingTemplates] = useState<FindingItem[]>([]);
+  const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([]);
+  const [selectedReportTemplateId, setSelectedReportTemplateId] = useState<string>('');
   const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([]);
   const [evidenceTemplates, setEvidenceTemplates] = useState<EvidenceItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -249,6 +256,13 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       if (api.GetEvidenceTemplates) {
         const tpls = await api.GetEvidenceTemplates();
         setEvidenceTemplates(tpls || []);
+      }
+      if (api.ListReportTemplates) {
+        const rTpls = await api.ListReportTemplates();
+        setReportTemplates(rTpls || []);
+        if (rTpls && rTpls.length > 0) {
+          setSelectedReportTemplateId((prev) => prev || rTpls[0].id);
+        }
       }
     } catch (err: unknown) {
       console.error('Failed to load pentest hub data:', err);
@@ -717,11 +731,49 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
     setTableHeaders(updated);
   };
 
+  const handleSaveCurrentFindingAsTemplate = async () => {
+    const api = getEvidenceApi();
+    if (!api?.SaveFindingTemplateToFile) return;
+    if (!findEditTitle.trim()) {
+      setFeedbackMsg({ type: 'error', text: 'Enter a finding title before saving as template.' });
+      return;
+    }
+    try {
+      const now = new Date().toISOString();
+      await api.SaveFindingTemplateToFile({
+        id: `tpl-find-${Date.now()}`,
+        engagementId: '',
+        title: findEditTitle.trim(),
+        category: findEditCategory || 'General',
+        severity: findEditSeverity,
+        status: 'draft',
+        description: findEditDescription,
+        impact: findEditImpact,
+        remediation: findEditRemediation,
+        cve: findEditCve.trim() || undefined,
+        cvss: findEditCvss.trim() || undefined,
+        cvssVector: findEditCvssVector.trim() || undefined,
+        mitreAttack: findEditMitreAttack.trim() || undefined,
+        tags: findEditTags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+        createdAt: now,
+        updatedAt: now,
+      });
+      setFeedbackMsg({ type: 'success', text: `Saved "${findEditTitle.trim()}" to finding_templates.json` });
+      await refreshAll();
+    } catch (err: unknown) {
+      setFeedbackMsg({ type: 'error', text: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
   const buildReportRequest = useCallback(
     (splitByHost = false, outputDir = ''): ReportExportRequest => ({
       engagementId: activeEngagement?.id || '',
       hostId: splitByHost || reportHostScope === 'all' ? '' : reportHostScope,
       format: reportFormat,
+      templateId: selectedReportTemplateId || undefined,
       splitByHost,
       includeInternalEvidence: reportIncludeInternal,
       includePortFindings: reportIncludePorts,
@@ -733,6 +785,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
       activeEngagement?.id,
       reportHostScope,
       reportFormat,
+      selectedReportTemplateId,
       reportIncludeInternal,
       reportIncludePorts,
       reportIncludeUnlinked,
@@ -1226,36 +1279,58 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   {findingTemplates.length > 0 && (
-                    <select
-                      className="cyber-hud-select"
-                      style={{ width: '200px', height: '32px', border: '1px solid rgba(0, 240, 255, 0.4)' }}
-                      defaultValue=""
-                      onChange={(e) => {
-                        const tpl = findingTemplates.find((t) => t.id === e.target.value);
-                        if (tpl) {
-                          openNewFinding(tpl);
-                        }
-                        e.target.value = '';
-                      }}
-                    >
-                      <option value="" disabled>
-                        ✨ Use Finding Template...
-                      </option>
-                      {findingTemplates.map((tpl) => (
-                        <option key={tpl.id} value={tpl.id}>
-                          [{tpl.severity.toUpperCase()}] {tpl.title}
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <select
+                        aria-label="Finding Template Selector"
+                        className="cyber-hud-select"
+                        style={{ width: '210px', height: '32px', border: '1px solid rgba(0, 240, 255, 0.4)' }}
+                        defaultValue=""
+                        onChange={(e) => {
+                          const tpl = findingTemplates.find((t) => t.id === e.target.value);
+                          if (tpl) {
+                            openNewFinding(tpl);
+                          }
+                          e.target.value = '';
+                        }}
+                      >
+                        <option value="" disabled>
+                          Use Finding Template...
                         </option>
-                      ))}
-                    </select>
+                        {findingTemplates.map((tpl) => (
+                          <option key={tpl.id} value={tpl.id}>
+                            [{tpl.severity.toUpperCase()}] {tpl.title}
+                          </option>
+                        ))}
+                      </select>
+                      <span
+                        className="file-backed-badge"
+                        title="Templates loaded from external finding_templates.json"
+                      >
+                        JSON
+                      </span>
+                      {onOpenFileManager && (
+                        <button
+                          type="button"
+                          className="cyber-hud-btn btn-sm"
+                          onClick={onOpenFileManager}
+                          title="Manage external template files in Settings -> Files & Templates"
+                        >
+                          <CyberIcon name="folder" size={12} />
+                          <span>Files</span>
+                        </button>
+                      )}
+                    </div>
                   )}
                   <button
                     type="button"
                     className="cyber-btn cyber-btn-primary"
                     onClick={() => openNewFinding()}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                   >
-                    + New Finding
+                    <CyberIcon name="plus" size={13} />
+                    <span>New Finding</span>
                   </button>
                 </div>
               </div>
@@ -1923,16 +1998,31 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    className="cyber-btn cyber-btn-secondary"
+                    className="cyber-btn cyber-btn-danger"
                     onClick={() => setIsEditingFinding(false)}
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="cyber-btn cyber-btn-primary">
-                    💾 Save Finding
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary"
+                    onClick={() => void handleSaveCurrentFindingAsTemplate()}
+                    title="Save this finding structure into finding_templates.json for reuse across engagements"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <CyberIcon name="file" size={13} />
+                    <span>Save as Template</span>
+                  </button>
+                  <button
+                    type="submit"
+                    className="cyber-btn cyber-btn-primary"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <CyberIcon name="check" size={13} />
+                    <span>Save Finding</span>
                   </button>
                 </div>
               </form>
@@ -2563,6 +2653,48 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     ))}
                   </select>
                 </label>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#cbd5e1' }}>
+                  <span>Report Template:</span>
+                  <select
+                    aria-label="Report Template Selector"
+                    value={selectedReportTemplateId}
+                    onChange={(e) => setSelectedReportTemplateId(e.target.value)}
+                    style={{
+                      background: 'rgba(2, 6, 12, 0.9)',
+                      border: '1px solid rgba(0, 240, 255, 0.35)',
+                      color: '#e2e8f0',
+                      padding: '3px 8px',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: '0.75rem',
+                      maxWidth: '230px',
+                    }}
+                  >
+                    <option value="">Default Bare Scaffold</option>
+                    {reportTemplates.map((rt) => (
+                      <option key={rt.id} value={rt.id}>
+                        {rt.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span
+                    className="file-backed-badge"
+                    title="Report narrative scaffolds loaded from external report_templates.json"
+                  >
+                    JSON
+                  </span>
+                  {onOpenFileManager && (
+                    <button
+                      type="button"
+                      className="cyber-hud-btn btn-sm"
+                      onClick={onOpenFileManager}
+                      title="Open Settings -> Files & Templates to customize or locate report_templates.json"
+                    >
+                      <CyberIcon name="folder" size={12} />
+                      <span>Manage</span>
+                    </button>
+                  )}
+                </div>
 
                 <div style={{ display: 'inline-flex', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
                   <button

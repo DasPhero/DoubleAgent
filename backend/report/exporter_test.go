@@ -343,3 +343,86 @@ func TestExporter_DocxScaffoldReproducibilityAndXML_F30(t *testing.T) {
 		t.Fatalf("written .docx bytes on disk differed from compiled Base64 artifact")
 	}
 }
+
+func TestF30ReportTemplatePopulatesMarkdownHTMLAndDOCX(t *testing.T) {
+	payload := buildF30TestPayload(false)
+	tpl := core.DefaultReportTemplates()[1] // tpl-rep-ad
+	tpl.Author = "Jane Operator (DoubleAgent Red Team)"
+	tpl.Classification = "STRICTLY CONFIDENTIAL — ACME CORP"
+	tpl.ExecutiveSummaryIntro = "Domain takeover confirmed via Kerberoasting and weak service ACLs."
+	tpl.MethodologyText = "Assumed-breach Active Directory audit using BloodHound and Impacket."
+	tpl.ScopeNotes = "Internal AD forest corp.acme.local (DC01 and member servers)."
+	tpl.AttackPathTemplate = "Unprivileged user to Kerberoast svc_sql to DA compromise."
+	tpl.LimitationsText = "Legacy mainframe segment excluded by written ROE."
+	tpl.ConclusionText = "Rotate krbtgt twice and migrate SQL SPNs to gMSA accounts."
+
+	for _, format := range []string{"markdown", "html"} {
+		res, err := report.CompileAndExport(core.ReportExportRequest{
+			EngagementID:   "eng-1",
+			Format:         format,
+			ReportTemplate: &tpl,
+		}, payload)
+		if err != nil {
+			t.Fatalf("CompileAndExport(%s) failed: %v", format, err)
+		}
+		for _, want := range []string{
+			tpl.TitlePrefix,
+			tpl.Author,
+			tpl.Classification,
+			tpl.ExecutiveSummaryIntro,
+			tpl.MethodologyText,
+			tpl.ScopeNotes,
+			tpl.AttackPathTemplate,
+			tpl.LimitationsText,
+			tpl.ConclusionText,
+		} {
+			if !strings.Contains(res.Content, want) {
+				t.Fatalf("%s export missing template content %q", format, want)
+			}
+		}
+	}
+
+	docxRes, err := report.CompileAndExport(core.ReportExportRequest{
+		EngagementID:   "eng-1",
+		Format:         "docx",
+		ReportTemplate: &tpl,
+	}, payload)
+	if err != nil {
+		t.Fatalf("CompileAndExport(docx) failed: %v", err)
+	}
+	rawZip, err := base64.StdEncoding.DecodeString(docxRes.ContentBase64)
+	if err != nil {
+		t.Fatalf("decode base64 docx: %v", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(rawZip), int64(len(rawZip)))
+	if err != nil {
+		t.Fatalf("open docx zip: %v", err)
+	}
+	var docXML string
+	for _, f := range zr.File {
+		if f.Name == "word/document.xml" {
+			rc, _ := f.Open()
+			b, _ := io.ReadAll(rc)
+			_ = rc.Close()
+			docXML = string(b)
+		}
+	}
+	for _, want := range []string{
+		strings.ToUpper(tpl.TitlePrefix),
+		tpl.Author,
+		tpl.Classification,
+		tpl.ExecutiveSummaryIntro,
+		tpl.MethodologyText,
+		tpl.ScopeNotes,
+		tpl.AttackPathTemplate,
+		tpl.LimitationsText,
+		tpl.ConclusionText,
+	} {
+		if !strings.Contains(docXML, want) {
+			t.Fatalf("docx word/document.xml missing template text %q", want)
+		}
+	}
+	if strings.Contains(docXML, "[AUTHOR NOTE — REPLACE BEFORE PDF EXPORT]") || strings.Contains(docXML, "[AUTHOR NOTE: Insert Assessor Name") {
+		t.Fatalf("docx should replace report-level [AUTHOR NOTE placeholders when ReportTemplate is supplied")
+	}
+}

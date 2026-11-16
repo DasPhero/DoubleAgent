@@ -187,5 +187,85 @@ describe('Evidence-Vault Per-Host Markdown & HTML Reporting (F-30)', () => {
       expect(screen.getByText('ACME-DC01-10.10.20.10.html')).toBeInTheDocument();
     });
   });
+
+  it('loads external report templates, passes templateId on compile, and saves findings as external templates', async () => {
+    const generateMock = vi.fn(async (req: { format: string; templateId?: string }) => ({
+      format: req.format,
+      fileName: 'report.md',
+      content: `# Custom Report (${req.templateId || 'none'})`,
+      contentSha256: 'aaaa111122223333444455556666777788889999aaaabbbbccccddddeeeeffff',
+      findingsCount: 0,
+      evidenceCount: 0,
+      hostCount: 0,
+      internalExcluded: 0,
+    }));
+    const saveFindingTplMock = vi.fn(async () => {});
+
+    (window as unknown as { go: unknown }).go = {
+      main: {
+        App: {
+          ListEngagements: async () => [{ id: 'eng-1', name: 'ACME' }],
+          GetActiveEngagement: async () => ({ id: 'eng-1', name: 'ACME' }),
+          ListFindings: async () => [],
+          GetFindingTemplates: async () => [
+            {
+              id: 'tpl-find-1',
+              engagementId: '',
+              title: 'Default SSH Weak Cipher',
+              category: 'Network',
+              severity: 'medium',
+              status: 'draft',
+              description: 'CBC cipher enabled.',
+              createdAt: '2026-11-16T00:00:00Z',
+              updatedAt: '2026-11-16T00:00:00Z',
+            },
+          ],
+          SaveFindingTemplateToFile: saveFindingTplMock,
+          ListReportTemplates: async () => [
+            { id: 'tpl-rep-standard', name: 'Standard Assessment Report' },
+            { id: 'tpl-rep-ad', name: 'Active Directory Internal Audit' },
+          ],
+          ListEvidence: async () => [],
+          GetEvidenceCategories: async () => ['General'],
+          GetEvidenceTemplates: async () => [],
+          GenerateEvidenceReport: generateMock,
+        },
+      },
+    };
+
+    render(
+      <EvidenceVaultModal
+        isOpen
+        onClose={() => {}}
+        hosts={[{ id: 'h-dc', label: 'DC01', address: '10.10.20.10' }]}
+        activeHostId="h-dc"
+      />
+    );
+
+    // Save a custom finding template via editor
+    fireEvent.click(screen.getByRole('button', { name: /New Finding/i }));
+    const titleInput = screen.getByPlaceholderText(/e\.g\. Kerberoasting on Domain Controller/i);
+    fireEvent.change(titleInput, { target: { value: 'Redis Unauthenticated Access' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save as Template/i }));
+
+    await waitFor(() => {
+      expect(saveFindingTplMock).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Redis Unauthenticated Access' })
+      );
+    });
+
+    // Switch to Assessment Report tab and change Report Template
+    fireEvent.click(screen.getByText('Assessment Report'));
+    const repSelect = await screen.findByLabelText('Report Template Selector');
+    fireEvent.change(repSelect, { target: { value: 'tpl-rep-ad' } });
+
+    await waitFor(() => {
+      expect(generateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          templateId: 'tpl-rep-ad',
+        })
+      );
+    });
+  });
 });
 

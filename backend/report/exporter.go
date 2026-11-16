@@ -112,8 +112,18 @@ func RenderMarkdown(doc *core.CompiledReport) (string, string) {
 	populateArtifactHashes(doc)
 
 	var b strings.Builder
-	b.WriteString("# DoubleAgent — Security Assessment & Evidence Report\n\n")
+	title := "# DoubleAgent — Security Assessment & Evidence Report\n\n"
+	if doc.Template != nil && strings.TrimSpace(doc.Template.TitlePrefix) != "" {
+		title = fmt.Sprintf("# %s — %s\n\n", strings.TrimSpace(doc.Template.TitlePrefix), doc.EngagementName)
+	}
+	b.WriteString(title)
 	b.WriteString(fmt.Sprintf("- **Engagement:** %s\n", doc.EngagementName))
+	if doc.Template != nil && strings.TrimSpace(doc.Template.Author) != "" {
+		b.WriteString(fmt.Sprintf("- **Author:** %s\n", strings.TrimSpace(doc.Template.Author)))
+	}
+	if doc.Template != nil && strings.TrimSpace(doc.Template.Classification) != "" {
+		b.WriteString(fmt.Sprintf("- **Classification:** %s\n", strings.TrimSpace(doc.Template.Classification)))
+	}
 	if doc.EngagementScope != "" {
 		b.WriteString(fmt.Sprintf("- **Scope:** %s\n", doc.EngagementScope))
 	}
@@ -127,6 +137,29 @@ func RenderMarkdown(doc *core.CompiledReport) (string, string) {
 		b.WriteString(fmt.Sprintf("- **Internal Vault Privacy:** %d internal non-reportable proof artifacts excluded\n", doc.InternalExcludedCount))
 	}
 	b.WriteString("\n---\n\n")
+
+	if doc.Template != nil {
+		if strings.TrimSpace(doc.Template.ExecutiveSummaryIntro) != "" {
+			b.WriteString("## Executive Summary\n\n")
+			b.WriteString(strings.TrimSpace(doc.Template.ExecutiveSummaryIntro) + "\n\n")
+		}
+		if strings.TrimSpace(doc.Template.MethodologyText) != "" || strings.TrimSpace(doc.Template.ScopeNotes) != "" || strings.TrimSpace(doc.Template.LimitationsText) != "" {
+			b.WriteString("## Methodology & Scope\n\n")
+			if strings.TrimSpace(doc.Template.MethodologyText) != "" {
+				b.WriteString(strings.TrimSpace(doc.Template.MethodologyText) + "\n\n")
+			}
+			if strings.TrimSpace(doc.Template.ScopeNotes) != "" {
+				b.WriteString("**Scope Notes:** " + strings.TrimSpace(doc.Template.ScopeNotes) + "\n\n")
+			}
+			if strings.TrimSpace(doc.Template.LimitationsText) != "" {
+				b.WriteString("**Limitations:** " + strings.TrimSpace(doc.Template.LimitationsText) + "\n\n")
+			}
+		}
+		if strings.TrimSpace(doc.Template.AttackPathTemplate) != "" {
+			b.WriteString("## Attack Narrative\n\n")
+			b.WriteString(strings.TrimSpace(doc.Template.AttackPathTemplate) + "\n\n")
+		}
+	}
 
 	b.WriteString("## 1. Executive Severity Summary\n\n")
 	b.WriteString("| Severity | Count |\n")
@@ -258,6 +291,11 @@ func RenderMarkdown(doc *core.CompiledReport) (string, string) {
 		}
 
 		b.WriteString("---\n\n")
+	}
+
+	if doc.Template != nil && strings.TrimSpace(doc.Template.ConclusionText) != "" {
+		b.WriteString("## Conclusion & Remediation Roadmap\n\n")
+		b.WriteString(strings.TrimSpace(doc.Template.ConclusionText) + "\n\n")
 	}
 
 	out := b.String()
@@ -417,9 +455,11 @@ var htmlReportTmpl = template.Must(template.New("report").Funcs(template.FuncMap
 <body>
 <div class="container">
   <header>
-    <h1>DoubleAgent — Security Assessment &amp; Evidence Report</h1>
+    <h1>{{if and .Template .Template.TitlePrefix}}{{.Template.TitlePrefix}} — {{.EngagementName}}{{else}}DoubleAgent — Security Assessment &amp; Evidence Report{{end}}</h1>
     <div class="meta-grid">
       <div><strong>Engagement:</strong> {{.EngagementName}}</div>
+      {{if and .Template .Template.Author}}<div><strong>Author:</strong> {{.Template.Author}}</div>{{end}}
+      {{if and .Template .Template.Classification}}<div><strong>Classification:</strong> {{.Template.Classification}}</div>{{end}}
       {{if .EngagementScope}}<div><strong>Scope:</strong> {{.EngagementScope}}</div>{{end}}
       {{if .EngagementTimeframe}}<div><strong>Timeframe:</strong> {{.EngagementTimeframe}}</div>{{end}}
       <div><strong>Revision (UTC):</strong> {{.DeterministicTimestamp}}</div>
@@ -428,6 +468,29 @@ var htmlReportTmpl = template.Must(template.New("report").Funcs(template.FuncMap
       <div><strong>Evidence Proofs:</strong> {{.TotalEvidence}}</div>
     </div>
   </header>
+
+  {{if .Template}}
+  {{if .Template.ExecutiveSummaryIntro}}
+  <section>
+    <h2>Executive Summary</h2>
+    <p>{{.Template.ExecutiveSummaryIntro}}</p>
+  </section>
+  {{end}}
+  {{if or .Template.MethodologyText .Template.ScopeNotes .Template.LimitationsText}}
+  <section>
+    <h2>Methodology &amp; Scope</h2>
+    {{if .Template.MethodologyText}}<p>{{.Template.MethodologyText}}</p>{{end}}
+    {{if .Template.ScopeNotes}}<p><strong>Scope Notes:</strong> {{.Template.ScopeNotes}}</p>{{end}}
+    {{if .Template.LimitationsText}}<p><strong>Limitations:</strong> {{.Template.LimitationsText}}</p>{{end}}
+  </section>
+  {{end}}
+  {{if .Template.AttackPathTemplate}}
+  <section>
+    <h2>Attack Narrative</h2>
+    <p>{{.Template.AttackPathTemplate}}</p>
+  </section>
+  {{end}}
+  {{end}}
 
   {{if and (gt .InternalExcludedCount 0) (not .IncludeInternal)}}
   <div class="notice">
@@ -556,6 +619,13 @@ var htmlReportTmpl = template.Must(template.New("report").Funcs(template.FuncMap
     </article>
     {{end}}
   </section>
+
+  {{if and .Template .Template.ConclusionText}}
+  <section>
+    <h2>Conclusion &amp; Remediation Roadmap</h2>
+    <p>{{.Template.ConclusionText}}</p>
+  </section>
+  {{end}}
 </div>
 </body>
 </html>

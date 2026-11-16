@@ -94,6 +94,10 @@ export function DeleteFinding(arg1) {
   return window['go']['main']['App']['DeleteFinding'](arg1);
 }
 
+export function DeleteFindingTemplateFromFile(arg1) {
+  return window['go']['main']['App']['DeleteFindingTemplateFromFile'](arg1);
+}
+
 export function DeleteForwardRule(arg1) {
   return window['go']['main']['App']['DeleteForwardRule'](arg1);
 }
@@ -130,6 +134,10 @@ export function DeleteRemoteItem(arg1, arg2) {
   return window['go']['main']['App']['DeleteRemoteItem'](arg1, arg2);
 }
 
+export function DeleteReportTemplateFromFile(arg1) {
+  return window['go']['main']['App']['DeleteReportTemplateFromFile'](arg1);
+}
+
 export function DeleteSSHKey(arg1) {
   return window['go']['main']['App']['DeleteSSHKey'](arg1);
 }
@@ -148,6 +156,10 @@ export function DeleteSnippetChain(arg1) {
 
 export function DeleteSnippetChainFromFile(arg1) {
   return window['go']['main']['App']['DeleteSnippetChainFromFile'](arg1);
+}
+
+export function DeleteSnippetFromFile(arg1) {
+  return window['go']['main']['App']['DeleteSnippetFromFile'](arg1);
 }
 
 export function DeleteTotpRecord(arg1) {
@@ -350,6 +362,10 @@ export function GetSnippetContext(arg1) {
   return window['go']['main']['App']['GetSnippetContext'](arg1);
 }
 
+export function GetSnippetsConfig() {
+  return window['go']['main']['App']['GetSnippetsConfig']();
+}
+
 export function GetTotpCode(arg1) {
   return window['go']['main']['App']['GetTotpCode'](arg1);
 }
@@ -466,6 +482,10 @@ export function ListLocalDir(arg1) {
   return window['go']['main']['App']['ListLocalDir'](arg1);
 }
 
+export function ListManagedFiles() {
+  return window['go']['main']['App']['ListManagedFiles']();
+}
+
 export function ListNetworkRoutes() {
   return window['go']['main']['App']['ListNetworkRoutes']();
 }
@@ -490,6 +510,10 @@ export function ListRemoteDir(arg1, arg2) {
   return window['go']['main']['App']['ListRemoteDir'](arg1, arg2);
 }
 
+export function ListReportTemplates() {
+  return window['go']['main']['App']['ListReportTemplates']();
+}
+
 export function ListSerialPorts() {
   return window['go']['main']['App']['ListSerialPorts']();
 }
@@ -508,6 +532,10 @@ export function ListSnippetChainsFromFile() {
 
 export function ListSnippets() {
   return window['go']['main']['App']['ListSnippets']();
+}
+
+export function ListSnippetsFromFile() {
+  return window['go']['main']['App']['ListSnippetsFromFile']();
 }
 
 export function ListTotpRecords() {
@@ -570,6 +598,10 @@ export function RenderPayload(arg1) {
   return window['go']['main']['App']['RenderPayload'](arg1);
 }
 
+export function ResetManagedFileDefaults(arg1) {
+  return window['go']['main']['App']['ResetManagedFileDefaults'](arg1);
+}
+
 export function ResetVault() {
   return window['go']['main']['App']['ResetVault']();
 }
@@ -594,6 +626,10 @@ export function ResolveVaultConflicts(arg1, arg2) {
   return window['go']['main']['App']['ResolveVaultConflicts'](arg1, arg2);
 }
 
+export function RevealPathInExplorer(arg1) {
+  return window['go']['main']['App']['RevealPathInExplorer'](arg1);
+}
+
 export function RunRouteHealthCheck(arg1) {
   return window['go']['main']['App']['RunRouteHealthCheck'](arg1);
 }
@@ -612,6 +648,10 @@ export function SaveEvidence(arg1) {
 
 export function SaveFinding(arg1) {
   return window['go']['main']['App']['SaveFinding'](arg1);
+}
+
+export function SaveFindingTemplateToFile(arg1) {
+  return window['go']['main']['App']['SaveFindingTemplateToFile'](arg1);
 }
 
 export function SaveForwardRule(arg1) {
@@ -666,6 +706,10 @@ export function SaveReportFileDialog(arg1, arg2) {
   return window['go']['main']['App']['SaveReportFileDialog'](arg1, arg2);
 }
 
+export function SaveReportTemplateToFile(arg1) {
+  return window['go']['main']['App']['SaveReportTemplateToFile'](arg1);
+}
+
 export function SaveSnippet(arg1) {
   return window['go']['main']['App']['SaveSnippet'](arg1);
 }
@@ -676,6 +720,10 @@ export function SaveSnippetChain(arg1) {
 
 export function SaveSnippetChainToFile(arg1) {
   return window['go']['main']['App']['SaveSnippetChainToFile'](arg1);
+}
+
+export function SaveSnippetToFile(arg1) {
+  return window['go']['main']['App']['SaveSnippetToFile'](arg1);
 }
 
 export function SaveTotpRecord(arg1) {
@@ -730,6 +778,10 @@ export function SetActiveEngagement(arg1) {
   return window['go']['main']['App']['SetActiveEngagement'](arg1);
 }
 
+export function SetManagedFilePath(arg1, arg2) {
+  return window['go']['main']['App']['SetManagedFilePath'](arg1, arg2);
+}
+
 export function SetPayloadTemplatesPath(arg1) {
   return window['go']['main']['App']['SetPayloadTemplatesPath'](arg1);
 }
@@ -748,6 +800,10 @@ export function SetSerialRTS(arg1, arg2) {
 
 export function SetSnippetChainsPath(arg1) {
   return window['go']['main']['App']['SetSnippetChainsPath'](arg1);
+}
+
+export function SetSnippetsPath(arg1) {
+  return window['go']['main']['App']['SetSnippetsPath'](arg1);
 }
 
 export function SetWorkspaceStore(arg1) {

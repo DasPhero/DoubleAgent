@@ -3437,27 +3437,78 @@ body,
   gap: 0.5rem;
 }
 
-.cyber-input, .cyber-select {
+.cyber-input, .cyber-select, .cyber-textarea {
   background: #03060c;
-  border: 1px solid rgba(0, 240, 255, 0.25);
+  border: 1px solid rgba(0, 240, 255, 0.28);
   color: #e2e8f0;
   padding: 0.45rem 0.75rem;
   font-size: 0.82rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
   border-radius: 2px;
   box-sizing: border-box;
   width: 100%;
 }
 
-.cyber-input:focus, .cyber-select:focus {
+.cyber-textarea {
+  line-height: 1.5;
+  resize: vertical;
+  color: #a7f3d0;
+}
+
+.cyber-input:focus, .cyber-select:focus, .cyber-textarea:focus {
   outline: none;
   border-color: #00f0ff;
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+}
+
+.cyber-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1.25rem;
+  background: rgba(10, 18, 32, 0.96);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+}
+
+.cyber-dialog-header h3 {
+  margin: 0;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #00f0ff;
 }
 
 .cyber-manual-form {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  padding: 1.15rem 1.25rem;
+  overflow-y: auto;
+}
+
+.cyber-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding-top: 0.85rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.cyber-btn-danger {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.48);
+  color: #fca5a5;
+}
+
+.cyber-btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
 }
 
 .cyber-form-grid-2 {
@@ -3915,6 +3966,88 @@ body,
   color: #ef4444;
   background: rgba(239, 68, 68, 0.15);
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+/* Unified HUD Buttons (Snippets, Chains, Modals) */
+.cyber-hud-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.82rem;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.36);
+  color: #38bdf8;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cyber-hud-btn:hover:not(:disabled) {
+  background: rgba(0, 240, 255, 0.18);
+  border-color: #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.cyber-hud-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cyber-hud-btn.btn-sm {
+  padding: 0.26rem 0.56rem;
+  font-size: 0.71rem;
+}
+
+.cyber-hud-btn.btn-primary {
+  background: linear-gradient(135deg, #00f0ff 0%, #0099cc 100%);
+  border-color: #00f0ff;
+  color: #040914;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+}
+
+.cyber-hud-btn.btn-primary:hover:not(:disabled) {
+  background: #00ffff;
+  color: #020617;
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.6);
+}
+
+.cyber-hud-btn.btn-danger,
+.cyber-hud-btn.btn-cancel {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.cyber-hud-btn.btn-danger:hover:not(:disabled),
+.cyber-hud-btn.btn-cancel:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+/* File-backed indicator badge */
+.file-backed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.59rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  flex-shrink: 0;
 }
 
 /* Empty State */

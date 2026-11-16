@@ -267,7 +267,7 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
               title="Configure and launch a new reverse or bind listener"
             >
               <CyberIcon name="plus" size={13} />
-              <span>+ LAUNCH LISTENER</span>
+              <span>LAUNCH LISTENER</span>
             </button>
             <button
               type="button"

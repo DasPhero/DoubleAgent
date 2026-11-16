@@ -107,8 +107,8 @@ describe('SnippetChainsModal (F-16)', () => {
       />
     );
 
-    // Click + New Chain
-    fireEvent.click(screen.getByRole('button', { name: /\+ New Chain/i }));
+    // Click New Chain
+    fireEvent.click(screen.getByRole('button', { name: /^New Chain$/i }));
 
     expect(screen.getByText('CREATE NEW SNIPPET CHAIN')).toBeInTheDocument();
 

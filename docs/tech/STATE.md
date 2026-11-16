@@ -5,6 +5,18 @@
 - **Stage:** `2-flagship`
 
 ## What Works
+- **UI Polish, File-Backed Indicators, External Templates, & Centralized File Manager**:
+  - **Theme & Button Consistency (`frontend/src/styles.css`, `PayloadGeneratorModal.tsx`, `ListenerManagerModal.tsx`, `SnippetsManagerModal.tsx`, `SnippetChainsModal.tsx`)**:
+    - Implemented `.cyber-textarea`, `.cyber-dialog-header`, `.cyber-dialog-actions`, `.cyber-btn-danger`, `.cyber-hud-btn` (including `.btn-sm`, `.btn-primary`, and crimson `.btn-danger`/`.btn-cancel`), and `.file-backed-badge` in `styles.css`.
+    - Removed duplicate `+` text prefixes beside `<CyberIcon name="plus" />` across `ListenerManagerModal`, `SnippetsManagerModal`, and `SnippetChainsModal`.
+    - Moved `New Payload` down into the left `PAYLOADS (N)` panel header, un-squished `Save as Snippet`, and applied HUD styling + crimson Cancel/Close controls across all editors (`PayloadGeneratorModal`, `SnippetsManagerModal`, `SnippetChainsModal`, `EvidenceVaultModal`).
+  - **Externalized Command Snippets & Finding / Evidence / Report Templates (`backend/core/snippets_files.go`, `backend/core/templates_files.go`, `backend/core/report.go`, `backend/report/exporter.go`, `backend/report/docx.go`, `app.go`)**:
+    - Externalized Command Snippets (`command_snippets.json`, with vault compatibility fallback in `ResolveSnippetTemplate`), Finding presets (`finding_templates.json`), Evidence Proof templates (`evidence_templates.json`), and Report Narrative templates (`report_templates.json`, with 4 seeded presets) to editable external JSON stores with atomic persistence and starter seeding (`GetSnippetsConfig`, `SetSnippetsPath`, `ListSnippetsFromFile`, `SaveSnippetToFile`, `SaveFindingTemplateToFile`, `ListReportTemplates`, `SaveReportTemplateToFile`, etc.).
+    - Wired `ReportTemplate` (`TitlePrefix`, `Author`, `Classification`, `ExecutiveSummaryIntro`, `MethodologyText`, `ScopeNotes`, `AttackPathTemplate`, `LimitationsText`, `ConclusionText`) into `RenderMarkdown`, `RenderHTML`, and `RenderDOCX` so exports populate cleanly from `TemplateID` while keeping bare fallback deterministic when omitted (`TestF30ReportTemplatePopulatesMarkdownHTMLAndDOCX`).
+    - Hardened `RelocateVaultFile` / `getEffectiveVaultPath` in `app.go` with `skipGlobalVaultPointer` when stores are injected for tests and automatic cleanup of any leaked `TestApp` temporary paths from `vault_location.txt`.
+  - **Centralized File & Template Manager & Badges (`SettingsView.tsx`, `SettingsView.test.tsx`, `SnippetsManagerModal.tsx`, `EvidenceVaultModal.tsx`, `App.tsx`)**:
+    - Added **Files & Templates** (`'files'`) tab in Settings backed by `ListManagedFiles`, `SetManagedFilePath`, `ResetManagedFileDefaults`, and `RevealPathInExplorer`, giving an overview of Vault, `payload_templates.json`, `snippet_chains.json`, `command_snippets.json`, `finding_templates.json`, `evidence_templates.json`, `report_templates.json`, and the Staging Directory with status/count/size, folder/file pickers, OS explorer reveal, starter initialization/reset, and quick tool links.
+    - Marked file-backed menu entries (`XML`, `JSON`, `DIR`, `FILE`) in `App.tsx` dropdowns and added `JSON` badges + **Manage / Files** shortcuts inside `EvidenceVaultModal.tsx`.
 - **UI Navigation, View & Sidebar Reorganization**:
   - **Clean Dropdown Structure & Responsive Top Bar (`frontend/src/App.tsx`, `frontend/src/styles.css`, `frontend/src/types/workspace.ts`)**:
     - Removed `Tunnels & Routing` items from the `Engagement` dropdown.

@@ -9,6 +9,7 @@ import {
   findShortcutConflict,
 } from '../types/shortcuts';
 import type { VaultSyncInfo, VaultConflictReport } from '../types/vaultSync';
+import type { ExternalManagedFileInfo } from '../types/pentest';
 import { CyberIcon } from './CyberIcon';
 
 interface WailsSyncApi {
@@ -17,6 +18,12 @@ interface WailsSyncApi {
   RelocateVaultFile?: (newPath: string, moveExisting: boolean) => Promise<void>;
   ScanSyncConflictFiles?: () => Promise<string[]>;
   MergeExternalVaultFile?: (filePath: string, password: string) => Promise<VaultConflictReport>;
+  ListManagedFiles?: () => Promise<ExternalManagedFileInfo[]>;
+  SetManagedFilePath?: (fileId: string, customPath: string) => Promise<ExternalManagedFileInfo>;
+  ResetManagedFileDefaults?: (fileId: string) => Promise<ExternalManagedFileInfo>;
+  RevealPathInExplorer?: (targetPath: string) => Promise<void>;
+  SelectFileDialog?: (title: string, filterName: string, filterPattern: string) => Promise<string>;
+  SelectDirectoryDialog?: (title: string) => Promise<string>;
 }
 
 function getWailsSyncApi(): WailsSyncApi | undefined {
@@ -24,7 +31,7 @@ function getWailsSyncApi(): WailsSyncApi | undefined {
   return w.go?.main?.App;
 }
 
-export type SettingsTabId = 'appearance' | 'security' | 'sync' | 'shortcuts' | 'migration' | 'about';
+export type SettingsTabId = 'appearance' | 'security' | 'sync' | 'files' | 'shortcuts' | 'migration' | 'about';
 
 export interface SettingsViewProps {
   activeTab: SettingsTabId;
@@ -46,6 +53,7 @@ export interface SettingsViewProps {
   onRefreshSync?: () => Promise<void>;
   onOpenSSHConfigImport?: () => void;
   onOpenPuttyTermiusImport?: () => void;
+  onOpenToolForManagedFile?: (fileId: string) => void;
   onClose?: () => void;
   onOpenAsTab?: () => void;
   isModal?: boolean;
@@ -73,6 +81,7 @@ export function SettingsView({
   onRefreshSync,
   onOpenSSHConfigImport,
   onOpenPuttyTermiusImport,
+  onOpenToolForManagedFile,
   onClose,
   onOpenAsTab,
   isModal = false,
@@ -93,11 +102,35 @@ export function SettingsView({
   const [manualMergePw, setManualMergePw] = useState<string>('');
   const [isMerging, setIsMerging] = useState<boolean>(false);
 
+  // Centralized File & Template Manager State
+  const [managedFiles, setManagedFiles] = useState<ExternalManagedFileInfo[]>([]);
+  const [managedFilesLoading, setManagedFilesLoading] = useState<boolean>(false);
+  const [managedFileMsg, setManagedFileMsg] = useState<string>('');
+  const [managedFileErr, setManagedFileErr] = useState<string>('');
+
+  const loadManagedFiles = React.useCallback(async () => {
+    const api = getWailsSyncApi();
+    if (!api?.ListManagedFiles) return;
+    setManagedFilesLoading(true);
+    setManagedFileErr('');
+    try {
+      const list = await api.ListManagedFiles();
+      setManagedFiles(list || []);
+    } catch (err: unknown) {
+      setManagedFileErr(err instanceof Error ? err.message : String(err));
+    } finally {
+      setManagedFilesLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (activeTab === 'sync' && onRefreshSync) {
       void onRefreshSync();
     }
-  }, [activeTab, onRefreshSync]);
+    if (activeTab === 'files') {
+      void loadManagedFiles();
+    }
+  }, [activeTab, onRefreshSync, loadManagedFiles]);
 
   // Shortcuts & Leader Key State
   const currentKeybindings = useMemo(() => globalSettings.keybindings || {}, [globalSettings.keybindings]);
@@ -418,6 +451,17 @@ export function SettingsView({
         >
           <CyberIcon name="network" size={12} />
           <span>Storage &amp; Sync</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'files'}
+          className={`settings-tab-btn ${activeTab === 'files' ? 'active' : ''}`}
+          onClick={() => onTabChange('files')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          <CyberIcon name="file" size={12} />
+          <span>Files &amp; Templates</span>
         </button>
         <button
           type="button"
@@ -1394,6 +1438,238 @@ export function SettingsView({
               >
                 {isMerging ? 'Merging...' : 'Merge Vault'}
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* Tab: Files & Templates Manager */}
+      {activeTab === 'files' && (
+        <div className="settings-grid" role="tabpanel" aria-label="Files and External Templates Manager">
+          <section className="settings-section" style={{ gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+              <div>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <CyberIcon name="folder" size={16} />
+                  <span>External Files &amp; Template Manager</span>
+                </h3>
+                <p className="setting-description" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+                  Overview of every external JSON template store, encrypted vault file, and staging directory used by DoubleAgent. Point stores to a synced folder, reveal them in your OS file explorer, or initialize/reset starter templates.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="cyber-hud-btn btn-primary"
+                onClick={() => void loadManagedFiles()}
+                disabled={managedFilesLoading}
+              >
+                <CyberIcon name="stabilize" size={13} />
+                <span>{managedFilesLoading ? 'Scanning...' : 'Refresh Overview'}</span>
+              </button>
+            </div>
+
+            {managedFileMsg && (
+              <div style={{ marginBottom: '0.75rem', padding: '0.5rem 0.75rem', border: '1px solid rgba(16, 185, 129, 0.45)', background: 'rgba(16, 185, 129, 0.1)', color: '#6ee7b7', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                {managedFileMsg}
+              </div>
+            )}
+            {managedFileErr && (
+              <div style={{ marginBottom: '0.75rem', padding: '0.5rem 0.75rem', border: '1px solid rgba(239, 68, 68, 0.5)', background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                {managedFileErr}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {managedFiles.length === 0 && !managedFilesLoading ? (
+                <div style={{ padding: '1.25rem', border: '1px dashed rgba(0, 240, 255, 0.25)', color: '#94a3b8', fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                  No external file registry entries loaded yet. Click Refresh Overview or run inside the desktop app.
+                </div>
+              ) : (
+                managedFiles.map((mf) => {
+                  const api = getWailsSyncApi();
+                  const isJson = mf.kind === 'json';
+                  const isDir = mf.kind === 'directory';
+                  const isVault = mf.kind === 'vault';
+                  return (
+                    <div
+                      key={mf.id}
+                      style={{
+                        background: 'rgba(6, 12, 22, 0.85)',
+                        border: '1px solid rgba(0, 240, 255, 0.2)',
+                        borderLeft: `3px solid ${mf.exists ? '#10b981' : '#f59e0b'}`,
+                        padding: '0.85rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <strong style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>{mf.name}</strong>
+                          <span className="file-backed-badge">{mf.kind.toUpperCase()}</span>
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              fontFamily: 'JetBrains Mono, monospace',
+                              padding: '1px 6px',
+                              border: '1px solid rgba(148, 163, 184, 0.3)',
+                              color: '#94a3b8',
+                            }}
+                          >
+                            {mf.featureLabel}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              fontFamily: 'JetBrains Mono, monospace',
+                              padding: '1px 6px',
+                              border: `1px solid ${mf.exists ? 'rgba(16, 185, 129, 0.45)' : 'rgba(245, 158, 11, 0.45)'}`,
+                              color: mf.exists ? '#34d399' : '#fbbf24',
+                              background: mf.exists ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                            }}
+                          >
+                            {mf.exists ? 'ON DISK' : 'NOT YET CREATED'}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>
+                          {mf.exists ? `${mf.itemCount} item(s)${isDir ? '' : ` · ${(mf.sizeBytes / 1024).toFixed(1)} KB`}` : `Default: ${mf.defaultName}`}
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>{mf.description}</div>
+
+                      <div
+                        className="font-mono"
+                        style={{
+                          fontSize: '0.74rem',
+                          color: '#00f0ff',
+                          background: 'rgba(2, 6, 14, 0.9)',
+                          border: '1px solid rgba(0, 240, 255, 0.16)',
+                          padding: '0.4rem 0.6rem',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {mf.filePath}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {api?.RevealPathInExplorer && (
+                          <button
+                            type="button"
+                            className="cyber-hud-btn btn-sm"
+                            onClick={async () => {
+                              setManagedFileErr('');
+                              try {
+                                await api.RevealPathInExplorer?.(mf.filePath);
+                              } catch (err: unknown) {
+                                setManagedFileErr(err instanceof Error ? err.message : String(err));
+                              }
+                            }}
+                          >
+                            <CyberIcon name="folder" size={12} />
+                            <span>Reveal in Explorer</span>
+                          </button>
+                        )}
+
+                        {!isVault && api?.SelectFileDialog && isJson && (
+                          <button
+                            type="button"
+                            className="cyber-hud-btn btn-sm"
+                            onClick={async () => {
+                              setManagedFileErr('');
+                              setManagedFileMsg('');
+                              try {
+                                const chosen = await api.SelectFileDialog?.(`Select ${mf.name}`, 'JSON Files', '*.json');
+                                if (chosen && api.SetManagedFilePath) {
+                                  const updated = await api.SetManagedFilePath(mf.id, chosen);
+                                  setManagedFileMsg(`Pointed ${mf.name} to ${updated.filePath}`);
+                                  await loadManagedFiles();
+                                }
+                              } catch (err: unknown) {
+                                setManagedFileErr(err instanceof Error ? err.message : String(err));
+                              }
+                            }}
+                          >
+                            <CyberIcon name="file" size={12} />
+                            <span>Browse File</span>
+                          </button>
+                        )}
+
+                        {!isVault && api?.SelectDirectoryDialog && (
+                          <button
+                            type="button"
+                            className="cyber-hud-btn btn-sm"
+                            onClick={async () => {
+                              setManagedFileErr('');
+                              setManagedFileMsg('');
+                              try {
+                                const folder = await api.SelectDirectoryDialog?.(`Select Folder for ${mf.name}`);
+                                if (folder && api.SetManagedFilePath) {
+                                  const updated = await api.SetManagedFilePath(mf.id, folder);
+                                  setManagedFileMsg(`Updated ${mf.name} -> ${updated.filePath}`);
+                                  await loadManagedFiles();
+                                }
+                              } catch (err: unknown) {
+                                setManagedFileErr(err instanceof Error ? err.message : String(err));
+                              }
+                            }}
+                          >
+                            <CyberIcon name="folder" size={12} />
+                            <span>{isDir ? 'Change Folder' : 'Browse Folder'}</span>
+                          </button>
+                        )}
+
+                        {isJson && api?.ResetManagedFileDefaults && (
+                          <button
+                            type="button"
+                            className="cyber-hud-btn btn-sm btn-danger"
+                            onClick={async () => {
+                              setManagedFileErr('');
+                              setManagedFileMsg('');
+                              try {
+                                const updated = await api.ResetManagedFileDefaults?.(mf.id);
+                                if (updated) {
+                                  setManagedFileMsg(`Initialized/reset starter defaults for ${mf.name} (${updated.itemCount} item(s))`);
+                                }
+                                await loadManagedFiles();
+                              } catch (err: unknown) {
+                                setManagedFileErr(err instanceof Error ? err.message : String(err));
+                              }
+                            }}
+                            title="Write starter templates to disk or reset existing templates to built-in defaults"
+                          >
+                            <CyberIcon name="stabilize" size={12} />
+                            <span>{mf.exists ? 'Reset Defaults' : 'Initialize Defaults'}</span>
+                          </button>
+                        )}
+
+                        {isVault && (
+                          <button
+                            type="button"
+                            className="cyber-hud-btn btn-sm"
+                            onClick={() => onTabChange('sync')}
+                          >
+                            <CyberIcon name="shield" size={12} />
+                            <span>Manage in Storage &amp; Sync</span>
+                          </button>
+                        )}
+
+                        {onOpenToolForManagedFile && !isVault && (
+                          <button
+                            type="button"
+                            className="cyber-hud-btn btn-sm btn-primary"
+                            onClick={() => onOpenToolForManagedFile(mf.id)}
+                          >
+                            <CyberIcon name="undock" size={12} />
+                            <span>Open Tool</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </section>
         </div>

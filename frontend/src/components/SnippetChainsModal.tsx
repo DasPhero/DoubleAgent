@@ -318,7 +318,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
               </div>
             </div>
           </div>
-          <button type="button" className="cyber-hud-btn btn-sm" onClick={onClose} aria-label="Close Modal">
+          <button type="button" className="cyber-btn-close" onClick={onClose} aria-label="Close Modal">
             <CyberIcon name="close" size={14} />
           </button>
         </div>
@@ -545,7 +545,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.85rem' }}
                 >
                   <CyberIcon name="plus" size={13} />
-                  <span>+ New Chain</span>
+                  <span>New Chain</span>
                 </button>
               </div>
 
@@ -728,7 +728,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                 </span>
                 <button
                   type="button"
-                  className="cyber-hud-btn btn-sm"
+                  className="cyber-hud-btn btn-sm btn-cancel"
                   onClick={() => setEditingChain(null)}
                 >
                   Cancel
@@ -866,7 +866,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                     style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
                     <CyberIcon name="plus" size={12} />
-                    <span>+ Add Step</span>
+                    <span>Add Step</span>
                   </button>
                 </div>
 
@@ -1013,7 +1013,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                   style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
                   <CyberIcon name="plus" size={13} />
-                  <span>+ Add Step</span>
+                  <span>Add Step</span>
                 </button>
               </div>
 
@@ -1021,7 +1021,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)' }}>
                 <button
                   type="button"
-                  className="cyber-hud-btn"
+                  className="cyber-hud-btn btn-cancel"
                   onClick={() => setEditingChain(null)}
                   disabled={saving}
                 >

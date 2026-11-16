@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   PayloadTemplate,
   PayloadRenderOptions,
@@ -69,6 +69,33 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
   // Template editor modal
   const [editingTemplate, setEditingTemplate] = useState<PayloadTemplate | null>(null);
   const [savingTemplate, setSavingTemplate] = useState<boolean>(false);
+  const commandTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const handleInsertTemplateVar = (placeholder: string) => {
+    setEditingTemplate((prev) => {
+      if (!prev) return prev;
+      const el = commandTextareaRef.current;
+      const currentCmd = prev.command || '';
+      if (el) {
+        const start = typeof el.selectionStart === 'number' ? el.selectionStart : currentCmd.length;
+        const end = typeof el.selectionEnd === 'number' ? el.selectionEnd : currentCmd.length;
+        const nextCmd = currentCmd.slice(0, start) + placeholder + currentCmd.slice(end);
+        const nextCursor = start + placeholder.length;
+        setTimeout(() => {
+          const target = commandTextareaRef.current;
+          if (target) {
+            target.focus();
+            target.setSelectionRange(nextCursor, nextCursor);
+          }
+        }, 0);
+        return { ...prev, command: nextCmd };
+      }
+      setTimeout(() => {
+        commandTextareaRef.current?.focus();
+      }, 0);
+      return { ...prev, command: currentCmd + placeholder };
+    });
+  };
 
   // File path configuration dialog
   const [showPathInput, setShowPathInput] = useState<boolean>(false);
@@ -404,29 +431,6 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
           </div>
 
           <div className="cyber-hud-actions-block">
-            <button
-              type="button"
-              className="cyber-btn cyber-btn-primary"
-              onClick={() => {
-                setEditingTemplate({
-                  id: `tmpl-${Date.now()}`,
-                  name: '',
-                  description: '',
-                  os: 'linux',
-                  shell: 'bash',
-                  kind: 'reverse',
-                  command: '',
-                  defaultPort: 443,
-                  opsecRisk: 'low',
-                  notes: '',
-                  tags: [],
-                });
-              }}
-              title="Add new template to external file"
-            >
-              <CyberIcon name="plus" size={13} />
-              <span>New</span>
-            </button>
             <button
               type="button"
               className="cyber-btn cyber-btn-secondary"
@@ -774,6 +778,34 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                 gap: '0.5rem',
               }}
             >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em', fontFamily: 'var(--font-mono)' }}>
+                  PAYLOADS ({filteredTemplates.length})
+                </span>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-primary cyber-btn-sm"
+                  onClick={() => {
+                    setEditingTemplate({
+                      id: `tmpl-${Date.now()}`,
+                      name: '',
+                      description: '',
+                      os: 'linux',
+                      shell: 'bash',
+                      kind: 'reverse',
+                      command: '',
+                      defaultPort: 443,
+                      opsecRisk: 'low',
+                      notes: '',
+                      tags: [],
+                    });
+                  }}
+                  title="Create a new payload template in the external JSON file"
+                >
+                  <CyberIcon name="plus" size={12} />
+                  <span>New Payload</span>
+                </button>
+              </div>
               <div className="cyber-search-reticle" style={{ minWidth: 'unset', height: '32px' }}>
                 <span className="search-prefix">&gt;</span>
                 <input
@@ -1169,27 +1201,28 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
 
                 {/* Bottom Action Buttons */}
                 {currentTemplate.command && currentTemplate.command.trim() !== '' && (
-                  <div className="card-action-row">
+                  <div className="card-action-row" style={{ gap: '0.55rem', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       className={`cyber-btn-copy ${copyFeedback ? 'is-copied' : ''}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', minHeight: '34px', whiteSpace: 'nowrap' }}
                       onClick={() => void handleCopy()}
                     >
                       <CyberIcon name="copy" size={13} />
-                      <span style={{ marginLeft: '0.35rem' }}>
+                      <span>
                         {copyFeedback ? 'Copied to Clipboard!' : 'Copy Payload'}
                       </span>
                     </button>
 
                     <button
                       type="button"
-                      className="cyber-btn-copy"
-                      style={{ flex: 'unset', padding: '0 0.85rem' }}
+                      className="cyber-btn cyber-btn-secondary"
+                      style={{ minHeight: '34px', padding: '0.42rem 0.9rem', whiteSpace: 'nowrap' }}
                       onClick={() => void handleSaveSnippet()}
                       disabled={savingSnippet}
                     >
                       <CyberIcon name="save" size={13} />
-                      <span style={{ marginLeft: '0.35rem' }}>
+                      <span>
                         {savingSnippet ? 'Saving...' : 'Save as Snippet'}
                       </span>
                     </button>
@@ -1198,10 +1231,11 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                       <button
                         type="button"
                         className="cyber-btn-inject"
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', minHeight: '34px', padding: '0.42rem 0.9rem', whiteSpace: 'nowrap' }}
                         onClick={handleSendTerminal}
                       >
                         <CyberIcon name="terminal" size={13} />
-                        <span style={{ marginLeft: '0.35rem' }}>Send to Terminal</span>
+                        <span>Send to Terminal</span>
                       </button>
                     )}
                   </div>
@@ -1232,9 +1266,13 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
           <div className="cyber-modal-overlay" onClick={() => setEditingTemplate(null)}>
             <div
               className="cyber-dialog-card"
-              style={{ maxWidth: '680px' }}
+              style={{ maxWidth: '680px', maxHeight: '90vh' }}
               onClick={(e) => e.stopPropagation()}
             >
+              <div className="cyber-corner-reticle cyber-corner-tl" />
+              <div className="cyber-corner-reticle cyber-corner-tr" />
+              <div className="cyber-corner-reticle cyber-corner-bl" />
+              <div className="cyber-corner-reticle cyber-corner-br" />
               <div className="cyber-dialog-header">
                 <h3>
                   {editingTemplate.id.startsWith('tmpl-') && templates.some((t) => t.id === editingTemplate.id)
@@ -1245,6 +1283,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                   type="button"
                   className="cyber-btn-close"
                   onClick={() => setEditingTemplate(null)}
+                  aria-label="Close Payload Template Dialog"
                 >
                   <CyberIcon name="close" size={13} />
                 </button>
@@ -1354,13 +1393,49 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                 </div>
 
                 <div className="cyber-field-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <label className="cyber-label">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    <label className="cyber-label" htmlFor="payload-editor-command">
                       Payload Command Template * (Use &#123;&#123;LHOST&#125;&#125; and &#123;&#123;LPORT&#125;&#125;)
                     </label>
                     <span style={{ fontSize: '0.68rem', color: '#00f0ff' }}>Saved to external JSON file</span>
                   </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.35rem',
+                      padding: '0.45rem 0.65rem',
+                      marginBottom: '0.4rem',
+                      backgroundColor: 'rgba(6, 14, 26, 0.88)',
+                      border: '1px solid rgba(0, 240, 255, 0.2)',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, marginRight: '0.2rem' }}>
+                      Insert Variable:
+                    </span>
+                    {[
+                      { token: '{{LHOST}}', hint: 'Insert local attacker / VPN callback IP placeholder' },
+                      { token: '{{LPORT}}', hint: 'Insert listener port placeholder' },
+                      { token: '{{SHELL=/bin/bash}}', hint: 'Insert interactive shell parameter with default' },
+                      { token: '{{PARAM=default}}', hint: 'Insert custom variable placeholder' },
+                    ].map((v) => (
+                      <button
+                        key={v.token}
+                        type="button"
+                        className="btn-var-pill"
+                        title={v.hint}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleInsertTemplateVar(v.token)}
+                      >
+                        {v.token}
+                      </button>
+                    ))}
+                  </div>
                   <textarea
+                    id="payload-editor-command"
+                    ref={commandTextareaRef}
                     className="cyber-textarea"
                     rows={5}
                     value={editingTemplate.command}
@@ -1385,7 +1460,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                 <div className="cyber-dialog-actions">
                   <button
                     type="button"
-                    className="cyber-btn cyber-btn-secondary"
+                    className="cyber-btn cyber-btn-danger"
                     onClick={() => setEditingTemplate(null)}
                   >
                     Cancel

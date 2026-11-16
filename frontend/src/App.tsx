@@ -23,7 +23,7 @@ import { ProxychainsExportModal } from './components/ProxychainsExportModal';
 import { FileItem, TransferTask } from './types/sftp';
 import { ForwardRule, ForwardTunnelStatus } from './types/forward';
 import { ProxyProfile, ProxyProfileSummary, ProxychainsExportOptions } from './types/proxy';
-import { Snippet, SnippetContext, SnippetChain, SnippetVariable, SnippetChainsFileConfig } from './types/snippet';
+import { Snippet, SnippetContext, SnippetChain, SnippetVariable, SnippetChainsFileConfig, SnippetsFileConfig } from './types/snippet';
 import { SnippetsManagerModal } from './components/SnippetsManagerModal';
 import { SnippetRunModal } from './components/SnippetRunModal';
 import { SnippetChainsModal } from './components/SnippetChainsModal';
@@ -68,6 +68,7 @@ import {
   PayloadRenderOptions,
   PayloadRenderResult,
   PayloadFileConfig,
+  PayloadEncoding,
 } from './types/payload';
 import { ListenerManagerModal } from './components/ListenerManagerModal';
 import { ListenerProfile, ManagedListenerInfo } from './types/listener';
@@ -983,6 +984,11 @@ interface WailsAppBindings {
   ListSnippetChainsFromFile?: () => Promise<SnippetChain[]>;
   SaveSnippetChainToFile?: (chain: SnippetChain) => Promise<void>;
   DeleteSnippetChainFromFile?: (chainId: string) => Promise<void>;
+  GetSnippetsConfig?: () => Promise<SnippetsFileConfig>;
+  SetSnippetsPath?: (customPath: string) => Promise<SnippetsFileConfig>;
+  ListSnippetsFromFile?: () => Promise<Snippet[]>;
+  SaveSnippetToFile?: (snippet: Snippet) => Promise<void>;
+  DeleteSnippetFromFile?: (snippetId: string) => Promise<void>;
   ListListenerProfiles?: () => Promise<ListenerProfile[]>;
   SaveListenerProfile?: (prof: ListenerProfile) => Promise<void>;
   DeleteListenerProfile?: (profileId: string) => Promise<void>;
@@ -1055,7 +1061,7 @@ export interface SerialPortInfo {
   isConnected?: boolean;
 }
 
-export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'pivot' | 'transfer' | 'listeners' | 'notes' | 'totp' | 'credentials';
+export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'payloads' | 'pivot' | 'transfer' | 'listeners' | 'notes' | 'totp' | 'credentials';
 export type NavDropdownMenu = 'view' | 'engagement-selector' | 'engagement-tools' | 'terminals' | 'offense' | 'networking' | 'intel';
 
 interface WailsRuntime {
@@ -1240,6 +1246,28 @@ export function App({
   }, [scratchpadContent]);
 
   useEffect(() => {
+    if (activeSidebarPanel === 'payloads') {
+      const api = getWailsBindings();
+      if (api?.ListPayloadTemplates) {
+        void api.ListPayloadTemplates().then((list) => {
+          const items = list || [];
+          setSidebarPayloads(items);
+          setSidebarSelectedPayloadId((prev) => {
+            if (prev && items.some((t) => t.id === prev)) return prev;
+            return items[0]?.id || '';
+          });
+        }).catch(() => {});
+      }
+      if (api?.GetLocalNetworkIPs) {
+        void api.GetLocalNetworkIPs().then((ips) => {
+          if (ips && ips.length > 0) {
+            setSidebarPayloadLocalIPs(ips);
+            const vpn = ips.find((i) => i.isVpn) || ips[0];
+            setSidebarPayloadLhost((curr) => (curr === '10.10.14.1' ? vpn.ip : curr));
+          }
+        }).catch(() => {});
+      }
+    }
     if (activeSidebarPanel === 'listeners') {
       const api = getWailsBindings();
       if (api?.ListActiveManagedListeners) {
@@ -1500,6 +1528,15 @@ export function App({
   const [showNmapImportModal, setShowNmapImportModal] = useState<boolean>(false);
   // Payload Generator state (F-33)
   const [showPayloadGeneratorModal, setShowPayloadGeneratorModal] = useState<boolean>(false);
+  const [sidebarPayloads, setSidebarPayloads] = useState<PayloadTemplate[]>([]);
+  const [sidebarPayloadQuery, setSidebarPayloadQuery] = useState<string>('');
+  const [sidebarPayloadOs, setSidebarPayloadOs] = useState<'all' | 'linux' | 'windows'>('all');
+  const [sidebarPayloadLhost, setSidebarPayloadLhost] = useState<string>('10.10.14.1');
+  const [sidebarPayloadLport, setSidebarPayloadLport] = useState<number>(443);
+  const [sidebarPayloadEncoding, setSidebarPayloadEncoding] = useState<PayloadEncoding>('none');
+  const [sidebarPayloadLocalIPs, setSidebarPayloadLocalIPs] = useState<NetworkInterfaceIP[]>([]);
+  const [sidebarSelectedPayloadId, setSidebarSelectedPayloadId] = useState<string>('');
+  const [sidebarPayloadPreview, setSidebarPayloadPreview] = useState<PayloadRenderResult | null>(null);
   // Listener Manager state (F-32)
   const [showListenerManagerModal, setShowListenerManagerModal] = useState<boolean>(false);
   // File Transfer Helper state (F-31)
@@ -1797,7 +1834,31 @@ export function App({
   const [showProxychainsExportModal, setShowProxychainsExportModal] = useState<boolean>(false);
   const [proxychainsOptions, setProxychainsOptions] = useState<ProxychainsExportOptions | undefined>(undefined);
 
+  useEffect(() => {
+    if (activeSidebarPanel !== 'payloads' || !sidebarSelectedPayloadId) {
+      setSidebarPayloadPreview(null);
+      return;
+    }
+    const api = getWailsBindings();
+    if (!api?.RenderPayload) return;
+    let active = true;
+    void api.RenderPayload({
+      templateId: sidebarSelectedPayloadId,
+      lhost: sidebarPayloadLhost || '10.10.14.1',
+      lport: Number(sidebarPayloadLport) || 443,
+      encoding: sidebarPayloadEncoding,
+    }).then((res) => {
+      if (active) setSidebarPayloadPreview(res);
+    }).catch(() => {
+      if (active) setSidebarPayloadPreview(null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [activeSidebarPanel, sidebarSelectedPayloadId, sidebarPayloadLhost, sidebarPayloadLport, sidebarPayloadEncoding]);
+
   // Snippets State (F-15)
+  const [externalSnippets, setExternalSnippets] = useState<Snippet[]>([]);
   const [showSnippetsModal, setShowSnippetsModal] = useState<boolean>(false);
   const [runModalSnippet, setRunModalSnippet] = useState<Snippet | null>(null);
   const [runModalContext, setRunModalContext] = useState<SnippetContext | null>(null);
@@ -2441,6 +2502,9 @@ export function App({
             if (api.ListSnippetChains) {
               api.ListSnippetChains('').then(setChains).catch(() => {});
             }
+            if (api.ListSnippetsFromFile) {
+              api.ListSnippetsFromFile().then(setExternalSnippets).catch(() => {});
+            }
           }
           return;
         } catch {
@@ -2469,6 +2533,9 @@ export function App({
         }
         if (api.ListSnippetChains) {
           api.ListSnippetChains('').then(setChains).catch(() => {});
+        }
+        if (api.ListSnippetsFromFile) {
+          api.ListSnippetsFromFile().then(setExternalSnippets).catch(() => {});
         }
         if (api.ListForwardRules) {
           const rules = await api.ListForwardRules();
@@ -3892,47 +3959,82 @@ export function App({
 
   const handleSaveSnippet = async (snippet: Snippet): Promise<void> => {
     const api = getWailsBindings();
-    if (api?.SaveSnippet) {
+    const toSave: Snippet = {
+      ...snippet,
+      id: snippet.id || `snippet-${Date.now()}`,
+    };
+    let savedAny = false;
+    if (api?.SaveSnippetToFile) {
       try {
-        await api.SaveSnippet(snippet);
-        await refreshVaultState();
-        setStatusMessage(`Saved snippet "${snippet.name}".`);
+        await api.SaveSnippetToFile(toSave);
+        if (api.ListSnippetsFromFile) {
+          const reloaded = await api.ListSnippetsFromFile();
+          setExternalSnippets(reloaded || []);
+        }
+        savedAny = true;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        setStatusMessage(`Save snippet failed: ${msg}`);
+        setStatusMessage(`Save external snippet failed: ${msg}`);
       }
-    } else {
+    }
+    if (api?.SaveSnippet) {
+      try {
+        await api.SaveSnippet(toSave);
+        await refreshVaultState();
+        savedAny = true;
+      } catch (err: unknown) {
+        if (!savedAny) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStatusMessage(`Save snippet failed: ${msg}`);
+          return;
+        }
+      }
+    } else if (!savedAny) {
       setVaultSummary((prev) => {
-        const id = snippet.id || `snippet-${Date.now()}`;
-        const updated = { ...snippet, id };
-        const exists = (prev.snippets || []).some((s) => s.id === id);
+        const exists = (prev.snippets || []).some((s) => s.id === toSave.id);
         const list = exists
-          ? (prev.snippets || []).map((s) => (s.id === id ? updated : s))
-          : [...(prev.snippets || []), updated];
+          ? (prev.snippets || []).map((s) => (s.id === toSave.id ? toSave : s))
+          : [...(prev.snippets || []), toSave];
         return { ...prev, snippets: list };
       });
-      setStatusMessage(`Saved snippet "${snippet.name}".`);
     }
+    setStatusMessage(`Saved snippet "${toSave.name}".`);
   };
 
   const handleDeleteSnippet = async (snippetId: string): Promise<void> => {
     const api = getWailsBindings();
+    let deletedAny = false;
+    if (api?.DeleteSnippetFromFile) {
+      try {
+        await api.DeleteSnippetFromFile(snippetId);
+        if (api.ListSnippetsFromFile) {
+          const reloaded = await api.ListSnippetsFromFile();
+          setExternalSnippets(reloaded || []);
+        }
+        deletedAny = true;
+      } catch {
+        // continue to vault delete
+      }
+    }
     if (api?.DeleteSnippet) {
       try {
         await api.DeleteSnippet(snippetId);
         await refreshVaultState();
-        setStatusMessage('Snippet deleted.');
+        deletedAny = true;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setStatusMessage(`Delete snippet failed: ${msg}`);
+        if (!deletedAny) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStatusMessage(`Delete snippet failed: ${msg}`);
+          return;
+        }
       }
-    } else {
+    } else if (!deletedAny) {
       setVaultSummary((prev) => ({
         ...prev,
         snippets: (prev.snippets || []).filter((s) => s.id !== snippetId),
       }));
-      setStatusMessage('Snippet deleted.');
     }
+    setStatusMessage('Snippet deleted.');
   };
 
   const handleSaveNote = async (note: NotePage): Promise<void> => {
@@ -4070,9 +4172,21 @@ export function App({
     [sessionId]
   );
 
+  const mergedSnippets = useMemo(() => {
+    const byId = new Map<string, Snippet>();
+    for (const s of externalSnippets) {
+      byId.set(s.id, s);
+    }
+    for (const s of vaultSummary.snippets || []) {
+      if (!byId.has(s.id)) {
+        byId.set(s.id, s);
+      }
+    }
+    return Array.from(byId.values());
+  }, [externalSnippets, vaultSummary.snippets]);
+
   const filteredDrawerSnippets = useMemo(() => {
-    const list = vaultSummary.snippets || [];
-    return list.filter((s) => {
+    return mergedSnippets.filter((s) => {
       if (snippetDrawerOs !== 'all') {
         const hasOsTag = (s.tags || []).some((t) => t.toLowerCase() === snippetDrawerOs);
         if (!hasOsTag) return false;
@@ -4087,7 +4201,25 @@ export function App({
       }
       return true;
     });
-  }, [vaultSummary.snippets, snippetDrawerOs, snippetDrawerQuery]);
+  }, [mergedSnippets, snippetDrawerOs, snippetDrawerQuery]);
+
+  const filteredSidebarPayloads = useMemo(() => {
+    const q = sidebarPayloadQuery.toLowerCase().trim();
+    return sidebarPayloads.filter((t) => {
+      if (sidebarPayloadOs !== 'all' && t.os !== 'any' && t.os !== sidebarPayloadOs) {
+        return false;
+      }
+      if (q) {
+        return (
+          t.name.toLowerCase().includes(q) ||
+          (t.shell || '').toLowerCase().includes(q) ||
+          (t.kind || '').toLowerCase().includes(q) ||
+          (t.command || '').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [sidebarPayloads, sidebarPayloadQuery, sidebarPayloadOs]);
 
   const activeHostId = activePane?.hostId || activeTab?.hostId;
 
@@ -6692,9 +6824,28 @@ export function App({
               ) : node.paneType === 'snippets' ? (
                 <SnippetsManagerModal
                   isDocked={true}
-                  snippets={vaultSummary.snippets || []}
+                  snippets={mergedSnippets}
                   onSaveSnippet={handleSaveSnippet}
                   onDeleteSnippet={handleDeleteSnippet}
+                  getFileConfig={async () => {
+                    const api = getWailsBindings();
+                    if (api?.GetSnippetsConfig) return api.GetSnippetsConfig();
+                    return { filePath: 'command_snippets.json', snippetCount: mergedSnippets.length, exists: false };
+                  }}
+                  setFilePath={async (path) => {
+                    const api = getWailsBindings();
+                    if (api?.SetSnippetsPath) return api.SetSnippetsPath(path);
+                    throw new Error('SetSnippetsPath API not available');
+                  }}
+                  onReloadFromFile={async () => {
+                    const api = getWailsBindings();
+                    if (api?.ListSnippetsFromFile) {
+                      const loaded = await api.ListSnippetsFromFile();
+                      setExternalSnippets(loaded || []);
+                      return loaded || [];
+                    }
+                    return [];
+                  }}
                   onRunSnippet={(snip) => {
                     const targetTermPane =
                       collectPanes(tab.rootNode).find(
@@ -8049,7 +8200,8 @@ export function App({
     shortcut?: string,
     action?: () => void,
     disabled?: boolean,
-    active?: boolean
+    active?: boolean,
+    fileBadge?: string
   ) => (
     <div key={toolId} className="nav-dropdown-row">
       <button
@@ -8062,11 +8214,44 @@ export function App({
           action?.();
         }}
       >
-        <span>{label}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+          <span>{label}</span>
+          {fileBadge && (
+            <span className="file-backed-badge" title={`Reads/writes external ${fileBadge} file/folder`}>
+              {fileBadge}
+            </span>
+          )}
+        </span>
         {shortcut && <span className="nav-dropdown-shortcut">{shortcut}</span>}
       </button>
     </div>
   );
+
+  const openToolForManagedFile = (fileId: string) => {
+    setShowGlobalSettingsModal(false);
+    switch (fileId) {
+      case 'payload_templates':
+        setShowPayloadGeneratorModal(true);
+        break;
+      case 'snippet_chains':
+        setChainsHostFilter(activeTab?.hostId || null);
+        setShowChainsModal(true);
+        break;
+      case 'command_snippets':
+        setShowSnippetsModal(true);
+        break;
+      case 'finding_templates':
+      case 'evidence_templates':
+      case 'report_templates':
+        setShowEvidenceModal(true);
+        break;
+      case 'staging_dir':
+        setShowFileTransferModal(true);
+        break;
+      default:
+        break;
+    }
+  };
 
   const renderWinrmManager = (isEmbedded: boolean, onCloseAction: () => void, tabId?: string) => (
     <WinrmManagerModal
@@ -8471,15 +8656,15 @@ export function App({
                     </div>
                     {renderDropdownRow('eng-scope', 'Target Scope & Hub', undefined, () => setShowEngagementHubModal(true))}
                     {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists', undefined, () => setShowCredStoreModal(true))}
-                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings', undefined, () => setShowEvidenceModal(true))}
+                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings', undefined, () => setShowEvidenceModal(true), false, false, 'JSON')}
                     <div className="nav-dropdown-divider" />
                     <div className="tools-sub-header">Engagement Archive (.daeng)</div>
                     {renderDropdownRow('eng-export', 'Export .daeng Package', undefined, () => {
                       setShowEngagementHubModal(true);
-                    })}
+                    }, false, false, 'FILE')}
                     {renderDropdownRow('eng-import', 'Import .daeng Package', undefined, () => {
                       setShowEngagementHubModal(true);
-                    })}
+                    }, false, false, 'FILE')}
                   </div>
                 )}
               </div>
@@ -8565,22 +8750,22 @@ export function App({
                   onMouseMove={handleMenuMove}
                 >
                   <div className="tools-sub-header">Phase 1 // Recon &amp; Enumeration</div>
-                  {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest', undefined, () => setShowNmapImportModal(true))}
+                  {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest', undefined, () => setShowNmapImportModal(true), false, false, 'XML')}
 
                   <div className="nav-dropdown-divider" />
                   <div className="tools-sub-header">Phase 2 // Delivery &amp; Catchers</div>
                   {renderDropdownRow('listener-manager', 'Listener Manager', undefined, () => setShowListenerManagerModal(true))}
-                  {renderDropdownRow('payload-generator', 'Payload Generator // Shells', undefined, () => setShowPayloadGeneratorModal(true))}
-                  {renderDropdownRow('file-transfer', 'File Transfer Helper // Staging', undefined, () => setShowFileTransferModal(true))}
+                  {renderDropdownRow('payload-generator', 'Payload Generator // Shells', undefined, () => setShowPayloadGeneratorModal(true), false, false, 'JSON')}
+                  {renderDropdownRow('file-transfer', 'File Transfer Helper // Staging', undefined, () => setShowFileTransferModal(true), false, false, 'DIR')}
 
                   <div className="nav-dropdown-divider" />
                   <div className="tools-sub-header">Phase 3 // Execution &amp; Post-Exploit</div>
                   {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting', undefined, () => openWinrmTab())}
-                  {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true))}
+                  {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true), false, false, 'JSON')}
                   {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits', undefined, () => {
                     setChainsHostFilter(activeTab?.hostId || null);
                     setShowChainsModal(true);
-                  })}
+                  }, false, false, 'JSON')}
                 </div>
               )}
             </div>
@@ -8802,6 +8987,27 @@ export function App({
               <CyberIcon name="chain" size={18} />
               {drawerChains.length > 0 && (
                 <span className="activity-bar-badge">{drawerChains.length}</span>
+              )}
+            </button>
+
+            {/* 3b. Payload Generator & Reverse/Bind Shells */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'payloads' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'payloads' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('payloads');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Payload Generator & Shells"
+              aria-label="Payload Generator Panel"
+            >
+              <CyberIcon name="target" size={18} />
+              {sidebarPayloads.length > 0 && (
+                <span className="activity-bar-badge">{sidebarPayloads.length}</span>
               )}
             </button>
 
@@ -9389,6 +9595,249 @@ export function App({
                       ))
                     )}
                   </div>
+                </div>
+              )}
+
+              {activeSidebarPanel === 'payloads' && (
+                <div className="drawer-panel drawer-payloads-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                  <div className="sidebar-header">
+                    <h2>Payload Generator</h2>
+                    <div className="sidebar-actions" style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setShowPayloadGeneratorModal(true)}
+                        title="Open Full Payload Generator & Template Editor"
+                      >
+                        Full View
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Callback Parameters */}
+                  <div
+                    style={{
+                      padding: '0.55rem 0.75rem',
+                      borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.38rem',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="cyber-hud-input"
+                        aria-label="Sidebar Payload LHOST"
+                        placeholder="LHOST (10.10.14.1)"
+                        value={sidebarPayloadLhost}
+                        onChange={(e) => setSidebarPayloadLhost(e.target.value)}
+                        style={{ flex: 1, minWidth: 0, fontSize: '0.73rem', padding: '0.28rem 0.45rem' }}
+                      />
+                      <input
+                        type="number"
+                        className="cyber-hud-input"
+                        aria-label="Sidebar Payload LPORT"
+                        value={sidebarPayloadLport}
+                        onChange={(e) => setSidebarPayloadLport(parseInt(e.target.value, 10) || 443)}
+                        style={{ width: '68px', fontSize: '0.73rem', padding: '0.28rem 0.45rem' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      {sidebarPayloadLocalIPs.length > 0 && (
+                        <select
+                          aria-label="Sidebar Interface LHOST"
+                          className="cyber-hud-select"
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) setSidebarPayloadLhost(e.target.value);
+                          }}
+                          style={{ flex: 1, minWidth: 0, fontSize: '0.7rem', padding: '0.25rem 0.4rem' }}
+                        >
+                          <option value="">NICs ({sidebarPayloadLocalIPs.length})...</option>
+                          {sidebarPayloadLocalIPs.map((nic) => (
+                            <option key={`${nic.interface}-${nic.ip}`} value={nic.ip}>
+                              {nic.isVpn ? '[VPN] ' : ''}{nic.interface}: {nic.ip}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <select
+                        aria-label="Sidebar Payload Encoding"
+                        className="cyber-hud-select"
+                        value={sidebarPayloadEncoding}
+                        onChange={(e) => setSidebarPayloadEncoding(e.target.value as PayloadEncoding)}
+                        style={{ flex: 1, minWidth: 0, fontSize: '0.7rem', padding: '0.25rem 0.4rem' }}
+                      >
+                        <option value="none">Raw</option>
+                        <option value="base64">Base64</option>
+                        <option value="url">URL</option>
+                        <option value="powershell_b64">PS B64 (-e)</option>
+                        <option value="hex">Hex</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Search & OS Filter */}
+                  <div style={{ padding: '0.5rem 0.75rem 0.25rem', flexShrink: 0 }}>
+                    <input
+                      className="sidebar-search"
+                      aria-label="Filter Sidebar Payloads"
+                      placeholder="Search payloads & shells..."
+                      value={sidebarPayloadQuery}
+                      onChange={(e) => setSidebarPayloadQuery(e.target.value)}
+                      style={{ marginBottom: '0.35rem' }}
+                    />
+                    <div className="drawer-filter-bar" style={{ marginBottom: 0 }}>
+                      <button
+                        type="button"
+                        className={`drawer-filter-btn ${sidebarPayloadOs === 'all' ? 'active' : ''}`}
+                        onClick={() => setSidebarPayloadOs('all')}
+                      >
+                        ALL
+                      </button>
+                      <button
+                        type="button"
+                        className={`drawer-filter-btn ${sidebarPayloadOs === 'linux' ? 'active' : ''}`}
+                        onClick={() => setSidebarPayloadOs('linux')}
+                      >
+                        LINUX
+                      </button>
+                      <button
+                        type="button"
+                        className={`drawer-filter-btn ${sidebarPayloadOs === 'windows' ? 'active' : ''}`}
+                        onClick={() => setSidebarPayloadOs('windows')}
+                      >
+                        WINDOWS
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Scrollable Payload List */}
+                  <div className="drawer-items-list" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                    {filteredSidebarPayloads.length === 0 ? (
+                      <div className="drawer-empty-state">
+                        <span>No payload templates loaded.</span>
+                        <button
+                          type="button"
+                          className="cyber-hud-btn btn-primary btn-sm"
+                          style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                          onClick={() => setShowPayloadGeneratorModal(true)}
+                        >
+                          <CyberIcon name="plus" size={12} />
+                          <span>Open Payload Editor</span>
+                        </button>
+                      </div>
+                    ) : (
+                      filteredSidebarPayloads.map((tmpl) => {
+                        const isSelected = sidebarSelectedPayloadId === tmpl.id;
+                        return (
+                          <div
+                            key={tmpl.id}
+                            className="drawer-card"
+                            style={{
+                              cursor: 'pointer',
+                              borderColor: isSelected ? 'rgba(0, 240, 255, 0.75)' : undefined,
+                              backgroundColor: isSelected ? 'rgba(0, 240, 255, 0.08)' : undefined,
+                            }}
+                            onClick={() => {
+                              setSidebarSelectedPayloadId(tmpl.id);
+                              if (tmpl.defaultPort) setSidebarPayloadLport(tmpl.defaultPort);
+                            }}
+                          >
+                            <div className="drawer-card-header">
+                              <span className="drawer-card-title">{tmpl.name}</span>
+                              <span className="drawer-badge">{(tmpl.os || 'any').toUpperCase()}</span>
+                            </div>
+                            <div className="drawer-card-meta">
+                              <span>{tmpl.kind}</span>
+                              <span>{tmpl.shell}</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Rendered Command Preview + Inject Actions */}
+                  {sidebarPayloadPreview && (
+                    <div
+                      style={{
+                        padding: '0.55rem 0.75rem',
+                        borderTop: '1px solid rgba(0, 240, 255, 0.25)',
+                        background: 'rgba(4, 10, 18, 0.96)',
+                        flexShrink: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.35rem',
+                      }}
+                    >
+                      {sidebarPayloadPreview.opsecWarnings && sidebarPayloadPreview.opsecWarnings.length > 0 && (
+                        <div style={{ fontSize: '0.66rem', color: '#fbbf24' }}>
+                          {sidebarPayloadPreview.opsecWarnings[0]}
+                        </div>
+                      )}
+                      <pre
+                        style={{
+                          margin: 0,
+                          padding: '0.4rem 0.5rem',
+                          background: 'rgba(2, 6, 12, 0.9)',
+                          border: '1px solid rgba(0, 240, 255, 0.25)',
+                          color: '#a7f3d0',
+                          fontSize: '0.68rem',
+                          fontFamily: 'JetBrains Mono, monospace',
+                          maxHeight: '78px',
+                          overflowY: 'auto',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {sidebarPayloadPreview.rendered}
+                      </pre>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <button
+                          type="button"
+                          className="drawer-action-btn"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(sidebarPayloadPreview.rendered);
+                            setStatusMessage('Copied rendered payload to clipboard.');
+                          }}
+                        >
+                          <CyberIcon name="copy" size={11} />
+                          <span>Copy</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="drawer-action-btn"
+                          disabled={!sessionId}
+                          onClick={() => {
+                            if (sessionId) {
+                              void getWailsBindings()?.WriteTerminal?.(sessionId, sidebarPayloadPreview.rendered);
+                              setStatusMessage('Inserted payload into active terminal.');
+                            }
+                          }}
+                        >
+                          <CyberIcon name="edit" size={11} />
+                          <span>Insert</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="drawer-action-btn run-btn"
+                          disabled={!sessionId}
+                          onClick={() => {
+                            if (sessionId) {
+                              void getWailsBindings()?.WriteTerminal?.(sessionId, sidebarPayloadPreview.rendered + '\n');
+                              setStatusMessage('Executed payload in active terminal.');
+                            }
+                          }}
+                        >
+                          <CyberIcon name="play" size={11} />
+                          <span>Run</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -11530,6 +11979,7 @@ export function App({
                           setActiveConflictFilePath(file);
                           setShowConflictModal(true);
                         }}
+                        onOpenToolForManagedFile={openToolForManagedFile}
                         isModal={false}
                       />
                     ) : tab.tabType === 'notes' ? (
@@ -13359,6 +13809,7 @@ export function App({
               setActiveConflictFilePath(file);
               setShowConflictModal(true);
             }}
+            onOpenToolForManagedFile={openToolForManagedFile}
             onOpenAsTab={() => {
               setShowGlobalSettingsModal(false);
               openSettingsTab(settingsActiveTab);
@@ -13835,7 +14286,7 @@ export function App({
 
       {showSnippetsModal && (
         <SnippetsManagerModal
-          snippets={vaultSummary.snippets || []}
+          snippets={mergedSnippets}
           onSaveSnippet={handleSaveSnippet}
           onDeleteSnippet={handleDeleteSnippet}
           onRunSnippet={(snip) => void handleTriggerSnippet(snip, snippetActiveSessionId)}
@@ -13845,6 +14296,27 @@ export function App({
             setShowSnippetsModal(false);
             setSnippetPrefillBody('');
           }}
+          getFileConfig={async () => {
+            const api = getWailsBindings();
+            if (api?.GetSnippetsConfig) return api.GetSnippetsConfig();
+            return { filePath: 'command_snippets.json', snippetCount: mergedSnippets.length, exists: false };
+          }}
+          setFilePath={async (path) => {
+            const api = getWailsBindings();
+            if (api?.SetSnippetsPath) return api.SetSnippetsPath(path);
+            throw new Error('SetSnippetsPath API not available');
+          }}
+          onReloadFromFile={async () => {
+            const api = getWailsBindings();
+            if (api?.ListSnippetsFromFile) {
+              const loaded = await api.ListSnippetsFromFile();
+              setExternalSnippets(loaded || []);
+              return loaded || [];
+            }
+            return [];
+          }}
+          onSelectFile={(t, fn, fp) => getWailsBindings()?.SelectFileDialog?.(t, fn, fp) ?? Promise.resolve('')}
+          onSelectDirectory={(t) => getWailsBindings()?.SelectDirectoryDialog?.(t) ?? Promise.resolve('')}
         />
       )}
 
@@ -14086,6 +14558,11 @@ export function App({
             address: h.address,
           }))}
           activeHostId={activeTab?.hostId}
+          onOpenFileManager={() => {
+            setShowEvidenceModal(false);
+            setSettingsActiveTab('files');
+            setShowGlobalSettingsModal(true);
+          }}
         />
       )}
 

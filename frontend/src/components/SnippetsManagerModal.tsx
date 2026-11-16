@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Snippet } from '../types/snippet';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Snippet, SnippetsFileConfig } from '../types/snippet';
 import { CyberIcon } from './CyberIcon';
 
 export interface SnippetsManagerModalProps {
@@ -12,6 +12,11 @@ export interface SnippetsManagerModalProps {
   initialPrefillBody?: string;
   isDocked?: boolean;
   onDockToView?: () => void;
+  getFileConfig?: () => Promise<SnippetsFileConfig>;
+  setFilePath?: (path: string) => Promise<SnippetsFileConfig>;
+  onReloadFromFile?: () => Promise<Snippet[]>;
+  onSelectFile?: (title: string, filterName: string, filterPattern: string) => Promise<string>;
+  onSelectDirectory?: (title: string) => Promise<string>;
 }
 
 export function SnippetsManagerModal({
@@ -24,6 +29,11 @@ export function SnippetsManagerModal({
   initialPrefillBody,
   isDocked = false,
   onDockToView,
+  getFileConfig,
+  setFilePath,
+  onReloadFromFile,
+  onSelectFile,
+  onSelectDirectory,
 }: SnippetsManagerModalProps): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string>('all');
@@ -50,8 +60,90 @@ export function SnippetsManagerModal({
   const [formTags, setFormTags] = useState('');
   const [formConfirm, setFormConfirm] = useState(true);
   const [error, setError] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [fileConfig, setFileConfig] = useState<SnippetsFileConfig | null>(null);
+  const [showPathInput, setShowPathInput] = useState(false);
+  const [customPathValue, setCustomPathValue] = useState('');
   const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (getFileConfig) {
+      getFileConfig()
+        .then((cfg) => {
+          setFileConfig(cfg);
+          setCustomPathValue(cfg.filePath || '');
+        })
+        .catch(() => {});
+    }
+  }, [getFileConfig]);
+
+  const handleReloadFile = async () => {
+    try {
+      if (onReloadFromFile) {
+        await onReloadFromFile();
+      }
+      if (getFileConfig) {
+        const cfg = await getFileConfig();
+        setFileConfig(cfg);
+      }
+      setInfoMessage('Reloaded command snippets from disk.');
+      setTimeout(() => setInfoMessage(''), 3000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleBrowseSnippetFile = async () => {
+    try {
+      const file = onSelectFile
+        ? await onSelectFile('Select Command Snippets JSON File', 'JSON Files', '*.json')
+        : await (window as unknown as { go?: { main?: { App?: { SelectFileDialog: (t: string, fn: string, fp: string) => Promise<string> } } } }).go?.main?.App?.SelectFileDialog?.(
+            'Select Command Snippets JSON File',
+            'JSON Files',
+            '*.json'
+          );
+      if (file && file.trim() && setFilePath) {
+        const updated = await setFilePath(file.trim());
+        setFileConfig(updated);
+        await handleReloadFile();
+        setInfoMessage(`Loaded snippets from: ${file.trim()}`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleBrowseSnippetFolder = async () => {
+    try {
+      const folder = onSelectDirectory
+        ? await onSelectDirectory('Select Command Snippets Folder')
+        : await (window as unknown as { go?: { main?: { App?: { SelectDirectoryDialog: (t: string) => Promise<string> } } } }).go?.main?.App?.SelectDirectoryDialog?.(
+            'Select Command Snippets Folder'
+          );
+      if (folder && folder.trim() && setFilePath) {
+        const updated = await setFilePath(folder.trim());
+        setFileConfig(updated);
+        await handleReloadFile();
+        setInfoMessage(`Configured snippets folder: ${folder.trim()} (command_snippets.json)`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleApplyCustomSnippetPath = async () => {
+    if (!customPathValue.trim() || !setFilePath) return;
+    try {
+      const updated = await setFilePath(customPathValue.trim());
+      setFileConfig(updated);
+      setShowPathInput(false);
+      await handleReloadFile();
+      setInfoMessage(`Configured snippets path: ${updated.filePath}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   // Sync edit form state when editingSnippet changes
   const startEdit = (snip: Snippet) => {
@@ -246,15 +338,121 @@ export function SnippetsManagerModal({
                   onClick={onClose}
                   aria-label="Close"
                 >
-                  ×
+                  <CyberIcon name="close" size={14} />
                 </button>
               </div>
             </div>
           </>
         )}
 
+        {!isDocked && (getFileConfig || setFilePath) && (
+          <div
+            style={{
+              padding: '0.5rem 1.25rem',
+              backgroundColor: 'rgba(5, 12, 22, 0.95)',
+              borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.55rem',
+              fontSize: '0.73rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', overflow: 'hidden' }}>
+              <span style={{ color: '#00f0ff', fontWeight: 600 }}>SNIPPETS STORE:</span>
+              <span
+                style={{
+                  color: '#cbd5e1',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: '0.72rem',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  maxWidth: '340px',
+                }}
+                title={fileConfig?.filePath || 'command_snippets.json'}
+              >
+                {fileConfig?.filePath || 'command_snippets.json'}
+              </span>
+              <span className="file-backed-badge">JSON</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {onReloadFromFile && (
+                <button
+                  type="button"
+                  className="cyber-hud-btn btn-sm"
+                  onClick={() => void handleReloadFile()}
+                  title="Reload snippets from disk"
+                >
+                  <CyberIcon name="stabilize" size={11} />
+                  <span>Reload File</span>
+                </button>
+              )}
+              {setFilePath && (
+                <>
+                  <button
+                    type="button"
+                    className="cyber-hud-btn btn-sm"
+                    onClick={() => void handleBrowseSnippetFile()}
+                    title="Select a specific command snippets JSON file"
+                  >
+                    <CyberIcon name="file" size={11} />
+                    <span>Browse File</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-hud-btn btn-sm"
+                    onClick={() => void handleBrowseSnippetFolder()}
+                    title="Select a folder (uses command_snippets.json inside)"
+                  >
+                    <CyberIcon name="folder" size={11} />
+                    <span>Browse Folder</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="cyber-hud-btn btn-sm"
+                    onClick={() => {
+                      setCustomPathValue(fileConfig?.filePath || '');
+                      setShowPathInput(!showPathInput);
+                    }}
+                    title="Edit command snippets file path"
+                  >
+                    <CyberIcon name="edit" size={11} />
+                    <span>Config Path</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showPathInput && setFilePath && (
+          <div style={{ padding: '0.55rem 1.25rem', backgroundColor: 'rgba(2, 8, 16, 0.95)', borderBottom: '1px solid rgba(0, 240, 255, 0.2)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <input
+              type="text"
+              className="cyber-hud-input"
+              style={{ flex: 1 }}
+              value={customPathValue}
+              onChange={(e) => setCustomPathValue(e.target.value)}
+              placeholder="Enter path to command_snippets.json or folder..."
+            />
+            <button type="button" className="cyber-hud-btn btn-sm btn-primary" onClick={() => void handleApplyCustomSnippetPath()}>
+              Apply Path
+            </button>
+            <button type="button" className="cyber-hud-btn btn-sm btn-cancel" onClick={() => setShowPathInput(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
+
         <div className="dialog-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: isDocked ? '0.75rem' : '1.25rem' }}>
         {error && <div className="error-banner">{error}</div>}
+        {infoMessage && (
+          <div style={{ marginBottom: '0.75rem', padding: '0.45rem 0.7rem', border: '1px solid rgba(16, 185, 129, 0.4)', background: 'rgba(16, 185, 129, 0.1)', color: '#34d399', fontSize: '0.76rem', fontFamily: 'JetBrains Mono, monospace' }}>
+            {infoMessage}
+          </div>
+        )}
 
         {/* Main Content Area */}
         {!editingSnippet ? (
@@ -341,14 +539,14 @@ export function SnippetsManagerModal({
                 style={{ height: '36px', padding: '0 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <CyberIcon name="plus" size={13} />
-                <span>+ New Snippet</span>
+                <span>New Snippet</span>
               </button>
             </div>
 
             {/* Snippets List */}
             {filteredSnippets.length === 0 ? (
               <div className="snippets-empty-state">
-                <p>No snippets found. Click "+ New Snippet" to create one.</p>
+                <p>No snippets found. Click "New Snippet" to create one.</p>
               </div>
             ) : (
               <div className="snippets-list-grid">
@@ -605,7 +803,7 @@ export function SnippetsManagerModal({
             <div className="modal-actions" style={{ marginTop: '0.4rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)' }}>
               <button
                 type="button"
-                className="cyber-hud-btn"
+                className="cyber-hud-btn btn-cancel"
                 onClick={() => setEditingSnippet(null)}
                 disabled={saving}
               >

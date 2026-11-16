@@ -243,7 +243,47 @@ func RenderDOCX(doc *core.CompiledReport) ([]byte, string, error) {
 	b := &docxBuilder{}
 
 	// Cover / Document Control Banner
-	b.writeParagraph("SECURITY ASSESSMENT & PENETRATION TEST REPORT", docxParaOpts{
+	bannerTitle := "SECURITY ASSESSMENT & PENETRATION TEST REPORT"
+	authorText := "[AUTHOR NOTE: Insert Assessor Name & Organization]"
+	classText := "CONFIDENTIAL — AUTHORIZED RECIPIENTS ONLY"
+	execIntroText := "[AUTHOR NOTE — REPLACE BEFORE PDF EXPORT]: Summarize the overall security posture, primary business risks observed during the engagement, and top 3 strategic remediation themes for executive stakeholders."
+	execIntroIsTemplate := false
+	methText := "[AUTHOR NOTE]: Describe rules of engagement, testing perspective (External / Internal / Assumed Breach), source IP(s) used, and any out-of-scope exclusions. Standard phases followed: Reconnaissance -> Service Enumeration -> Vulnerability Validation -> Privilege Escalation / Lateral Movement -> Evidence Verification -> Reporting."
+	methIsTemplate := false
+	scopeNotesText := ""
+	limitationsText := ""
+	attackPathText := "[AUTHOR NOTE]: Walk through the end-to-end attack narrative—how initial access or misconfigurations combined to reach high-value assets."
+	attackPathIsTemplate := false
+	conclusionText := ""
+
+	if doc.Template != nil {
+		if v := strings.TrimSpace(doc.Template.TitlePrefix); v != "" {
+			bannerTitle = strings.ToUpper(v)
+		}
+		if v := strings.TrimSpace(doc.Template.Author); v != "" {
+			authorText = v
+		}
+		if v := strings.TrimSpace(doc.Template.Classification); v != "" {
+			classText = v
+		}
+		if v := strings.TrimSpace(doc.Template.ExecutiveSummaryIntro); v != "" {
+			execIntroText = v
+			execIntroIsTemplate = true
+		}
+		if v := strings.TrimSpace(doc.Template.MethodologyText); v != "" {
+			methText = v
+			methIsTemplate = true
+		}
+		scopeNotesText = strings.TrimSpace(doc.Template.ScopeNotes)
+		limitationsText = strings.TrimSpace(doc.Template.LimitationsText)
+		if v := strings.TrimSpace(doc.Template.AttackPathTemplate); v != "" {
+			attackPathText = v
+			attackPathIsTemplate = true
+		}
+		conclusionText = strings.TrimSpace(doc.Template.ConclusionText)
+	}
+
+	b.writeParagraph(bannerTitle, docxParaOpts{
 		Bold:           true,
 		Color:          "0284C7",
 		FontSizeHalfPt: 20,
@@ -279,8 +319,8 @@ func RenderDOCX(doc *core.CompiledReport) ([]byte, string, error) {
 			{{Text: "Authorized Scope", Bold: true}, {Text: scopeText}},
 			{{Text: "Assessment Window", Bold: true}, {Text: timeframeText}},
 			{{Text: "Report Timestamp (UTC)", Bold: true}, {Text: doc.DeterministicTimestamp}},
-			{{Text: "Lead Tester / Author", Bold: true}, {Text: "[AUTHOR NOTE: Insert Assessor Name & Organization]"}},
-			{{Text: "Document Classification", Bold: true}, {Text: "CONFIDENTIAL — AUTHORIZED RECIPIENTS ONLY", Bold: true, Color: "991B1B"}},
+			{{Text: "Lead Tester / Author", Bold: true}, {Text: authorText}},
+			{{Text: "Document Classification", Bold: true}, {Text: classText, Bold: true, Color: "991B1B"}},
 			{{Text: "Compiled Totals", Bold: true}, {Text: fmt.Sprintf("%d Host(s) · %d Finding(s) · %d Evidence Artifact(s)", len(doc.HostSections), doc.TotalFindings, doc.TotalEvidence)}},
 		},
 	)
@@ -296,17 +336,22 @@ func RenderDOCX(doc *core.CompiledReport) ([]byte, string, error) {
 		KeepNext:        true,
 		PageBreakBefore: true,
 	})
-	b.writeParagraph(
-		"[AUTHOR NOTE — REPLACE BEFORE PDF EXPORT]: Summarize the overall security posture, primary business risks observed during the engagement, and top 3 strategic remediation themes for executive stakeholders.",
-		docxParaOpts{
-			Italic:          true,
-			Color:           "92400E",
-			FontSizeHalfPt:  20,
-			ShadingFill:     "FEF3C7",
-			LeftBorderColor: "D97706",
-			SpaceAfter:      160,
-		},
-	)
+	execParaOpts := docxParaOpts{
+		Italic:          true,
+		Color:           "92400E",
+		FontSizeHalfPt:  20,
+		ShadingFill:     "FEF3C7",
+		LeftBorderColor: "D97706",
+		SpaceAfter:      160,
+	}
+	if execIntroIsTemplate {
+		execParaOpts = docxParaOpts{
+			Color:          "1E293B",
+			FontSizeHalfPt: 21,
+			SpaceAfter:     160,
+		}
+	}
+	b.writeParagraph(execIntroText, execParaOpts)
 
 	b.writeTable(
 		[]string{"Severity Rating", "Count", "Remediation SLA Guidance (Template)"},
@@ -330,17 +375,36 @@ func RenderDOCX(doc *core.CompiledReport) ([]byte, string, error) {
 		SpaceAfter:     120,
 		KeepNext:       true,
 	})
-	b.writeParagraph(
-		"[AUTHOR NOTE]: Describe rules of engagement, testing perspective (External / Internal / Assumed Breach), source IP(s) used, and any out-of-scope exclusions. Standard phases followed: Reconnaissance -> Service Enumeration -> Vulnerability Validation -> Privilege Escalation / Lateral Movement -> Evidence Verification -> Reporting.",
-		docxParaOpts{
-			Italic:          true,
-			Color:           "1E3A8A",
-			FontSizeHalfPt:  20,
-			ShadingFill:     "EFF6FF",
-			LeftBorderColor: "2563EB",
-			SpaceAfter:      140,
-		},
-	)
+	methParaOpts := docxParaOpts{
+		Italic:          true,
+		Color:           "1E3A8A",
+		FontSizeHalfPt:  20,
+		ShadingFill:     "EFF6FF",
+		LeftBorderColor: "2563EB",
+		SpaceAfter:      140,
+	}
+	if methIsTemplate {
+		methParaOpts = docxParaOpts{
+			Color:          "1E293B",
+			FontSizeHalfPt: 21,
+			SpaceAfter:     100,
+		}
+	}
+	b.writeParagraph(methText, methParaOpts)
+	if scopeNotesText != "" {
+		b.writeParagraph("Scope Notes: "+scopeNotesText, docxParaOpts{
+			Color:          "334155",
+			FontSizeHalfPt: 20,
+			SpaceAfter:     80,
+		})
+	}
+	if limitationsText != "" {
+		b.writeParagraph("Assessment Limitations: "+limitationsText, docxParaOpts{
+			Color:          "475569",
+			FontSizeHalfPt: 20,
+			SpaceAfter:     120,
+		})
+	}
 
 	if len(doc.HostSections) > 0 {
 		hostRows := make([][]docxTableCell, 0, len(doc.HostSections))
@@ -373,17 +437,22 @@ func RenderDOCX(doc *core.CompiledReport) ([]byte, string, error) {
 		SpaceAfter:     100,
 		KeepNext:       true,
 	})
-	b.writeParagraph(
-		"[AUTHOR NOTE]: Walk through the end-to-end attack narrative—how initial access or misconfigurations combined to reach high-value assets.",
-		docxParaOpts{
-			Italic:          true,
-			Color:           "92400E",
-			FontSizeHalfPt:  20,
-			ShadingFill:     "FEF3C7",
-			LeftBorderColor: "D97706",
-			SpaceAfter:      120,
-		},
-	)
+	attackParaOpts := docxParaOpts{
+		Italic:          true,
+		Color:           "92400E",
+		FontSizeHalfPt:  20,
+		ShadingFill:     "FEF3C7",
+		LeftBorderColor: "D97706",
+		SpaceAfter:      120,
+	}
+	if attackPathIsTemplate {
+		attackParaOpts = docxParaOpts{
+			Color:          "1E293B",
+			FontSizeHalfPt: 21,
+			SpaceAfter:     120,
+		}
+	}
+	b.writeParagraph(attackPathText, attackParaOpts)
 	highImpactCount := 0
 	for _, sec := range doc.HostSections {
 		for _, fs := range sec.Findings {
@@ -577,6 +646,23 @@ func RenderDOCX(doc *core.CompiledReport) ([]byte, string, error) {
 				{Text: pf.Source},
 			})
 		}
+	}
+
+	if conclusionText != "" {
+		b.writeParagraph("Conclusion & Strategic Remediation Roadmap", docxParaOpts{
+			Style:          "Heading1",
+			Bold:           true,
+			Color:          "0F172A",
+			FontSizeHalfPt: 30,
+			SpaceBefore:    180,
+			SpaceAfter:     100,
+			KeepNext:       true,
+		})
+		b.writeParagraph(conclusionText, docxParaOpts{
+			Color:          "1E293B",
+			FontSizeHalfPt: 21,
+			SpaceAfter:     140,
+		})
 	}
 
 	// 5. Appendix A: Discovered Ports & Services

@@ -94,6 +94,8 @@ DoubleAgent is structured as a Wails v2 application (see [ADR-0008](../adr/ADR-0
 
 ## How to Run & Test
 
+See the full AI agent & developer instructions in [BUILD_AND_TEST_GUIDE.md](BUILD_AND_TEST_GUIDE.md) and UI/HUD tokens in [styleguide.md](../styleguide.md).
+
 ```bash
 # Backend tests & static analysis
 go vet ./backend/... .

@@ -64,8 +64,14 @@ type App struct {
 
 	pendingMergeExternalPayload *core.VaultPayload
 	pendingMergeFilePath        string
+	skipGlobalVaultPointer      bool
 	payloadFilePath             string
 	chainsFilePath              string
+	snippetsFilePath            string
+	findingTemplatesFilePath    string
+	evidenceTemplatesFilePath   string
+	reportTemplatesFilePath     string
+	stagingDirPath              string
 	managedListeners            map[string]*managedListenerInstance
 	fileServers                 map[string]*transfer.ManagedServer
 	pivotMgr                    *pivot.Manager
@@ -116,7 +122,14 @@ func getEffectiveVaultPath() string {
 		if data, err := os.ReadFile(ptr); err == nil {
 			trimmed := strings.TrimSpace(string(data))
 			if trimmed != "" {
-				return trimmed
+				// Self-heal if an earlier test run leaked a Go t.TempDir() path into vault_location.txt
+				clean := filepath.Clean(trimmed)
+				tempRoot := filepath.Clean(os.TempDir())
+				if strings.HasPrefix(strings.ToLower(clean), strings.ToLower(tempRoot)) && strings.Contains(clean, "TestApp") {
+					_ = os.Remove(ptr)
+				} else {
+					return trimmed
+				}
 			}
 		}
 	}
@@ -208,6 +221,9 @@ func NewAppWithDependencies(
 				app.emit(app.ctx, "vault:locked", true)
 			},
 		})
+	} else {
+		// Injected stores (used in unit/integration tests) must never overwrite the user's global vault_location.txt
+		app.skipGlobalVaultPointer = true
 	}
 	app.vaultStore = vaultStore
 	app.workspaceStore = data.NewWorkspaceStore(defaultWorkspacePath())
@@ -2766,14 +2782,7 @@ func (a *App) SaveProxychainsFile(content string, targetPath string) error {
 	return os.WriteFile(targetPath, []byte(content), 0644)
 }
 
-// SaveSnippet saves or updates a command snippet in the vault, auto-extracting variable placeholders (F-15).
-func (a *App) SaveSnippet(snippet core.Snippet) error {
-	a.vaultStore.Touch()
-	payload, err := a.vaultStore.GetPayload()
-	if err != nil {
-		return err
-	}
-
+func normalizeSnippetForSave(snippet core.Snippet) core.Snippet {
 	if snippet.ID == "" {
 		snippet.ID = fmt.Sprintf("snippet-%d", time.Now().UnixNano())
 	}
@@ -2804,6 +2813,18 @@ func (a *App) SaveSnippet(snippet core.Snippet) error {
 		}
 	}
 	snippet.Variables = extracted
+	return snippet
+}
+
+// SaveSnippet saves or updates a command snippet in the vault, auto-extracting variable placeholders (F-15).
+func (a *App) SaveSnippet(snippet core.Snippet) error {
+	a.vaultStore.Touch()
+	payload, err := a.vaultStore.GetPayload()
+	if err != nil {
+		return err
+	}
+
+	snippet = normalizeSnippetForSave(snippet)
 
 	updated := false
 	for i, s := range payload.Snippets {
@@ -2845,6 +2866,84 @@ func (a *App) DeleteSnippet(snippetID string) error {
 	}
 	a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
 	return nil
+}
+
+func (a *App) getSnippetsFilePath() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.snippetsFilePath != "" {
+		return a.snippetsFilePath
+	}
+	return core.ResolveSnippetsFilePath("")
+}
+
+// GetSnippetsConfig returns the status of the external command snippets JSON file (F-15).
+func (a *App) GetSnippetsConfig() (*core.SnippetsFileConfig, error) {
+	p := a.getSnippetsFilePath()
+	cfg := core.GetSnippetsFileConfig(p)
+	return &cfg, nil
+}
+
+// SetSnippetsPath configures a custom path for external command snippets (F-15).
+// If a folder is given, it automatically resolves to command_snippets.json inside that folder.
+func (a *App) SetSnippetsPath(customPath string) (*core.SnippetsFileConfig, error) {
+	clean := core.ResolveSnippetsFilePath(customPath)
+	if clean == "" {
+		return nil, errors.New("snippets path must not be empty")
+	}
+
+	a.mu.Lock()
+	a.snippetsFilePath = clean
+	a.mu.Unlock()
+
+	if _, err := core.LoadSnippetsFromFile(clean); err != nil {
+		return nil, err
+	}
+	cfg := core.GetSnippetsFileConfig(clean)
+	return &cfg, nil
+}
+
+// ListSnippetsFromFile loads command snippets from the external command_snippets.json store (F-15).
+func (a *App) ListSnippetsFromFile() ([]core.Snippet, error) {
+	return core.LoadSnippetsFromFile(a.getSnippetsFilePath())
+}
+
+// SaveSnippetToFile creates or updates a command snippet in command_snippets.json (F-15).
+func (a *App) SaveSnippetToFile(snippet core.Snippet) error {
+	snippet = normalizeSnippetForSave(snippet)
+	p := a.getSnippetsFilePath()
+	list, err := core.LoadSnippetsFromFile(p)
+	if err != nil {
+		return err
+	}
+	updated := false
+	for i, s := range list {
+		if s.ID == snippet.ID {
+			list[i] = snippet
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		list = append(list, snippet)
+	}
+	return core.SaveSnippetsToFile(p, list)
+}
+
+// DeleteSnippetFromFile removes a command snippet by ID from command_snippets.json (F-15).
+func (a *App) DeleteSnippetFromFile(snippetID string) error {
+	p := a.getSnippetsFilePath()
+	list, err := core.LoadSnippetsFromFile(p)
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.Snippet, 0, len(list))
+	for _, s := range list {
+		if s.ID != snippetID {
+			filtered = append(filtered, s)
+		}
+	}
+	return core.SaveSnippetsToFile(p, filtered)
 }
 
 // ListSnippets returns all snippets stored in the vault (F-15).
@@ -2927,12 +3026,24 @@ func (a *App) ResolveSnippetTemplate(snippetID string, sessionID string, userVal
 	var targetSnippet *core.Snippet
 	for _, s := range payload.Snippets {
 		if s.ID == snippetID {
-			targetSnippet = &s
+			copyS := s
+			targetSnippet = &copyS
 			break
 		}
 	}
 	if targetSnippet == nil {
-		return "", fmt.Errorf("snippet %s not found in vault", snippetID)
+		if fileSnips, fErr := core.LoadSnippetsFromFile(a.getSnippetsFilePath()); fErr == nil {
+			for _, s := range fileSnips {
+				if s.ID == snippetID {
+					copyS := s
+					targetSnippet = &copyS
+					break
+				}
+			}
+		}
+	}
+	if targetSnippet == nil {
+		return "", fmt.Errorf("snippet %s not found in vault or external snippets file", snippetID)
 	}
 
 	snipCtx := a.GetSnippetContext(sessionID)
@@ -4543,10 +4654,12 @@ func (a *App) RelocateVaultFile(newPath string, moveExisting bool) error {
 		}
 	}
 
-	ptr := vaultPointerPath()
-	if ptr != "" {
-		_ = os.MkdirAll(filepath.Dir(ptr), 0o700)
-		_ = os.WriteFile(ptr, []byte(newPath), 0o600)
+	if !a.skipGlobalVaultPointer {
+		ptr := vaultPointerPath()
+		if ptr != "" {
+			_ = os.MkdirAll(filepath.Dir(ptr), 0o700)
+			_ = os.WriteFile(ptr, []byte(newPath), 0o600)
+		}
 	}
 
 	if err := a.vaultStore.SetFilePath(newPath); err != nil {
@@ -5117,9 +5230,13 @@ func (a *App) AddEvidenceCategory(engagementID, category string) error {
 	return nil
 }
 
-// GetEvidenceTemplates returns pre-filled finding templates (F-18).
+// GetEvidenceTemplates returns pre-filled evidence templates loaded from external JSON (F-18).
 func (a *App) GetEvidenceTemplates() []core.EvidenceItem {
-	return core.DefaultEvidenceTemplates()
+	items, err := core.LoadEvidenceTemplates(a.getEvidenceTemplatesFilePath())
+	if err != nil {
+		return core.DefaultEvidenceTemplates()
+	}
+	return items
 }
 
 // ListFindings returns findings filtered by engagement ID and/or host ID (F-18).
@@ -5228,9 +5345,433 @@ func (a *App) DeleteFinding(id string) error {
 	return nil
 }
 
-// GetFindingTemplates returns structured starter findings for common vulnerability classes.
+// GetFindingTemplates returns structured starter findings loaded from external finding_templates.json.
 func (a *App) GetFindingTemplates() []core.FindingItem {
-	return core.DefaultFindingTemplates()
+	items, err := core.LoadFindingTemplates(a.getFindingTemplatesFilePath())
+	if err != nil {
+		return core.DefaultFindingTemplates()
+	}
+	return items
+}
+
+func (a *App) getFindingTemplatesFilePath() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.findingTemplatesFilePath != "" {
+		return a.findingTemplatesFilePath
+	}
+	return core.ResolveFindingTemplatesFilePath("")
+}
+
+func (a *App) getEvidenceTemplatesFilePath() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.evidenceTemplatesFilePath != "" {
+		return a.evidenceTemplatesFilePath
+	}
+	return core.ResolveEvidenceTemplatesFilePath("")
+}
+
+func (a *App) getReportTemplatesFilePath() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.reportTemplatesFilePath != "" {
+		return a.reportTemplatesFilePath
+	}
+	return core.ResolveReportTemplatesFilePath("")
+}
+
+// SaveFindingTemplateToFile adds or updates a finding template in finding_templates.json.
+func (a *App) SaveFindingTemplateToFile(item core.FindingItem) error {
+	item.Title = strings.TrimSpace(item.Title)
+	if item.Title == "" {
+		return errors.New("finding template title is required")
+	}
+	p := a.getFindingTemplatesFilePath()
+	items, err := core.LoadFindingTemplates(p)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(item.ID) == "" {
+		item.ID = fmt.Sprintf("tpl-find-custom-%d", time.Now().UnixNano())
+	}
+	if strings.TrimSpace(item.Category) == "" {
+		item.Category = "General"
+	}
+	if strings.TrimSpace(item.Severity) == "" {
+		item.Severity = "medium"
+	}
+	updated := false
+	for i, existing := range items {
+		if existing.ID == item.ID {
+			items[i] = item
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		items = append(items, item)
+	}
+	return core.SaveFindingTemplates(p, items)
+}
+
+// DeleteFindingTemplateFromFile removes a finding template by ID from finding_templates.json.
+func (a *App) DeleteFindingTemplateFromFile(id string) error {
+	p := a.getFindingTemplatesFilePath()
+	items, err := core.LoadFindingTemplates(p)
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.FindingItem, 0, len(items))
+	for _, it := range items {
+		if it.ID != id {
+			filtered = append(filtered, it)
+		}
+	}
+	return core.SaveFindingTemplates(p, filtered)
+}
+
+// ListReportTemplates returns customizable report narrative templates loaded from report_templates.json.
+func (a *App) ListReportTemplates() ([]core.ReportTemplate, error) {
+	return core.LoadReportTemplates(a.getReportTemplatesFilePath())
+}
+
+// SaveReportTemplateToFile creates or updates a report template in report_templates.json.
+func (a *App) SaveReportTemplateToFile(tpl core.ReportTemplate) error {
+	tpl.Name = strings.TrimSpace(tpl.Name)
+	if tpl.Name == "" {
+		return errors.New("report template name is required")
+	}
+	p := a.getReportTemplatesFilePath()
+	items, err := core.LoadReportTemplates(p)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(tpl.ID) == "" {
+		tpl.ID = fmt.Sprintf("tpl-rep-custom-%d", time.Now().UnixNano())
+	}
+	updated := false
+	for i, existing := range items {
+		if existing.ID == tpl.ID {
+			items[i] = tpl
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		items = append(items, tpl)
+	}
+	return core.SaveReportTemplates(p, items)
+}
+
+// DeleteReportTemplateFromFile removes a report template by ID from report_templates.json.
+func (a *App) DeleteReportTemplateFromFile(id string) error {
+	p := a.getReportTemplatesFilePath()
+	items, err := core.LoadReportTemplates(p)
+	if err != nil {
+		return err
+	}
+	filtered := make([]core.ReportTemplate, 0, len(items))
+	for _, it := range items {
+		if it.ID != id {
+			filtered = append(filtered, it)
+		}
+	}
+	return core.SaveReportTemplates(p, filtered)
+}
+
+// ListManagedFiles returns overview metadata for all external vault, template, and staging paths used by DoubleAgent.
+func (a *App) ListManagedFiles() ([]core.ExternalManagedFileInfo, error) {
+	vaultPath := getEffectiveVaultPath()
+	if a.vaultStore != nil && strings.TrimSpace(a.vaultStore.GetFilePath()) != "" {
+		vaultPath = a.vaultStore.GetFilePath()
+	}
+	vaultInfo := core.ExternalManagedFileInfo{
+		ID:           "vault",
+		Name:         "Encrypted Vault Store",
+		Kind:         "vault",
+		Description:  "XChaCha20-Poly1305 encrypted container holding hosts, credentials, snippets, findings, and evidence.",
+		FeatureLabel: "Core Vault & Security",
+		FilePath:     vaultPath,
+		DefaultName:  "doubleagent.vault",
+	}
+	if fi, err := os.Stat(vaultPath); err == nil && !fi.IsDir() {
+		vaultInfo.Exists = true
+		vaultInfo.SizeBytes = fi.Size()
+		vaultInfo.LastModified = fi.ModTime().UTC().Format(time.RFC3339)
+		if a.vaultStore != nil {
+			if payload, pErr := a.vaultStore.GetPayload(); pErr == nil {
+				vaultInfo.ItemCount = len(payload.Hosts)
+			}
+		}
+	}
+
+	payloadPath := a.getPayloadFilePath()
+	payloadInfo := core.StatJSONTemplateFile(
+		"payload_templates",
+		"Payload & Reverse/Bind Shell Templates",
+		"External JSON definitions used by the Payload Generator without embedding exploit strings in Go.",
+		"Payload Generator",
+		payloadPath,
+		"payload_templates.json",
+		func(p string) int {
+			items, err := core.LoadPayloadTemplates(p)
+			if err != nil {
+				return 0
+			}
+			return len(items)
+		},
+	)
+
+	chainsPath := a.getChainsFilePath()
+	chainsInfo := core.StatJSONTemplateFile(
+		"snippet_chains",
+		"Snippet Chains",
+		"Multi-step ordered exploit, privilege escalation, and pivoting workflows stored outside the binary.",
+		"Snippet Chains",
+		chainsPath,
+		"snippet_chains.json",
+		func(p string) int {
+			items, err := core.LoadSnippetChainsFromFile(p)
+			if err != nil {
+				return 0
+			}
+			return len(items)
+		},
+	)
+
+	snippetsPath := a.getSnippetsFilePath()
+	snippetsInfo := core.StatJSONTemplateFile(
+		"command_snippets",
+		"Command Snippets & Variables",
+		"External JSON library of reusable single-shot command templates with {{HOST}}/{{USER}}/{{SECRET:id}} placeholders.",
+		"Command Snippets",
+		snippetsPath,
+		core.CommandSnippetsFileName,
+		func(p string) int {
+			items, err := core.LoadSnippetsFromFile(p)
+			if err != nil {
+				return 0
+			}
+			return len(items)
+		},
+	)
+
+	findingPath := a.getFindingTemplatesFilePath()
+	findingInfo := core.StatJSONTemplateFile(
+		"finding_templates",
+		"Finding Templates",
+		"Reusable vulnerability finding presets (title, CVSS, MITRE ATT&CK, impact, remediation) for Evidence Vault.",
+		"Evidence Vault → Findings",
+		findingPath,
+		core.FindingTemplatesFileName,
+		func(p string) int {
+			items, err := core.LoadFindingTemplates(p)
+			if err != nil {
+				return 0
+			}
+			return len(items)
+		},
+	)
+
+	evidencePath := a.getEvidenceTemplatesFilePath()
+	evidenceInfo := core.StatJSONTemplateFile(
+		"evidence_templates",
+		"Evidence Proof Templates",
+		"Starter evidence artifact skeletons for quick proof logging inside Evidence Vault.",
+		"Evidence Vault → Proofs",
+		evidencePath,
+		core.EvidenceTemplatesFileName,
+		func(p string) int {
+			items, err := core.LoadEvidenceTemplates(p)
+			if err != nil {
+				return 0
+			}
+			return len(items)
+		},
+	)
+
+	reportPath := a.getReportTemplatesFilePath()
+	reportInfo := core.StatJSONTemplateFile(
+		"report_templates",
+		"Report Narrative Templates",
+		"Customer deliverable scaffolds (author, classification, executive intro, methodology, attack path, conclusion) applied to .docx / .html / .md exports.",
+		"Evidence Vault → Assessment Report",
+		reportPath,
+		core.ReportTemplatesFileName,
+		func(p string) int {
+			items, err := core.LoadReportTemplates(p)
+			if err != nil {
+				return 0
+			}
+			return len(items)
+		},
+	)
+
+	stagingPath := a.GetDefaultStagingDirectory()
+	stagingInfo := core.ExternalManagedFileInfo{
+		ID:           "staging_dir",
+		Name:         "File Staging & Delivery Directory",
+		Kind:         "directory",
+		Description:  "Local root directory served by the HTTP Staging Engine and file transfer helpers.",
+		FeatureLabel: "File Transfer Helper",
+		FilePath:     stagingPath,
+		DefaultName:  "staging",
+	}
+	if fi, err := os.Stat(stagingPath); err == nil && fi.IsDir() {
+		stagingInfo.Exists = true
+		stagingInfo.LastModified = fi.ModTime().UTC().Format(time.RFC3339)
+		if entries, rErr := os.ReadDir(stagingPath); rErr == nil {
+			stagingInfo.ItemCount = len(entries)
+		}
+	}
+
+	return []core.ExternalManagedFileInfo{
+		vaultInfo,
+		payloadInfo,
+		chainsInfo,
+		snippetsInfo,
+		findingInfo,
+		evidenceInfo,
+		reportInfo,
+		stagingInfo,
+	}, nil
+}
+
+// SetManagedFilePath updates the path of a managed template file or staging directory and ensures it is initialized.
+func (a *App) SetManagedFilePath(fileID string, customPath string) (*core.ExternalManagedFileInfo, error) {
+	trimmed := strings.TrimSpace(customPath)
+	if trimmed == "" {
+		return nil, errors.New("path must not be empty")
+	}
+
+	switch fileID {
+	case "payload_templates":
+		if _, err := a.SetPayloadTemplatesPath(trimmed); err != nil {
+			return nil, err
+		}
+	case "snippet_chains":
+		if _, err := a.SetSnippetChainsPath(trimmed); err != nil {
+			return nil, err
+		}
+	case "command_snippets":
+		if _, err := a.SetSnippetsPath(trimmed); err != nil {
+			return nil, err
+		}
+	case "finding_templates":
+		resolved := core.ResolveFindingTemplatesFilePath(trimmed)
+		a.mu.Lock()
+		a.findingTemplatesFilePath = resolved
+		a.mu.Unlock()
+		if _, err := core.LoadFindingTemplates(resolved); err != nil {
+			return nil, err
+		}
+	case "evidence_templates":
+		resolved := core.ResolveEvidenceTemplatesFilePath(trimmed)
+		a.mu.Lock()
+		a.evidenceTemplatesFilePath = resolved
+		a.mu.Unlock()
+		if _, err := core.LoadEvidenceTemplates(resolved); err != nil {
+			return nil, err
+		}
+	case "report_templates":
+		resolved := core.ResolveReportTemplatesFilePath(trimmed)
+		a.mu.Lock()
+		a.reportTemplatesFilePath = resolved
+		a.mu.Unlock()
+		if _, err := core.LoadReportTemplates(resolved); err != nil {
+			return nil, err
+		}
+	case "staging_dir":
+		clean := filepath.Clean(trimmed)
+		if fi, err := os.Stat(clean); err != nil || !fi.IsDir() {
+			return nil, fmt.Errorf("staging directory %q does not exist or is not a folder", clean)
+		}
+		a.mu.Lock()
+		a.stagingDirPath = clean
+		a.mu.Unlock()
+	default:
+		return nil, fmt.Errorf("managed file %q does not support path override here", fileID)
+	}
+
+	list, err := a.ListManagedFiles()
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range list {
+		if item.ID == fileID {
+			copyItem := item
+			return &copyItem, nil
+		}
+	}
+	return nil, fmt.Errorf("managed file %q not found after update", fileID)
+}
+
+// ResetManagedFileDefaults restores a JSON template store to its seeded starter presets.
+func (a *App) ResetManagedFileDefaults(fileID string) (*core.ExternalManagedFileInfo, error) {
+	switch fileID {
+	case "payload_templates":
+		if err := core.SavePayloadTemplates(a.getPayloadFilePath(), []core.PayloadTemplate{}); err != nil {
+			return nil, err
+		}
+	case "snippet_chains":
+		if err := core.SaveSnippetChainsToFile(a.getChainsFilePath(), core.GetBuiltinSnippetChains()); err != nil {
+			return nil, err
+		}
+	case "command_snippets":
+		if err := core.SaveSnippetsToFile(a.getSnippetsFilePath(), core.GetDefaultCommandSnippets()); err != nil {
+			return nil, err
+		}
+	case "finding_templates":
+		if err := core.SaveFindingTemplates(a.getFindingTemplatesFilePath(), core.DefaultFindingTemplates()); err != nil {
+			return nil, err
+		}
+	case "evidence_templates":
+		if err := core.SaveEvidenceTemplates(a.getEvidenceTemplatesFilePath(), core.DefaultEvidenceTemplates()); err != nil {
+			return nil, err
+		}
+	case "report_templates":
+		if err := core.SaveReportTemplates(a.getReportTemplatesFilePath(), core.DefaultReportTemplates()); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("cannot reset defaults for managed item %q", fileID)
+	}
+
+	list, err := a.ListManagedFiles()
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range list {
+		if item.ID == fileID {
+			copyItem := item
+			return &copyItem, nil
+		}
+	}
+	return nil, fmt.Errorf("managed file %q not found after reset", fileID)
+}
+
+// RevealPathInExplorer opens the OS file manager highlighting or opening the target path safely without a shell.
+func (a *App) RevealPathInExplorer(targetPath string) error {
+	clean := filepath.Clean(strings.TrimSpace(targetPath))
+	if clean == "" || clean == "." {
+		return errors.New("target path is empty")
+	}
+	if goruntime.GOOS == "windows" {
+		if fi, err := os.Stat(clean); err == nil && !fi.IsDir() {
+			return exec.Command("explorer.exe", "/select,"+clean).Start()
+		}
+		dir := clean
+		if _, err := os.Stat(clean); err != nil {
+			dir = filepath.Dir(clean)
+		}
+		return exec.Command("explorer.exe", dir).Start()
+	}
+	openDir := clean
+	if fi, err := os.Stat(clean); err != nil || !fi.IsDir() {
+		openDir = filepath.Dir(clean)
+	}
+	return exec.Command("xdg-open", openDir).Start()
 }
 
 // ExportEngagementPackage serializes an engagement and all its enclosed artifacts into an exportable .daeng package (F-36).
@@ -5294,6 +5835,12 @@ func (a *App) ImportEngagementFile(filePath string, password string) (*core.Enga
 
 // GetDefaultStagingDirectory returns a practical default directory for staging files (F-31).
 func (a *App) GetDefaultStagingDirectory() string {
+	a.mu.Lock()
+	custom := a.stagingDirPath
+	a.mu.Unlock()
+	if custom != "" {
+		return custom
+	}
 	if wd, err := os.Getwd(); err == nil && wd != "" {
 		return wd
 	}
@@ -6019,6 +6566,22 @@ func (a *App) DownloadWinrmFile(sessionID string, remotePath string, localPath s
 	return sess.Download(ctx, remotePath, localPath)
 }
 
+func (a *App) resolveReportTemplateForRequest(req core.ReportExportRequest) core.ReportExportRequest {
+	if req.ReportTemplate != nil || strings.TrimSpace(req.TemplateID) == "" {
+		return req
+	}
+	if list, err := core.LoadReportTemplates(a.getReportTemplatesFilePath()); err == nil {
+		for _, tpl := range list {
+			if tpl.ID == req.TemplateID {
+				copyTpl := tpl
+				req.ReportTemplate = &copyTpl
+				break
+			}
+		}
+	}
+	return req
+}
+
 // GenerateEvidenceReport compiles an engagement/per-host Assessment & Evidence report (Markdown or HTML) with SHA-256 integrity digests (F-30).
 // When req.SplitByHost is true and req.OutputDir is provided, each host report + manifest.sha256 is written directly into OutputDir.
 func (a *App) GenerateEvidenceReport(req core.ReportExportRequest) (*core.ReportExportResult, error) {
@@ -6027,7 +6590,7 @@ func (a *App) GenerateEvidenceReport(req core.ReportExportRequest) (*core.Report
 	if err != nil {
 		return nil, err
 	}
-	return report.CompileAndExport(req, payload)
+	return report.CompileAndExport(a.resolveReportTemplateForRequest(req), payload)
 }
 
 // ExportEvidenceReportToFile compiles the F-30 report and writes it deterministically to filePath with SHA-256 verification.
@@ -6037,7 +6600,7 @@ func (a *App) ExportEvidenceReportToFile(req core.ReportExportRequest, filePath 
 	if err != nil {
 		return nil, err
 	}
-	return report.ExportToFile(req, payload, filePath)
+	return report.ExportToFile(a.resolveReportTemplateForRequest(req), payload, filePath)
 }
 
 // SaveReportFileDialog opens a native Wails Save File dialog configured for Markdown or HTML reports (F-30).

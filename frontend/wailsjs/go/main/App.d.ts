@@ -49,6 +49,8 @@ export function DeleteEvidence(arg1:string):Promise<void>;
 
 export function DeleteFinding(arg1:string):Promise<void>;
 
+export function DeleteFindingTemplateFromFile(arg1:string):Promise<void>;
+
 export function DeleteForwardRule(arg1:string):Promise<void>;
 
 export function DeleteGroup(arg1:string):Promise<void>;
@@ -67,6 +69,8 @@ export function DeleteProxyProfile(arg1:string):Promise<void>;
 
 export function DeleteRemoteItem(arg1:string,arg2:string):Promise<void>;
 
+export function DeleteReportTemplateFromFile(arg1:string):Promise<void>;
+
 export function DeleteSSHKey(arg1:string):Promise<void>;
 
 export function DeleteSessionLog(arg1:string):Promise<void>;
@@ -76,6 +80,8 @@ export function DeleteSnippet(arg1:string):Promise<void>;
 export function DeleteSnippetChain(arg1:string):Promise<void>;
 
 export function DeleteSnippetChainFromFile(arg1:string):Promise<void>;
+
+export function DeleteSnippetFromFile(arg1:string):Promise<void>;
 
 export function DeleteTotpRecord(arg1:string):Promise<void>;
 
@@ -177,6 +183,8 @@ export function GetSnippetChainsConfig():Promise<core.SnippetChainsFileConfig>;
 
 export function GetSnippetContext(arg1:string):Promise<core.SnippetContext>;
 
+export function GetSnippetsConfig():Promise<core.SnippetsFileConfig>;
+
 export function GetTotpCode(arg1:string):Promise<core.TotpCodeResponse>;
 
 export function GetVaultSummary():Promise<core.VaultSummary>;
@@ -235,6 +243,8 @@ export function ListListenerProfiles():Promise<Array<core.ListenerProfile>>;
 
 export function ListLocalDir(arg1:string):Promise<Array<core.FileItem>>;
 
+export function ListManagedFiles():Promise<Array<core.ExternalManagedFileInfo>>;
+
 export function ListNetworkRoutes():Promise<Array<core.NetworkRoute>>;
 
 export function ListNotes(arg1:string):Promise<Array<core.NotePage>>;
@@ -247,6 +257,8 @@ export function ListRawTcpListeners():Promise<Array<core.RawTcpListenerInfo>>;
 
 export function ListRemoteDir(arg1:string,arg2:string):Promise<Array<core.FileItem>>;
 
+export function ListReportTemplates():Promise<Array<core.ReportTemplate>>;
+
 export function ListSerialPorts():Promise<Array<core.SerialPortInfo>>;
 
 export function ListSessionLogs():Promise<Array<core.SessionLogRecord>>;
@@ -256,6 +268,8 @@ export function ListSnippetChains(arg1:string):Promise<Array<core.SnippetChain>>
 export function ListSnippetChainsFromFile():Promise<Array<core.SnippetChain>>;
 
 export function ListSnippets():Promise<Array<core.Snippet>>;
+
+export function ListSnippetsFromFile():Promise<Array<core.Snippet>>;
 
 export function ListTotpRecords():Promise<Array<core.TotpSummary>>;
 
@@ -287,6 +301,8 @@ export function RelocateVaultFile(arg1:string,arg2:boolean):Promise<void>;
 
 export function RenderPayload(arg1:core.PayloadRenderOptions):Promise<core.PayloadRenderResult>;
 
+export function ResetManagedFileDefaults(arg1:string):Promise<core.ExternalManagedFileInfo>;
+
 export function ResetVault():Promise<void>;
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
@@ -299,6 +315,8 @@ export function ResolveSnippetTemplate(arg1:string,arg2:string,arg3:Record<strin
 
 export function ResolveVaultConflicts(arg1:Record<string, string>,arg2:boolean):Promise<void>;
 
+export function RevealPathInExplorer(arg1:string):Promise<void>;
+
 export function RunRouteHealthCheck(arg1:core.RouteCheckRequest):Promise<core.RouteHealthReport>;
 
 export function SaveCredential(arg1:core.CredentialEntry):Promise<void>;
@@ -308,6 +326,8 @@ export function SaveEngagement(arg1:core.Engagement):Promise<void>;
 export function SaveEvidence(arg1:core.EvidenceItem):Promise<void>;
 
 export function SaveFinding(arg1:core.FindingItem):Promise<void>;
+
+export function SaveFindingTemplateToFile(arg1:core.FindingItem):Promise<void>;
 
 export function SaveForwardRule(arg1:core.ForwardRule):Promise<void>;
 
@@ -335,11 +355,15 @@ export function SaveRemoteEditContent(arg1:string,arg2:string,arg3:boolean):Prom
 
 export function SaveReportFileDialog(arg1:string,arg2:string):Promise<string>;
 
+export function SaveReportTemplateToFile(arg1:core.ReportTemplate):Promise<void>;
+
 export function SaveSnippet(arg1:core.Snippet):Promise<void>;
 
 export function SaveSnippetChain(arg1:core.SnippetChain):Promise<void>;
 
 export function SaveSnippetChainToFile(arg1:core.SnippetChain):Promise<void>;
+
+export function SaveSnippetToFile(arg1:core.Snippet):Promise<void>;
 
 export function SaveTotpRecord(arg1:core.TotpRecord):Promise<void>;
 
@@ -367,6 +391,8 @@ export function SendSerialBreak(arg1:string):Promise<void>;
 
 export function SetActiveEngagement(arg1:string):Promise<void>;
 
+export function SetManagedFilePath(arg1:string,arg2:string):Promise<core.ExternalManagedFileInfo>;
+
 export function SetPayloadTemplatesPath(arg1:string):Promise<core.PayloadFileConfig>;
 
 export function SetRawTcpSessionLineMode(arg1:string,arg2:boolean,arg3:string):Promise<void>;
@@ -376,6 +402,8 @@ export function SetSerialDTR(arg1:string,arg2:boolean):Promise<void>;
 export function SetSerialRTS(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetSnippetChainsPath(arg1:string):Promise<core.SnippetChainsFileConfig>;
+
+export function SetSnippetsPath(arg1:string):Promise<core.SnippetsFileConfig>;
 
 export function SetWorkspaceStore(arg1:data.WorkspaceStore):Promise<void>;
 

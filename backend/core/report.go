@@ -17,15 +17,17 @@ const (
 
 // ReportExportRequest configures a reproducible Markdown, HTML, or Word (.docx) Evidence-Vault export (Pentest F-30).
 type ReportExportRequest struct {
-	EngagementID            string `json:"engagementId,omitempty"`
-	HostID                  string `json:"hostId,omitempty"` // "" exports all hosts grouped per-host
-	Format                  string `json:"format"`           // "markdown" | "html" | "docx"
-	SplitByHost             bool   `json:"splitByHost,omitempty"`
-	IncludeInternalEvidence bool   `json:"includeInternalEvidence,omitempty"`
-	IncludePortFindings     bool   `json:"includePortFindings"`
-	IncludeUnlinkedEvidence bool   `json:"includeUnlinkedEvidence"`
-	IncludeLinkedNotes      bool   `json:"includeLinkedNotes"`
-	OutputDir               string `json:"outputDir,omitempty"`
+	EngagementID            string          `json:"engagementId,omitempty"`
+	HostID                  string          `json:"hostId,omitempty"` // "" exports all hosts grouped per-host
+	Format                  string          `json:"format"`           // "markdown" | "html" | "docx"
+	TemplateID              string          `json:"templateId,omitempty"`
+	ReportTemplate          *ReportTemplate `json:"reportTemplate,omitempty"`
+	SplitByHost             bool            `json:"splitByHost,omitempty"`
+	IncludeInternalEvidence bool            `json:"includeInternalEvidence,omitempty"`
+	IncludePortFindings     bool            `json:"includePortFindings"`
+	IncludeUnlinkedEvidence bool            `json:"includeUnlinkedEvidence"`
+	IncludeLinkedNotes      bool            `json:"includeLinkedNotes"`
+	OutputDir               string          `json:"outputDir,omitempty"`
 }
 
 // NormalizeReportFormat canonicalizes requested output format strings.
@@ -151,6 +153,7 @@ type CompiledReport struct {
 	Format                 string               `json:"format"`
 	DeterministicTimestamp string               `json:"deterministicTimestamp"`
 	IncludeInternal        bool                 `json:"includeInternal"`
+	Template               *ReportTemplate      `json:"template,omitempty"`
 	TotalSeverityCounts    ReportSeverityCounts `json:"totalSeverityCounts"`
 	TotalFindings          int                  `json:"totalFindings"`
 	TotalEvidence          int                  `json:"totalEvidence"`
@@ -570,6 +573,7 @@ func BuildCompiledReport(req ReportExportRequest, payload VaultPayload) (*Compil
 		Format:                 req.Format,
 		DeterministicTimestamp: detTS,
 		IncludeInternal:        req.IncludeInternalEvidence,
+		Template:               req.ReportTemplate,
 		TotalSeverityCounts:    totalCounts,
 		TotalFindings:          totalFindings,
 		TotalEvidence:          totalEvidence,
