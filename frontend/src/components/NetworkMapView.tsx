@@ -54,22 +54,22 @@ export function formatBytes(bytes?: number): string {
 
 export function formatTunnelRoute(tun: ForwardTunnelStatus, hostLabel: string): string {
   if (tun.type === 'L') {
-    return `Client:${tun.bindPort} ──▶ ${hostLabel}:${tun.targetPort || 'dyn'} (-L Local)`;
+    return `Client:${tun.bindPort} -> ${hostLabel}:${tun.targetPort || 'dyn'} (-L Local)`;
   }
   if (tun.type === 'R') {
-    return `${hostLabel}:${tun.bindPort} ──▶ Client:${tun.targetPort || 'dyn'} (-R Remote)`;
+    return `${hostLabel}:${tun.bindPort} -> Client:${tun.targetPort || 'dyn'} (-R Remote)`;
   }
-  return `Client:${tun.bindPort} ──▶ ${hostLabel} (-D SOCKS5)`;
+  return `Client:${tun.bindPort} -> ${hostLabel} (-D SOCKS5)`;
 }
 
 export function formatRuleRoute(rule: ForwardRule, hostLabel: string): string {
   if (rule.type === 'L') {
-    return `Client:${rule.bindPort} ⇢ ${hostLabel}:${rule.targetPort || 'dyn'} (-L)`;
+    return `Client:${rule.bindPort} -> ${hostLabel}:${rule.targetPort || 'dyn'} (-L)`;
   }
   if (rule.type === 'R') {
-    return `${hostLabel}:${rule.bindPort} ⇢ Client:${rule.targetPort || 'dyn'} (-R)`;
+    return `${hostLabel}:${rule.bindPort} -> Client:${rule.targetPort || 'dyn'} (-R)`;
   }
-  return `Client:${rule.bindPort} ⇢ ${hostLabel} (-D SOCKS5)`;
+  return `Client:${rule.bindPort} -> ${hostLabel} (-D SOCKS5)`;
 }
 
 // ---------------------------------------------------------
@@ -100,7 +100,7 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
         <div className="topo-node-title-group">
           <span
             className="topo-color-strip"
-            style={{ backgroundColor: data.color || data.groupColor || '#2dd4bf' }}
+            style={{ backgroundColor: data.color || data.groupColor || 'var(--accent-bright)' }}
           />
           <strong className="topo-node-label" title={data.label}>
             {data.label}
@@ -135,7 +135,7 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
               className="topo-group-pill"
               style={{
                 borderColor: data.groupColor || 'rgba(45, 212, 191, 0.4)',
-                color: data.groupColor || '#2dd4bf',
+                color: data.groupColor || 'var(--accent-bright)',
               }}
             >
               {data.groupName}
@@ -143,12 +143,12 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
           )}
           {data.jumpHops && data.jumpHops.length > 0 && (
             <span className="topo-jump-pill" title={`Via ${data.jumpHops.length} Jump Hop(s)`}>
-              ⛓ {data.jumpHops.length} Hops
+              <CyberIcon name="chain" size={14} /> {data.jumpHops.length} Hops
             </span>
           )}
           {data.activeTunnelsCount && data.activeTunnelsCount > 0 ? (
             <span className="topo-tunnel-pill" title={`${data.activeTunnelsCount} Active Tunnel(s)`}>
-              ⇄ {data.activeTunnelsCount} Tunnels
+              <CyberIcon name="arrow-left-right" size={14} /> {data.activeTunnelsCount} Tunnels
             </span>
           ) : null}
         </div>
@@ -175,7 +175,7 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
                 <span className="chip-mode">-{tun.type}</span>
                 <div className="chip-endpoints">
                   <span className="ep-local">Client:{tun.bindPort}</span>
-                  <span className="ep-arrow">▶</span>
+                  <span className="ep-arrow"><CyberIcon name="arrow-right" size={14} /></span>
                   <span className="ep-remote">{data.label}:{tun.targetPort || 'dyn'}</span>
                 </div>
               </div>
@@ -194,7 +194,7 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
                 <span className="chip-mode standby">-{rule.type}</span>
                 <div className="chip-endpoints">
                   <span className="ep-local">{rule.type === 'R' ? data.label : 'Client'}:{rule.bindPort}</span>
-                  <span className="ep-arrow">⇢</span>
+                  <span className="ep-arrow"><CyberIcon name="arrow-right" size={14} /></span>
                   <span className="ep-remote">{rule.type === 'R' ? 'Client' : data.label}:{rule.targetPort || 'dyn'}</span>
                 </div>
                 {hostId && data.onStartTunnel && (
@@ -207,7 +207,7 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
                       data.onStartTunnel?.(hostId, rule.id);
                     }}
                   >
-                    ▶ START
+                    <CyberIcon name="play" size={14} /> START
                   </button>
                 )}
               </div>
@@ -554,7 +554,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             data: {
               id: `proxy-node-${hop}`,
               hostId: `proxy-node-${hop}`,
-              label: hop.startsWith('SOCKS5:') ? hop : `⛓ Bastion: ${hop}`,
+              label: hop.startsWith('SOCKS5:') ? hop : `Bastion: ${hop}`,
               nodeType: 'host',
               address: hop,
               port: 22,
@@ -755,12 +755,12 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             target: h.id,
             animated: isSessionActive,
             style: {
-              stroke: isSessionActive ? '#2dd4bf' : 'rgba(45, 212, 191, 0.45)',
+              stroke: isSessionActive ? 'var(--accent-bright)' : 'rgba(45, 212, 191, 0.45)',
               strokeWidth: isSessionActive ? 2.5 : 1.5,
             },
             markerEnd: {
               type: MarkerType.ArrowClosed,
-              color: isSessionActive ? '#2dd4bf' : 'rgba(45, 212, 191, 0.45)',
+              color: isSessionActive ? 'var(--accent-bright)' : 'rgba(45, 212, 191, 0.45)',
             },
           });
         }
@@ -809,7 +809,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
           animated: false,
           label: `${formatRuleRoute(rule, h.label)} [STANDBY]`,
           labelStyle: {
-            fill: '#5eead4',
+            fill: 'var(--accent-text)',
             fontWeight: 600,
             fontFamily: "'JetBrains Mono', Consolas, monospace",
             fontSize: '10px',
@@ -942,21 +942,21 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
               className={`topo-mode-btn ${filterMode === 'active' ? 'active' : ''}`}
               onClick={() => setFilterMode('active')}
             >
-              🟢 Active ({stats.activeSessions})
+ Active ({stats.activeSessions})
             </button>
             <button
               type="button"
               className={`topo-mode-btn ${filterMode === 'tunnels' ? 'active' : ''}`}
               onClick={() => setFilterMode('tunnels')}
             >
-              ⇄ Tunnels ({stats.activeTunnels})
+              <CyberIcon name="arrow-left-right" size={14} /> Tunnels ({stats.activeTunnels})
             </button>
             <button
               type="button"
               className={`topo-mode-btn ${filterMode === 'jumps' ? 'active' : ''}`}
               onClick={() => setFilterMode('jumps')}
             >
-              ⛓ Jumps ({stats.jumpChains})
+              <CyberIcon name="chain" size={14} /> Jumps ({stats.jumpChains})
             </button>
           </div>
 
@@ -1023,7 +1023,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
           <MiniMap
             className="network-map-minimap"
             nodeColor={(n) => {
-              if (n.type === 'clientNode') return '#14b8a6';
+              if (n.type === 'clientNode') return 'var(--accent-primary)';
               const d = n.data as TopologyNodeData;
               if (d.status === 'active') return '#10b981';
               if (d.status === 'tunnel') return '#ec4899';
@@ -1067,7 +1067,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
               {selectedHostGroup && (
                 <div className="inspector-field">
                   <span className="inspector-label">Host Group</span>
-                  <strong className="inspector-val" style={{ color: selectedHostGroup.color || '#2dd4bf' }}>
+                  <strong className="inspector-val" style={{ color: selectedHostGroup.color || 'var(--accent-bright)' }}>
                     {selectedHostGroup.name}
                   </strong>
                 </div>
@@ -1132,7 +1132,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                           <span className="tunnel-card-badge active">
                             -{t.type} {t.type === 'L' ? 'LOCAL FORWARD' : t.type === 'R' ? 'REMOTE FORWARD' : 'DYNAMIC SOCKS5'}
                           </span>
-                          <span className="tunnel-live-indicator">● LIVE</span>
+                          <span className="tunnel-live-indicator"><CyberIcon name="record" size={12} /> LIVE</span>
                         </div>
 
                         {/* Explicit Routing Diagram */}
@@ -1146,7 +1146,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                           </div>
 
                           <div className="diagram-flow">
-                            <span className="flow-arrow">──────▶</span>
+                            <span className="flow-arrow"><CyberIcon name="arrow-right" size={16} /></span>
                             <span className="flow-mode">SSH TUNNEL</span>
                           </div>
 
@@ -1174,7 +1174,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                               className="hud-btn-danger"
                               onClick={() => onStopTunnel(t.id)}
                             >
-                              ■ STOP TUNNEL
+                              <CyberIcon name="stop" size={14} /> STOP TUNNEL
                             </button>
                           </div>
                         )}
@@ -1198,7 +1198,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                             <span className="tunnel-card-badge standby">
                               -{r.type} {r.label || (r.type === 'L' ? 'Local Forward' : r.type === 'R' ? 'Remote Forward' : 'Dynamic SOCKS5')}
                             </span>
-                            <span className="tunnel-standby-indicator">○ STANDBY</span>
+                            <span className="tunnel-standby-indicator">STANDBY</span>
                           </div>
 
                           {/* Explicit Routing Diagram */}
@@ -1212,7 +1212,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                             </div>
 
                             <div className="diagram-flow">
-                              <span className="flow-arrow">⇢ ⇢ ⇢</span>
+                              <span className="flow-arrow"><CyberIcon name="arrow-right" size={16} /></span>
                               <span className="flow-mode">STANDBY</span>
                             </div>
 
@@ -1233,7 +1233,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                               title="Start tunnel (connects automatically if offline)"
                               onClick={() => onStartTunnel?.(selectedHost.id, r.id)}
                             >
-                              ▶ START TUNNEL
+                              <CyberIcon name="play" size={14} /> START TUNNEL
                             </button>
                             <span className="action-hint">Auto-connects to {selectedHost.label} if offline</span>
                           </div>
@@ -1270,7 +1270,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
                           className="inspector-note-link"
                           onClick={() => onOpenNotes?.(selectedHost.id)}
                         >
-                          📄 {n.title}
+                          <CyberIcon name="file" size={14} /> {n.title}
                         </button>
                       </li>
                     ))}

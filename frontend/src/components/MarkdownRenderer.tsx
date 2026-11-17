@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CyberIcon } from './CyberIcon';
 
 interface MarkdownRendererProps {
   content: string;
@@ -105,7 +106,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   onClick={() => handleCopyCode(fullCode, codeIdx)}
                   title="Copy code block"
                 >
-                  {copiedIndex === codeIdx ? '✓ Copied' : '📋 Copy'}
+                  {copiedIndex === codeIdx ? <><CyberIcon name="check" size={14} /> Copied</> : <><CyberIcon name="clipboard" size={14} /> Copy</>}
                 </button>
               </div>
               <pre className="code-content">

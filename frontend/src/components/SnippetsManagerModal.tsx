@@ -309,11 +309,11 @@ export function SnippetsManagerModal({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                     <CyberIcon name="bolt" size={16} />
                     <span>Command Snippets</span>
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     {"DYNAMIC-SNIPPETS // INJECT {{HOST}} {{USER}} {{PORT}}"}
                   </div>
                 </div>
@@ -350,7 +350,7 @@ export function SnippetsManagerModal({
             style={{
               padding: '0.5rem 1.25rem',
               backgroundColor: 'rgba(5, 12, 22, 0.95)',
-              borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+              borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -360,7 +360,7 @@ export function SnippetsManagerModal({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', overflow: 'hidden' }}>
-              <span style={{ color: '#00f0ff', fontWeight: 600 }}>SNIPPETS STORE:</span>
+              <span style={{ color: 'var(--accent-bright)', fontWeight: 600 }}>SNIPPETS STORE:</span>
               <span
                 style={{
                   color: '#cbd5e1',
@@ -428,7 +428,7 @@ export function SnippetsManagerModal({
         )}
 
         {showPathInput && setFilePath && (
-          <div style={{ padding: '0.55rem 1.25rem', backgroundColor: 'rgba(2, 8, 16, 0.95)', borderBottom: '1px solid rgba(0, 240, 255, 0.2)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ padding: '0.55rem 1.25rem', backgroundColor: 'rgba(2, 8, 16, 0.95)', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <input
               type="text"
               className="cyber-hud-input"
@@ -472,7 +472,7 @@ export function SnippetsManagerModal({
                   style={{
                     position: 'absolute',
                     left: '0.75rem',
-                    color: '#00f0ff',
+                    color: 'var(--accent-bright)',
                     opacity: 0.75,
                     pointerEvents: 'none',
                     display: 'inline-flex',
@@ -493,7 +493,7 @@ export function SnippetsManagerModal({
                     height: '36px',
                     fontSize: '0.82rem',
                     backgroundColor: 'rgba(4, 10, 20, 0.92)',
-                    border: '1px solid rgba(0, 240, 255, 0.35)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                     color: '#e2e8f0',
                   }}
                 />
@@ -630,10 +630,10 @@ export function SnippetsManagerModal({
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 paddingBottom: '0.65rem',
-                borderBottom: '1px solid rgba(0, 240, 255, 0.22)',
+                borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent)',
               }}
             >
-              <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#00f0ff', letterSpacing: '0.04em' }}>
+              <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--accent-bright)', letterSpacing: '0.04em' }}>
                 {editingSnippet.id ? `Edit Snippet: ${editingSnippet.name}` : 'New Command Snippet'}
               </h3>
               <button
@@ -695,7 +695,7 @@ export function SnippetsManagerModal({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <label htmlFor="snip-body" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              <label htmlFor="snip-body" style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                 Command Body *
               </label>
               <textarea
@@ -714,7 +714,7 @@ export function SnippetsManagerModal({
                   resize: 'vertical',
                   padding: '0.65rem 0.85rem',
                   backgroundColor: 'rgba(3, 8, 18, 0.95)',
-                  border: '1px solid rgba(0, 240, 255, 0.38)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 38%, transparent)',
                   color: '#a7f3d0',
                   borderRadius: '4px',
                 }}
@@ -728,7 +728,7 @@ export function SnippetsManagerModal({
               style={{
                 padding: '0.65rem 0.85rem',
                 backgroundColor: 'rgba(6, 14, 26, 0.88)',
-                border: '1px solid rgba(0, 240, 255, 0.2)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                 borderRadius: '4px',
                 display: 'flex',
                 alignItems: 'center',
@@ -774,9 +774,9 @@ export function SnippetsManagerModal({
                     key={v}
                     style={{
                       padding: '0.15rem 0.45rem',
-                      background: 'rgba(0, 240, 255, 0.1)',
-                      border: '1px solid rgba(0, 240, 255, 0.3)',
-                      color: '#00f0ff',
+                      background: 'color-mix(in srgb, var(--accent-bright) 10%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
+                      color: 'var(--accent-bright)',
                       borderRadius: '3px',
                       fontFamily: 'JetBrains Mono, Consolas, monospace',
                       fontSize: '0.74rem',
@@ -800,7 +800,7 @@ export function SnippetsManagerModal({
               </label>
             </div>
 
-            <div className="modal-actions" style={{ marginTop: '0.4rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)' }}>
+            <div className="modal-actions" style={{ marginTop: '0.4rem', paddingTop: '0.75rem', borderTop: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
               <button
                 type="button"
                 className="cyber-hud-btn btn-cancel"

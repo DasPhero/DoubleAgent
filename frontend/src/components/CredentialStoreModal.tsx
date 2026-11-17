@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { CyberIcon } from './CyberIcon';
 import {
   Engagement,
   CredentialEntry,
@@ -500,10 +501,10 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 id="credstore-dialog-title" style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                ⚔️ CREDENTIAL STORE &amp; SPRAY LISTS
+              <h3 id="credstore-dialog-title" style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                 CREDENTIAL STORE &amp; SPRAY LISTS
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 PENTEST MODULE // ENGAGEMENT POOL &amp; LOCKOUT GUARD
               </div>
             </div>
@@ -514,7 +515,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
 
@@ -522,7 +523,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
         <div
           style={{
             background: 'rgba(5, 12, 24, 0.95)',
-            borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+            borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
             padding: '0.65rem 1.25rem',
             display: 'flex',
             alignItems: 'center',
@@ -532,19 +533,19 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{ fontSize: '0.76rem', color: '#00f0ff', fontWeight: 700, letterSpacing: '0.04em' }}>
-              🎯 TARGET ENGAGEMENT:
+            <span style={{ fontSize: '0.76rem', color: 'var(--accent-bright)', fontWeight: 700, letterSpacing: '0.04em' }}>
+              <CyberIcon name="target" size={14} /> TARGET ENGAGEMENT:
             </span>
             <select
               className="cyber-hud-select"
               value={selectedEngagementId}
               onChange={(e) => void handleEngagementChange(e.target.value)}
-              style={{ fontSize: '0.78rem', height: '32px', minWidth: '320px', borderColor: 'rgba(0, 240, 255, 0.45)', padding: '2px 8px' }}
+              style={{ fontSize: '0.78rem', height: '32px', minWidth: '320px', borderColor: 'color-mix(in srgb, var(--accent-bright) 45%, transparent)', padding: '2px 8px' }}
             >
-              <option value="">🌐 No Engagement (Casual / Global Pool)</option>
+              <option value=""><CyberIcon name="globe" size={14} /> No Engagement (Casual / Global Pool)</option>
               {engagements.map((eng) => (
                 <option key={eng.id} value={eng.id}>
-                  🎯 {eng.name}
+                  <CyberIcon name="target" size={14} /> {eng.name}
                 </option>
               ))}
             </select>
@@ -563,7 +564,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
             padding: '0.75rem 1.25rem 0 1.25rem',
             display: 'flex',
             gap: '0.5rem',
-            borderBottom: '1px solid rgba(0, 240, 255, 0.15)',
+            borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent)',
             background: 'rgba(5, 10, 18, 0.5)',
           }}
         >
@@ -572,14 +573,14 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
             className={`settings-tab-btn ${activeTab === 'creds' ? 'active' : ''}`}
             onClick={() => setActiveTab('creds')}
           >
-            <span>🔑 1. Credential Pool ({filteredCreds.length})</span>
+            <span><CyberIcon name="key" size={14} /> 1. Credential Pool ({filteredCreds.length})</span>
           </button>
           <button
             type="button"
             className={`settings-tab-btn ${activeTab === 'spray' ? 'active' : ''}`}
             onClick={() => setActiveTab('spray')}
           >
-            <span>⚡ 2. Spray Generator &amp; Wordlists</span>
+            <span><CyberIcon name="bolt" size={14} /> 2. Spray Generator &amp; Wordlists</span>
           </button>
         </div>
 
@@ -611,13 +612,13 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
               }}
               role="alert"
             >
-              <span>{feedbackMsg.type === 'error' ? '⚠️ ' : '✓ '}{feedbackMsg.text}</span>
+              <span>{feedbackMsg.type === 'error' ? <CyberIcon name="warning" size={14} /> : <CyberIcon name="check" size={14} />} {feedbackMsg.text}</span>
               <button
                 type="button"
                 onClick={() => setFeedbackMsg(null)}
                 style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}
               >
-                ✕
+                <CyberIcon name="close" size={14} />
               </button>
             </div>
           )}
@@ -629,7 +630,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
               <div
                 style={{
                   background: 'rgba(5, 12, 24, 0.75)',
-                  border: '1px solid rgba(0, 240, 255, 0.2)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                   padding: '0.65rem 0.85rem',
                   display: 'flex',
                   alignItems: 'center',
@@ -639,7 +640,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ color: '#00f0ff', fontWeight: 700 }}>POOL SCOPE:</span>
+                  <span style={{ color: 'var(--accent-bright)', fontWeight: 700 }}>POOL SCOPE:</span>
                   <span style={{ color: '#f1f5f9', fontWeight: 600 }}>
                     {selectedEngagementId
                       ? `Enclosed to ${engagements.find((e) => e.id === selectedEngagementId)?.name || selectedEngagementId}`
@@ -692,7 +693,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                   onSubmit={handleSaveCredential}
                   style={{
                     background: 'rgba(5, 9, 16, 0.85)',
-                    border: '1px solid rgba(0, 240, 255, 0.35)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                     padding: '1rem',
                     borderRadius: '2px',
                     display: 'flex',
@@ -700,7 +701,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                     gap: '0.75rem',
                   }}
                 >
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.04em' }}>
                     {editingCredId ? '/// EDIT CREDENTIAL' : '/// REGISTER NEW CREDENTIAL'}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: '0.75rem' }}>
@@ -758,8 +759,8 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
 
                   {/* SSH Key File Selector Helper */}
                   {credCategory === 'ssh_key' && (
-                    <div style={{ background: 'rgba(0, 240, 255, 0.05)', padding: '0.5rem', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>📂 Load Key File:</span>
+                    <div style={{ background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)', padding: '0.5rem', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}><CyberIcon name="folder" size={14} /> Load Key File:</span>
                       <input
                         type="file"
                         accept=".pem,.pub,.key,.id_rsa,.id_ed25519,.ppk,text/plain"
@@ -846,23 +847,23 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       Cancel
                     </button>
                     <button type="submit" className="cyber-btn cyber-btn-primary">
-                      ✓ {editingCredId ? 'Update Credential' : 'Save Credential'}
+                      <CyberIcon name="check" size={14} /> {editingCredId ? 'Update Credential' : 'Save Credential'}
                     </button>
                   </div>
                 </form>
               )}
 
               {/* Credential Table with Edit and Delete */}
-              <div style={{ border: '1px solid rgba(0, 240, 255, 0.2)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', borderRadius: '2px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                   <thead>
-                    <tr style={{ background: 'rgba(5, 10, 18, 0.85)', borderBottom: '1px solid rgba(0, 240, 255, 0.2)' }}>
+                    <tr style={{ background: 'rgba(5, 10, 18, 0.85)', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
                       <th style={{ padding: '8px', width: '36px', textAlign: 'center' }}>
                         <input
                           type="checkbox"
                           checked={selectedCredIds.size === filteredCreds.length && filteredCreds.length > 0}
                           onChange={(e) => selectAllCreds(e.target.checked)}
-                          style={{ accentColor: '#00f0ff', cursor: 'pointer' }}
+                          style={{ accentColor: 'var(--accent-bright)', cursor: 'pointer' }}
                         />
                       </th>
                       <th style={{ padding: '8px', textAlign: 'left', color: '#94a3b8' }}>USER &amp; REALM</th>
@@ -887,7 +888,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                             key={c.id}
                             style={{
                               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                              background: selectedCredIds.has(c.id) ? 'rgba(0, 240, 255, 0.07)' : 'transparent',
+                              background: selectedCredIds.has(c.id) ? 'color-mix(in srgb, var(--accent-bright) 7%, transparent)' : 'transparent',
                             }}
                           >
                             <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -895,7 +896,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                                 type="checkbox"
                                 checked={selectedCredIds.has(c.id)}
                                 onChange={() => toggleSelectCred(c.id)}
-                                style={{ accentColor: '#00f0ff', cursor: 'pointer' }}
+                                style={{ accentColor: 'var(--accent-bright)', cursor: 'pointer' }}
                               />
                             </td>
                             <td style={{ padding: '8px' }}>
@@ -908,7 +909,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                             </td>
                             <td style={{ padding: '8px', fontFamily: 'JetBrains Mono, monospace' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ color: isRevealed ? '#00f0ff' : '#94a3b8' }}>
+                                <span style={{ color: isRevealed ? 'var(--accent-bright)' : '#94a3b8' }}>
                                   {isRevealed
                                     ? c.secret.length > 36
                                       ? `${c.secret.slice(0, 36)}...`
@@ -926,7 +927,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#64748b' }}
                                   title={isRevealed ? 'Hide secret' : 'Show secret'}
                                 >
-                                  {isRevealed ? '🙈' : '👁️'}
+                                  {isRevealed ? <CyberIcon name="eye-off" size={14} /> : <CyberIcon name="eye" size={14} />}
                                 </button>
                                 <button
                                   type="button"
@@ -934,16 +935,16 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '11px', color: copiedId === `sec-${c.id}` ? '#10b981' : '#64748b' }}
                                   title="Copy secret"
                                 >
-                                  {copiedId === `sec-${c.id}` ? '✓' : '📋'}
+                                  {copiedId === `sec-${c.id}` ? <CyberIcon name="check" size={14} /> : <CyberIcon name="clipboard" size={14} />}
                                 </button>
                               </div>
                             </td>
                             <td style={{ padding: '8px' }}>
                               <span
                                 style={{
-                                  background: 'rgba(0, 240, 255, 0.1)',
-                                  color: '#00f0ff',
-                                  border: '1px solid rgba(0, 240, 255, 0.3)',
+                                  background: 'color-mix(in srgb, var(--accent-bright) 10%, transparent)',
+                                  color: 'var(--accent-bright)',
+                                  border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
                                   padding: '1px 6px',
                                   borderRadius: '2px',
                                   fontSize: '0.68rem',
@@ -964,7 +965,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                                 onClick={() => handleEditCred(c)}
                                 title="Edit credential"
                               >
-                                ✏️
+                                <CyberIcon name="edit" size={14} />
                               </button>
                               <button
                                 type="button"
@@ -973,7 +974,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                                 onClick={() => handleDeleteCred(c.id, c.label || c.username)}
                                 title="Delete credential"
                               >
-                                ✕
+                                <CyberIcon name="close" size={14} />
                               </button>
                             </td>
                           </tr>
@@ -993,7 +994,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
               <div
                 style={{
                   background: 'rgba(5, 12, 24, 0.85)',
-                  border: '1px solid rgba(0, 240, 255, 0.25)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                   padding: '0.75rem 1rem',
                   borderRadius: '2px',
                   display: 'flex',
@@ -1003,8 +1004,8 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
-                      🛡️ DEFENSIVE LOCKOUT POLICY &amp; SPRAY GUARD
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.04em' }}>
+                      <CyberIcon name="shield" size={14} /> DEFENSIVE LOCKOUT POLICY &amp; SPRAY GUARD
                     </span>
                     {selectedEngagementId ? (
                       <span style={{ fontSize: '0.68rem', color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -1022,7 +1023,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                       onClick={() => void handleSaveLockoutPolicy()}
                     >
-                      💾 Save Policy to Engagement
+                      <CyberIcon name="save" size={14} /> Save Policy to Engagement
                     </button>
                   )}
                 </div>
@@ -1093,7 +1094,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                   role="alert"
                 >
                   <span style={{ fontSize: '1.25rem', lineHeight: '1' }}>
-                    {sprayResult.warning.severity === 'critical' ? '🛑' : '⚠️'}
+                    {sprayResult.warning.severity === 'critical' ? <CyberIcon name="warning" size={14} /> : <CyberIcon name="warning" size={14} />}
                   </span>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '0.84rem' }}>
@@ -1188,7 +1189,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
               <div
                 style={{
                   background: 'rgba(5, 12, 22, 0.75)',
-                  border: '1px solid rgba(0, 240, 255, 0.15)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent)',
                   padding: '0.65rem 0.85rem',
                   borderRadius: '2px',
                   display: 'flex',
@@ -1199,7 +1200,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.72rem', color: '#00f0ff', fontWeight: 700 }}>WORDLIST PRESETS:</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--accent-bright)', fontWeight: 700 }}>WORDLIST PRESETS:</span>
                   <button
                     type="button"
                     className="cyber-btn cyber-btn-secondary cyber-btn-sm"
@@ -1235,7 +1236,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                     className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                     style={{ cursor: 'pointer', margin: 0 }}
                   >
-                    📂 Load Wordlist (.txt)
+                    <CyberIcon name="folder" size={14} /> Load Wordlist (.txt)
                     <input
                       type="file"
                       accept=".txt,.lst,.wordlist"
@@ -1300,7 +1301,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                       onClick={() => handleCopyToClipboard(sprayResult?.content || '', 'spray-all')}
                     >
-                      {copiedId === 'spray-all' ? '✓ Copied' : '📋 Copy All'}
+                      {copiedId === 'spray-all' ? <><CyberIcon name="check" size={14} /> Copied</> : <><CyberIcon name="clipboard" size={14} /> Copy All</>}
                     </button>
                     <button
                       type="button"
@@ -1308,7 +1309,7 @@ export const CredentialStoreModal: React.FC<CredentialStoreModalProps> = ({
                       onClick={handleDownloadSprayList}
                       disabled={!sprayResult?.content}
                     >
-                      💾 Download .txt
+                      <CyberIcon name="save" size={14} /> Download .txt
                     </button>
                   </div>
                 </div>

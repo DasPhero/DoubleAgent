@@ -88,7 +88,7 @@ export const VaultConflictModal: React.FC<VaultConflictModalProps> = ({
             onClick={onClose}
             aria-label="Close Conflict Resolver"
           >
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
 
@@ -182,14 +182,14 @@ export const VaultConflictModal: React.FC<VaultConflictModalProps> = ({
                       className={`conflict-choice-btn ${currentRes === 'local' ? 'active' : ''}`}
                       onClick={() => handleSetResolution(item.id, 'local')}
                     >
-                      ✓ Keep Local
+                      <CyberIcon name="check" size={14} /> Keep Local
                     </button>
                     <button
                       type="button"
                       className={`conflict-choice-btn ${currentRes === 'remote' ? 'active' : ''}`}
                       onClick={() => handleSetResolution(item.id, 'remote')}
                     >
-                      ✓ Accept Synced
+                      <CyberIcon name="check" size={14} /> Accept Synced
                     </button>
                     <button
                       type="button"
@@ -234,7 +234,7 @@ export const VaultConflictModal: React.FC<VaultConflictModalProps> = ({
               onClick={() => void handleApply()}
               disabled={isApplying}
             >
-              {isApplying ? 'Applying Merge...' : '⚡ Apply Resolutions & Save Vault'}
+              {isApplying ? 'Applying Merge...' : <><CyberIcon name="bolt" size={14} /> Apply Resolutions & Save Vault</>}
             </button>
           </div>
         </div>

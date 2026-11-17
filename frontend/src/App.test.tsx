@@ -100,7 +100,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
 
     // Open Global Settings -> Config Migration and click Import ssh_config (F-22)
-    fireEvent.click(screen.getByRole('button', { name: /Settings ⚙/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Settings/i }));
     fireEvent.click(screen.getByRole('tab', { name: /Config Migration/i }));
     fireEvent.click(screen.getByRole('button', { name: /Import ssh_config/i }));
     fireEvent.change(screen.getByLabelText('SSH Config Content'), {
@@ -215,13 +215,13 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.keyDown(window, { key: ',', ctrlKey: true });
     expect(screen.getByRole('dialog', { name: 'Global Settings' })).toBeInTheDocument();
 
-    // Switch theme to Dracula
-    fireEvent.click(screen.getByRole('button', { name: /Dracula/i }));
-    expect(main).toHaveClass('theme-dracula');
+    // Switch theme to Crimson
+    fireEvent.click(screen.getByRole('button', { name: /Crimson/i }));
+    expect(main).toHaveClass('theme-crimson');
 
-    // Switch theme to Nord
-    fireEvent.click(screen.getByRole('button', { name: /Nord/i }));
-    expect(main).toHaveClass('theme-nord');
+    // Switch theme to Vice
+    fireEvent.click(screen.getByRole('button', { name: /Vice/i }));
+    expect(main).toHaveClass('theme-vice');
 
     // Change font family, font size, and cursor style
     fireEvent.change(screen.getByLabelText('Font Family'), {
@@ -262,7 +262,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(screen.getByText('16px')).toBeInTheDocument();
 
     // Reopen settings and reset to defaults
-    fireEvent.click(screen.getByRole('button', { name: /Settings ⚙/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Settings/i }));
     fireEvent.click(screen.getByRole('button', { name: /Reset to Defaults/i }));
     expect(main).toHaveClass('theme-teal');
     fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
@@ -272,9 +272,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     render(<App />);
 
     // 1. Verify Top Bar Menu System
-    const viewMenuBtn = screen.getByRole('button', { name: /View ▾/i });
-    const terminalsMenuBtn = screen.getByRole('button', { name: /Terminals ▾/i });
-    const intelMenuBtn = screen.getByRole('button', { name: /Intel & Keys ▾/i });
+    const viewMenuBtn = screen.getByRole('button', { name: /View/i });
+    const terminalsMenuBtn = screen.getByRole('button', { name: /Terminals/i });
+    const intelMenuBtn = screen.getByRole('button', { name: /Intel & Keys/i });
 
     expect(viewMenuBtn).toBeInTheDocument();
     expect(terminalsMenuBtn).toBeInTheDocument();
@@ -426,7 +426,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(sidebar).not.toHaveClass('collapsed');
 
     // 1. Open Local PowerShell terminal via Hoverable Terminals Menu
-    const toolsBtn = screen.getByRole('button', { name: /Terminals ▾/i });
+    const toolsBtn = screen.getByRole('button', { name: /Terminals/i });
     fireEvent.mouseEnter(toolsBtn);
     expect(screen.getByRole('menu', { name: 'Terminals Menu' })).toBeInTheDocument();
 
@@ -533,7 +533,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     // 5. Open Saleae-style Signal & Logic Analyzer
     fireEvent.click(logicAnalyzerBtn);
     expect(screen.getByRole('region', { name: 'Signal Analyzer' })).toBeInTheDocument();
-    expect(screen.getByText('📈 LOGIC ANALYZER')).toBeInTheDocument();
+    expect(screen.getByText(/LOGIC ANALYZER/)).toBeInTheDocument();
     expect(screen.getByText(/COM4 @ 115200 baud/i)).toBeInTheDocument();
 
     // Toggle Live / Pause button
@@ -552,7 +552,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     render(<App />);
 
     // 1. Open Local Shell (PowerShell) via Terminals Menu
-    const toolsBtn = screen.getByRole('button', { name: /Terminals ▾/i });
+    const toolsBtn = screen.getByRole('button', { name: /Terminals/i });
     fireEvent.mouseEnter(toolsBtn);
     const pwshItem = screen.getByRole('menuitem', { name: /Local Shell \(PowerShell\)/i });
     fireEvent.click(pwshItem);
@@ -818,7 +818,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(screen.getByText('INACTIVE')).toBeInTheDocument();
 
       // 4. Start tunnel on the active SSH session
-      const startBtn = screen.getByRole('button', { name: /▶ Start Tunnel/i });
+      const startBtn = screen.getByRole('button', { name: /Start Tunnel/i });
       fireEvent.click(startBtn);
 
       // Tunnel should become active
@@ -1366,7 +1366,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
       // 3. Test Interactive Key Rebinding with Conflict Detection
       // Click Rebind on "Command Palette & Quick Connect"
-      const rebindButtons = screen.getAllByRole('button', { name: /⌨️ Rebind/i });
+      const rebindButtons = screen.getAllByRole('button', { name: /Rebind/i });
       fireEvent.click(rebindButtons[0]);
 
       // Press a conflicting key combo (e.g. Ctrl+B which belongs to Toggle Sidebar)
@@ -1377,11 +1377,11 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Now press a non-conflicting combo: Ctrl+Shift+K
       fireEvent.keyDown(recordBox, { key: 'k', ctrlKey: true, shiftKey: true });
       expect(screen.getByText('Ctrl+Shift+K')).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /✓ Save/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Save/i }));
       expect(screen.getByText('Ctrl+Shift+K')).toBeInTheDocument();
 
       // Reset that binding back to default
-      const resetBtn = screen.getByRole('button', { name: /^↺ Reset$/i });
+      const resetBtn = screen.getByRole('button', { name: /^Reset$/i });
       fireEvent.click(resetBtn);
       expect(screen.getByText('Ctrl+K')).toBeInTheDocument();
 
@@ -1394,7 +1394,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       fireEvent.change(targetTypeSelect, { target: { value: 'snippet' } });
 
       // Verify snippet dropdown appears with "⚡ Server Status"
-      expect(screen.getByText(/⚡ Server Status/i)).toBeInTheDocument();
+      expect(screen.getByText(/Server Status/i)).toBeInTheDocument();
 
       // Record key for custom shortcut: Ctrl+Alt+S
       const customRecordBox = screen.getByText(/Click to record keys\.\.\./i);
@@ -1573,7 +1573,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(clipboardText).toBe('123456');
 
       // 4. Test adding new TOTP via URI parse
-      const addBtn = screen.getByRole('button', { name: /➕ Add Authenticator/i });
+      const addBtn = screen.getByRole('button', { name: /Add Authenticator/i });
       fireEvent.click(addBtn);
 
       const uriInput = screen.getByPlaceholderText(/otpauth:\/\/totp\//i);
@@ -1629,7 +1629,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       fireEvent.click(sidebarTotpBtn);
 
       // Wait for 2FA sidebar header to show Quick Inject 2FA button
-      const inject2faBtn = await screen.findByRole('button', { name: /🔐 2FA \/ TOTP/i });
+      const inject2faBtn = await screen.findByRole('button', { name: /2FA \/ TOTP/i });
       expect(inject2faBtn).toBeInTheDocument();
 
       // With multiple tokens (3 defined), clicking 2FA opens the reduced quick selector dialog
@@ -1638,7 +1638,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(quickDialog).toBeInTheDocument();
 
       // Click the insert button for the first token
-      const insertButtons = screen.getAllByRole('button', { name: /⚡ INSERT/i });
+      const insertButtons = screen.getAllByRole('button', { name: /INSERT/i });
       expect(insertButtons.length).toBeGreaterThan(0);
       fireEvent.click(insertButtons[0]);
 
@@ -1773,16 +1773,16 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     // 2. Connect to Audit Bastion — session logging should automatically start (⏺ REC)
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
     const recBtn = await screen.findByRole('button', { name: /Toggle Session Logging for Audit Bastion/i });
-    expect(recBtn).toHaveTextContent('⏺ REC');
+    expect(recBtn).toHaveTextContent('REC');
     expect(recBtn).toHaveClass('recording');
 
     // 3. Toggle session logging off and back on from the terminal pane header
     fireEvent.click(recBtn);
-    expect(recBtn).toHaveTextContent('⚪ Log');
+    expect(recBtn).toHaveTextContent('Log');
     expect(recBtn).not.toHaveClass('recording');
 
     fireEvent.click(recBtn);
-    expect(recBtn).toHaveTextContent('⏺ REC');
+    expect(recBtn).toHaveTextContent('REC');
 
     // 4. Open Session Logs & Recordings via Intel & Keys -> Session Logs & Recordings (F-21)
     fireEvent.click(screen.getByRole('button', { name: /Intel & Keys/i }));
@@ -1839,24 +1839,24 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     const currentPane2 = screen.getByLabelText('Pane Cluster Node (H-Split #2)');
     expect(currentPane1).toHaveClass('is-broadcasting');
     expect(currentPane2).toHaveClass('is-broadcasting');
-    expect(within(currentPane1).getByText('🔴 BROADCAST')).toBeInTheDocument();
-    expect(within(currentPane2).getByText('🔴 BROADCAST')).toBeInTheDocument();
+    expect(within(currentPane1).getByText('BROADCAST')).toBeInTheDocument();
+    expect(within(currentPane2).getByText('BROADCAST')).toBeInTheDocument();
 
     const castBtn1 = within(currentPane1).getByRole('button', { name: /Toggle Broadcast for Cluster Node/i });
     const castBtn2 = within(currentPane2).getByRole('button', { name: /Toggle Broadcast for Cluster Node \(H-Split #2\)/i });
-    expect(castBtn1).toHaveTextContent('📡 ACTIVE');
-    expect(castBtn2).toHaveTextContent('📡 ACTIVE');
+    expect(castBtn1).toHaveTextContent('ACTIVE');
+    expect(castBtn2).toHaveTextContent('ACTIVE');
 
     // 6. Test custom pane selection: toggle off pane2 from broadcast group
     fireEvent.click(castBtn2);
-    expect(castBtn2).toHaveTextContent('📡 Cast');
+    expect(castBtn2).toHaveTextContent('Cast');
     expect(screen.getByLabelText('Pane Cluster Node (H-Split #2)')).not.toHaveClass('is-broadcasting');
     expect(screen.getByLabelText('Pane Cluster Node')).toHaveClass('is-broadcasting');
     expect(broadcastStatusPill).toHaveTextContent(/BROADCAST \(1 sessions\)/i);
 
     // Re-include pane2 into broadcast group
     fireEvent.click(castBtn2);
-    expect(castBtn2).toHaveTextContent('📡 ACTIVE');
+    expect(castBtn2).toHaveTextContent('ACTIVE');
     expect(screen.getByLabelText('Pane Cluster Node (H-Split #2)')).toHaveClass('is-broadcasting');
     expect(broadcastStatusPill).toHaveTextContent(/BROADCAST \(2 sessions\)/i);
 
@@ -2274,7 +2274,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
       // 3. Verify Steuerpult HUD telemetry counters (Hosts, Subnets, Tunnels, Jumps)
       expect(within(mapRegion).getByText('All (2)')).toBeInTheDocument();
-      expect(within(mapRegion).getByText(/⇄ Tunnels \(1\)/i)).toBeInTheDocument();
+      expect(within(mapRegion).getAllByText(/Tunnels \(1\)/i).length).toBeGreaterThan(0);
       expect(within(mapRegion).getByText('Hosts')).toBeInTheDocument();
       expect(within(mapRegion).getByText('Subnets')).toBeInTheDocument();
 
@@ -2422,14 +2422,14 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     expect(await screen.findByText('nginx.conf')).toBeInTheDocument();
     expect(screen.getByText('/etc/nginx/nginx.conf')).toBeInTheDocument();
     expect(screen.getByText(/Production-Server/i)).toBeInTheDocument();
-    expect(screen.getByText('✓ Synced')).toBeInTheDocument();
+    expect(screen.getByText('Synced')).toBeInTheDocument();
 
     const textarea = screen.getByLabelText(/Remote file content for nginx.conf/i) as HTMLTextAreaElement;
     expect(textarea.value).toBe(mockContent);
 
     // 2. Modify content in editor
     fireEvent.change(textarea, { target: { value: 'server {\n  listen 443 ssl;\n}\n' } });
-    expect(await screen.findByText('● Unsaved')).toBeInTheDocument();
+    expect(await screen.findByText('Unsaved')).toBeInTheDocument();
 
     // 3. Save modified content
     const saveBtn = screen.getByRole('button', { name: /Save Remote \(Ctrl\+S\)/i });
@@ -2533,7 +2533,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       render(<App />);
 
       // 1. Open Settings modal -> Storage & Sync
-      fireEvent.click(screen.getByRole('button', { name: /Settings ⚙/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Settings/i }));
       const syncMenuItem = screen.getByRole('tab', { name: /Storage & Sync/i });
       fireEvent.click(syncMenuItem);
 
@@ -2645,7 +2645,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       render(<App />);
 
       // 1. Open Settings -> Config Migration -> Import PuTTY / Termius (F-30)
-      fireEvent.click(screen.getByRole('button', { name: /Settings ⚙/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Settings/i }));
       fireEvent.click(screen.getByRole('tab', { name: /Config Migration/i }));
       const openImportModalBtn = screen.getByRole('button', { name: /Import PuTTY \/ Termius/i });
       fireEvent.click(openImportModalBtn);
@@ -2663,7 +2663,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(screen.getByText('PuTTY Prod Server')).toBeInTheDocument();
       expect(screen.getByText('10.50.0.1:22')).toBeInTheDocument();
       expect(screen.getByText('In Vault')).toBeInTheDocument();
-      expect(screen.getByText('⇄ 1 Tunnels')).toBeInTheDocument();
+      expect(screen.getByText('1 Tunnels')).toBeInTheDocument();
 
       // 3. Click Import Selected button
       const importBtn = screen.getByRole('button', { name: /Import Selected/i });
@@ -2801,7 +2801,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(screen.getByText(/CATCHES:/i)).toBeInTheDocument();
 
       // Stop listener
-      const stopListenerBtn = screen.getByRole('button', { name: /■ STOP LISTENER/i });
+      const stopListenerBtn = screen.getByRole('button', { name: /STOP LISTENER/i });
       fireEvent.click(stopListenerBtn);
       await waitFor(() => {
         expect(stoppedListenerId).toBe('listener-1');
@@ -2823,9 +2823,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       });
 
       // Verify auto-spawned incoming shell tab
-      const caughtTabs = await screen.findAllByText(/TCP :4444 ◀ 10\.10\.10\.150:51234/i);
+      const caughtTabs = await screen.findAllByText(/TCP :4444 <- 10\.10\.10\.150:51234/i);
       expect(caughtTabs.length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText(/⚡ TTY UPGRADE ▾/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/TTY UPGRADE/i).length).toBeGreaterThanOrEqual(1);
     } finally {
       delete (window as unknown as { go?: unknown }).go;
       delete (window as unknown as { runtime?: unknown }).runtime;
@@ -2910,7 +2910,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       render(<App />);
 
       // 1. Open Engagement menu -> Credential Pool & Spray Lists
-      const engMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
+      const engMenuBtn = screen.getByRole('button', { name: /^Engagement$/i });
       fireEvent.click(engMenuBtn);
       const credToolBtn = screen.getByText(/Credential Pool & Spray Lists/i);
       fireEvent.click(credToolBtn);
@@ -3022,7 +3022,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       render(<App />);
 
       // 1. Open Engagement menu -> Evidence Vault
-      const engMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
+      const engMenuBtn = screen.getByRole('button', { name: /^Engagement$/i });
       fireEvent.click(engMenuBtn);
       const eviToolBtn = screen.getByText(/Evidence Vault & Findings/i);
       fireEvent.click(eviToolBtn);
@@ -3142,7 +3142,7 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
 
       expect(screen.queryByRole('button', { name: /\+ New Engagement/i })).not.toBeInTheDocument();
 
-      const engToolsMenuBtn = screen.getByRole('button', { name: /Engagement ▾/i });
+      const engToolsMenuBtn = screen.getByRole('button', { name: /^Engagement$/i });
       expect(engToolsMenuBtn).toBeInTheDocument();
 
       // 2. Open Engagement Tools dropdown and verify actions
@@ -3286,14 +3286,14 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       expect(document.querySelectorAll('.nav-pinned-btn').length).toBe(0);
 
       // 1. Engagement dropdown has no tunnels & routing items
-      fireEvent.click(screen.getByRole('button', { name: /Engagement ▾/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^Engagement$/i }));
       const engMenu = screen.getByRole('menu', { name: /Engagement Specific Tools Menu/i });
       expect(within(engMenu).queryByText(/Port Forwarding/i)).not.toBeInTheDocument();
       expect(within(engMenu).queryByText(/Proxy Profiles/i)).not.toBeInTheDocument();
       expect(within(engMenu).queryByText(/Pivoting Engine/i)).not.toBeInTheDocument();
 
       // 2. Terminals dropdown no longer contains Port Forwarding, Proxy Profiles, Pivoting Engine, Route Health Check, or SFTP
-      fireEvent.click(screen.getByRole('button', { name: /Terminals ▾/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Terminals/i }));
       const termMenu = screen.getByRole('menu', { name: /Terminals Menu/i });
       expect(within(termMenu).queryByText(/Port Forwarding/i)).not.toBeInTheDocument();
       expect(within(termMenu).queryByText(/Proxy Profiles/i)).not.toBeInTheDocument();

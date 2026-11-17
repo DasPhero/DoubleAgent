@@ -325,7 +325,7 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
         >
           <div className="cyber-hud-panel" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2dd4bf', letterSpacing: '0.06em' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
                 CHECK MODE &amp; OPSEC GUARD
               </span>
               {activeEngagementId && (
@@ -596,7 +596,7 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
               {activeDashboardItems.length > 0 && (
                 <div className="cyber-hud-panel" style={{ padding: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.06em' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
                       LIVE LISTENERS, PIVOTS &amp; SERVERS ({activeDashboardItems.length})
                     </span>
                     <span style={{ fontSize: '0.68rem', color: '#64748b' }}>In-memory status (0 probes sent)</span>
@@ -619,7 +619,7 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
                           gap: '0.5rem',
                           padding: '0.45rem 0.65rem',
                           background: 'rgba(15, 23, 42, 0.55)',
-                          border: '1px solid rgba(56, 189, 248, 0.25)',
+                          border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                           borderRadius: 4,
                           fontFamily: 'monospace',
                           fontSize: '0.73rem',
@@ -628,7 +628,7 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <span style={{ color: '#34d399', fontWeight: 700 }}>[{item.status.toUpperCase()}]</span>
                           <strong style={{ color: '#e2e8f0' }}>{item.name}</strong>
-                          <span style={{ color: '#38bdf8' }}>({item.kind})</span>
+                          <span style={{ color: 'var(--accent-bright)' }}>({item.kind})</span>
                           <span style={{ color: '#94a3b8' }}>{item.endpoint}</span>
                           {item.metaSummary && <span style={{ color: '#fcd34d' }}>· {item.metaSummary}</span>}
                         </div>
@@ -715,7 +715,7 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
                           {badge.label}
                         </span>
                         <strong style={{ fontSize: '0.83rem', color: '#f1f5f9' }}>{entry.name}</strong>
-                        <span style={{ fontSize: '0.7rem', color: '#2dd4bf', fontFamily: 'monospace' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'monospace' }}>
                           [{entry.kind}]
                         </span>
                         {entry.metaSummary && (
@@ -753,7 +753,7 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
                             style={{
                               fontSize: '0.69rem',
                               fontFamily: 'monospace',
-                              color: '#67e8f9',
+                              color: 'var(--accent-text)',
                               background: 'rgba(6, 182, 212, 0.1)',
                               border: '1px solid rgba(6, 182, 212, 0.25)',
                               padding: '0.05rem 0.35rem',
@@ -809,7 +809,7 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
                               </span>
                               <span style={{ color: '#e2e8f0' }}>{probe.target}</span>
                               {probe.viaProxy && (
-                                <span style={{ color: '#38bdf8' }}>via {probe.viaProxy}</span>
+                                <span style={{ color: 'var(--accent-bright)' }}>via {probe.viaProxy}</span>
                               )}
                             </div>
                             <div style={{ color: '#94a3b8' }}>

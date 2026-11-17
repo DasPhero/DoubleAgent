@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { CyberIcon } from './CyberIcon';
 import type { TotpSummary, TotpRecord, TotpCodeResponse } from '../types/totp';
 
 export interface HostSummaryOption {
@@ -513,7 +514,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
             type="button"
             className="cyber-btn cyber-btn-primary"
             onClick={handleOpenAdd}
-            aria-label="➕ Add Authenticator"
+            aria-label="Add Authenticator"
             title="Register a new TOTP 2FA secret or paste URI"
           >
             <span className="btn-glitch-icon">+</span> ADD KEY
@@ -524,7 +525,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
             onClick={handleOpenImport}
             title="Import authenticators from otpauth:// URIs or JSON vault backup"
           >
-            📥 IMPORT
+            <CyberIcon name="download" size={14} /> IMPORT
           </button>
           <button
             type="button"
@@ -532,7 +533,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
             onClick={() => void handleOpenExport('uri')}
             title="Export authenticators as otpauth:// URIs or JSON backup"
           >
-            📤 EXPORT
+            <CyberIcon name="upload" size={14} /> EXPORT
           </button>
 
           {!isDocked && onDockToView && (
@@ -542,7 +543,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
               onClick={onDockToView}
               title="Dock TOTP Authenticator as a split panel inside current workspace view"
             >
-              📌 DOCK VIEW
+              <CyberIcon name="pin" size={14} /> DOCK VIEW
             </button>
           )}
 
@@ -554,7 +555,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
               aria-label="Close TOTP Authenticator"
               title="Close window"
             >
-              ✕
+              <CyberIcon name="close" size={14} />
             </button>
           )}
         </div>
@@ -563,17 +564,17 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
       {/* Alert Notices */}
       {errorMessage && (
         <div className="cyber-banner cyber-banner-error" role="alert">
-          <span className="banner-icon">⚠</span>
+          <span className="banner-icon"><CyberIcon name="warning" size={14} /></span>
           <span className="banner-text">{errorMessage}</span>
           <button type="button" onClick={() => setErrorMessage('')} className="banner-close-btn">
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
       )}
 
       {successNotice && (
         <div className="cyber-banner cyber-banner-success" role="status">
-          <span className="banner-icon">✓</span>
+          <span className="banner-icon"><CyberIcon name="check" size={14} /></span>
           <span className="banner-text">{successNotice}</span>
         </div>
       )}
@@ -597,7 +598,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
               onClick={() => setSearchQuery('')}
               title="Clear search"
             >
-              ✕
+              <CyberIcon name="close" size={14} />
             </button>
           )}
         </div>
@@ -615,7 +616,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
             className={`cyber-pill-btn ${filterMode === 'linked' ? 'active' : ''}`}
             onClick={() => setFilterMode('linked')}
           >
-            🖥 LINKED [{linkedCount}]
+            <CyberIcon name="desktop" size={14} /> LINKED [{linkedCount}]
           </button>
           <button
             type="button"
@@ -643,14 +644,14 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                     className={`cyber-tab-btn ${inputMode === 'uri' ? 'active' : ''}`}
                     onClick={() => setInputMode('uri')}
                   >
-                    🔗 PASTE URI
+                    <CyberIcon name="chain" size={14} /> PASTE URI
                   </button>
                   <button
                     type="button"
                     className={`cyber-tab-btn ${inputMode === 'manual' ? 'active' : ''}`}
                     onClick={() => setInputMode('manual')}
                   >
-                    ✏ MANUAL ENTRY
+                    <CyberIcon name="edit" size={14} /> MANUAL ENTRY
                   </button>
                 </>
               )}
@@ -659,7 +660,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                 className="cyber-btn-sm cyber-btn-secondary"
                 onClick={() => setShowAddEdit(false)}
               >
-                ✕ CANCEL
+                <CyberIcon name="close" size={14} /> CANCEL
               </button>
             </div>
           </div>
@@ -683,7 +684,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                   onClick={() => void handleParseUri()}
                   aria-label="Parse URI"
                 >
-                  ⚡ PARSE URI
+                  <CyberIcon name="bolt" size={14} /> PARSE URI
                 </button>
               </div>
             </div>
@@ -736,7 +737,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                       onClick={() => setShowSecret((prev) => !prev)}
                       title={showSecret ? 'Hide secret' : 'Reveal secret'}
                     >
-                      {showSecret ? '🙈' : '👁'}
+                      {showSecret ? <CyberIcon name="eye-off" size={14} /> : <CyberIcon name="eye" size={14} />}
                     </button>
                   </div>
                 </label>
@@ -825,7 +826,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                   disabled={loading}
                   aria-label={editingId ? 'Save Changes' : 'Save to Encrypted Vault'}
                 >
-                  {editingId ? '✓ SAVE CHANGES' : '🛡 ENCRYPT TO VAULT'}
+                  {editingId ? <><CyberIcon name="check" size={14} /> SAVE CHANGES</> : <><CyberIcon name="shield" size={14} /> ENCRYPT TO VAULT</>}
                 </button>
               </div>
             </form>
@@ -838,7 +839,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
         {filteredList.length === 0 ? (
           <div className="cyber-empty-state">
             <div className="cyber-empty-radar" />
-            <div className="cyber-empty-icon">🛡️</div>
+            <div className="cyber-empty-icon"><CyberIcon name="shield" size={14} /></div>
             <h3 className="cyber-empty-title">/// ZERO AUTHENTICATOR SEEDS IN SCOPE ///</h3>
             <p className="cyber-empty-desc">
               {searchQuery
@@ -851,7 +852,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                   type="button"
                   className="cyber-btn cyber-btn-primary"
                   onClick={handleOpenAdd}
-                  aria-label="➕ Add Authenticator"
+                  aria-label="Add Authenticator"
                 >
                   + ADD FIRST KEY
                 </button>
@@ -860,7 +861,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                   className="cyber-btn cyber-btn-secondary"
                   onClick={handleOpenImport}
                 >
-                  📥 IMPORT BACKUP
+                  <CyberIcon name="download" size={14} /> IMPORT BACKUP
                 </button>
               </div>
             )}
@@ -913,7 +914,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                   <div className="card-tags-block">
                     {hostLabel && (
                       <span className="card-host-pill" title={`Linked to Host: ${hostLabel}`}>
-                        <span className="pill-pulse" /> 🖥 {hostLabel}
+                        <span className="pill-pulse" /> <CyberIcon name="desktop" size={14} /> {hostLabel}
                       </span>
                     )}
                     <span className="card-meta-pill">
@@ -1000,7 +1001,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                     onClick={() => void handleCopyCode(item.id, codeResp?.code || '')}
                     title="Copy 2FA token to clipboard"
                   >
-                    {copiedId === item.id ? '✓ COPIED TO CLIPBOARD' : '📋 COPY CODE'}
+                    {copiedId === item.id ? <><CyberIcon name="check" size={14} /> COPIED TO CLIPBOARD</> : <><CyberIcon name="clipboard" size={14} /> COPY CODE</>}
                   </button>
 
                   {activeSessionId && (
@@ -1011,7 +1012,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                       disabled={injectingId === item.id}
                       title="Directly inject 2FA code into active SSH terminal prompt"
                     >
-                      {injectingId === item.id ? '...' : '⚡ INJECT'}
+                      {injectingId === item.id ? '...' : <><CyberIcon name="bolt" size={14} /> INJECT</>}
                     </button>
                   )}
 
@@ -1022,7 +1023,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                     title="Edit authenticator parameters"
                     aria-label={`Edit ${item.label}`}
                   >
-                    ✏
+                    <CyberIcon name="edit" size={14} />
                   </button>
 
                   <button
@@ -1032,7 +1033,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                     title="Delete authenticator from vault"
                     aria-label={`Delete ${item.label}`}
                   >
-                    ✕
+                    <CyberIcon name="close" size={14} />
                   </button>
                 </div>
               </div>
@@ -1068,7 +1069,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                 className="cyber-btn-close"
                 onClick={() => setShowExportModal(false)}
               >
-                ✕
+                <CyberIcon name="close" size={14} />
               </button>
             </div>
 
@@ -1081,20 +1082,20 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                     className={`cyber-tab-btn ${exportFormat === 'uri' ? 'active' : ''}`}
                     onClick={() => void handleChangeExportFormat('uri')}
                   >
-                    🔗 OTPAUTH:// URIS (STANDARD)
+                    <CyberIcon name="chain" size={14} /> OTPAUTH:// URIS (STANDARD)
                   </button>
                   <button
                     type="button"
                     className={`cyber-tab-btn ${exportFormat === 'json' ? 'active' : ''}`}
                     onClick={() => void handleChangeExportFormat('json')}
                   >
-                    📦 JSON VAULT FORMAT
+                    <CyberIcon name="file" size={14} /> JSON VAULT FORMAT
                   </button>
                 </div>
               </div>
 
               <div className="dialog-warning-banner">
-                <span className="warn-icon">⚠</span>
+                <span className="warn-icon"><CyberIcon name="warning" size={14} /></span>
                 <span>
                   SECURITY WARNING: Exported content contains cleartext cryptographic seeds. Save strictly to an
                   encrypted storage device or password manager.
@@ -1116,14 +1117,14 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                 className={`cyber-btn ${exportCopied ? 'cyber-btn-success' : 'cyber-btn-primary'}`}
                 onClick={() => void handleCopyExport()}
               >
-                {exportCopied ? '✓ COPIED ALL TO CLIPBOARD' : '📋 COPY TO CLIPBOARD'}
+                {exportCopied ? <><CyberIcon name="check" size={14} /> COPIED ALL TO CLIPBOARD</> : <><CyberIcon name="clipboard" size={14} /> COPY TO CLIPBOARD</>}
               </button>
               <button
                 type="button"
                 className="cyber-btn cyber-btn-secondary"
                 onClick={handleDownloadExport}
               >
-                💾 DOWNLOAD FILE
+                <CyberIcon name="save" size={14} /> DOWNLOAD FILE
               </button>
               <button
                 type="button"
@@ -1151,7 +1152,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                 className="cyber-btn-close"
                 onClick={() => setShowImportModal(false)}
               >
-                ✕
+                <CyberIcon name="close" size={14} />
               </button>
             </div>
 
@@ -1167,7 +1168,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                   className="cyber-btn cyber-btn-secondary"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  📁 LOAD FROM FILE (.TXT / .JSON)
+                  <CyberIcon name="folder" size={14} /> LOAD FROM FILE (.TXT / .JSON)
                 </button>
                 <input
                   type="file"
@@ -1180,7 +1181,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
 
               {importError && (
                 <div className="cyber-banner cyber-banner-error" role="alert">
-                  <span className="banner-icon">⚠</span>
+                  <span className="banner-icon"><CyberIcon name="warning" size={14} /></span>
                   <span className="banner-text">{importError}</span>
                 </div>
               )}
@@ -1202,7 +1203,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
                 onClick={() => void handleExecuteImport()}
                 disabled={importLoading}
               >
-                {importLoading ? 'IMPORTING...' : '🚀 IMPORT AUTHENTICATORS'}
+                {importLoading ? 'IMPORTING...' : <><CyberIcon name="rocket" size={14} /> IMPORT AUTHENTICATORS</>}
               </button>
               <button
                 type="button"

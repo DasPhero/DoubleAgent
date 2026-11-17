@@ -382,10 +382,10 @@ export function SettingsView({
         <div className="dialog-title">
           <span className="cyber-hazard-stripes">///</span>
           <div>
-            <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CyberIcon name="gear" size={16} /> Global Settings &amp; Preferences
             </h3>
-            <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
               SYSTEM CONFIGURATION // THEMES · VAULT SECURITY · CLOUD SYNC · MIGRATION
             </div>
           </div>
@@ -510,11 +510,13 @@ export function SettingsView({
               {(
                 [
                   { id: 'teal', label: 'Teal (Cyber)', swatch: '#2dd4bf' },
-                  { id: 'dracula', label: 'Dracula', swatch: '#bd93f9' },
                   { id: 'one-dark', label: 'One Dark', swatch: '#61afef' },
-                  { id: 'nord', label: 'Nord', swatch: '#88c0d0' },
-                  { id: 'monokai', label: 'Monokai Pro', swatch: '#ffd866' },
-                  { id: 'crimson', label: 'Crimson', swatch: '#f43f5e' },
+                  { id: 'crimson', label: 'Crimson', swatch: '#ff2e2e' },
+                  { id: 'neon', label: 'Neon', swatch: '#ff2bd6' },
+                  { id: 'vice', label: 'Vice', swatch: '#2dd4bf' },
+                  { id: 'viper', label: 'Viper', swatch: '#aaff00' },
+                  { id: 'voltage', label: 'Voltage', swatch: '#2f9bff' },
+                  { id: 'plasma', label: 'Plasma', swatch: '#ff2b4e' },
                 ] as const
               ).map((th) => (
                 <button
@@ -528,6 +530,66 @@ export function SettingsView({
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="settings-section">
+            <h3>Terminal Background</h3>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0 0 0.7rem', lineHeight: 1.5 }}>
+              A themed HUD graphic rendered once behind the whole terminal space (not per split pane). Panes turn to
+              glass so it shines through. Animation is deliberately subtle and respects reduced-motion.
+            </p>
+            <div className="theme-options-grid">
+              {(
+                [
+                  { id: 'none', label: 'None (Solid)' },
+                  { id: 'minimal', label: 'Minimal' },
+                  { id: 'grid', label: 'Wide Grid' },
+                  { id: 'pulse', label: 'Pulse' },
+                  { id: 'watermark', label: 'Watermark' },
+                  { id: 'matrix', label: 'Hacking' },
+                ] as const
+              ).map((bg) => (
+                <button
+                  key={bg.id}
+                  type="button"
+                  className={`theme-card-btn ${(globalSettings.terminalBg ?? 'none') === bg.id ? 'active' : ''}`}
+                  onClick={() => onUpdateSettings({ terminalBg: bg.id })}
+                >
+                  <span>{bg.label}</span>
+                </button>
+              ))}
+            </div>
+            {(globalSettings.terminalBg ?? 'none') !== 'none' && (
+              <>
+                <div className="settings-field-row">
+                  <label htmlFor="setting-bg-opacity">
+                    Surface Opacity ({Math.round((globalSettings.terminalBgOpacity ?? 0.75) * 100)}%)
+                  </label>
+                  <input
+                    id="setting-bg-opacity"
+                    aria-label="Terminal Surface Opacity"
+                    type="range"
+                    min={0.4}
+                    max={0.95}
+                    step={0.05}
+                    value={globalSettings.terminalBgOpacity ?? 0.75}
+                    onChange={(e) => onUpdateSettings({ terminalBgOpacity: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="settings-field-row">
+                  <label htmlFor="setting-bg-animate">Subtle Animation</label>
+                  <select
+                    id="setting-bg-animate"
+                    aria-label="Terminal Background Animation"
+                    value={(globalSettings.terminalBgAnimate ?? true) ? 'on' : 'off'}
+                    onChange={(e) => onUpdateSettings({ terminalBgAnimate: e.target.value === 'on' })}
+                  >
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                  </select>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="settings-section">
@@ -807,14 +869,14 @@ export function SettingsView({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <div>
                   <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span>⌨️ Leader Key / Prefix Mode</span>
+                    <span><CyberIcon name="keyboard" size={14} /> Leader Key / Prefix Mode</span>
                     <span
                       style={{
                         fontSize: '0.68rem',
                         padding: '0.1rem 0.45rem',
                         borderRadius: '9999px',
                         background: leaderEnabled ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                        color: leaderEnabled ? '#2dd4bf' : 'var(--text-muted)',
+                        color: leaderEnabled ? 'var(--accent-bright)' : 'var(--text-muted)',
                       }}
                     >
                       {leaderEnabled ? 'Active' : 'Disabled'}
@@ -890,7 +952,7 @@ export function SettingsView({
                 onClick={handleResetAllBindings}
                 title="Restore all keyboard shortcuts to factory defaults"
               >
-                ↺ Reset All to Defaults
+                <CyberIcon name="refresh" size={14} /> Reset All to Defaults
               </button>
             </div>
 
@@ -983,12 +1045,12 @@ export function SettingsView({
                                 }
                               }}
                             >
-                              <span>🔴</span>
+                              <span className="status-led led-red led-pulse led-sm" />
                               <span>{recordedCombo || 'Press key combo...'}</span>
                             </div>
                             {conflictWarning && (
                               <div className="shortcut-conflict-warning">
-                                ⚠️ Conflicts with: <strong>{conflictWarning}</strong>
+                                <CyberIcon name="warning" size={14} /> Conflicts with: <strong>{conflictWarning}</strong>
                               </div>
                             )}
                           </div>
@@ -1019,7 +1081,7 @@ export function SettingsView({
                               onClick={() => handleSaveRecordedKey(def.actionId)}
                               style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
                             >
-                              ✓ Save
+                              <CyberIcon name="check" size={14} /> Save
                             </button>
                             <button
                               type="button"
@@ -1031,7 +1093,7 @@ export function SettingsView({
                               }}
                               style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
                             >
-                              ✕
+                              <CyberIcon name="close" size={14} />
                             </button>
                           </div>
                         ) : (
@@ -1046,7 +1108,7 @@ export function SettingsView({
                               }}
                               style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
                             >
-                              ⌨️ Rebind
+                              <CyberIcon name="keyboard" size={14} /> Rebind
                             </button>
                             {isOverridden && (
                               <button
@@ -1056,7 +1118,7 @@ export function SettingsView({
                                 title="Reset to default key"
                                 style={{ padding: '0.15rem 0.45rem', fontSize: '0.72rem' }}
                               >
-                                ↺ Reset
+                                <CyberIcon name="refresh" size={14} /> Reset
                               </button>
                             )}
                           </div>
@@ -1139,13 +1201,13 @@ export function SettingsView({
                         >
                           {availableSnippets.map((s) => (
                             <option key={s.id} value={s.id}>
-                              ⚡ {s.name}
+                              <CyberIcon name="bolt" size={14} /> {s.name}
                             </option>
                           ))}
                         </select>
                       ) : (
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingTop: '0.4rem' }}>
-                          No snippets in vault yet. Create one under Tools ▾ &rarr; Snippets.
+                          No snippets in vault yet. Create one under Tools <CyberIcon name="chevron-down" size={14} /> &rarr; Snippets.
                         </div>
                       )
                     ) : (
@@ -1191,12 +1253,12 @@ export function SettingsView({
                         }
                       }}
                     >
-                      <span>{isRecordingCustom ? '🔴' : '⌨️'}</span>
+                      <span>{isRecordingCustom ? <CyberIcon name="record" size={14} /> : <CyberIcon name="keyboard" size={14} />}</span>
                       <span>{newShortcutKey || (isRecordingCustom ? 'Press desired keys...' : 'Click to record keys...')}</span>
                     </div>
                     {customConflictWarning && (
                       <div className="shortcut-conflict-warning">
-                        ⚠️ Conflicts with: <strong>{customConflictWarning}</strong>
+                        <CyberIcon name="warning" size={14} /> Conflicts with: <strong>{customConflictWarning}</strong>
                       </div>
                     )}
                   </div>
@@ -1241,8 +1303,8 @@ export function SettingsView({
                       <td>
                         <div style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{sc.action}</div>
                         {sc.snippetName && (
-                          <span style={{ fontSize: '0.72rem', color: '#2dd4bf' }}>
-                            ⚡ Bound to snippet: {sc.snippetName}
+                          <span style={{ fontSize: '0.72rem', color: 'var(--accent-bright)' }}>
+                            <CyberIcon name="bolt" size={14} /> Bound to snippet: {sc.snippetName}
                           </span>
                         )}
                       </td>
@@ -1302,13 +1364,13 @@ export function SettingsView({
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>VAULT FILE PATH:</span>
                 {syncInfo && (
                   <span className={`sync-status-pill ${syncInfo.status}`}>
-                    {syncInfo.status === 'synced' && '🟢 IN SYNC (Disk matches memory)'}
-                    {syncInfo.status === 'external_change' && '🟡 EXTERNAL CHANGE DETECTED'}
-                    {syncInfo.status === 'conflict' && `🔴 CONFLICT (${syncInfo.conflictCount} items)`}
+                    {syncInfo.status === 'synced' && 'IN SYNC (Disk matches memory)'}
+                    {syncInfo.status === 'external_change' && 'EXTERNAL CHANGE DETECTED'}
+                    {syncInfo.status === 'conflict' && `CONFLICT (${syncInfo.conflictCount} items)`}
                   </span>
                 )}
               </div>
-              <div className="font-mono" style={{ background: 'rgba(5, 9, 16, 0.8)', padding: '0.65rem 0.85rem', border: '1px solid rgba(255, 255, 255, 0.1)', wordBreak: 'break-all', fontSize: '0.8rem', color: '#00f0ff' }}>
+              <div className="font-mono" style={{ background: 'rgba(5, 9, 16, 0.8)', padding: '0.65rem 0.85rem', border: '1px solid rgba(255, 255, 255, 0.1)', wordBreak: 'break-all', fontSize: '0.8rem', color: 'var(--accent-bright)' }}>
                 {syncInfo?.filePath || 'Default user config directory'}
               </div>
               <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -1323,7 +1385,7 @@ export function SettingsView({
                 className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                 onClick={() => void handleCheckSync()}
               >
-                🔄 Check for External Changes
+                <CyberIcon name="refresh" size={14} /> Check for External Changes
               </button>
             </div>
           </section>
@@ -1481,7 +1543,7 @@ export function SettingsView({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {managedFiles.length === 0 && !managedFilesLoading ? (
-                <div style={{ padding: '1.25rem', border: '1px dashed rgba(0, 240, 255, 0.25)', color: '#94a3b8', fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                <div style={{ padding: '1.25rem', border: '1px dashed color-mix(in srgb, var(--accent-bright) 25%, transparent)', color: '#94a3b8', fontSize: '0.8rem', fontFamily: 'JetBrains Mono, monospace' }}>
                   No external file registry entries loaded yet. Click Refresh Overview or run inside the desktop app.
                 </div>
               ) : (
@@ -1495,7 +1557,7 @@ export function SettingsView({
                       key={mf.id}
                       style={{
                         background: 'rgba(6, 12, 22, 0.85)',
-                        border: '1px solid rgba(0, 240, 255, 0.2)',
+                        border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                         borderLeft: `3px solid ${mf.exists ? '#10b981' : '#f59e0b'}`,
                         padding: '0.85rem 1rem',
                         display: 'flex',
@@ -1543,9 +1605,9 @@ export function SettingsView({
                         className="font-mono"
                         style={{
                           fontSize: '0.74rem',
-                          color: '#00f0ff',
+                          color: 'var(--accent-bright)',
                           background: 'rgba(2, 6, 14, 0.9)',
-                          border: '1px solid rgba(0, 240, 255, 0.16)',
+                          border: '1px solid color-mix(in srgb, var(--accent-bright) 16%, transparent)',
                           padding: '0.4rem 0.6rem',
                           wordBreak: 'break-all',
                         }}
@@ -1686,11 +1748,11 @@ export function SettingsView({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
               {/* Card 1: OpenSSH config */}
-              <div style={{ background: 'rgba(5, 10, 18, 0.75)', border: '1px solid rgba(0, 240, 255, 0.25)', borderRadius: '4px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div style={{ background: 'rgba(5, 10, 18, 0.75)', border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', borderRadius: '4px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '1.2rem' }}>⚙️</span>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#00f0ff' }}>OpenSSH Configuration</h4>
+                    <span style={{ fontSize: '1.2rem' }}><CyberIcon name="gear" size={14} /></span>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--accent-bright)' }}>OpenSSH Configuration</h4>
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
                     Parse and import host declarations from <code>~/.ssh/config</code>. Supports HostName, User, Port, IdentityFile, and ProxyJump directives.
@@ -1707,11 +1769,11 @@ export function SettingsView({
               </div>
 
               {/* Card 2: PuTTY / Termius */}
-              <div style={{ background: 'rgba(5, 10, 18, 0.75)', border: '1px solid rgba(0, 240, 255, 0.25)', borderRadius: '4px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div style={{ background: 'rgba(5, 10, 18, 0.75)', border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', borderRadius: '4px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '1.2rem' }}>📥</span>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#00f0ff' }}>PuTTY &amp; Termius Sessions</h4>
+                    <span style={{ fontSize: '1.2rem' }}><CyberIcon name="download" size={14} /></span>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--accent-bright)' }}>PuTTY &amp; Termius Sessions</h4>
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: '1.5', margin: '0 0 1rem 0' }}>
                     Scan Windows Registry or .reg exports for saved PuTTY sessions, or import JSON session backups exported from Termius.

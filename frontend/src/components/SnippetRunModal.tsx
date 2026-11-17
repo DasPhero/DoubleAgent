@@ -217,13 +217,13 @@ export function SnippetRunModal({
         <div className="cyber-corner-reticle cyber-corner-bl" />
         <div className="cyber-corner-reticle cyber-corner-br" />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: '0.6rem', borderBottom: '1px solid rgba(0, 240, 255, 0.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: '0.6rem', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-              <span style={{ color: '#00f0ff', display: 'inline-flex' }}>
+              <span style={{ color: 'var(--accent-bright)', display: 'inline-flex' }}>
                 <CyberIcon name="bolt" size={16} />
               </span>
-              <h2 style={{ margin: 0, fontSize: '1rem', color: '#00f0ff', letterSpacing: '0.05em' }}>
+              <h2 style={{ margin: 0, fontSize: '1rem', color: 'var(--accent-bright)', letterSpacing: '0.05em' }}>
                 {snippet.name}
               </h2>
             </div>
@@ -261,7 +261,7 @@ export function SnippetRunModal({
         {/* Variable Inputs */}
         {vars.length > 0 && (
           <div className="snippet-variables-form" style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-            <h4 style={{ margin: 0, fontSize: '0.76rem', color: '#00f0ff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <h4 style={{ margin: 0, fontSize: '0.76rem', color: 'var(--accent-bright)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Snippet Parameters &amp; Injected Variables
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', maxHeight: '240px', overflowY: 'auto', paddingRight: '0.25rem' }}>
@@ -286,7 +286,7 @@ export function SnippetRunModal({
                 return (
                   <div key={v.name} className="snippet-var-row" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     <label htmlFor={`var-${v.name}`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem' }}>
-                      <code style={{ color: '#00f0ff', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{`{{${v.name}}}`}</code>
+                      <code style={{ color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{`{{${v.name}}}`}</code>
                       {isAuto && <span className="snippet-auto-badge">auto</span>}
                       {isSecret && <span className="snippet-secret-badge">vault secret</span>}
                       {v.description && (
@@ -348,7 +348,7 @@ export function SnippetRunModal({
 
         {error && <div className="error-banner">{error}</div>}
 
-        <div className="modal-actions" style={{ marginTop: '0.4rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+        <div className="modal-actions" style={{ marginTop: '0.4rem', paddingTop: '0.75rem', borderTop: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
           <button type="button" className="cyber-hud-btn" onClick={onClose} disabled={executing}>
             Cancel
           </button>

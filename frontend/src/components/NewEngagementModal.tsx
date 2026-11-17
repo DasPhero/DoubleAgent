@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CyberIcon } from './CyberIcon';
 import { Engagement } from '../types/pentest';
 
 interface NewEngagementModalProps {
@@ -106,10 +107,10 @@ export const NewEngagementModal: React.FC<NewEngagementModalProps> = ({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 id="new-engagement-title" style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                {existingEngagement ? '⚙️ Edit Pentest Engagement' : '🎯 New Pentest Engagement'}
+              <h3 id="new-engagement-title" style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                {existingEngagement ? <><CyberIcon name="gear" size={14} /> Edit Pentest Engagement</> : <><CyberIcon name="target" size={14} /> New Pentest Engagement</>}
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, monospace', marginTop: '2px' }}>
                 CUSTOMER SEGREGATION // ENCLOSED OPERATIONAL BOUNDARY &amp; GDPR COMPLIANCE
               </div>
             </div>
@@ -120,7 +121,7 @@ export const NewEngagementModal: React.FC<NewEngagementModalProps> = ({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
 
@@ -139,14 +140,14 @@ export const NewEngagementModal: React.FC<NewEngagementModalProps> = ({
               }}
               role="alert"
             >
-              ⚠️ {errorMsg}
+              <CyberIcon name="warning" size={14} /> {errorMsg}
             </div>
           )}
 
           <div
             style={{
-              background: 'rgba(0, 240, 255, 0.05)',
-              border: '1px solid rgba(0, 240, 255, 0.2)',
+              background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
               padding: '0.65rem 0.85rem',
               fontSize: '0.75rem',
               color: '#94a3b8',
@@ -213,8 +214,8 @@ export const NewEngagementModal: React.FC<NewEngagementModalProps> = ({
               gap: '0.75rem',
             }}
           >
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.04em' }}>
-              🛡️ DEFENSIVE LOCKOUT POLICY DEFAULTS
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.04em' }}>
+              <CyberIcon name="shield" size={14} /> DEFENSIVE LOCKOUT POLICY DEFAULTS
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
@@ -300,7 +301,7 @@ export const NewEngagementModal: React.FC<NewEngagementModalProps> = ({
               className="cyber-btn cyber-btn-primary"
               disabled={isSaving}
             >
-              <span>{isSaving ? 'SAVING...' : existingEngagement ? '✓ UPDATE ENGAGEMENT' : '🎯 CREATE ENGAGEMENT'}</span>
+              <span>{isSaving ? 'SAVING...' : existingEngagement ? <><CyberIcon name="check" size={14} /> UPDATE ENGAGEMENT</> : <><CyberIcon name="target" size={14} /> CREATE ENGAGEMENT</>}</span>
             </button>
           </div>
         </form>

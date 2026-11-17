@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { CyberIcon } from './CyberIcon';
 import { SessionLogRecord } from '../types/sessionLog';
 
 interface SessionLogsModalProps {
@@ -154,10 +155,10 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                ⏺ Session Logs &amp; Transcripts
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                <CyberIcon name="record" size={14} /> Session Logs &amp; Transcripts
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 AUDIT-TELEMETRY // TIMESTAMPED RECORDINGS &amp; PASSWORD-ECHO REDACTED
               </div>
             </div>
@@ -169,7 +170,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
               onClick={() => void onRefreshLogs()}
               aria-label="Refresh Session Logs"
             >
-              🔄 Refresh
+              <CyberIcon name="refresh" size={14} /> Refresh
             </button>
             <button
               type="button"
@@ -205,7 +206,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
             <div className="session-logs-list" aria-label="Recorded Sessions List">
               {filteredLogs.length === 0 ? (
                 <div className="session-logs-empty">
-                  No session logs recorded yet. Enable logging on a Host or click <strong>⚪ Log</strong> in any terminal pane header.
+                  No session logs recorded yet. Enable logging on a Host or click <strong> Log</strong> in any terminal pane header.
                 </div>
               ) : (
                 filteredLogs.map((log) => {
@@ -227,7 +228,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
                       <div className="session-log-item-top">
                         <strong>{log.hostLabel}</strong>
                         <span className={`session-log-badge ${log.active ? 'active' : 'closed'}`}>
-                          {log.active ? '⏺ REC' : 'Saved'}
+                          {log.active ? <><CyberIcon name="record" size={14} /> REC</> : 'Saved'}
                         </span>
                       </div>
                       <div className="session-log-item-meta">
@@ -269,7 +270,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
                         className="btn-danger btn-sm"
                         onClick={() => void onStopActiveLog(selectedLog.sessionId)}
                       >
-                        ⏹ Stop Recording
+                        <CyberIcon name="stop" size={14} /> Stop Recording
                       </button>
                     )}
                     <button
@@ -277,14 +278,14 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
                       className="cyber-btn cyber-btn-secondary btn-sm"
                       onClick={() => void handleCopyContent()}
                     >
-                      📋 Copy
+                      <CyberIcon name="clipboard" size={14} /> Copy
                     </button>
                     <button
                       type="button"
                       className="cyber-btn cyber-btn-secondary btn-sm"
                       onClick={handleDownloadFile}
                     >
-                      ⬇ Download .log
+                      <CyberIcon name="download" size={14} /> Download .log
                     </button>
                     <button
                       type="button"
@@ -292,7 +293,7 @@ export const SessionLogsModal: React.FC<SessionLogsModalProps> = ({
                       aria-label={`Delete Log ${selectedLog.hostLabel}`}
                       onClick={() => void onDeleteLog(selectedLog.id)}
                     >
-                      🗑 Delete
+                      <CyberIcon name="trash" size={14} /> Delete
                     </button>
                   </div>
                 </div>

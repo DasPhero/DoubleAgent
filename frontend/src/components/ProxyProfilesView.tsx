@@ -220,11 +220,11 @@ export function ProxyProfilesView({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <CyberIcon name="shield" size={16} />
                 <span>Proxy Profiles &amp; Bastion Chains</span>
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 VAULT-PROXIES // JUMP CHAINS · SOCKS5 (WITH AUTH) · COMMAND
               </div>
             </div>
@@ -449,7 +449,7 @@ export function ProxyProfilesView({
                               disabled={idx === 0}
                               style={{ padding: '2px 6px', fontSize: '0.75rem' }}
                             >
-                              ↑
+                              <CyberIcon name="chevron-up" size={14} />
                             </button>
                             <button
                               type="button"
@@ -458,7 +458,7 @@ export function ProxyProfilesView({
                               disabled={idx === jumpHostIds.length - 1}
                               style={{ padding: '2px 6px', fontSize: '0.75rem' }}
                             >
-                              ↓
+                              <CyberIcon name="chevron-down" size={14} />
                             </button>
                             <button
                               type="button"
@@ -466,7 +466,7 @@ export function ProxyProfilesView({
                               onClick={() => handleRemoveJumpHop(idx)}
                               style={{ padding: '2px 6px', fontSize: '0.75rem', color: '#f87171' }}
                             >
-                              ✕
+                              <CyberIcon name="close" size={14} />
                             </button>
                           </div>
                         </div>
@@ -640,7 +640,7 @@ export function ProxyProfilesView({
                 border: '1px dashed var(--border-color)',
               }}
             >
-              <div style={{ marginBottom: '12px', color: '#00f0ff', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ marginBottom: '12px', color: 'var(--accent-bright)', display: 'flex', justifyContent: 'center' }}>
                 <CyberIcon name="shield" size={32} />
               </div>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'var(--text-bright)' }}>
@@ -664,7 +664,7 @@ export function ProxyProfilesView({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '16px' }}>
               {filteredProfiles.map((p) => {
                 const badgeColor =
-                  p.type === 'jump' ? '#2dd4bf' : p.type === 'command' ? '#c084fc' : '#fbbf24';
+                  p.type === 'jump' ? 'var(--accent-bright)' : p.type === 'command' ? '#c084fc' : '#fbbf24';
                 const badgeLabel =
                   p.type === 'jump' ? 'ProxyJump' : p.type === 'command' ? 'ProxyCommand' : 'SOCKS5';
                 const profEngagement = engagements.find((e) => e.id === p.engagementId);
@@ -692,9 +692,9 @@ export function ProxyProfilesView({
                           <span
                             style={{
                               fontSize: '0.68rem',
-                              color: profEngagement ? '#00f0ff' : '#94a3b8',
-                              background: profEngagement ? 'rgba(0, 240, 255, 0.12)' : 'rgba(148, 163, 184, 0.1)',
-                              border: `1px solid ${profEngagement ? 'rgba(0, 240, 255, 0.4)' : 'rgba(148, 163, 184, 0.25)'}`,
+                              color: profEngagement ? 'var(--accent-bright)' : '#94a3b8',
+                              background: profEngagement ? 'color-mix(in srgb, var(--accent-bright) 12%, transparent)' : 'rgba(148, 163, 184, 0.1)',
+                              border: `1px solid ${profEngagement ? 'color-mix(in srgb, var(--accent-bright) 40%, transparent)' : 'rgba(148, 163, 184, 0.25)'}`,
                               padding: '1px 6px',
                               fontFamily: 'JetBrains Mono, monospace',
                             }}
@@ -723,7 +723,7 @@ export function ProxyProfilesView({
                           <div>
                             <span style={{ fontWeight: 600 }}>Chain ({p.jumpHostIds?.length || 0} hop{(p.jumpHostIds?.length || 0) === 1 ? '' : 's'}):</span>{' '}
                             <span style={{ fontFamily: 'monospace' }}>
-                              {(p.jumpHostIds || []).map((h) => getHostLabel(h)).join(' ➔ ') || 'Empty'}
+                              {(p.jumpHostIds || []).map((h) => getHostLabel(h)).join(' -> ') || 'Empty'}
                             </span>
                           </div>
                         )}

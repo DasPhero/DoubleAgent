@@ -1085,11 +1085,11 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
             <span className="cyber-hazard-stripes">///</span>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <h3 id="evidence-dialog-title" style={{ margin: 0, fontSize: '1.05rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                  🛡️ Evidence Vault &amp; Findings
+                <h3 id="evidence-dialog-title" style={{ margin: 0, fontSize: '1.05rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                  <CyberIcon name="shield" size={14} /> Evidence Vault &amp; Findings
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.74rem', color: '#00f0ff', fontWeight: 700 }}>ENGAGEMENT:</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--accent-bright)', fontWeight: 700 }}>ENGAGEMENT:</span>
                   <select
                     className="cyber-hud-select"
                     value={activeEngagement?.id || ''}
@@ -1105,18 +1105,18 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                         }
                       }
                     }}
-                    style={{ fontSize: '0.78rem', height: '32px', minWidth: '320px', borderColor: 'rgba(0, 240, 255, 0.45)', padding: '2px 8px' }}
+                    style={{ fontSize: '0.78rem', height: '32px', minWidth: '320px', borderColor: 'color-mix(in srgb, var(--accent-bright) 45%, transparent)', padding: '2px 8px' }}
                   >
-                    <option value="">🌐 No Engagement (Casual / Global)</option>
+                    <option value=""><CyberIcon name="globe" size={14} /> No Engagement (Casual / Global)</option>
                     {engagements.map((eng) => (
                       <option key={eng.id} value={eng.id}>
-                        🎯 {eng.name}
+                        <CyberIcon name="target" size={14} /> {eng.name}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 SEPARATED WORKFLOW // 1 FINDING &rarr; MULTIPLE EVIDENCES &amp; REPORTABLE ARTIFACT TOGGLE
                 {activeEngagement && (
                   <span style={{ marginLeft: '8px', color: '#10b981', fontWeight: 700 }}>
@@ -1132,7 +1132,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
 
@@ -1143,7 +1143,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
             gap: '0.5rem',
             padding: '0.55rem 1.25rem',
             background: 'rgba(5, 12, 22, 0.9)',
-            borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
+            borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
             flexShrink: 0,
           }}
         >
@@ -1217,7 +1217,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
               }}
               role="alert"
             >
-              <span>{feedbackMsg.type === 'error' ? '⚠️' : '✓'}</span>
+              <span>{feedbackMsg.type === 'error' ? <CyberIcon name="warning" size={14} /> : <CyberIcon name="check" size={14} />}</span>
               <span>{feedbackMsg.text}</span>
             </div>
           )}
@@ -1244,11 +1244,11 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     style={{ width: '135px', height: '32px' }}
                   >
                     <option value="all">All Severities</option>
-                    <option value="critical">🔴 Critical</option>
-                    <option value="high">🟠 High</option>
-                    <option value="medium">🟡 Medium</option>
-                    <option value="low">🔵 Low</option>
-                    <option value="info">ℹ️ Info</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                    <option value="info">Info</option>
                   </select>
                   <select
                     className="cyber-hud-select"
@@ -1285,7 +1285,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                       <select
                         aria-label="Finding Template Selector"
                         className="cyber-hud-select"
-                        style={{ width: '210px', height: '32px', border: '1px solid rgba(0, 240, 255, 0.4)' }}
+                        style={{ width: '210px', height: '32px', border: '1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent)' }}
                         defaultValue=""
                         onChange={(e) => {
                           const tpl = findingTemplates.find((t) => t.id === e.target.value);
@@ -1341,8 +1341,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   style={{
                     padding: '2.5rem',
                     textAlign: 'center',
-                    background: 'rgba(0, 240, 255, 0.02)',
-                    border: '1px dashed rgba(0, 240, 255, 0.25)',
+                    background: 'color-mix(in srgb, var(--accent-bright) 2%, transparent)',
+                    border: '1px dashed color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                     color: '#94a3b8',
                     fontFamily: 'JetBrains Mono, monospace',
                     fontSize: '0.85rem',
@@ -1385,8 +1385,12 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                                 fontWeight: 700,
                                 textTransform: 'uppercase',
                                 fontFamily: 'JetBrains Mono, monospace',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
                               }}
                             >
+                              <span className="status-led led-sm" style={{ color: badge.border }} />
                               {finding.severity}
                             </span>
                             <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#f1f5f9' }}>
@@ -1396,7 +1400,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               {finding.category}
                             </span>
                             {finding.cve && (
-                              <span style={{ fontSize: '0.68rem', color: '#a5f3fc', background: 'rgba(0, 240, 255, 0.1)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--accent-text)', background: 'color-mix(in srgb, var(--accent-bright) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '1px 6px', fontFamily: 'JetBrains Mono, monospace' }}>
                                 {finding.cve}
                               </span>
                             )}
@@ -1411,17 +1415,17 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               </span>
                             )}
                             {hostObj && (
-                              <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--accent-bright)', background: 'color-mix(in srgb, var(--accent-bright) 10%, transparent)', padding: '1px 6px', borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 <CyberIcon name="terminal" size={10} /> {hostObj.label}
                               </span>
                             )}
                             <span
                               style={{
                                 fontSize: '0.68rem',
-                                color: linkedEvCount > 0 ? '#00f0ff' : '#64748b',
-                                border: linkedEvCount > 0 ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid rgba(100, 116, 139, 0.25)',
+                                color: linkedEvCount > 0 ? 'var(--accent-bright)' : '#64748b',
+                                border: linkedEvCount > 0 ? '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' : '1px solid rgba(100, 116, 139, 0.25)',
                                 padding: '1px 6px',
-                                background: linkedEvCount > 0 ? 'rgba(0, 240, 255, 0.08)' : 'transparent',
+                                background: linkedEvCount > 0 ? 'color-mix(in srgb, var(--accent-bright) 8%, transparent)' : 'transparent',
                                 fontFamily: 'JetBrains Mono, monospace',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1457,8 +1461,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                         </div>
 
                         {finding.remediation && (
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', background: 'rgba(0, 240, 255, 0.03)', padding: '0.4rem 0.6rem', borderLeft: '2px solid #00f0ff' }}>
-                            <strong style={{ color: '#00f0ff' }}>Remediation: </strong>
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', background: 'color-mix(in srgb, var(--accent-bright) 3%, transparent)', padding: '0.4rem 0.6rem', borderLeft: '2px solid var(--accent-bright)' }}>
+                            <strong style={{ color: 'var(--accent-bright)' }}>Remediation: </strong>
                             {finding.remediation}
                           </div>
                         )}
@@ -1475,7 +1479,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
             <div
               style={{
                 background: 'rgba(7, 14, 26, 0.95)',
-                border: '1px solid #00f0ff',
+                border: '1px solid var(--accent-bright)',
                 padding: '1.25rem',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1483,15 +1487,15 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
-                  {findEditId ? '✏️ EDIT SECURITY FINDING' : '⚡ CREATE NEW SECURITY FINDING'}
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.04em' }}>
+                  {findEditId ? <><CyberIcon name="edit" size={14} /> EDIT SECURITY FINDING</> : <><CyberIcon name="bolt" size={14} /> CREATE NEW SECURITY FINDING</>}
                 </span>
                 <button
                   type="button"
                   style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}
                   onClick={() => setIsEditingFinding(false)}
                 >
-                  ✕
+                  <CyberIcon name="close" size={14} />
                 </button>
               </div>
 
@@ -1529,11 +1533,11 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                       value={findEditSeverity}
                       onChange={(e) => setFindEditSeverity(e.target.value as EvidenceSeverity)}
                     >
-                      <option value="critical">🔴 Critical</option>
-                      <option value="high">🟠 High</option>
-                      <option value="medium">🟡 Medium</option>
-                      <option value="low">🔵 Low</option>
-                      <option value="info">ℹ️ Info</option>
+                      <option value="critical">Critical</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                      <option value="info">Info</option>
                     </select>
                   </div>
                 </div>
@@ -1643,20 +1647,20 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   <div
                     style={{
                       background: 'rgba(2, 6, 12, 0.95)',
-                      border: '1px solid #00f0ff',
+                      border: '1px solid var(--accent-bright)',
                       padding: '0.85rem',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.65rem',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 240, 255, 0.25)', paddingBottom: '0.4rem' }}>
-                      <span style={{ fontSize: '0.78rem', color: '#00f0ff', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', paddingBottom: '0.4rem' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--accent-bright)', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <CyberIcon name="calculator" size={12} /> FIRST.org CVSS v3.1 BASE SCORE CALCULATOR
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>
-                          VECTOR: <code style={{ color: '#38bdf8' }}>{findEditCvssVector || computeCvssV31(cvssParams).vector}</code>
+                          VECTOR: <code style={{ color: 'var(--accent-bright)' }}>{findEditCvssVector || computeCvssV31(cvssParams).vector}</code>
                         </span>
                         <span
                           style={{
@@ -1890,8 +1894,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                 {/* ATTACHED EVIDENCES SECTION */}
                 <div
                   style={{
-                    background: 'rgba(0, 240, 255, 0.04)',
-                    border: '1px solid rgba(0, 240, 255, 0.25)',
+                    background: 'color-mix(in srgb, var(--accent-bright) 4%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                     padding: '0.75rem',
                     display: 'flex',
                     flexDirection: 'column',
@@ -1899,8 +1903,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: '#00f0ff', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
-                      🛡️ SUPPORTING EVIDENCES ({findEditEvidenceIds.length})
+                    <span style={{ fontSize: '0.78rem', color: 'var(--accent-bright)', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
+                      <CyberIcon name="shield" size={14} /> SUPPORTING EVIDENCES ({findEditEvidenceIds.length})
                     </span>
                     <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                       1 Finding can have multiple evidences (mimikatz dump, hashes, network trace)
@@ -1921,7 +1925,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                             key={ev.id}
                             style={{
                               background: 'rgba(2, 6, 12, 0.85)',
-                              border: '1px solid rgba(0, 240, 255, 0.2)',
+                              border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                               padding: '0.4rem 0.65rem',
                               display: 'flex',
                               alignItems: 'center',
@@ -1931,14 +1935,14 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                              <span style={{ color: '#00f0ff' }}>🛡️ {ev.title}</span>
+                              <span style={{ color: 'var(--accent-bright)' }}><CyberIcon name="shield" size={14} /> {ev.title}</span>
                               <span style={{ color: '#64748b' }}>[{ev.type}]</span>
                               <button
                                 type="button"
                                 style={{
-                                  background: ev.inReport !== false ? 'rgba(0, 240, 255, 0.15)' : 'rgba(100, 116, 139, 0.15)',
-                                  border: ev.inReport !== false ? '1px solid #00f0ff' : '1px solid #64748b',
-                                  color: ev.inReport !== false ? '#00f0ff' : '#94a3b8',
+                                  background: ev.inReport !== false ? 'color-mix(in srgb, var(--accent-bright) 15%, transparent)' : 'rgba(100, 116, 139, 0.15)',
+                                  border: ev.inReport !== false ? '1px solid var(--accent-bright)' : '1px solid #64748b',
+                                  color: ev.inReport !== false ? 'var(--accent-bright)' : '#94a3b8',
                                   fontSize: '0.68rem',
                                   padding: '1px 6px',
                                   cursor: 'pointer',
@@ -1946,7 +1950,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                                 onClick={() => handleToggleEvidenceInReport(ev)}
                                 title="Toggle whether this evidence is exported in client report"
                               >
-                                {ev.inReport !== false ? '📄 In Report' : '🔒 Internal Only'}
+                                {ev.inReport !== false ? <><CyberIcon name="file" size={14} /> In Report</> : <><CyberIcon name="lock" size={14} /> Internal Only</>}
                               </button>
                             </div>
                             <button
@@ -1956,7 +1960,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               onClick={() => setFindEditEvidenceIds(findEditEvidenceIds.filter((id) => id !== ev.id))}
                               title="Detach evidence from this finding"
                             >
-                              ✕ Detach
+                              <CyberIcon name="close" size={14} /> Detach
                             </button>
                           </div>
                         );
@@ -2051,9 +2055,9 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     style={{ width: '160px', height: '32px' }}
                   >
                     <option value="all">All Evidence</option>
-                    <option value="reportable">📄 Reportable Only</option>
-                    <option value="internal">🔒 Internal Only</option>
-                    <option value="unlinked">⚠️ Unassigned</option>
+                    <option value="reportable"><CyberIcon name="file" size={14} /> Reportable Only</option>
+                    <option value="internal"><CyberIcon name="lock" size={14} /> Internal Only</option>
+                    <option value="unlinked"><CyberIcon name="warning" size={14} /> Unassigned</option>
                   </select>
                   <select
                     className="cyber-hud-select"
@@ -2088,7 +2092,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   {evidenceTemplates.length > 0 && (
                     <select
                       className="cyber-hud-select"
-                      style={{ width: '185px', height: '32px', border: '1px solid rgba(0, 240, 255, 0.4)' }}
+                      style={{ width: '185px', height: '32px', border: '1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent)' }}
                       defaultValue=""
                       onChange={(e) => {
                         const tpl = evidenceTemplates.find((t) => t.id === e.target.value);
@@ -2099,7 +2103,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                       }}
                     >
                       <option value="" disabled>
-                        ✨ Use Evidence Preset...
+                        <CyberIcon name="star" size={14} /> Use Evidence Preset...
                       </option>
                       {evidenceTemplates.map((tpl) => (
                         <option key={tpl.id} value={tpl.id}>
@@ -2124,8 +2128,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   style={{
                     padding: '2.5rem',
                     textAlign: 'center',
-                    background: 'rgba(0, 240, 255, 0.02)',
-                    border: '1px dashed rgba(0, 240, 255, 0.25)',
+                    background: 'color-mix(in srgb, var(--accent-bright) 2%, transparent)',
+                    border: '1px dashed color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                     color: '#94a3b8',
                     fontFamily: 'JetBrains Mono, monospace',
                     fontSize: '0.85rem',
@@ -2155,8 +2159,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                         key={item.id}
                         style={{
                           background: 'rgba(5, 11, 20, 0.85)',
-                          border: item.inReport !== false ? '1px solid rgba(0, 240, 255, 0.25)' : '1px solid rgba(100, 116, 139, 0.3)',
-                          borderLeft: item.inReport !== false ? '4px solid #00f0ff' : '4px solid #64748b',
+                          border: item.inReport !== false ? '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)' : '1px solid rgba(100, 116, 139, 0.3)',
+                          borderLeft: item.inReport !== false ? '4px solid var(--accent-bright)' : '4px solid #64748b',
                           padding: '0.85rem 1rem',
                           display: 'flex',
                           flexDirection: 'column',
@@ -2178,20 +2182,24 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                                   background: getSeverityBadgeColor(item.severity).bg,
                                   border: `1px solid ${getSeverityBadgeColor(item.severity).border}`,
                                   color: getSeverityBadgeColor(item.severity).text,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
                                 }}
                               >
+                                <span className="status-led led-sm" style={{ color: getSeverityBadgeColor(item.severity).border }} />
                                 {item.severity.toUpperCase()}
                               </span>
                             )}
                             <span style={{ fontSize: '0.72rem', color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: '2px' }}>
                               {item.category}
                             </span>
-                            <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, monospace' }}>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, monospace' }}>
                               [{item.type.toUpperCase()}]
                             </span>
                             {hostObj && (
-                              <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '1px 6px', borderRadius: '2px' }}>
-                                🖥️ {hostObj.label}
+                              <span style={{ fontSize: '0.72rem', color: 'var(--accent-bright)', background: 'color-mix(in srgb, var(--accent-bright) 10%, transparent)', padding: '1px 6px', borderRadius: '2px' }}>
+                                <CyberIcon name="desktop" size={14} /> {hostObj.label}
                               </span>
                             )}
                             {item.tags?.map((t) => (
@@ -2204,9 +2212,9 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               type="button"
                               onClick={() => handleToggleEvidenceInReport(item)}
                               style={{
-                                background: item.inReport !== false ? 'rgba(0, 240, 255, 0.15)' : 'rgba(100, 116, 139, 0.15)',
-                                border: item.inReport !== false ? '1px solid #00f0ff' : '1px solid #64748b',
-                                color: item.inReport !== false ? '#00f0ff' : '#94a3b8',
+                                background: item.inReport !== false ? 'color-mix(in srgb, var(--accent-bright) 15%, transparent)' : 'rgba(100, 116, 139, 0.15)',
+                                border: item.inReport !== false ? '1px solid var(--accent-bright)' : '1px solid #64748b',
+                                color: item.inReport !== false ? 'var(--accent-bright)' : '#94a3b8',
                                 fontSize: '0.68rem',
                                 padding: '1px 6px',
                                 cursor: 'pointer',
@@ -2214,16 +2222,16 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               }}
                               title="Click to toggle whether this evidence is exported in client report"
                             >
-                              {item.inReport !== false ? '📄 In Report' : '🔒 Internal Only'}
+                              {item.inReport !== false ? <><CyberIcon name="file" size={14} /> In Report</> : <><CyberIcon name="lock" size={14} /> Internal Only</>}
                             </button>
                             {/* Linked Finding Pill */}
                             {linkedFinding ? (
                               <span style={{ fontSize: '0.7rem', color: '#a78bfa', background: 'rgba(167, 139, 250, 0.12)', border: '1px solid rgba(167, 139, 250, 0.3)', padding: '1px 6px', borderRadius: '2px', fontFamily: 'JetBrains Mono, monospace' }}>
-                                🎯 Linked: {linkedFinding.title}
+                                <CyberIcon name="target" size={14} /> Linked: {linkedFinding.title}
                               </span>
                             ) : (
                               <span style={{ fontSize: '0.68rem', color: '#eab308', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '1px 6px', borderRadius: '2px', fontFamily: 'JetBrains Mono, monospace' }}>
-                                ⚠️ Standalone / Unassigned
+                                <CyberIcon name="warning" size={14} /> Standalone / Unassigned
                               </span>
                             )}
                           </div>
@@ -2235,7 +2243,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               style={{ padding: '2px 7px', fontSize: '0.72rem' }}
                               onClick={() => handleCopyText(item.content, item.id)}
                             >
-                              {copiedId === item.id ? '✓ Copied' : '📋 Copy'}
+                              {copiedId === item.id ? <><CyberIcon name="check" size={14} /> Copied</> : <><CyberIcon name="clipboard" size={14} /> Copy</>}
                             </button>
                             <button
                               type="button"
@@ -2243,7 +2251,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               style={{ padding: '2px 7px', fontSize: '0.72rem' }}
                               onClick={() => openEditEvidence(item)}
                             >
-                              ✏️ Edit
+                              <CyberIcon name="edit" size={14} /> Edit
                             </button>
                             <button
                               type="button"
@@ -2251,7 +2259,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               style={{ padding: '2px 7px', fontSize: '0.72rem', color: '#ef4444' }}
                               onClick={() => handleDeleteEvidence(item.id, item.title)}
                             >
-                              ✕
+                              <CyberIcon name="close" size={14} />
                             </button>
                           </div>
                         </div>
@@ -2271,9 +2279,9 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                             <div style={{ overflowX: 'auto' }}>
                               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', fontFamily: 'JetBrains Mono, monospace' }}>
                                 <thead>
-                                  <tr style={{ background: 'rgba(0, 240, 255, 0.08)', borderBottom: '1px solid rgba(0, 240, 255, 0.2)' }}>
+                                  <tr style={{ background: 'color-mix(in srgb, var(--accent-bright) 8%, transparent)', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
                                     {parsedTable.headers.map((h, i) => (
-                                      <th key={i} style={{ padding: '4px 8px', textAlign: 'left', color: '#00f0ff' }}>
+                                      <th key={i} style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--accent-bright)' }}>
                                         {h}
                                       </th>
                                     ))}
@@ -2311,7 +2319,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
             <div
               style={{
                 background: 'rgba(7, 14, 26, 0.95)',
-                border: '1px solid #00f0ff',
+                border: '1px solid var(--accent-bright)',
                 padding: '1.25rem',
                 display: 'flex',
                 flexDirection: 'column',
@@ -2319,15 +2327,15 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
-                  {eviEditId ? '✏️ EDIT EVIDENCE ARTIFACT' : '🛡️ CAPTURE NEW EVIDENCE ARTIFACT'}
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.04em' }}>
+                  {eviEditId ? <><CyberIcon name="edit" size={14} /> EDIT EVIDENCE ARTIFACT</> : <><CyberIcon name="shield" size={14} /> CAPTURE NEW EVIDENCE ARTIFACT</>}
                 </span>
                 <button
                   type="button"
                   style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}
                   onClick={() => setIsEditingEvidence(false)}
                 >
-                  ✕
+                  <CyberIcon name="close" size={14} />
                 </button>
               </div>
 
@@ -2349,10 +2357,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                       <label className="cyber-label">Category</label>
                       <button
                         type="button"
-                        style={{ background: 'none', border: 'none', color: '#00f0ff', cursor: 'pointer', fontSize: '0.68rem', fontFamily: 'JetBrains Mono, monospace' }}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-bright)', cursor: 'pointer', fontSize: '0.68rem', fontFamily: 'JetBrains Mono, monospace' }}
                         onClick={() => setShowAddCategory(!showAddCategory)}
                       >
-                        {showAddCategory ? '✕ Cancel' : '+ New'}
+                        {showAddCategory ? <><CyberIcon name="close" size={14} /> Cancel</> : <><CyberIcon name="plus" size={14} /> New</>}
                       </button>
                     </div>
                     {showAddCategory ? (
@@ -2427,7 +2435,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                       <option value="">-- No Linked Finding (Standalone Proof) --</option>
                       {findingsList.map((f) => (
                         <option key={f.id} value={f.id}>
-                          🎯 [{f.severity.toUpperCase()}] {f.title}
+                          <CyberIcon name="target" size={14} /> [{f.severity.toUpperCase()}] {f.title}
                         </option>
                       ))}
                     </select>
@@ -2462,7 +2470,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     <div style={{ overflowX: 'auto', maxHeight: '180px', overflowY: 'auto' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', fontFamily: 'JetBrains Mono, monospace' }}>
                         <thead>
-                          <tr style={{ background: 'rgba(0, 240, 255, 0.08)' }}>
+                          <tr style={{ background: 'color-mix(in srgb, var(--accent-bright) 8%, transparent)' }}>
                             {tableHeaders.map((h, i) => (
                               <th key={i} style={{ padding: '4px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -2479,7 +2487,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                                       title="Delete column"
                                       onClick={() => handleDeleteTableCol(i)}
                                     >
-                                      ✕
+                                      <CyberIcon name="close" size={14} />
                                     </button>
                                   )}
                                 </div>
@@ -2503,7 +2511,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                               ))}
                               <td>
                                 <button type="button" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }} onClick={() => handleDeleteTableRow(ri)}>
-                                  ✕
+                                  <CyberIcon name="close" size={14} />
                                 </button>
                               </td>
                             </tr>
@@ -2521,8 +2529,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     alignItems: 'center',
                     gap: '0.65rem',
                     padding: '0.5rem 0.75rem',
-                    background: eviEditInReport ? 'rgba(0, 240, 255, 0.05)' : 'rgba(100, 116, 139, 0.1)',
-                    border: eviEditInReport ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid rgba(100, 116, 139, 0.3)',
+                    background: eviEditInReport ? 'color-mix(in srgb, var(--accent-bright) 5%, transparent)' : 'rgba(100, 116, 139, 0.1)',
+                    border: eviEditInReport ? '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' : '1px solid rgba(100, 116, 139, 0.3)',
                   }}
                 >
                   <input
@@ -2530,21 +2538,21 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     id="evi-edit-in-report"
                     checked={eviEditInReport}
                     onChange={(e) => setEviEditInReport(e.target.checked)}
-                    style={{ accentColor: '#00f0ff', width: '16px', height: '16px', cursor: 'pointer' }}
+                    style={{ accentColor: 'var(--accent-bright)', width: '16px', height: '16px', cursor: 'pointer' }}
                   />
                   <label
                     htmlFor="evi-edit-in-report"
                     style={{
                       fontSize: '0.8rem',
-                      color: eviEditInReport ? '#00f0ff' : '#94a3b8',
+                      color: eviEditInReport ? 'var(--accent-bright)' : '#94a3b8',
                       cursor: 'pointer',
                       fontFamily: 'JetBrains Mono, Consolas, monospace',
                       userSelect: 'none',
                     }}
                   >
                     {eviEditInReport
-                      ? '📄 Include in Assessment Report (Reportable Finding Proof)'
-                      : '🔒 Internal Vault Evidence Only (Excluded from Client Report)'}
+                      ? <><CyberIcon name="file" size={14} /> Include in Assessment Report (Reportable Finding Proof)</>
+                      : <><CyberIcon name="lock" size={14} /> Internal Vault Evidence Only (Excluded from Client Report)</>}
                   </label>
                 </div>
 
@@ -2557,7 +2565,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     Cancel
                   </button>
                   <button type="submit" className="cyber-btn cyber-btn-primary">
-                    💾 Save Evidence Artifact
+                    <CyberIcon name="save" size={14} /> Save Evidence Artifact
                   </button>
                 </div>
               </form>
@@ -2571,7 +2579,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
-                  <h4 style={{ margin: 0, color: '#00f0ff', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <h4 style={{ margin: 0, color: 'var(--accent-bright)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                     <CyberIcon name="file" size={16} />
                     Assessment Report Compiler &amp; Per-Host Exporter
                   </h4>
@@ -2608,7 +2616,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     onClick={() => void handleBatchExportPerHost()}
                     disabled={reportLoading}
                     title="Writes one report file per target host plus manifest.sha256"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderColor: 'rgba(0, 240, 255, 0.4)', color: '#00f0ff' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderColor: 'color-mix(in srgb, var(--accent-bright) 40%, transparent)', color: 'var(--accent-bright)' }}
                   >
                     <CyberIcon name="folder" size={14} />
                     Export 1 File Per Host
@@ -2625,7 +2633,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   flexWrap: 'wrap',
                   padding: '0.6rem 0.8rem',
                   background: 'rgba(10, 18, 30, 0.75)',
-                  border: '1px solid rgba(0, 240, 255, 0.22)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent)',
                   fontFamily: 'JetBrains Mono, monospace',
                   fontSize: '0.75rem',
                 }}
@@ -2638,7 +2646,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     onChange={(e) => setReportHostScope(e.target.value)}
                     style={{
                       background: 'rgba(2, 6, 12, 0.9)',
-                      border: '1px solid rgba(0, 240, 255, 0.35)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                       color: '#e2e8f0',
                       padding: '3px 8px',
                       fontFamily: 'JetBrains Mono, monospace',
@@ -2662,7 +2670,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     onChange={(e) => setSelectedReportTemplateId(e.target.value)}
                     style={{
                       background: 'rgba(2, 6, 12, 0.9)',
-                      border: '1px solid rgba(0, 240, 255, 0.35)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                       color: '#e2e8f0',
                       padding: '3px 8px',
                       fontFamily: 'JetBrains Mono, monospace',
@@ -2696,14 +2704,14 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   )}
                 </div>
 
-                <div style={{ display: 'inline-flex', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
+                <div style={{ display: 'inline-flex', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' }}>
                   <button
                     type="button"
                     onClick={() => setReportFormat('docx')}
                     title="Editable Customer Pentest Report Scaffold (open in Word/LibreOffice & Export PDF)"
                     style={{
-                      background: reportFormat === 'docx' ? 'rgba(0, 240, 255, 0.18)' : 'transparent',
-                      color: reportFormat === 'docx' ? '#00f0ff' : '#94a3b8',
+                      background: reportFormat === 'docx' ? 'color-mix(in srgb, var(--accent-bright) 18%, transparent)' : 'transparent',
+                      color: reportFormat === 'docx' ? 'var(--accent-bright)' : '#94a3b8',
                       border: 'none',
                       padding: '4px 10px',
                       cursor: 'pointer',
@@ -2718,10 +2726,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     type="button"
                     onClick={() => setReportFormat('markdown')}
                     style={{
-                      background: reportFormat === 'markdown' ? 'rgba(0, 240, 255, 0.18)' : 'transparent',
-                      color: reportFormat === 'markdown' ? '#00f0ff' : '#94a3b8',
+                      background: reportFormat === 'markdown' ? 'color-mix(in srgb, var(--accent-bright) 18%, transparent)' : 'transparent',
+                      color: reportFormat === 'markdown' ? 'var(--accent-bright)' : '#94a3b8',
                       border: 'none',
-                      borderLeft: '1px solid rgba(0, 240, 255, 0.3)',
+                      borderLeft: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
                       padding: '4px 10px',
                       cursor: 'pointer',
                       fontFamily: 'JetBrains Mono, monospace',
@@ -2735,10 +2743,10 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     type="button"
                     onClick={() => setReportFormat('html')}
                     style={{
-                      background: reportFormat === 'html' ? 'rgba(0, 240, 255, 0.18)' : 'transparent',
-                      color: reportFormat === 'html' ? '#00f0ff' : '#94a3b8',
+                      background: reportFormat === 'html' ? 'color-mix(in srgb, var(--accent-bright) 18%, transparent)' : 'transparent',
+                      color: reportFormat === 'html' ? 'var(--accent-bright)' : '#94a3b8',
                       border: 'none',
-                      borderLeft: '1px solid rgba(0, 240, 255, 0.3)',
+                      borderLeft: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
                       padding: '4px 10px',
                       cursor: 'pointer',
                       fontFamily: 'JetBrains Mono, monospace',
@@ -2772,8 +2780,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     type="button"
                     onClick={() => setReportPreviewView('rendered')}
                     style={{
-                      background: reportPreviewView === 'rendered' ? 'rgba(56, 189, 248, 0.16)' : 'transparent',
-                      color: reportPreviewView === 'rendered' ? '#38bdf8' : '#94a3b8',
+                      background: reportPreviewView === 'rendered' ? 'color-mix(in srgb, var(--accent-bright) 16%, transparent)' : 'transparent',
+                      color: reportPreviewView === 'rendered' ? 'var(--accent-bright)' : '#94a3b8',
                       border: 'none',
                       padding: '3px 8px',
                       cursor: 'pointer',
@@ -2787,8 +2795,8 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                     type="button"
                     onClick={() => setReportPreviewView('source')}
                     style={{
-                      background: reportPreviewView === 'source' ? 'rgba(56, 189, 248, 0.16)' : 'transparent',
-                      color: reportPreviewView === 'source' ? '#38bdf8' : '#94a3b8',
+                      background: reportPreviewView === 'source' ? 'color-mix(in srgb, var(--accent-bright) 16%, transparent)' : 'transparent',
+                      color: reportPreviewView === 'source' ? 'var(--accent-bright)' : '#94a3b8',
                       border: 'none',
                       borderLeft: '1px solid rgba(148, 163, 184, 0.3)',
                       padding: '3px 8px',
@@ -2815,11 +2823,11 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                        background: excludedCount > 0 ? 'rgba(56, 189, 248, 0.08)' : 'rgba(15, 23, 42, 0.5)',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                        background: excludedCount > 0 ? 'color-mix(in srgb, var(--accent-bright) 8%, transparent)' : 'rgba(15, 23, 42, 0.5)',
+                        border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
                         padding: '0.45rem 0.75rem',
                         fontSize: '0.74rem',
-                        color: '#38bdf8',
+                        color: 'var(--accent-bright)',
                         fontFamily: 'JetBrains Mono, monospace',
                       }}
                     >
@@ -2856,7 +2864,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: copiedId === 'report-sha256' ? '#00f0ff' : '#a7f3d0',
+                        color: copiedId === 'report-sha256' ? 'var(--accent-bright)' : '#a7f3d0',
                         cursor: 'pointer',
                         padding: 0,
                         display: 'inline-flex',
@@ -2906,7 +2914,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   style={{
                     width: '100%',
                     height: '50vh',
-                    border: '1px solid rgba(0, 240, 255, 0.3)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
                     background: '#0b0f17',
                   }}
                 />
@@ -2914,7 +2922,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                 <div
                   style={{
                     background: 'rgba(2, 6, 12, 0.95)',
-                    border: '1px solid rgba(0, 240, 255, 0.3)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
                     padding: '1.1rem',
                     fontSize: '0.84rem',
                     color: '#cbd5e1',

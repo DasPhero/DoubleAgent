@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CyberIcon } from './CyberIcon';
 import {
   CredentialCategory,
   CredentialEntry,
@@ -225,10 +226,10 @@ export function SaveSelectionCredModal({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                🔑 Save Terminal Selection as Credential
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                <CyberIcon name="key" size={14} /> Save Terminal Selection as Credential
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 CREDENTIAL-INGEST // AUTO-ASSOCIATE HOST &amp; ENGAGEMENT POOL
               </div>
             </div>
@@ -266,8 +267,8 @@ export function SaveSelectionCredModal({
             {/* Association Telemetry Banner */}
             <div
               style={{
-                background: 'rgba(0, 240, 255, 0.05)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
+                background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                 padding: '0.55rem 0.85rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -278,12 +279,12 @@ export function SaveSelectionCredModal({
             >
               <div>
                 <span style={{ color: '#94a3b8' }}>SOURCE: </span>
-                <strong style={{ color: '#00f0ff' }}>Terminal Selection</strong>
+                <strong style={{ color: 'var(--accent-bright)' }}>Terminal Selection</strong>
               </div>
               {matchedHost && (
                 <div>
                   <span style={{ color: '#94a3b8' }}>ASSOCIATED HOST: </span>
-                  <strong style={{ color: '#38bdf8' }}>{matchedHost.label || matchedHost.address}</strong>
+                  <strong style={{ color: 'var(--accent-bright)' }}>{matchedHost.label || matchedHost.address}</strong>
                 </div>
               )}
             </div>
@@ -299,10 +300,10 @@ export function SaveSelectionCredModal({
                   value={engagementId}
                   onChange={(e) => setEngagementId(e.target.value)}
                 >
-                  <option value="">🌐 Global / No Engagement</option>
+                  <option value=""><CyberIcon name="globe" size={14} /> Global / No Engagement</option>
                   {engagements.map((eng) => (
                     <option key={eng.id} value={eng.id}>
-                      🎯 {eng.name}
+                      <CyberIcon name="target" size={14} /> {eng.name}
                     </option>
                   ))}
                 </select>
@@ -321,7 +322,7 @@ export function SaveSelectionCredModal({
                   <option value="">(No specific host)</option>
                   {hosts.map((h) => (
                     <option key={h.id} value={h.id}>
-                      🖥️ {h.label} ({h.address})
+                      <CyberIcon name="desktop" size={14} /> {h.label} ({h.address})
                     </option>
                   ))}
                 </select>
@@ -449,7 +450,7 @@ export function SaveSelectionCredModal({
               className="cyber-btn cyber-btn-primary"
               disabled={isSaving}
             >
-              {isSaving ? 'Saving...' : '💾 Save to Vault'}
+              {isSaving ? 'Saving...' : <><CyberIcon name="save" size={14} /> Save to Vault</>}
             </button>
           </div>
         </form>
@@ -605,10 +606,10 @@ export function SaveSelectionEvidenceModal({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                🛡️ Save Terminal Selection as Evidence
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                <CyberIcon name="shield" size={14} /> Save Terminal Selection as Evidence
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 EVIDENCE-STORE // LOG PROOF &amp; ASSOCIATE WITH ENGAGEMENT TARGET
               </div>
             </div>
@@ -646,8 +647,8 @@ export function SaveSelectionEvidenceModal({
             {/* Association Telemetry Banner */}
             <div
               style={{
-                background: 'rgba(0, 240, 255, 0.05)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
+                background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                 padding: '0.55rem 0.85rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -658,12 +659,12 @@ export function SaveSelectionEvidenceModal({
             >
               <div>
                 <span style={{ color: '#94a3b8' }}>SOURCE: </span>
-                <strong style={{ color: '#00f0ff' }}>Terminal Output</strong>
+                <strong style={{ color: 'var(--accent-bright)' }}>Terminal Output</strong>
               </div>
               {matchedHost && (
                 <div>
                   <span style={{ color: '#94a3b8' }}>HOST: </span>
-                  <strong style={{ color: '#38bdf8' }}>{matchedHost.label || matchedHost.address}</strong>
+                  <strong style={{ color: 'var(--accent-bright)' }}>{matchedHost.label || matchedHost.address}</strong>
                 </div>
               )}
             </div>
@@ -679,10 +680,10 @@ export function SaveSelectionEvidenceModal({
                   value={engagementId}
                   onChange={(e) => setEngagementId(e.target.value)}
                 >
-                  <option value="">🌐 Global / No Engagement</option>
+                  <option value=""><CyberIcon name="globe" size={14} /> Global / No Engagement</option>
                   {engagements.map((eng) => (
                     <option key={eng.id} value={eng.id}>
-                      🎯 {eng.name}
+                      <CyberIcon name="target" size={14} /> {eng.name}
                     </option>
                   ))}
                 </select>
@@ -701,7 +702,7 @@ export function SaveSelectionEvidenceModal({
                   <option value="">(No specific host)</option>
                   {hosts.map((h) => (
                     <option key={h.id} value={h.id}>
-                      🖥️ {h.label} ({h.address})
+                      <CyberIcon name="desktop" size={14} /> {h.label} ({h.address})
                     </option>
                   ))}
                 </select>
@@ -754,7 +755,7 @@ export function SaveSelectionEvidenceModal({
                   <option value="">(None - Standalone Internal Evidence)</option>
                   {findings.map((f) => (
                     <option key={f.id} value={f.id}>
-                      🎯 [{(f.severity || 'info').toUpperCase()}] {f.title}
+                      <CyberIcon name="target" size={14} /> [{(f.severity || 'info').toUpperCase()}] {f.title}
                     </option>
                   ))}
                 </select>
@@ -783,8 +784,8 @@ export function SaveSelectionEvidenceModal({
                 alignItems: 'center',
                 gap: '0.65rem',
                 padding: '0.5rem 0.75rem',
-                background: inReport ? 'rgba(0, 240, 255, 0.05)' : 'rgba(100, 116, 139, 0.1)',
-                border: inReport ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid rgba(100, 116, 139, 0.3)',
+                background: inReport ? 'color-mix(in srgb, var(--accent-bright) 5%, transparent)' : 'rgba(100, 116, 139, 0.1)',
+                border: inReport ? '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' : '1px solid rgba(100, 116, 139, 0.3)',
               }}
             >
               <input
@@ -792,21 +793,21 @@ export function SaveSelectionEvidenceModal({
                 id="ev-in-report"
                 checked={inReport}
                 onChange={(e) => setInReport(e.target.checked)}
-                style={{ accentColor: '#00f0ff', width: '16px', height: '16px', cursor: 'pointer' }}
+                style={{ accentColor: 'var(--accent-bright)', width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <label
                 htmlFor="ev-in-report"
                 style={{
                   fontSize: '0.8rem',
-                  color: inReport ? '#00f0ff' : '#94a3b8',
+                  color: inReport ? 'var(--accent-bright)' : '#94a3b8',
                   cursor: 'pointer',
                   fontFamily: 'JetBrains Mono, Consolas, monospace',
                   userSelect: 'none',
                 }}
               >
                 {inReport
-                  ? '📄 Include in Assessment Report (Reportable Finding Proof)'
-                  : '🔒 Internal Vault Evidence Only (Excluded from Client Report)'}
+                  ? <><CyberIcon name="file" size={14} /> Include in Assessment Report (Reportable Finding Proof)</>
+                  : <><CyberIcon name="lock" size={14} /> Internal Vault Evidence Only (Excluded from Client Report)</>}
               </label>
             </div>
 
@@ -839,7 +840,7 @@ export function SaveSelectionEvidenceModal({
               className="cyber-btn cyber-btn-primary"
               disabled={isSaving}
             >
-              {isSaving ? 'Saving...' : '🛡️ Save to Evidence Vault'}
+              {isSaving ? 'Saving...' : <><CyberIcon name="shield" size={14} /> Save to Evidence Vault</>}
             </button>
           </div>
         </form>
@@ -962,17 +963,17 @@ export function SaveSelectionNoteModal({
         {/* Pinned Header */}
         <div className="dialog-header" style={{ flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span className="cyber-hazard-stripes" style={{ fontSize: '1.25rem', color: '#00f0ff' }}>
+            <span className="cyber-hazard-stripes" style={{ fontSize: '1.25rem', color: 'var(--accent-bright)' }}>
               ///
             </span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#00f0ff', letterSpacing: '0.05em' }}>
-                📝 Save to Host / Engagement Notes
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--accent-bright)', letterSpacing: '0.05em' }}>
+                <CyberIcon name="note" size={14} /> Save to Host / Engagement Notes
               </h3>
               <div
                 style={{
                   fontSize: '0.7rem',
-                  color: '#38bdf8',
+                  color: 'var(--accent-bright)',
                   fontFamily: 'JetBrains Mono, Consolas, monospace',
                   marginTop: '2px',
                   letterSpacing: '0.04em',
@@ -1008,8 +1009,8 @@ export function SaveSelectionNoteModal({
 
             <div
               style={{
-                background: 'rgba(0, 240, 255, 0.05)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
+                background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                 padding: '0.55rem 0.85rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -1020,12 +1021,12 @@ export function SaveSelectionNoteModal({
             >
               <div>
                 <span style={{ color: '#94a3b8' }}>SOURCE: </span>
-                <strong style={{ color: '#00f0ff' }}>Terminal Output (Nmap / Recon)</strong>
+                <strong style={{ color: 'var(--accent-bright)' }}>Terminal Output (Nmap / Recon)</strong>
               </div>
               {matchedHost && (
                 <div>
                   <span style={{ color: '#94a3b8' }}>TARGET: </span>
-                  <strong style={{ color: '#38bdf8' }}>{matchedHost.label || matchedHost.address}</strong>
+                  <strong style={{ color: 'var(--accent-bright)' }}>{matchedHost.label || matchedHost.address}</strong>
                 </div>
               )}
             </div>
@@ -1041,10 +1042,10 @@ export function SaveSelectionNoteModal({
                   value={engagementId}
                   onChange={(e) => setEngagementId(e.target.value)}
                 >
-                  <option value="">🌐 Global / No Engagement</option>
+                  <option value=""><CyberIcon name="globe" size={14} /> Global / No Engagement</option>
                   {engagements.map((eng) => (
                     <option key={eng.id} value={eng.id}>
-                      🎯 {eng.name}
+                      <CyberIcon name="target" size={14} /> {eng.name}
                     </option>
                   ))}
                 </select>
@@ -1063,7 +1064,7 @@ export function SaveSelectionNoteModal({
                   <option value="">(Global Workspace Note)</option>
                   {hosts.map((h) => (
                     <option key={h.id} value={h.id}>
-                      🖥️ {h.label} ({h.address})
+                      <CyberIcon name="desktop" size={14} /> {h.label} ({h.address})
                     </option>
                   ))}
                 </select>
@@ -1111,7 +1112,7 @@ export function SaveSelectionNoteModal({
               Cancel
             </button>
             <button type="submit" className="cyber-btn cyber-btn-primary" disabled={isSaving}>
-              {isSaving ? 'Saving...' : '📝 Save to Notes'}
+              {isSaving ? 'Saving...' : <><CyberIcon name="note" size={14} /> Save to Notes</>}
             </button>
           </div>
         </form>
@@ -1277,17 +1278,17 @@ export function SaveSelectionFindingModal({
         {/* Pinned Header */}
         <div className="dialog-header" style={{ flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span className="cyber-hazard-stripes" style={{ fontSize: '1.25rem', color: '#00f0ff' }}>
+            <span className="cyber-hazard-stripes" style={{ fontSize: '1.25rem', color: 'var(--accent-bright)' }}>
               ///
             </span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#00f0ff', letterSpacing: '0.05em' }}>
-                🎯 Create Security Finding from Selection
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--accent-bright)', letterSpacing: '0.05em' }}>
+                <CyberIcon name="target" size={14} /> Create Security Finding from Selection
               </h3>
               <div
                 style={{
                   fontSize: '0.7rem',
-                  color: '#38bdf8',
+                  color: 'var(--accent-bright)',
                   fontFamily: 'JetBrains Mono, Consolas, monospace',
                   marginTop: '2px',
                   letterSpacing: '0.04em',
@@ -1323,8 +1324,8 @@ export function SaveSelectionFindingModal({
 
             <div
               style={{
-                background: 'rgba(0, 240, 255, 0.05)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
+                background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                 padding: '0.55rem 0.85rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -1335,12 +1336,12 @@ export function SaveSelectionFindingModal({
             >
               <div>
                 <span style={{ color: '#94a3b8' }}>SOURCE: </span>
-                <strong style={{ color: '#00f0ff' }}>Terminal Output &rarr; Attached as Evidence #1</strong>
+                <strong style={{ color: 'var(--accent-bright)' }}>Terminal Output &rarr; Attached as Evidence #1</strong>
               </div>
               {matchedHost && (
                 <div>
                   <span style={{ color: '#94a3b8' }}>TARGET: </span>
-                  <strong style={{ color: '#38bdf8' }}>{matchedHost.label || matchedHost.address}</strong>
+                  <strong style={{ color: 'var(--accent-bright)' }}>{matchedHost.label || matchedHost.address}</strong>
                 </div>
               )}
             </div>
@@ -1356,10 +1357,10 @@ export function SaveSelectionFindingModal({
                   value={engagementId}
                   onChange={(e) => setEngagementId(e.target.value)}
                 >
-                  <option value="">🌐 Global / No Engagement</option>
+                  <option value=""><CyberIcon name="globe" size={14} /> Global / No Engagement</option>
                   {engagements.map((eng) => (
                     <option key={eng.id} value={eng.id}>
-                      🎯 {eng.name}
+                      <CyberIcon name="target" size={14} /> {eng.name}
                     </option>
                   ))}
                 </select>
@@ -1378,7 +1379,7 @@ export function SaveSelectionFindingModal({
                   <option value="">(No specific host)</option>
                   {hosts.map((h) => (
                     <option key={h.id} value={h.id}>
-                      🖥️ {h.label} ({h.address})
+                      <CyberIcon name="desktop" size={14} /> {h.label} ({h.address})
                     </option>
                   ))}
                 </select>
@@ -1515,8 +1516,8 @@ export function SaveSelectionFindingModal({
                 alignItems: 'center',
                 gap: '0.65rem',
                 padding: '0.45rem 0.75rem',
-                background: inReport ? 'rgba(0, 240, 255, 0.05)' : 'rgba(100, 116, 139, 0.1)',
-                border: inReport ? '1px solid rgba(0, 240, 255, 0.3)' : '1px solid rgba(100, 116, 139, 0.3)',
+                background: inReport ? 'color-mix(in srgb, var(--accent-bright) 5%, transparent)' : 'rgba(100, 116, 139, 0.1)',
+                border: inReport ? '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' : '1px solid rgba(100, 116, 139, 0.3)',
               }}
             >
               <input
@@ -1524,21 +1525,21 @@ export function SaveSelectionFindingModal({
                 id="find-in-report"
                 checked={inReport}
                 onChange={(e) => setInReport(e.target.checked)}
-                style={{ accentColor: '#00f0ff', width: '16px', height: '16px', cursor: 'pointer' }}
+                style={{ accentColor: 'var(--accent-bright)', width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <label
                 htmlFor="find-in-report"
                 style={{
                   fontSize: '0.8rem',
-                  color: inReport ? '#00f0ff' : '#94a3b8',
+                  color: inReport ? 'var(--accent-bright)' : '#94a3b8',
                   cursor: 'pointer',
                   fontFamily: 'JetBrains Mono, Consolas, monospace',
                   userSelect: 'none',
                 }}
               >
                 {inReport
-                  ? '📄 Include this Proof in Client Assessment Report'
-                  : '🔒 Internal Proof Only (Hide excerpt from Client Report)'}
+                  ? <><CyberIcon name="file" size={14} /> Include this Proof in Client Assessment Report</>
+                  : <><CyberIcon name="lock" size={14} /> Internal Proof Only (Hide excerpt from Client Report)</>}
               </label>
             </div>
 
@@ -1567,7 +1568,7 @@ export function SaveSelectionFindingModal({
               Cancel
             </button>
             <button type="submit" className="cyber-btn cyber-btn-primary" disabled={isSaving}>
-              {isSaving ? 'Creating...' : '🎯 Create Finding with Attached Evidence'}
+              {isSaving ? 'Creating...' : <><CyberIcon name="target" size={14} /> Create Finding with Attached Evidence</>}
             </button>
           </div>
         </form>

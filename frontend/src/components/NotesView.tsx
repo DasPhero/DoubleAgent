@@ -153,10 +153,10 @@ export const NotesView: React.FC<NotesViewProps> = ({
         updatedAt: new Date().toISOString(),
       };
       await onSaveNote(updated);
-      setSaveStatus('✓ Saved');
+      setSaveStatus('Saved');
       setTimeout(() => setSaveStatus(null), 2500);
     } catch {
-      setSaveStatus('❌ Error saving');
+      setSaveStatus('Error saving');
     } finally {
       setIsSaving(false);
     }
@@ -209,7 +209,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
   return (
     <div className="notes-view-container" role="region" aria-label="Host Notes and Documentation">
       {/* Top Header */}
-      <div className="notes-header" style={{ background: 'rgba(7, 13, 24, 0.95)', borderBottom: '1px solid rgba(0, 240, 255, 0.3)' }}>
+      <div className="notes-header" style={{ background: 'rgba(7, 13, 24, 0.95)', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' }}>
         <div className="notes-header-left">
           <button
             type="button"
@@ -222,10 +222,10 @@ export const NotesView: React.FC<NotesViewProps> = ({
             <span>{isSidebarCollapsed ? 'Show List' : 'Hide List'}</span>
           </button>
           <span className="cyber-hazard-stripes" style={{ marginRight: '6px' }}>///</span>
-          <h2 className="notes-header-title" style={{ color: '#00f0ff', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          <h2 className="notes-header-title" style={{ color: 'var(--accent-bright)', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <CyberIcon name="note" size={16} /> Host Notes &amp; Documentation
           </h2>
-          <span className="notes-count-badge" style={{ background: 'rgba(0, 240, 255, 0.15)', color: '#00f0ff', border: '1px solid rgba(0, 240, 255, 0.4)' }}>{filteredNotes.length} items</span>
+          <span className="notes-count-badge" style={{ background: 'color-mix(in srgb, var(--accent-bright) 15%, transparent)', color: 'var(--accent-bright)', border: '1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent)' }}>{filteredNotes.length} items</span>
         </div>
         <div className="notes-header-right">
           {onOpenAsTab && (
@@ -451,7 +451,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
               {/* Editor / Preview Content Split */}
               {editIsFolder ? (
                 <div className="note-folder-view">
-                  <span className="folder-icon" style={{ display: 'inline-flex', color: '#00f0ff' }}>
+                  <span className="folder-icon" style={{ display: 'inline-flex', color: 'var(--accent-bright)' }}>
                     <CyberIcon name="folder" size={28} />
                   </span>
                   <h3>Folder: {editTitle}</h3>
@@ -494,7 +494,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
             </div>
           ) : (
             <div className="note-empty-selection">
-              <span className="empty-icon" style={{ display: 'inline-flex', color: '#00f0ff' }}>
+              <span className="empty-icon" style={{ display: 'inline-flex', color: 'var(--accent-bright)' }}>
                 <CyberIcon name="note" size={32} />
               </span>
               <h3>Select a note or folder</h3>
@@ -519,7 +519,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
           role="button"
           tabIndex={0}
         >
-          <span className="node-icon" style={{ display: 'inline-flex', color: note.isFolder ? '#38bdf8' : '#00f0ff' }}>
+          <span className="node-icon" style={{ display: 'inline-flex', color: note.isFolder ? 'var(--accent-bright)' : 'var(--accent-bright)' }}>
             <CyberIcon name={note.isFolder ? 'folder' : 'note'} size={13} />
           </span>
           <span className="node-title font-mono">{note.title}</span>

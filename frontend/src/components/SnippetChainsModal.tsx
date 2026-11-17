@@ -304,13 +304,13 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
         <div className="cyber-corner-reticle cyber-corner-br" />
 
         {/* Modal Header */}
-        <div className="cyber-modal-header" style={{ padding: '0.85rem 1.25rem', borderBottom: '1px solid rgba(0, 240, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="cyber-modal-header" style={{ padding: '0.85rem 1.25rem', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{ color: 'var(--color-primary-cyan, #00f0ff)' }}>
+            <span style={{ color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
               <CyberIcon name="chain" size={18} />
             </span>
             <div>
-              <div style={{ fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-primary-cyan, #00f0ff)' }}>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
                 SNIPPET CHAINS // MULTI-STAGE SEQUENCES
               </div>
               <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
@@ -328,7 +328,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
           style={{
             padding: '0.55rem 1.25rem',
             backgroundColor: 'rgba(5, 12, 22, 0.95)',
-            borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+            borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -338,7 +338,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', overflow: 'hidden' }}>
-            <span style={{ color: '#00f0ff', fontWeight: 600 }}>CHAINS STORE:</span>
+            <span style={{ color: 'var(--accent-bright)', fontWeight: 600 }}>CHAINS STORE:</span>
             <span
               style={{
                 color: '#cbd5e1',
@@ -421,7 +421,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
             style={{
               padding: '0.75rem 1.25rem',
               backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
+              borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
               display: 'flex',
               alignItems: 'center',
               gap: '0.65rem',
@@ -551,7 +551,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
 
               {/* List Grid */}
               {filteredChains.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b', border: '1px dashed rgba(0, 240, 255, 0.2)', borderRadius: '6px' }}>
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b', border: '1px dashed color-mix(in srgb, var(--accent-bright) 20%, transparent)', borderRadius: '6px' }}>
                   <CyberIcon name="chain" size={32} />
                   <p style={{ marginTop: '0.5rem', fontSize: '0.88rem' }}>No snippet chains found matching filters.</p>
                   <button type="button" className="cyber-hud-btn btn-sm" onClick={startNewChain} style={{ marginTop: '0.75rem' }}>
@@ -571,7 +571,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                         className="cyber-card"
                         style={{
                           backgroundColor: 'rgba(10, 20, 35, 0.75)',
-                          border: isExpanded ? '1px solid rgba(0, 240, 255, 0.6)' : '1px solid rgba(0, 240, 255, 0.25)',
+                          border: isExpanded ? '1px solid color-mix(in srgb, var(--accent-bright) 60%, transparent)' : '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                           borderRadius: '4px',
                           padding: '0.85rem 1rem',
                           transition: 'border-color 0.15s ease',
@@ -584,7 +584,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                                 {chain.name}
                               </span>
                               {chain.category && (
-                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'rgba(0, 240, 255, 0.12)', color: 'var(--color-primary-cyan, #00f0ff)', border: '1px solid rgba(0, 240, 255, 0.3)' }}>
+                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'color-mix(in srgb, var(--accent-bright) 12%, transparent)', color: 'var(--color-primary-cyan, var(--accent-bright))', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' }}>
                                   {chain.category}
                                 </span>
                               )}
@@ -592,7 +592,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                                 {chain.targetOs ? chain.targetOs.toUpperCase() : 'ANY OS'}
                               </span>
                               {chain.hostId ? (
-                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'color-mix(in srgb, var(--accent-bright) 15%, transparent)', color: 'var(--accent-bright)', border: '1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent)' }}>
                                   HOST: {hostObj ? hostObj.label : chain.hostId}
                                 </span>
                               ) : (
@@ -662,8 +662,8 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
 
                         {/* Collapsible Steps Preview */}
                         {isExpanded && (
-                          <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px dashed rgba(0, 240, 255, 0.2)' }}>
-                            <div style={{ fontSize: '0.72rem', letterSpacing: '0.05em', color: 'var(--color-primary-cyan, #00f0ff)', marginBottom: '0.5rem', fontWeight: 600 }}>
+                          <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px dashed color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
+                            <div style={{ fontSize: '0.72rem', letterSpacing: '0.05em', color: 'var(--color-primary-cyan, var(--accent-bright))', marginBottom: '0.5rem', fontWeight: 600 }}>
                               CHAIN STEP BREAKDOWN:
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -672,7 +672,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                                   key={st.id || sidx}
                                   style={{
                                     backgroundColor: 'rgba(4, 9, 18, 0.85)',
-                                    border: '1px solid rgba(0, 240, 255, 0.15)',
+                                    border: '1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent)',
                                     borderRadius: '3px',
                                     padding: '0.5rem 0.75rem',
                                   }}
@@ -697,7 +697,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                                       margin: 0,
                                       padding: '0.35rem 0.5rem',
                                       backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                                      border: '1px solid rgba(0, 240, 255, 0.1)',
+                                      border: '1px solid color-mix(in srgb, var(--accent-bright) 10%, transparent)',
                                       borderRadius: '2px',
                                       color: '#a7f3d0',
                                       fontSize: '0.74rem',
@@ -722,8 +722,8 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
           ) : (
             /* Chain Edit / Create Form */
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(0, 240, 255, 0.2)' }}>
-                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--color-primary-cyan, #00f0ff)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
                   {editingChain.id ? `EDIT CHAIN: ${editingChain.name}` : 'CREATE NEW SNIPPET CHAIN'}
                 </span>
                 <button
@@ -817,7 +817,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
               </div>
 
               {/* Safety & Execution Policy Flags */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'rgba(0, 0, 0, 0.4)', border: '1px solid rgba(0, 240, 255, 0.2)', borderRadius: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', backgroundColor: 'rgba(0, 0, 0, 0.4)', border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', borderRadius: '4px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', color: '#e2e8f0' }}>
                   <input
                     type="checkbox"
@@ -856,7 +856,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
               {/* Steps Editor */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--color-primary-cyan, #00f0ff)' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
                     ORDERED CHAIN STEPS ({editingChain.steps.length})
                   </span>
                   <button
@@ -875,7 +875,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                     key={step.id || idx}
                     style={{
                       backgroundColor: 'rgba(6, 14, 26, 0.9)',
-                      border: '1px solid rgba(0, 240, 255, 0.25)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                       borderRadius: '4px',
                       padding: '0.85rem',
                       display: 'flex',
@@ -885,7 +885,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary-cyan, #00f0ff)', width: '22px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary-cyan, var(--accent-bright))', width: '22px' }}>
                           #{idx + 1}
                         </span>
                         <input
@@ -906,7 +906,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                           onClick={() => handleMoveStep(idx, 'up')}
                           title="Move step up"
                         >
-                          ▲
+                          <CyberIcon name="chevron-up" size={14} />
                         </button>
                         <button
                           type="button"
@@ -915,7 +915,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                           onClick={() => handleMoveStep(idx, 'down')}
                           title="Move step down"
                         >
-                          ▼
+                          <CyberIcon name="chevron-down" size={14} />
                         </button>
                         <button
                           type="button"
@@ -1018,7 +1018,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
               </div>
 
               {/* Form Actions */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
                 <button
                   type="button"
                   className="cyber-hud-btn btn-cancel"

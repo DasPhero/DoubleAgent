@@ -133,7 +133,7 @@ export const HostNotesDrawer: React.FC<HostNotesDrawerProps> = ({
             </span>
           )}
           <span className="cyber-hazard-stripes" style={{ marginRight: '2px' }}>///</span>
-          <span className="drawer-icon" style={{ color: '#00f0ff', display: 'inline-flex' }}>
+          <span className="drawer-icon" style={{ color: 'var(--accent-bright)', display: 'inline-flex' }}>
             <CyberIcon name="note" size={14} />
           </span>
           <div className="drawer-titles">

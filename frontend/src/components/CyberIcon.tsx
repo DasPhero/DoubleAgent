@@ -52,7 +52,23 @@ export type CyberIconName =
   | 'check'
   | 'download'
   | 'file'
-  | 'clipboard';
+  | 'clipboard'
+  | 'keyboard'
+  | 'desktop'
+  | 'clock'
+  | 'eye'
+  | 'eye-off'
+  | 'rocket'
+  | 'star'
+  | 'chart'
+  | 'refresh'
+  | 'flag'
+  | 'globe'
+  | 'chevron-up'
+  | 'arrow-right'
+  | 'arrow-left'
+  | 'arrow-left-right'
+  | 'return';
 
 export interface CyberIconProps {
   name: CyberIconName;
@@ -485,6 +501,133 @@ export const CyberIcon: React.FC<CyberIconProps> = ({
         <svg {...commonProps}>
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
+        </svg>
+      );
+    case 'keyboard':
+      return (
+        <svg {...commonProps}>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="M6 8h.01" />
+          <path d="M10 8h.01" />
+          <path d="M14 8h.01" />
+          <path d="M18 8h.01" />
+          <path d="M8 12h.01" />
+          <path d="M12 12h.01" />
+          <path d="M16 12h.01" />
+          <path d="M7 16h10" />
+        </svg>
+      );
+    case 'desktop':
+      return (
+        <svg {...commonProps}>
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      );
+    case 'clock':
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      );
+    case 'eye':
+      return (
+        <svg {...commonProps}>
+          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case 'eye-off':
+      return (
+        <svg {...commonProps}>
+          <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+          <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+          <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+          <line x1="2" y1="2" x2="22" y2="22" />
+        </svg>
+      );
+    case 'rocket':
+      return (
+        <svg {...commonProps}>
+          <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+          <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+          <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+          <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+        </svg>
+      );
+    case 'star':
+      return (
+        <svg {...commonProps}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+      );
+    case 'chart':
+      return (
+        <svg {...commonProps}>
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+          <polyline points="16 7 22 7 22 13" />
+        </svg>
+      );
+    case 'refresh':
+      return (
+        <svg {...commonProps}>
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+          <path d="M21 3v5h-5" />
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+          <path d="M3 21v-5h5" />
+        </svg>
+      );
+    case 'flag':
+      return (
+        <svg {...commonProps}>
+          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+          <line x1="4" y1="22" x2="4" y2="15" />
+        </svg>
+      );
+    case 'globe':
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+        </svg>
+      );
+    case 'chevron-up':
+      return (
+        <svg {...commonProps}>
+          <polyline points="18 15 12 9 6 15" />
+        </svg>
+      );
+    case 'arrow-right':
+      return (
+        <svg {...commonProps}>
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      );
+    case 'arrow-left':
+      return (
+        <svg {...commonProps}>
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+      );
+    case 'arrow-left-right':
+      return (
+        <svg {...commonProps}>
+          <polyline points="17 11 21 7 17 3" />
+          <line x1="21" y1="7" x2="9" y2="7" />
+          <polyline points="7 21 3 17 7 13" />
+          <line x1="3" y1="17" x2="15" y2="17" />
+        </svg>
+      );
+    case 'return':
+      return (
+        <svg {...commonProps}>
+          <polyline points="9 10 4 15 9 20" />
+          <path d="M20 4v7a4 4 0 0 1-4 4H4" />
         </svg>
       );
   }

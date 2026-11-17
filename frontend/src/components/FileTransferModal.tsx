@@ -498,7 +498,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
             <div
               style={{
                 background: 'rgba(6, 13, 26, 0.85)',
-                border: '1px solid rgba(0, 240, 255, 0.28)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 28%, transparent)',
                 borderRadius: '4px',
                 padding: '0.85rem',
                 display: 'flex',
@@ -507,7 +507,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.08em' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.08em' }}>
                   /// 1. STAGING SERVER LAUNCHPAD
                 </span>
                 <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>HTTP / UPLOAD / SMB</span>
@@ -684,11 +684,11 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                   <div
                     style={{
                       background: '#030712',
-                      border: '1px solid rgba(0, 240, 255, 0.25)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                       padding: '0.5rem 0.65rem',
                       fontFamily: 'monospace',
                       fontSize: '0.74rem',
-                      color: '#38bdf8',
+                      color: 'var(--accent-bright)',
                       wordBreak: 'break-all',
                       borderRadius: '3px',
                     }}
@@ -798,7 +798,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                               <span style={{ color: ev.status >= 400 ? '#f87171' : '#34d399' }}>
                                 [{ev.status}]
                               </span>{' '}
-                              {ev.method} {ev.path} ← {ev.remoteAddr} ({formatBytes(ev.bytes)})
+                              {ev.method} {ev.path} <CyberIcon name="arrow-left" size={14} /> {ev.remoteAddr} ({formatBytes(ev.bytes)})
                             </div>
                           ))}
                       </div>
@@ -812,7 +812,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
             <div
               style={{
                 background: 'rgba(6, 13, 26, 0.85)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                 borderRadius: '4px',
                 padding: '0.75rem',
                 display: 'flex',
@@ -823,7 +823,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.07em' }}>
                   /// 2. STAGED FILES (CLICK TO TARGET &amp; HASH)
                 </span>
                 <button
@@ -859,8 +859,8 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                           padding: '0.38rem 0.55rem',
                           borderRadius: '3px',
                           cursor: 'pointer',
-                          background: isSelected ? 'rgba(0, 240, 255, 0.14)' : 'rgba(15, 23, 42, 0.65)',
-                          border: isSelected ? '1px solid rgba(0, 240, 255, 0.6)' : '1px solid rgba(148, 163, 184, 0.15)',
+                          background: isSelected ? 'color-mix(in srgb, var(--accent-bright) 14%, transparent)' : 'rgba(15, 23, 42, 0.65)',
+                          border: isSelected ? '1px solid color-mix(in srgb, var(--accent-bright) 60%, transparent)' : '1px solid rgba(148, 163, 184, 0.15)',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
@@ -869,7 +869,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                             style={{
                               fontSize: '0.76rem',
                               fontFamily: 'monospace',
-                              color: f.isDir ? '#38bdf8' : '#e2e8f0',
+                              color: f.isDir ? 'var(--accent-bright)' : '#e2e8f0',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
@@ -883,7 +883,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                             {f.isDir ? 'DIR' : formatBytes(f.size)}
                           </span>
                           {!f.isDir && (
-                            <span style={{ fontSize: '0.64rem', color: '#00f0ff', fontWeight: 600 }}>
+                            <span style={{ fontSize: '0.64rem', color: 'var(--accent-bright)', fontWeight: 600 }}>
                               {hashingFile === (f.relPath || f.name) ? 'HASHING...' : 'HASH'}
                             </span>
                           )}
@@ -902,7 +902,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
             <div
               style={{
                 background: 'rgba(6, 13, 26, 0.85)',
-                border: '1px solid rgba(0, 240, 255, 0.28)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 28%, transparent)',
                 borderRadius: '4px',
                 padding: '0.85rem',
                 display: 'flex',
@@ -911,7 +911,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.08em' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.08em' }}>
                   /// 3. TARGET COMMAND &amp; INTEGRITY GENERATOR
                 </span>
                 <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -1103,7 +1103,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                   key={method.id}
                   style={{
                     background: 'rgba(6, 13, 26, 0.88)',
-                    border: '1px solid rgba(0, 240, 255, 0.22)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent)',
                     borderRadius: '4px',
                     padding: '0.65rem 0.8rem',
                     display: 'flex',
@@ -1154,7 +1154,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                       borderRadius: '3px',
                       fontFamily: 'monospace',
                       fontSize: '0.73rem',
-                      color: '#00f0ff',
+                      color: 'var(--accent-bright)',
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-all',
                     }}

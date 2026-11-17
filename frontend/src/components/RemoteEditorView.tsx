@@ -255,11 +255,11 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
           {/* Status badge */}
           {isDirty ? (
             <span className="editor-status-pill dirty" title="Unsaved local modifications">
-              ● Unsaved
+              <CyberIcon name="record" size={14} /> Unsaved
             </span>
           ) : (
             <span className="editor-status-pill clean" title="Synced with remote server">
-              ✓ Synced
+              <CyberIcon name="check" size={14} /> Synced
             </span>
           )}
 
@@ -383,7 +383,7 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
                 onClick={() => setShowConflictModal(false)}
                 aria-label="Dismiss Conflict Dialog"
               >
-                ✕
+                <CyberIcon name="close" size={14} />
               </button>
             </div>
 

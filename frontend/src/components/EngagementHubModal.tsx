@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { CyberIcon } from './CyberIcon';
 import { Engagement, CredentialEntry, EvidenceItem } from '../types/pentest';
 
 export interface HostOption {
@@ -351,10 +352,10 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 id="engagement-hub-title" style={{ margin: 0, fontSize: '1rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                🎯 PENTEST ENGAGEMENT HUB &amp; SCOPE
+              <h3 id="engagement-hub-title" style={{ margin: 0, fontSize: '1rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                <CyberIcon name="target" size={14} /> PENTEST ENGAGEMENT HUB &amp; SCOPE
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 STANDALONE CUSTOMER ASSIGNMENTS · ARTIFACT VAULT · ENCRYPTED .DAENG PACKAGES
               </div>
             </div>
@@ -365,7 +366,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
             onClick={onClose}
             aria-label="Close Engagement Hub"
           >
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
 
@@ -386,13 +387,13 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
               fontFamily: 'JetBrains Mono, Consolas, monospace',
             }}
           >
-            <span>{feedbackMsg.type === 'success' ? '✓ ' : '⚠️ '}{feedbackMsg.text}</span>
+            <span>{feedbackMsg.type === 'success' ? <CyberIcon name="check" size={14} /> : <CyberIcon name="warning" size={14} />} {feedbackMsg.text}</span>
             <button
               type="button"
               onClick={() => setFeedbackMsg(null)}
               style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 4px' }}
             >
-              ✕
+              <CyberIcon name="close" size={14} />
             </button>
           </div>
         )}
@@ -403,7 +404,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
           <div
             style={{
               background: 'rgba(5, 12, 24, 0.85)',
-              border: '1px solid rgba(0, 240, 255, 0.25)',
+              border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
               padding: '0.85rem 1rem',
               display: 'flex',
               alignItems: 'center',
@@ -421,12 +422,12 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 className="cyber-hud-select"
                 value={activeEngagement?.id || ''}
                 onChange={(e) => void handleSetActive(e.target.value)}
-                style={{ flex: 1, minWidth: '280px', maxWidth: '420px', height: '34px', fontSize: '0.82rem', fontWeight: 600, color: '#00f0ff' }}
+                style={{ flex: 1, minWidth: '280px', maxWidth: '420px', height: '34px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-bright)' }}
               >
                 {engagements.length === 0 && <option value="">No Engagements Configured</option>}
                 {engagements.map((eng) => (
                   <option key={eng.id} value={eng.id}>
-                    {eng.name} {eng.id === activeEngagement?.id ? '★ (Active)' : ''}
+                    {eng.name} {eng.id === activeEngagement?.id ? '(Active)' : ''}
                   </option>
                 ))}
               </select>
@@ -449,7 +450,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
               onSubmit={handleCreateEngagement}
               style={{
                 background: 'rgba(8, 18, 32, 0.95)',
-                border: '1px solid rgba(0, 240, 255, 0.4)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent)',
                 padding: '1rem',
                 borderRadius: '2px',
                 display: 'flex',
@@ -457,7 +458,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 gap: '0.85rem',
               }}
             >
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.05em' }}>
                 /// DEFINE NEW PENTEST ENGAGEMENT
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -535,7 +536,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                   Cancel
                 </button>
                 <button type="submit" className="cyber-btn cyber-btn-primary cyber-btn-sm">
-                  ✓ Save Engagement
+                  <CyberIcon name="check" size={14} /> Save Engagement
                 </button>
               </div>
             </form>
@@ -546,7 +547,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
             <div
               style={{
                 background: 'rgba(5, 9, 16, 0.75)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                 borderRadius: '2px',
                 padding: '1.15rem',
                 display: 'flex',
@@ -560,7 +561,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     {activeEngagement.name}
                   </h4>
                   <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '3px', fontFamily: 'JetBrains Mono, monospace' }}>
-                    ID: {activeEngagement.id} {activeEngagement.timeframe ? `· ⏱️ ${activeEngagement.timeframe}` : ''}
+                    ID: {activeEngagement.id} {activeEngagement.timeframe ? `· ${activeEngagement.timeframe}` : ''}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -574,7 +575,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                       }}
                       style={{ fontSize: '0.72rem' }}
                     >
-                      ✏️ Edit Scope &amp; Settings
+                      <CyberIcon name="edit" size={14} /> Edit Scope &amp; Settings
                     </button>
                   )}
                   <button
@@ -583,7 +584,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     onClick={() => void handleDeleteEngagement(activeEngagement.id, activeEngagement.name)}
                     style={{ fontSize: '0.7rem' }}
                   >
-                    🗑️ Delete Engagement
+                    <CyberIcon name="trash" size={14} /> Delete Engagement
                   </button>
                 </div>
               </div>
@@ -594,11 +595,11 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 <div
                   style={{
                     background: 'rgba(2, 6, 12, 0.9)',
-                    border: '1px solid rgba(0, 240, 255, 0.15)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent)',
                     padding: '0.65rem 0.85rem',
                     fontSize: '0.78rem',
                     fontFamily: 'JetBrains Mono, Consolas, monospace',
-                    color: '#38bdf8',
+                    color: 'var(--accent-bright)',
                     borderRadius: '2px',
                     wordBreak: 'break-all',
                   }}
@@ -611,7 +612,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
               <div
                 style={{
                   background: 'rgba(10, 18, 32, 0.65)',
-                  border: '1px solid rgba(0, 240, 255, 0.2)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                   padding: '0.85rem',
                   borderRadius: '2px',
                   display: 'flex',
@@ -620,8 +621,8 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.04em' }}>
-                    🖥️ ENCLOSED IN-SCOPE HOSTS ({inScopeHostsList.length})
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.04em' }}>
+                    <CyberIcon name="desktop" size={14} /> ENCLOSED IN-SCOPE HOSTS ({inScopeHostsList.length})
                   </span>
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                     Strict customer encapsulation
@@ -634,8 +635,8 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                       <div
                         key={h.id}
                         style={{
-                          background: 'rgba(0, 240, 255, 0.08)',
-                          border: '1px solid rgba(0, 240, 255, 0.35)',
+                          background: 'color-mix(in srgb, var(--accent-bright) 8%, transparent)',
+                          border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                           borderRadius: '2px',
                           padding: '4px 8px',
                           fontSize: '0.74rem',
@@ -645,7 +646,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                         }}
                       >
                         <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{h.label}</span>
-                        <span style={{ color: '#38bdf8', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.68rem' }}>
+                        <span style={{ color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.68rem' }}>
                           {h.address || 'no-ip'}
                         </span>
                         <button
@@ -661,7 +662,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                           }}
                           title="Detach host from this engagement"
                         >
-                          ✕
+                          <CyberIcon name="close" size={14} />
                         </button>
                       </div>
                     ))}
@@ -705,7 +706,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                   <div
                     style={{
                       background: 'rgba(10, 18, 32, 0.75)',
-                      border: '1px solid rgba(0, 240, 255, 0.2)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                       padding: '0.75rem',
                       borderRadius: '2px',
                       display: 'flex',
@@ -713,8 +714,8 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                       gap: '4px',
                     }}
                   >
-                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>🖥️ In-Scope Hosts</span>
-                    <strong style={{ fontSize: '1.25rem', color: '#00f0ff', fontFamily: 'JetBrains Mono, monospace' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}><CyberIcon name="desktop" size={14} /> In-Scope Hosts</span>
+                    <strong style={{ fontSize: '1.25rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, monospace' }}>
                       {enclosedArtifacts.hostsCount}
                     </strong>
                   </div>
@@ -722,7 +723,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                   <div
                     style={{
                       background: 'rgba(10, 18, 32, 0.75)',
-                      border: '1px solid rgba(0, 240, 255, 0.2)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                       padding: '0.75rem',
                       borderRadius: '2px',
                       display: 'flex',
@@ -733,7 +734,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     onClick={onOpenCredStore}
                     title="Click to view credential pool"
                   >
-                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>🔑 Captured Creds</span>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}><CyberIcon name="key" size={14} /> Captured Creds</span>
                     <strong style={{ fontSize: '1.25rem', color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>
                       {enclosedArtifacts.credsCount}
                     </strong>
@@ -742,7 +743,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                   <div
                     style={{
                       background: 'rgba(10, 18, 32, 0.75)',
-                      border: '1px solid rgba(0, 240, 255, 0.2)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                       padding: '0.75rem',
                       borderRadius: '2px',
                       display: 'flex',
@@ -753,7 +754,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     onClick={onOpenEvidenceVault}
                     title="Click to view evidence vault"
                   >
-                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>🚩 Findings / Evidence</span>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}><CyberIcon name="flag" size={14} /> Findings / Evidence</span>
                     <strong style={{ fontSize: '1.25rem', color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace' }}>
                       {enclosedArtifacts.evidenceCount}
                     </strong>
@@ -771,7 +772,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     if (onOpenCredStore) onOpenCredStore();
                   }}
                 >
-                  🔑 Open Credential Pool &amp; Spray Lists
+                  <CyberIcon name="key" size={14} /> Open Credential Pool &amp; Spray Lists
                 </button>
                 <button
                   type="button"
@@ -781,7 +782,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     if (onOpenEvidenceVault) onOpenEvidenceVault();
                   }}
                 >
-                  🚩 Open Evidence Vault &amp; Findings
+                  <CyberIcon name="flag" size={14} /> Open Evidence Vault &amp; Findings
                 </button>
               </div>
             </div>
@@ -789,7 +790,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
             <div
               style={{
                 background: 'rgba(5, 9, 16, 0.75)',
-                border: '1px dashed rgba(0, 240, 255, 0.3)',
+                border: '1px dashed color-mix(in srgb, var(--accent-bright) 30%, transparent)',
                 padding: '2rem',
                 textAlign: 'center',
                 color: '#94a3b8',
@@ -804,7 +805,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
           <div
             style={{
               background: 'rgba(8, 16, 30, 0.85)',
-              border: '1px solid rgba(0, 240, 255, 0.25)',
+              border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
               borderRadius: '2px',
               padding: '1.15rem',
               display: 'flex',
@@ -813,8 +814,8 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
             }}
           >
             <div>
-              <h4 style={{ margin: 0, fontSize: '0.88rem', color: '#00f0ff', letterSpacing: '0.05em' }}>
-                📦 STANDALONE ENGAGEMENT FILE MANAGEMENT (.DAENG)
+              <h4 style={{ margin: 0, fontSize: '0.88rem', color: 'var(--accent-bright)', letterSpacing: '0.05em' }}>
+                <CyberIcon name="file" size={14} /> STANDALONE ENGAGEMENT FILE MANAGEMENT (.DAENG)
               </h4>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#94a3b8' }}>
                 Every engagement is isolated as an independent file to guarantee customer segregation and GDPR compliance.
@@ -827,7 +828,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
               <div
                 style={{
                   background: 'rgba(3, 8, 16, 0.65)',
-                  border: '1px solid rgba(0, 240, 255, 0.15)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent)',
                   padding: '0.9rem',
                   borderRadius: '2px',
                   display: 'flex',
@@ -836,7 +837,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 }}
               >
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9' }}>
-                  📤 Export Active Engagement
+                  <CyberIcon name="upload" size={14} /> Export Active Engagement
                 </div>
                 <div>
                   <label className="cyber-label">Password Protection (Optional)</label>
@@ -857,7 +858,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                   onClick={() => void handleExportPackage()}
                   disabled={!activeEngagement || isExporting}
                 >
-                  {isExporting ? 'PACKAGING...' : '📦 DOWNLOAD .DAENG PACKAGE'}
+                  {isExporting ? 'PACKAGING...' : <><CyberIcon name="download" size={14} /> DOWNLOAD .DAENG PACKAGE</>}
                 </button>
               </div>
 
@@ -865,7 +866,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
               <div
                 style={{
                   background: 'rgba(3, 8, 16, 0.65)',
-                  border: '1px solid rgba(0, 240, 255, 0.15)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent)',
                   padding: '0.9rem',
                   borderRadius: '2px',
                   display: 'flex',
@@ -874,7 +875,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                 }}
               >
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9' }}>
-                  📥 Import Engagement File
+                  <CyberIcon name="download" size={14} /> Import Engagement File
                 </div>
                 <div>
                   <label className="cyber-label">Select .daeng File</label>
@@ -885,7 +886,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                     style={{ fontSize: '0.75rem', color: '#cbd5e1' }}
                   />
                   {importFileName && (
-                    <div style={{ fontSize: '0.7rem', color: '#38bdf8', marginTop: '2px', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', marginTop: '2px', fontFamily: 'monospace' }}>
                       Selected: {importFileName}
                     </div>
                   )}
@@ -906,7 +907,7 @@ export const EngagementHubModal: React.FC<EngagementHubModalProps> = ({
                   onClick={() => void handleImportPackage()}
                   disabled={!importFileContent || isImporting}
                 >
-                  {isImporting ? 'IMPORTING...' : '📥 MERGE INTO VAULT'}
+                  {isImporting ? 'IMPORTING...' : <><CyberIcon name="download" size={14} /> MERGE INTO VAULT</>}
                 </button>
               </div>
             </div>

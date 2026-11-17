@@ -488,14 +488,14 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
             style={{
               padding: '0.75rem 1.4rem',
               backgroundColor: 'rgba(10, 22, 42, 0.96)',
-              borderBottom: '1px solid rgba(0, 240, 255, 0.3)',
+              borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
               display: 'flex',
               alignItems: 'center',
               gap: '0.6rem',
               flexWrap: 'wrap',
             }}
           >
-            <span style={{ fontSize: '0.74rem', color: '#00f0ff', fontWeight: 700, letterSpacing: '0.06em' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--accent-bright)', fontWeight: 700, letterSpacing: '0.06em' }}>
               EXTERNAL FILE OR FOLDER PATH:
             </span>
             <input
@@ -575,7 +575,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
           <div className="cyber-field-group">
             <div className="cyber-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>LHOST / LISTENER IP</span>
-              <span style={{ color: '#00f0ff' }}>&#123;&#123;LHOST&#125;&#125;</span>
+              <span style={{ color: 'var(--accent-bright)' }}>&#123;&#123;LHOST&#125;&#125;</span>
             </div>
             <div style={{ display: 'flex', gap: '0.4rem' }}>
               <input
@@ -603,7 +603,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
           <div className="cyber-field-group">
             <div className="cyber-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>LPORT / LISTENER PORT</span>
-              <span style={{ color: '#00f0ff' }}>&#123;&#123;LPORT&#125;&#125;</span>
+              <span style={{ color: 'var(--accent-bright)' }}>&#123;&#123;LPORT&#125;&#125;</span>
             </div>
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <input
@@ -688,7 +688,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
           <div
             style={{
               padding: '0.6rem 1.4rem',
-              borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+              borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
               backgroundColor: 'rgba(5, 15, 30, 0.9)',
               display: 'flex',
               flexWrap: 'wrap',
@@ -699,7 +699,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
             <div
               style={{
                 fontSize: '0.72rem',
-                color: '#00f0ff',
+                color: 'var(--accent-bright)',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
@@ -762,7 +762,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
           <div
             style={{
               width: '380px',
-              borderRight: '1px solid rgba(0, 240, 255, 0.22)',
+              borderRight: '1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent)',
               display: 'flex',
               flexDirection: 'column',
               backgroundColor: 'rgba(3, 8, 16, 0.55)',
@@ -772,14 +772,14 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
             <div
               style={{
                 padding: '0.75rem',
-                borderBottom: '1px solid rgba(0, 240, 255, 0.15)',
+                borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '0.5rem',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em', fontFamily: 'var(--font-mono)' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.07em', fontFamily: 'var(--font-mono)' }}>
                   PAYLOADS ({filteredTemplates.length})
                 </span>
                 <button
@@ -896,8 +896,8 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                         onClick={() => handleSelectTemplate(t)}
                         style={{
                           padding: '0.65rem 0.8rem',
-                          backgroundColor: isSelected ? 'rgba(0, 240, 255, 0.14)' : 'rgba(6, 16, 30, 0.8)',
-                          border: isSelected ? '1px solid #00f0ff' : '1px solid rgba(0, 240, 255, 0.18)',
+                          backgroundColor: isSelected ? 'color-mix(in srgb, var(--accent-bright) 14%, transparent)' : 'rgba(6, 16, 30, 0.8)',
+                          border: isSelected ? '1px solid var(--accent-bright)' : '1px solid color-mix(in srgb, var(--accent-bright) 18%, transparent)',
                           clipPath:
                             'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
                           cursor: 'pointer',
@@ -909,7 +909,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                             style={{
                               fontSize: '0.82rem',
                               fontWeight: 700,
-                              color: isSelected ? '#00f0ff' : '#f1f5f9',
+                              color: isSelected ? 'var(--accent-bright)' : '#f1f5f9',
                             }}
                           >
                             {t.name}
@@ -1084,12 +1084,12 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                     style={{
                       padding: '0.5rem 0.8rem',
                       backgroundColor: 'rgba(2, 8, 18, 0.75)',
-                      border: '1px solid rgba(0, 240, 255, 0.2)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                       fontSize: '0.74rem',
                       color: '#cbd5e1',
                     }}
                   >
-                    <span style={{ color: '#00f0ff', fontWeight: 700 }}>Operational Notes: </span>
+                    <span style={{ color: 'var(--accent-bright)', fontWeight: 700 }}>Operational Notes: </span>
                     {currentTemplate.notes}
                   </div>
                 )}
@@ -1101,7 +1101,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                       style={{
                         fontSize: '0.72rem',
                         fontWeight: 800,
-                        color: '#00f0ff',
+                        color: 'var(--accent-bright)',
                         letterSpacing: '0.08em',
                       }}
                     >
@@ -1145,8 +1145,8 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                           {fileConfig?.filePath ? fileConfig.filePath.split(/[\\/]/).pop() : 'payload_templates.json'}
                         </code>
                         ) without hardcoded commands. Click below to populate the operational command using{' '}
-                        <code style={{ color: '#00f0ff' }}>&#123;&#123;LHOST&#125;&#125;</code> and{' '}
-                        <code style={{ color: '#00f0ff' }}>&#123;&#123;LPORT&#125;&#125;</code> placeholders.
+                        <code style={{ color: 'var(--accent-bright)' }}>&#123;&#123;LHOST&#125;&#125;</code> and{' '}
+                        <code style={{ color: 'var(--accent-bright)' }}>&#123;&#123;LPORT&#125;&#125;</code> placeholders.
                       </div>
                       <button
                         type="button"
@@ -1175,8 +1175,8 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                           margin: 0,
                           fontSize: '0.86rem',
                           lineHeight: '1.55',
-                          color: '#00f0ff',
-                          textShadow: '0 0 10px rgba(0, 240, 255, 0.25)',
+                          color: 'var(--accent-bright)',
+                          textShadow: '0 0 10px color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-all',
                           fontFamily: 'var(--font-mono)',
@@ -1397,7 +1397,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                     <label className="cyber-label" htmlFor="payload-editor-command">
                       Payload Command Template * (Use &#123;&#123;LHOST&#125;&#125; and &#123;&#123;LPORT&#125;&#125;)
                     </label>
-                    <span style={{ fontSize: '0.68rem', color: '#00f0ff' }}>Saved to external JSON file</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--accent-bright)' }}>Saved to external JSON file</span>
                   </div>
                   <div
                     style={{
@@ -1408,7 +1408,7 @@ export const PayloadGeneratorModal: React.FC<PayloadGeneratorModalProps> = ({
                       padding: '0.45rem 0.65rem',
                       marginBottom: '0.4rem',
                       backgroundColor: 'rgba(6, 14, 26, 0.88)',
-                      border: '1px solid rgba(0, 240, 255, 0.2)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                       borderRadius: '4px',
                     }}
                   >

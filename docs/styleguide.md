@@ -49,6 +49,10 @@ Core tokens defined in `:root` and overridden by `.app-shell.theme-locked` / `.a
 | **Emerald (`#10b981`, `#34d399`)** | Active/connected sessions, copied confirmation (`.is-copied`), file present on disk |
 
 > **Audit Rule for Theme Consistency:** Components must reference `var(--accent-bright)`, `var(--accent-glow)`, `var(--accent-primary)`, `var(--accent-text)`, and `var(--border-accent)` instead of hardcoding `#00f0ff` or `rgba(0, 240, 255, ...)` in inline `style` props.
+>
+> **Translucent accents (the `color-mix` rule):** A hardcoded `rgba(0, 240, 255, A)` encodes a *specific* accent alpha the four tokens above can't all express. Replace it with `color-mix(in srgb, var(--accent-bright) <A×100>%, transparent)` so the tint tracks the active theme while preserving the exact opacity (e.g. `rgba(0, 240, 255, 0.25)` → `color-mix(in srgb, var(--accent-bright) 25%, transparent)`). The whole frontend was swept to this convention; `TotpManagerModal.tsx` (the MFA module) is the zero-hardcoded-color reference component.
+>
+> **Legitimate cyan literals that must stay:** per-host / per-tab **data** colors (`TabItem.color`, host color coding), the ANSI palette hexes inside `getThemeColors()`, and theme **swatch** hexes in `SettingsView.tsx`. These are stored values or literal previews, not themed chrome — never tokenize them.
 
 ---
 
@@ -98,8 +102,14 @@ Core tokens defined in `:root` and overridden by `.app-shell.theme-locked` / `.a
 
 ## 5. Iconography Rules
 
-- **Strict Rule (`AGENTS.md` #9):** **Never use Unicode emojis** anywhere in the UI (no `🛡️`, `🚀`, `🔒`, `✨`, `📋`, etc. in buttons, tabs, dropdowns, badges, dialogs, or select `<option>` text).
-- Import and render monochrome vector SVGs through [`CyberIcon.tsx`](../frontend/src/components/CyberIcon.tsx) so icons inherit `currentColor` cleanly across themes.
+- **Strict Rule (`AGENTS.md` #9):** **Never use Unicode emojis** anywhere in the UI (no `🛡️`, `🚀`, `🔒`, `✨`, `📋`, etc. in buttons, tabs, dropdowns, badges, dialogs, or select `<option>` text). This also covers geometric/arrow glyphs used as icons — `●`, `○`, `▲`, `▼`, `▾`, `►`, `▶`, `■`, `↵`, `⇄`, `⇢`, `──▶` — which are `CyberIcon`s, not characters.
+- Import and render monochrome vector SVGs through [`CyberIcon.tsx`](../frontend/src/components/CyberIcon.tsx) (68 icons) so icons inherit `currentColor` cleanly across themes.
+- **Context rules for replacing a glyph:**
+  - **JSX text** (`>⚡ LABEL<`): replace the glyph with `<CyberIcon name="bolt" size={14} />` followed by the text.
+  - **Ternary label strings** (`{busy ? '...' : '📋 Copy'}`): return a fragment — `{busy ? '...' : <><CyberIcon name="clipboard" size={14} /> Copy</>}`. A string literal cannot hold an icon.
+  - **`<option>` / `<optgroup label>` text and `aria-label`/`title` attributes:** strip the glyph (these can't contain an element); rely on the text. Colored status/severity circles (`🔴🟢🟡`) are **stripped**, not iconified — monochrome `currentColor` icons can't carry a status hue; use text plus the surrounding semantic color, or a styled CSS dot.
+  - **Persisted data strings** (`TabItem.title`, `setStatusMessage(...)`, react-flow node labels): strip the glyph or use ASCII (`->`); never inject JSX into a string.
+- The MFA module ([`TotpManagerModal.tsx`](../frontend/src/components/TotpManagerModal.tsx)) is the reference for icon-in-button usage.
 
 ---
 
@@ -111,3 +121,20 @@ Whenever adding a new color theme `<id>`:
 3. Add a matching high-contrast ANSI palette (`background`, `foreground`, `cursor`, `selectionBackground`, ANSI 16 colors) in `getThemeColors()` inside [`TerminalView.tsx`](../frontend/src/components/TerminalView.tsx).
 4. Add the theme swatch card in [`SettingsView.tsx`](../frontend/src/components/SettingsView.tsx).
 5. Verify `.app-shell.theme-locked` still overrides cleanly to armed crimson when the vault locks, and check contrast ratios across modals, terminal selections, and crimson `.btn-danger` buttons.
+
+### Theme Roster
+
+The single source of truth for valid IDs is the `colorTheme` union in [`TerminalView.tsx`](../frontend/src/components/TerminalView.tsx). Current unlocked themes:
+
+| ID | Label | `--accent-bright` | Second accent (`--accent-text`) | Vibe |
+| --- | --- | --- | --- | --- |
+| `teal` | Teal (Cyber) | `#00f0ff` | `#5eead4` | Default obsidian + cyan HUD |
+| `one-dark` | One Dark | `#61afef` | `#98c379` | Editor blue / green |
+| `crimson` | Crimson | `#ff2e2e` | `#ff9a9a` | True black + blood-red (kept warmer/deeper than the locked-vault scarlet `#ff003c` so unlocked never reads as armed) |
+| `neon` | Neon | `#ff2bd6` | `#ff9e4d` | Synthwave violet base, hot-pink glow, orange text |
+| `vice` | Vice | `#2dd4bf` | `#ff6ec7` | Cyberpunk teal glow × hot pink |
+| `viper` | Viper | `#aaff00` | `#bef264` | Acid / matrix green on near-black |
+| `voltage` | Voltage | `#2f9bff` | `#ffe014` | Electric-blue arc over navy, gold button fills; yellow text pushed to lemon `#ffe014` to clear the fixed warning amber `#ffaa00` |
+| `plasma` | Plasma | `#ff2b4e` | `#22d3ee` | Arasaka red chrome (glowing red borders/headers) over near-black with electric-teal content — red/teal cyberpunk duotone |
+
+> Note: `crimson` deliberately avoids the locked-state scarlet. When adding a red-family theme, keep `--accent-bright` distinguishable from `#ff003c` (the `.theme-locked` armed color) so operators can always tell a locked vault from an unlocked one at a glance.

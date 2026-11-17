@@ -328,8 +328,8 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
                   fontSize: '0.68rem',
                   padding: '0.05rem 0.35rem',
                   borderRadius: '2px',
-                  background: activeListeners.length > 0 ? 'rgba(0, 240, 255, 0.2)' : 'rgba(148, 163, 184, 0.15)',
-                  color: activeListeners.length > 0 ? '#00f0ff' : '#94a3b8',
+                  background: activeListeners.length > 0 ? 'color-mix(in srgb, var(--accent-bright) 20%, transparent)' : 'rgba(148, 163, 184, 0.15)',
+                  color: activeListeners.length > 0 ? 'var(--accent-bright)' : '#94a3b8',
                 }}
               >
                 {activeListeners.length}
@@ -386,7 +386,7 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
               ) : activeListeners.length === 0 ? (
                 <div className="cyber-empty-state">
                   <div className="cyber-empty-radar" />
-                  <div className="cyber-empty-icon" style={{ color: '#00f0ff' }}>
+                  <div className="cyber-empty-icon" style={{ color: 'var(--accent-bright)' }}>
                     <CyberIcon name="radar" size={36} />
                   </div>
                   <h3 className="cyber-empty-title">No Active Listeners Running</h3>
@@ -437,8 +437,8 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
                           <div
                             className="card-issuer-monogram"
                             style={{
-                              borderColor: hasCaught ? '#10b981' : isHighRiskPort ? '#ff2a6d' : '#00f0ff',
-                              color: hasCaught ? '#10b981' : isHighRiskPort ? '#ff2a6d' : '#00f0ff',
+                              borderColor: hasCaught ? '#10b981' : isHighRiskPort ? '#ff2a6d' : 'var(--accent-bright)',
+                              color: hasCaught ? '#10b981' : isHighRiskPort ? '#ff2a6d' : 'var(--accent-bright)',
                             }}
                           >
                             {l.tool.slice(0, 2).toUpperCase()}
@@ -453,9 +453,9 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
                             <span
                               className="card-host-pill"
                               style={{
-                                borderColor: hasCaught ? 'rgba(16, 185, 129, 0.5)' : 'rgba(0, 240, 255, 0.4)',
-                                color: hasCaught ? '#34d399' : '#00f0ff',
-                                background: hasCaught ? 'rgba(16, 185, 129, 0.14)' : 'rgba(0, 240, 255, 0.1)',
+                                borderColor: hasCaught ? 'rgba(16, 185, 129, 0.5)' : 'color-mix(in srgb, var(--accent-bright) 40%, transparent)',
+                                color: hasCaught ? '#34d399' : 'var(--accent-bright)',
+                                background: hasCaught ? 'rgba(16, 185, 129, 0.14)' : 'color-mix(in srgb, var(--accent-bright) 10%, transparent)',
                               }}
                             >
                               <span className="pill-pulse" />
@@ -481,7 +481,7 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
                                 <code
                                   style={{
                                     fontSize: '0.73rem',
-                                    color: '#67e8f9',
+                                    color: 'var(--accent-text)',
                                     fontFamily: 'var(--font-mono)',
                                     wordBreak: 'break-all',
                                   }}
@@ -498,7 +498,7 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
                                 alignItems: 'flex-end',
                                 justifyContent: 'center',
                                 padding: '0.25rem 0.5rem',
-                                border: '1px solid rgba(0, 240, 255, 0.25)',
+                                border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                                 background: 'rgba(2, 8, 18, 0.8)',
                               }}
                             >
@@ -509,7 +509,7 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
                                 style={{
                                   fontSize: '1.15rem',
                                   fontWeight: 800,
-                                  color: hasCaught ? '#10b981' : '#00f0ff',
+                                  color: hasCaught ? '#10b981' : 'var(--accent-bright)',
                                 }}
                               >
                                 {l.activeSessions ? l.activeSessions.length : l.catchCount || 0}
@@ -749,7 +749,7 @@ export const ListenerManagerModal: React.FC<ListenerManagerModalProps> = ({
 
                         <div className="card-code-terminal" style={{ cursor: 'default', padding: '0.55rem 0.75rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.78rem', color: '#00f0ff', fontWeight: 700 }}>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--accent-bright)', fontWeight: 700 }}>
                               HANDLER: {p.tool.toUpperCase()} ({p.kind.toUpperCase()})
                             </span>
                             <span

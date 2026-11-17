@@ -205,7 +205,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             onClick={onClose}
             aria-label="Close Import Dialog"
           >
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
 
@@ -219,7 +219,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
           {successResult && (
             <div className="alert-success" style={{ marginBottom: '1rem' }}>
-              <strong>✓ Migration Complete:</strong> {successResult.hostsImported} hosts imported,{' '}
+              <strong><CyberIcon name="check" size={14} /> Migration Complete:</strong> {successResult.hostsImported} hosts imported,{' '}
               {successResult.groupsCreated} groups created, {successResult.tunnelsConfigured} tunnels configured
               {successResult.keysImported > 0 ? `, ${successResult.keysImported} SSH keys saved` : ''}.
             </div>
@@ -270,7 +270,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                   OR load from an exported <code>.reg</code> file:
                 </span>
                 <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
-                  <span>📂 Choose .reg File</span>
+                  <span><CyberIcon name="folder" size={14} /> Choose .reg File</span>
                   <input
                     type="file"
                     accept=".reg,.txt"
@@ -310,7 +310,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', marginBottom: '0.8rem' }}>
                 <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
                   <CyberIcon name="folder" size={13} />
-                  <span>📂 Choose termius.json or .csv</span>
+                  <span><CyberIcon name="folder" size={14} /> Choose termius.json or .csv</span>
                   <input
                     type="file"
                     accept=".json,.csv,.txt"
@@ -440,7 +440,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 <table className="shortcuts-table" style={{ margin: 0 }}>
                   <thead>
                     <tr>
-                      <th style={{ width: '40px', textAlign: 'center' }}>✓</th>
+                      <th style={{ width: '40px', textAlign: 'center' }}><CyberIcon name="check" size={14} /></th>
                       <th>Host Label</th>
                       <th>Address : Port</th>
                       <th>User</th>
@@ -458,7 +458,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                           onClick={() => handleToggleSelect(idx)}
                           style={{
                             cursor: 'pointer',
-                            background: isSelected ? 'rgba(0, 240, 255, 0.05)' : undefined,
+                            background: isSelected ? 'color-mix(in srgb, var(--accent-bright) 5%, transparent)' : undefined,
                           }}
                         >
                           <td style={{ textAlign: 'center' }}>
@@ -470,7 +470,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                             />
                           </td>
                           <td style={{ fontWeight: 600, color: '#e2e8f0' }}>{h.label}</td>
-                          <td className="font-mono" style={{ fontSize: '0.76rem', color: '#38bdf8' }}>
+                          <td className="font-mono" style={{ fontSize: '0.76rem', color: 'var(--accent-bright)' }}>
                             {h.address}:{h.port}
                           </td>
                           <td style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
@@ -487,12 +487,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                           <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                             {h.keyPath && (
                               <div title={h.keyPath}>
-                                🔑 {h.keyPath.split(/[/\\]/).pop()}
+                                <CyberIcon name="key" size={14} /> {h.keyPath.split(/[/\\]/).pop()}
                               </div>
                             )}
                             {h.forwardRules && h.forwardRules.length > 0 && (
-                              <div style={{ color: '#2dd4bf' }}>
-                                ⇄ {h.forwardRules.length} Tunnels
+                              <div style={{ color: 'var(--accent-bright)' }}>
+                                <CyberIcon name="arrow-left-right" size={14} /> {h.forwardRules.length} Tunnels
                               </div>
                             )}
                           </td>
@@ -535,7 +535,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               disabled={isExecuting || selectedIndices.size === 0}
             >
               <CyberIcon name="bolt" size={13} />
-              <span>{isExecuting ? 'Importing...' : `⚡ Import Selected (${selectedIndices.size})`}</span>
+              <span>{isExecuting ? 'Importing...' : <><CyberIcon name="bolt" size={14} /> Import Selected ({selectedIndices.size})</>}</span>
             </button>
           </div>
         </div>

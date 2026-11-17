@@ -141,9 +141,9 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
       case 'alive_check':
         return {
           label: 'ALIVE CHECK // HOST DISCOVERY',
-          color: '#00f0ff',
-          bg: 'rgba(0, 240, 255, 0.12)',
-          border: 'rgba(0, 240, 255, 0.4)',
+          color: 'var(--accent-bright)',
+          bg: 'color-mix(in srgb, var(--accent-bright) 12%, transparent)',
+          border: 'color-mix(in srgb, var(--accent-bright) 40%, transparent)',
         };
       case 'port_scan':
         return {
@@ -195,13 +195,13 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <CyberIcon name="radar" size={16} /> NMAP XML RECON INGEST
               </h3>
               <div
                 style={{
                   fontSize: '0.7rem',
-                  color: '#38bdf8',
+                  color: 'var(--accent-bright)',
                   fontFamily: 'JetBrains Mono, Consolas, monospace',
                   marginTop: '2px',
                   letterSpacing: '0.04em',
@@ -241,15 +241,15 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
             /* Success Summary View */
             <div
               style={{
-                background: 'rgba(0, 240, 255, 0.05)',
-                border: '1px solid #00f0ff',
+                background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)',
+                border: '1px solid var(--accent-bright)',
                 padding: '1.25rem',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '1rem',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#00f0ff', fontWeight: 700, fontSize: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-bright)', fontWeight: 700, fontSize: '1rem' }}>
                 <CyberIcon name="shield" size={18} /> Ingest Completed Successfully
               </div>
               <div style={{ color: '#e2e8f0', fontSize: '0.85rem', lineHeight: '1.5' }}>
@@ -257,23 +257,23 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
-                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.75rem', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.4rem', color: '#00f0ff', fontWeight: 700 }}>{importSummary.createdHosts}</div>
+                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '0.75rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.4rem', color: 'var(--accent-bright)', fontWeight: 700 }}>{importSummary.createdHosts}</div>
                   <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Created Hosts</div>
                 </div>
-                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.75rem', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.4rem', color: '#38bdf8', fontWeight: 700 }}>{importSummary.updatedHosts}</div>
+                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '0.75rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.4rem', color: 'var(--accent-bright)', fontWeight: 700 }}>{importSummary.updatedHosts}</div>
                   <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Updated Hosts</div>
                 </div>
-                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.75rem', textAlign: 'center' }}>
+                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '0.75rem', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.4rem', color: '#4ade80', fontWeight: 700 }}>{importSummary.createdNotes}</div>
                   <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Total Notes</div>
                 </div>
-                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.75rem', textAlign: 'center' }}>
+                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '0.75rem', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.4rem', color: '#a855f7', fontWeight: 700 }}>{importSummary.createdPortNotes}</div>
                   <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Port Subpages</div>
                 </div>
-                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.75rem', textAlign: 'center' }}>
+                <div style={{ background: 'rgba(2, 6, 12, 0.8)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '0.75rem', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.4rem', color: '#f59e0b', fontWeight: 700 }}>{importSummary.createdPortFindings}</div>
                   <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Port Findings</div>
                 </div>
@@ -286,7 +286,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 style={{
-                  border: '2px dashed rgba(0, 240, 255, 0.35)',
+                  border: '2px dashed color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                   background: 'rgba(4, 9, 18, 0.8)',
                   padding: '1.25rem',
                   display: 'flex',
@@ -298,7 +298,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                   position: 'relative',
                 }}
               >
-                <CyberIcon name="upload" size={24} style={{ color: '#00f0ff' }} />
+                <CyberIcon name="upload" size={24} style={{ color: 'var(--accent-bright)' }} />
                 <div style={{ textAlign: 'center' }}>
                   <span style={{ color: '#f1f5f9', fontWeight: 600, fontSize: '0.85rem' }}>
                     Drag &amp; Drop Nmap XML File (.xml)
@@ -324,7 +324,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
 
               {/* Collapsible raw XML input */}
               <details style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                <summary style={{ cursor: 'pointer', color: '#38bdf8', userSelect: 'none' }}>
+                <summary style={{ cursor: 'pointer', color: 'var(--accent-bright)', userSelect: 'none' }}>
                   Paste Raw XML Directly / Edit Content
                 </summary>
                 <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
@@ -355,7 +355,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                 <div
                   style={{
                     background: 'rgba(4, 9, 18, 0.95)',
-                    border: '1px solid rgba(0, 240, 255, 0.35)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                     padding: '1rem',
                     display: 'flex',
                     flexDirection: 'column',
@@ -370,7 +370,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       gap: '0.5rem',
-                      borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
+                      borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                       paddingBottom: '0.65rem',
                     }}
                   >
@@ -390,14 +390,14 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                         {getScanKindBadge(scanResult.scanKind).label}
                       </span>
                       <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace' }}>
-                        SCAN ARGS: <code style={{ color: '#38bdf8' }}>{scanResult.args || 'nmap'}</code>
+                        SCAN ARGS: <code style={{ color: 'var(--accent-bright)' }}>{scanResult.args || 'nmap'}</code>
                       </span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.74rem', fontFamily: 'JetBrains Mono, monospace' }}>
                       <div>
                         <span style={{ color: '#94a3b8' }}>HOSTS UP: </span>
-                        <strong style={{ color: '#00f0ff' }}>{scanResult.upHostsCount}</strong>
+                        <strong style={{ color: 'var(--accent-bright)' }}>{scanResult.upHostsCount}</strong>
                         <span style={{ color: '#64748b' }}> / {scanResult.totalHosts}</span>
                       </div>
                       <div>
@@ -421,8 +421,8 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                           <div
                             key={hIdx}
                             style={{
-                              border: `1px solid ${isUp ? 'rgba(0, 240, 255, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                              background: isExpanded ? 'rgba(0, 240, 255, 0.05)' : 'rgba(2, 6, 12, 0.7)',
+                              border: `1px solid ${isUp ? 'color-mix(in srgb, var(--accent-bright) 30%, transparent)' : 'rgba(239, 68, 68, 0.3)'}`,
+                              background: isExpanded ? 'color-mix(in srgb, var(--accent-bright) 5%, transparent)' : 'rgba(2, 6, 12, 0.7)',
                               padding: '0.55rem 0.75rem',
                               cursor: 'pointer',
                               display: 'flex',
@@ -446,7 +446,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                                 >
                                   {host.state.toUpperCase()}
                                 </span>
-                                <strong style={{ color: '#00f0ff', fontSize: '0.82rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                                <strong style={{ color: 'var(--accent-bright)', fontSize: '0.82rem', fontFamily: 'JetBrains Mono, monospace' }}>
                                   {host.primaryName}
                                 </strong>
                                 {host.ipv4 && host.primaryName !== host.ipv4 && (
@@ -463,12 +463,12 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.72rem' }}>
                                 {host.osName && (
-                                  <span style={{ color: '#38bdf8' }}>{host.osName}</span>
+                                  <span style={{ color: 'var(--accent-bright)' }}>{host.osName}</span>
                                 )}
                                 <span style={{ color: host.openPorts.length > 0 ? '#a855f7' : '#94a3b8', fontWeight: 600 }}>
                                   {host.openPorts.length} open {host.openPorts.length === 1 ? 'port' : 'ports'}
                                 </span>
-                                <span style={{ color: '#64748b' }}>{isExpanded ? '▲' : '▼'}</span>
+                                <span style={{ color: '#64748b' }}>{isExpanded ? <CyberIcon name="chevron-up" size={12} /> : <CyberIcon name="chevron-down" size={12} />}</span>
                               </div>
                             </div>
 
@@ -518,7 +518,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                   </div>
 
                   {/* Target Engagement & Group Selection */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)', paddingTop: '0.65rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', borderTop: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', paddingTop: '0.65rem' }}>
                     <div>
                       <label className="cyber-label">Assign to Engagement</label>
                       <select
@@ -553,7 +553,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                   </div>
 
                   {/* Import Configuration Toggles */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', borderTop: '1px solid rgba(0, 240, 255, 0.2)', paddingTop: '0.65rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', borderTop: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', paddingTop: '0.65rem' }}>
                     <label className="cyber-label" style={{ marginBottom: '0.1rem' }}>Import Artifact Settings</label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.45rem' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.75rem', color: '#e2e8f0', cursor: 'pointer' }}>
@@ -561,7 +561,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                           type="checkbox"
                           checked={createHostRecords}
                           onChange={(e) => setCreateHostRecords(e.target.checked)}
-                          style={{ accentColor: '#00f0ff' }}
+                          style={{ accentColor: 'var(--accent-bright)' }}
                         />
                         <span>Create / Update Host Records</span>
                       </label>
@@ -571,7 +571,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                           type="checkbox"
                           checked={createPortNotes}
                           onChange={(e) => setCreatePortNotes(e.target.checked)}
-                          style={{ accentColor: '#00f0ff' }}
+                          style={{ accentColor: 'var(--accent-bright)' }}
                         />
                         <span>Generate Note Subpages per Port</span>
                       </label>
@@ -581,7 +581,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                           type="checkbox"
                           checked={createSummaryNotes}
                           onChange={(e) => setCreateSummaryNotes(e.target.checked)}
-                          style={{ accentColor: '#00f0ff' }}
+                          style={{ accentColor: 'var(--accent-bright)' }}
                         />
                         <span>Generate Nmap Scan Summary Note</span>
                       </label>
@@ -591,7 +591,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                           type="checkbox"
                           checked={createPortFindings}
                           onChange={(e) => setCreatePortFindings(e.target.checked)}
-                          style={{ accentColor: '#00f0ff' }}
+                          style={{ accentColor: 'var(--accent-bright)' }}
                         />
                         <span>Create Structured Port Findings</span>
                       </label>
@@ -601,7 +601,7 @@ export const NmapImportModal: React.FC<NmapImportModalProps> = ({
                           type="checkbox"
                           checked={onlyUpHosts}
                           onChange={(e) => setOnlyUpHosts(e.target.checked)}
-                          style={{ accentColor: '#00f0ff' }}
+                          style={{ accentColor: 'var(--accent-bright)' }}
                         />
                         <span>Only Import &apos;UP&apos; Hosts (Skip Dead IPs)</span>
                       </label>

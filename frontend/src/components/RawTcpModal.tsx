@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CyberIcon } from './CyberIcon';
 import { RawTcpConfig, RawTcpListenerConfig, RawTcpListenerInfo } from '../types/rawTcp';
 
 interface RawTcpModalProps {
@@ -124,10 +125,10 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 id="rawtcp-dialog-title" style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                ⚡ Raw TCP Socket &amp; Listener
+              <h3 id="rawtcp-dialog-title" style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                <CyberIcon name="bolt" size={14} /> Raw TCP Socket &amp; Listener
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 SEC-NETCAT // RAW TCP SOCKET ENGINE &amp; REVERSE CATCHER
               </div>
             </div>
@@ -138,7 +139,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
             onClick={onClose}
             aria-label="Close dialog"
           >
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
 
@@ -149,7 +150,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
             padding: '0.75rem 1.25rem 0 1.25rem',
             display: 'flex',
             gap: '0.5rem',
-            borderBottom: '1px solid rgba(0, 240, 255, 0.15)',
+            borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent)',
             background: 'rgba(5, 10, 18, 0.5)'
           }}
         >
@@ -158,20 +159,20 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
             className={`settings-tab-btn ${activeTab === 'client' ? 'active' : ''}`}
             onClick={() => setActiveTab('client')}
           >
-            <span>📡 Outgoing Client</span>
+            <span><CyberIcon name="broadcast" size={14} /> Outgoing Client</span>
           </button>
           <button
             type="button"
             className={`settings-tab-btn ${activeTab === 'listener' ? 'active' : ''}`}
             onClick={() => setActiveTab('listener')}
           >
-            <span>⚡ Inbound Listener / Reverse Catcher</span>
+            <span><CyberIcon name="bolt" size={14} /> Inbound Listener / Reverse Catcher</span>
             {listeners.length > 0 && (
               <span
                 style={{
                   marginLeft: '8px',
                   padding: '1px 6px',
-                  background: '#00f0ff',
+                  background: 'var(--accent-bright)',
                   color: '#040914',
                   borderRadius: '2px',
                   fontSize: '0.68rem',
@@ -200,8 +201,8 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
             <form onSubmit={handleConnect} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               <div
                 style={{
-                  background: 'rgba(0, 240, 255, 0.06)',
-                  border: '1px solid rgba(0, 240, 255, 0.2)',
+                  background: 'color-mix(in srgb, var(--accent-bright) 6%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                   padding: '0.65rem 0.85rem',
                   fontSize: '0.78rem',
                   color: '#94a3b8',
@@ -229,7 +230,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                   }}
                   role="alert"
                 >
-                  <span style={{ fontSize: '1rem', lineHeight: '1' }}>⚠️</span>
+                  <span style={{ fontSize: '1rem', lineHeight: '1' }}><CyberIcon name="warning" size={14} /></span>
                   <span style={{ flex: 1 }}>{clientError}</span>
                 </div>
               )}
@@ -304,7 +305,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
               <div
                 style={{
                   background: 'rgba(5, 9, 16, 0.75)',
-                  border: '1px solid rgba(0, 240, 255, 0.2)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                   padding: '0.85rem 1rem',
                   borderRadius: '2px',
                   display: 'flex',
@@ -317,7 +318,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                     type="checkbox"
                     checked={lineMode}
                     onChange={(e) => setLineMode(e.target.checked)}
-                    style={{ marginTop: '3px', cursor: 'pointer', accentColor: '#00f0ff' }}
+                    style={{ marginTop: '3px', cursor: 'pointer', accentColor: 'var(--accent-bright)' }}
                   />
                   <div>
                     <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f1f5f9' }}>
@@ -350,7 +351,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                           value="crlf"
                           checked={lineEnding === 'crlf'}
                           onChange={() => setLineEnding('crlf')}
-                          style={{ accentColor: '#00f0ff', cursor: 'pointer' }}
+                          style={{ accentColor: 'var(--accent-bright)', cursor: 'pointer' }}
                         />
                         <span><strong>CRLF (\r\n)</strong> — Standard Network RFC (HTTP / Redis / SMTP)</span>
                       </label>
@@ -361,7 +362,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                           value="lf"
                           checked={lineEnding === 'lf'}
                           onChange={() => setLineEnding('lf')}
-                          style={{ accentColor: '#00f0ff', cursor: 'pointer' }}
+                          style={{ accentColor: 'var(--accent-bright)', cursor: 'pointer' }}
                         />
                         <span><strong>LF (\n)</strong> — Unix / Linux Terminals</span>
                       </label>
@@ -372,7 +373,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                           value="cr"
                           checked={lineEnding === 'cr'}
                           onChange={() => setLineEnding('cr')}
-                          style={{ accentColor: '#00f0ff', cursor: 'pointer' }}
+                          style={{ accentColor: 'var(--accent-bright)', cursor: 'pointer' }}
                         />
                         <span><strong>CR (\r)</strong> — Legacy / Mac</span>
                       </label>
@@ -407,7 +408,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                   className="cyber-btn cyber-btn-primary"
                   disabled={isConnecting}
                 >
-                  <span>{isConnecting ? 'CONNECTING...' : '▶ CONNECT RAW TCP'}</span>
+                  <span>{isConnecting ? 'CONNECTING...' : <><CyberIcon name="play" size={14} /> CONNECT RAW TCP</>}</span>
                 </button>
               </div>
             </form>
@@ -415,8 +416,8 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               <div
                 style={{
-                  background: 'rgba(0, 240, 255, 0.06)',
-                  border: '1px solid rgba(0, 240, 255, 0.2)',
+                  background: 'color-mix(in srgb, var(--accent-bright) 6%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                   padding: '0.65rem 0.85rem',
                   fontSize: '0.78rem',
                   color: '#94a3b8',
@@ -444,7 +445,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                   }}
                   role="alert"
                 >
-                  <span style={{ fontSize: '1rem', lineHeight: '1' }}>⚠️</span>
+                  <span style={{ fontSize: '1rem', lineHeight: '1' }}><CyberIcon name="warning" size={14} /></span>
                   <span style={{ flex: 1 }}>{listenerError}</span>
                 </div>
               )}
@@ -486,7 +487,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                 <div
                   style={{
                     background: 'rgba(5, 9, 16, 0.75)',
-                    border: '1px solid rgba(0, 240, 255, 0.2)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                     padding: '0.85rem 1rem',
                     borderRadius: '2px'
                   }}
@@ -496,7 +497,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                       type="checkbox"
                       checked={autoSpawnTab}
                       onChange={(e) => setAutoSpawnTab(e.target.checked)}
-                      style={{ marginTop: '3px', cursor: 'pointer', accentColor: '#00f0ff' }}
+                      style={{ marginTop: '3px', cursor: 'pointer', accentColor: 'var(--accent-bright)' }}
                     />
                     <div>
                       <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f1f5f9' }}>
@@ -515,7 +516,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                     className="cyber-btn cyber-btn-primary"
                     disabled={isStartingListener}
                   >
-                    <span>{isStartingListener ? 'STARTING...' : '⚡ START LISTENER'}</span>
+                    <span>{isStartingListener ? 'STARTING...' : <><CyberIcon name="bolt" size={14} /> START LISTENER</>}</span>
                   </button>
                 </div>
               </form>
@@ -531,13 +532,13 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                     className="cyber-btn cyber-btn-secondary cyber-btn-sm"
                     onClick={() => void refreshListeners()}
                   >
-                    🔄 Refresh
+                    <CyberIcon name="refresh" size={14} /> Refresh
                   </button>
                 </div>
 
                 {listeners.length === 0 ? (
                   <div className="empty-listeners-box">
-                    <div className="radar-ping-icon">📡</div>
+                    <div className="radar-ping-icon"><CyberIcon name="broadcast" size={14} /></div>
                     <span>No active listeners. Start one above to catch reverse shells or incoming TCP traffic.</span>
                   </div>
                 ) : (
@@ -546,7 +547,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                       <div key={l.id} className="listener-card">
                         <div className="listener-card-header">
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span className="pulse-indicator">●</span>
+                            <span className="pulse-indicator"><CyberIcon name="record" size={14} /></span>
                             <span className="listener-bind-tag">
                               {l.bindAddress}:{l.port}
                             </span>
@@ -585,7 +586,7 @@ export const RawTcpModal: React.FC<RawTcpModalProps> = ({
                             style={{ fontSize: '0.7rem', padding: '0.25rem 0.6rem' }}
                             onClick={() => void onStopListener(l.id)}
                           >
-                            ■ STOP LISTENER
+                            <CyberIcon name="stop" size={14} /> STOP LISTENER
                           </button>
                         </div>
                       </div>

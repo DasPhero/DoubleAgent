@@ -14,6 +14,7 @@ import {
   searchTerminalPrevious,
   setSessionCwd,
 } from './components/TerminalView';
+import { TerminalBackground } from './components/TerminalBackground';
 import { SignalAnalyzerView } from './components/SignalAnalyzerView';
 import { SftpBrowserView } from './components/SftpBrowserView';
 import { PortForwardingView } from './components/PortForwardingView';
@@ -348,14 +349,14 @@ export interface TabItem {
 }
 
 export const HOST_PALETTE = [
-  '#0ea5e9', // Sky blue
+  'var(--accent-bright)', // Sky blue
   '#10b981', // Emerald green
   '#f59e0b', // Amber yellow
   '#f43f5e', // Rose red
   '#8b5cf6', // Violet purple
-  '#06b6d4', // Cyan
+  'var(--accent-bright)', // Cyan
   '#ec4899', // Pink
-  '#14b8a6', // Teal
+  'var(--accent-primary)', // Teal
   '#eab308', // Yellow
   '#6366f1', // Indigo
 ];
@@ -2176,14 +2177,14 @@ export function App({
         const paneId = `settings-pane-${seq}-1`;
         const newTab: TabItem = {
           id: tabId,
-          title: 'Settings ⚙',
+          title: 'Settings',
           color: '#2dd4bf',
           tabType: 'settings',
           rootNode: {
             type: 'pane',
             id: paneId,
             sessionId: `settings-${seq}`,
-            title: 'Settings ⚙',
+            title: 'Settings',
           },
           activePaneId: paneId,
         };
@@ -2210,7 +2211,7 @@ export function App({
         const paneId = `notes-pane-${seq}-1`;
         const newTab: TabItem = {
           id: tabId,
-          title: 'Notes 📝',
+          title: 'Notes',
           color: '#38bdf8',
           tabType: 'notes',
           notesHostId: hostId,
@@ -2219,7 +2220,7 @@ export function App({
             type: 'pane',
             id: paneId,
             sessionId: `notes-${seq}`,
-            title: 'Notes 📝',
+            title: 'Notes',
           },
           activePaneId: paneId,
         };
@@ -2243,7 +2244,7 @@ export function App({
       const paneId = `netmap-pane-${seq}-1`;
       const newTab: TabItem = {
         id: tabId,
-        title: 'Network Map 🌐',
+        title: 'Network Map',
         color: '#2dd4bf',
         tabType: 'network-map',
         rootNode: {
@@ -2761,7 +2762,7 @@ export function App({
         const seq = tabCounterRef.current;
         const tabId = `rawtcp-in-tab-${seq}`;
         const paneId = `rawtcp-in-pane-${seq}-1`;
-        const title = `TCP :${evt.listenerPort} ◀ ${evt.remoteAddr}`;
+        const title = `TCP :${evt.listenerPort} <- ${evt.remoteAddr}`;
         const color = '#10b981';
 
         const newTab: TabItem = {
@@ -2785,7 +2786,7 @@ export function App({
 
         setTabs((prev) => [...prev, newTab]);
         setActiveTabId(tabId);
-        setStatusMessage(`⚡ Incoming TCP connection caught on :${evt.listenerPort} from ${evt.remoteAddr}!`);
+        setStatusMessage(`Incoming TCP connection caught on :${evt.listenerPort} from ${evt.remoteAddr}!`);
       }
     });
 
@@ -3372,7 +3373,7 @@ export function App({
         next.delete(targetSessionId);
         return next;
       });
-      setStatusMessage(`⏹ Session logging stopped for ${label || targetSessionId}.`);
+      setStatusMessage(`Session logging stopped for ${label || targetSessionId}.`);
     } else {
       if (api?.StartSessionLogging) {
         try {
@@ -3415,7 +3416,7 @@ export function App({
         next.add(targetSessionId);
         return next;
       });
-      setStatusMessage(`⏺ Recording session transcript for ${label || targetSessionId}.`);
+      setStatusMessage(`Recording session transcript for ${label || targetSessionId}.`);
     }
   };
 
@@ -4327,7 +4328,7 @@ export function App({
       }
       await api?.WriteTerminal?.(snippetActiveSessionId, previewCmd + '\n');
     }
-    setStatusMessage(`⚡ Executed snippet "${runModalSnippet.name}".`);
+    setStatusMessage(`Executed snippet "${runModalSnippet.name}".`);
   };
 
   const handleSaveSnippetChain = async (chain: SnippetChain) => {
@@ -4416,7 +4417,7 @@ export function App({
       }
       await api?.WriteTerminal?.(runnerActiveSessionId, cmd + '\n');
     }
-    setStatusMessage(`⚡ Executed step ${stepIndex + 1} of chain "${runnerModalChain.name}".`);
+    setStatusMessage(`Executed step ${stepIndex + 1} of chain "${runnerModalChain.name}".`);
   };
 
   const handleConnect = async (e: React.FormEvent): Promise<void> => {
@@ -4971,7 +4972,7 @@ export function App({
     const newTab: TabItem = {
       id: tabId,
       title: 'New Connection',
-      color: '#14b8a6',
+      color: 'var(--accent-primary)',
       tabType: 'terminal',
       rootNode: {
         type: 'pane',
@@ -5029,7 +5030,7 @@ export function App({
       const newTab: TabItem = {
         id: tabId,
         title: 'New Connection',
-        color: '#14b8a6',
+        color: 'var(--accent-primary)',
         tabType: 'terminal',
         rootNode: {
           type: 'split',
@@ -5903,7 +5904,7 @@ export function App({
         id: newTabId,
         title: newPane.title,
         hostId,
-        color: '#14b8a6',
+        color: 'var(--accent-primary)',
         rootNode: newPane,
         activePaneId: newPane.id,
         tabType: 'terminal',
@@ -6154,15 +6155,15 @@ export function App({
       dropTargetIndicator?.paneId === node.id ? dropTargetIndicator.zone : null;
 
     const zoneButtons: { zone: DropZonePosition; label: string; icon: string }[] = [
-      { zone: 'top', label: `Dock Top on ${node.title}`, icon: '⬒ Top' },
-      { zone: 'left', label: `Dock Left on ${node.title}`, icon: '◧ Left' },
+      { zone: 'top', label: `Dock Top on ${node.title}`, icon: 'Top' },
+      { zone: 'left', label: `Dock Left on ${node.title}`, icon: 'Left' },
       {
         zone: 'center',
         label: isSameTabPane ? `Swap with ${node.title}` : `Dock Center on ${node.title}`,
-        icon: isSameTabPane ? '⇄ Swap' : '⊕ Dock',
+        icon: isSameTabPane ? 'Swap' : 'Dock',
       },
-      { zone: 'right', label: `Dock Right on ${node.title}`, icon: '◨ Right' },
-      { zone: 'bottom', label: `Dock Bottom on ${node.title}`, icon: '⬓ Bottom' },
+      { zone: 'right', label: `Dock Right on ${node.title}`, icon: 'Right' },
+      { zone: 'bottom', label: `Dock Bottom on ${node.title}`, icon: 'Bottom' },
     ];
 
     return (
@@ -6171,7 +6172,7 @@ export function App({
           <div className={`pane-snap-highlight snap-${activeZone}`}>
             <span className="pane-snap-badge">
               {activeZone === 'center' && isSameTabPane
-                ? `⇄ Swap with ${node.title}`
+                ? `Swap with ${node.title}`
                 : `Snap ${activeZone.toUpperCase()} — ${activeDrag.type === 'host' ? activeDrag.label : activeDrag.title}`}
             </span>
           </div>
@@ -6612,7 +6613,7 @@ export function App({
               </div>
               <div className="pane-header-actions">
                 {isPaneActive ? (
-                  <span className="pane-active-indicator">● ACTIVE</span>
+                  <span className="pane-active-indicator"><CyberIcon name="record" size={14} /> ACTIVE</span>
                 ) : (
                   <span className="pane-inactive-hint">FOCUS</span>
                 )}
@@ -6774,7 +6775,7 @@ export function App({
               </div>
               <div className="pane-header-actions">
                 {isPaneActive ? (
-                  <span className="pane-active-indicator">● ACTIVE</span>
+                  <span className="pane-active-indicator"><CyberIcon name="record" size={14} /> ACTIVE</span>
                 ) : (
                   <span className="pane-inactive-hint">FOCUS</span>
                 )}
@@ -6940,7 +6941,7 @@ export function App({
               </div>
               <div className="pane-header-actions">
                 {isPaneActive ? (
-                  <span className="pane-active-indicator">● ACTIVE</span>
+                  <span className="pane-active-indicator"><CyberIcon name="record" size={14} /> ACTIVE</span>
                 ) : (
                   <span className="pane-inactive-hint">FOCUS</span>
                 )}
@@ -7063,7 +7064,7 @@ export function App({
               </div>
               <div className="pane-header-actions">
                 {isPaneActive ? (
-                  <span className="pane-active-indicator">● ACTIVE</span>
+                  <span className="pane-active-indicator"><CyberIcon name="record" size={14} /> ACTIVE</span>
                 ) : (
                   <span className="pane-inactive-hint">FOCUS</span>
                 )}
@@ -7165,12 +7166,12 @@ export function App({
                   ? 'connecting'
                   : 'offline-red';
                 const ledTitle = isSessionAlive
-                  ? '● Session Active (Connected)'
+                  ? 'Session Active (Connected)'
                   : isConnecting
-                  ? '● Connecting to host...'
+                  ? 'Connecting to host...'
                   : node.hostId
-                  ? '● Session Disconnected — Click to connect'
-                  : '● Disconnected';
+                  ? 'Session Disconnected — Click to connect'
+                  : 'Disconnected';
 
                 return (
                   <span
@@ -7195,7 +7196,7 @@ export function App({
               />
               {isBroadcastingThis && (
                 <span className="pane-broadcast-badge" title="Broadcast Input ACTIVE on this pane">
-                  🔴 BROADCAST
+ BROADCAST
                 </span>
               )}
               {reconnectStates.has(node.id) && (
@@ -7345,7 +7346,7 @@ export function App({
               >
                 <CyberIcon name="record" size={10} />
                 <span className="sr-only">
-                  {activeLogSessions.has(node.sessionId) ? '⏺ REC' : '⚪ Log'}
+                  {activeLogSessions.has(node.sessionId) ? <><CyberIcon name="record" size={14} /> REC</> : 'Log'}
                 </span>
                 {activeLogSessions.has(node.sessionId) && (
                   <span className="hud-micro-tag">REC</span>
@@ -7366,7 +7367,7 @@ export function App({
                 }}
               >
                 <CyberIcon name="broadcast" size={12} />
-                <span className="sr-only">{isBroadcastingThis ? '📡 ACTIVE' : '📡 Cast'}</span>
+                <span className="sr-only">{isBroadcastingThis ? 'ACTIVE' : 'Cast'}</span>
                 {isBroadcastingThis && <span className="hud-micro-tag">CAST</span>}
               </button>
               {node.hostId && (
@@ -7463,7 +7464,7 @@ export function App({
                     title="Previous Match (Shift+Enter)"
                     onClick={() => executePaneSearch(node.sessionId, 'prev')}
                   >
-                    ▲
+                    <CyberIcon name="chevron-up" size={14} />
                   </button>
                   <button
                     type="button"
@@ -7472,7 +7473,7 @@ export function App({
                     title="Next Match (Enter)"
                     onClick={() => executePaneSearch(node.sessionId, 'next')}
                   >
-                    ▼
+                    <CyberIcon name="chevron-down" size={14} />
                   </button>
 
                   <button
@@ -8425,7 +8426,7 @@ export function App({
                 }
               >
                 <span>View</span>
-                <span style={{ fontSize: '0.65rem' }}>▾</span>
+                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
               </button>
               {activeDropdownMenu === 'view' && (
                 <div
@@ -8512,8 +8513,8 @@ export function App({
                     )
                   }
                   style={{
-                    borderColor: activeEngagement ? 'rgba(0, 240, 255, 0.55)' : undefined,
-                    color: activeEngagement ? '#00f0ff' : '#cbd5e1',
+                    borderColor: activeEngagement ? 'color-mix(in srgb, var(--accent-bright) 55%, transparent)' : undefined,
+                    color: activeEngagement ? 'var(--accent-bright)' : '#cbd5e1',
                   }}
                   title="Switch between Encapsulated Pentest Engagements or Casual Mode"
                 >
@@ -8560,8 +8561,8 @@ export function App({
                         void handleSelectEngagement('');
                       }}
                       style={{
-                        color: !activeEngagement ? '#00f0ff' : undefined,
-                        backgroundColor: !activeEngagement ? 'rgba(0, 240, 255, 0.1)' : undefined,
+                        color: !activeEngagement ? 'var(--accent-bright)' : undefined,
+                        backgroundColor: !activeEngagement ? 'color-mix(in srgb, var(--accent-bright) 10%, transparent)' : undefined,
                       }}
                     >
                       <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -8588,8 +8589,8 @@ export function App({
                                 void handleSelectEngagement(eng.id);
                               }}
                               style={{
-                                color: isSelected ? '#00f0ff' : undefined,
-                                backgroundColor: isSelected ? 'rgba(0, 240, 255, 0.12)' : undefined,
+                                color: isSelected ? 'var(--accent-bright)' : undefined,
+                                backgroundColor: isSelected ? 'color-mix(in srgb, var(--accent-bright) 12%, transparent)' : undefined,
                               }}
                             >
                               <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -8614,7 +8615,7 @@ export function App({
                         setShowNewEngagementModal(true);
                       }}
                     >
-                      <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#00f0ff' }}>
+                      <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--accent-bright)' }}>
                         <CyberIcon name="plus" size={12} />
                         <span>New Engagement...</span>
                       </span>
@@ -8641,7 +8642,7 @@ export function App({
                 >
                   <CyberIcon name="target" size={12} />
                   <span>Engagement</span>
-                  <span style={{ fontSize: '0.65rem' }}>▾</span>
+                  <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
                 </button>
                 {activeDropdownMenu === 'engagement-tools' && (
                   <div
@@ -8694,7 +8695,7 @@ export function App({
               >
                 <CyberIcon name="terminal" size={11} />
                 <span>Terminals</span>
-                <span style={{ fontSize: '0.65rem' }}>▾</span>
+                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
               </button>
               {activeDropdownMenu === 'terminals' && (
                 <div
@@ -8739,7 +8740,7 @@ export function App({
               >
                 <CyberIcon name="radar" size={11} />
                 <span>Recon &amp; Exploit</span>
-                <span style={{ fontSize: '0.65rem' }}>▾</span>
+                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
               </button>
               {activeDropdownMenu === 'offense' && (
                 <div
@@ -8788,7 +8789,7 @@ export function App({
               >
                 <CyberIcon name="tunnel" size={11} />
                 <span>Networking &amp; Pivoting</span>
-                <span style={{ fontSize: '0.65rem' }}>▾</span>
+                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
               </button>
               {activeDropdownMenu === 'networking' && (
                 <div
@@ -8831,7 +8832,7 @@ export function App({
               >
                 <CyberIcon name="shield" size={11} />
                 <span>Intel &amp; Keys</span>
-                <span style={{ fontSize: '0.65rem' }}>▾</span>
+                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
               </button>
               {activeDropdownMenu === 'intel' && (
                 <div
@@ -8902,7 +8903,7 @@ export function App({
                 setShowGlobalSettingsModal(true);
               }}
               title="Global Settings (Ctrl+,)"
-              aria-label="Settings ⚙"
+              aria-label="Settings"
             >
               <CyberIcon name="gear" size={12} />
               <span>Settings</span>
@@ -9028,7 +9029,7 @@ export function App({
             >
               <CyberIcon name="tunnel" size={18} />
               {(drawerPivots.filter((p) => p.status === 'running').length + activeTunnels.length) > 0 && (
-                <span className="activity-bar-badge" style={{ background: '#00f0ff', color: '#020617' }}>
+                <span className="activity-bar-badge" style={{ background: 'var(--accent-bright)', color: '#020617' }}>
                   {drawerPivots.filter((p) => p.status === 'running').length + activeTunnels.length}
                 </span>
               )}
@@ -9220,8 +9221,8 @@ export function App({
                   {/* Engagement Scope Filter Toggle */}
                   {activeEngagement ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.6rem 0.35rem 0.6rem', fontSize: '0.72rem' }}>
-                      <span style={{ color: '#00f0ff', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={activeEngagement.name}>
-                        🎯 {activeEngagement.name}
+                      <span style={{ color: 'var(--accent-bright)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={activeEngagement.name}>
+                        <CyberIcon name="target" size={14} /> {activeEngagement.name}
                       </span>
                       <button
                         type="button"
@@ -9230,13 +9231,13 @@ export function App({
                         onClick={() => setFilterByEngagementScope((prev) => !prev)}
                         title={filterByEngagementScope ? 'Showing only in-scope hosts for this engagement' : 'Showing all hosts in vault'}
                       >
-                        {filterByEngagementScope ? '🎯 In-Scope Only' : '🌐 All Vault Hosts'}
+                        {filterByEngagementScope ? <><CyberIcon name="target" size={14} /> In-Scope Only</> : <><CyberIcon name="globe" size={14} /> All Vault Hosts</>}
                       </button>
                     </div>
                   ) : (
                     engagementsList.length > 0 && (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.6rem 0.35rem 0.6rem', fontSize: '0.72rem' }}>
-                        <span style={{ color: '#94a3b8' }}>🌐 Casual Mode (Global Hosts)</span>
+                        <span style={{ color: '#94a3b8' }}><CyberIcon name="globe" size={14} /> Casual Mode (Global Hosts)</span>
                         <button
                           type="button"
                           className="cyber-btn cyber-btn-secondary cyber-btn-sm"
@@ -9288,7 +9289,7 @@ export function App({
                             <button
                               type="button"
                               className="btn-link"
-                              style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#00f0ff', cursor: 'pointer', background: 'none', border: 'none' }}
+                              style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--accent-bright)', cursor: 'pointer', background: 'none', border: 'none' }}
                               onClick={() => setSelectedHostTag('all')}
                             >
                               Show all hosts
@@ -9330,9 +9331,9 @@ export function App({
                               {h.engagementId && (
                                 <span
                                   style={{
-                                    background: 'rgba(0, 240, 255, 0.12)',
-                                    border: '1px solid rgba(0, 240, 255, 0.35)',
-                                    color: '#38bdf8',
+                                    background: 'color-mix(in srgb, var(--accent-bright) 12%, transparent)',
+                                    border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
+                                    color: 'var(--accent-bright)',
                                     fontSize: '0.62rem',
                                     fontWeight: 700,
                                     padding: '1px 5px',
@@ -9341,7 +9342,7 @@ export function App({
                                   }}
                                   title={`Bound to engagement: ${engagementsList.find((e) => e.id === h.engagementId)?.name || h.engagementId}`}
                                 >
-                                  🎯 {engagementsList.find((e) => e.id === h.engagementId)?.name || 'ENGAGED'}
+                                  <CyberIcon name="target" size={14} /> {engagementsList.find((e) => e.id === h.engagementId)?.name || 'ENGAGED'}
                                 </span>
                               )}
                             </div>
@@ -9618,7 +9619,7 @@ export function App({
                   <div
                     style={{
                       padding: '0.55rem 0.75rem',
-                      borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+                      borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.38rem',
@@ -9738,8 +9739,8 @@ export function App({
                             className="drawer-card"
                             style={{
                               cursor: 'pointer',
-                              borderColor: isSelected ? 'rgba(0, 240, 255, 0.75)' : undefined,
-                              backgroundColor: isSelected ? 'rgba(0, 240, 255, 0.08)' : undefined,
+                              borderColor: isSelected ? 'color-mix(in srgb, var(--accent-bright) 75%, transparent)' : undefined,
+                              backgroundColor: isSelected ? 'color-mix(in srgb, var(--accent-bright) 8%, transparent)' : undefined,
                             }}
                             onClick={() => {
                               setSidebarSelectedPayloadId(tmpl.id);
@@ -9765,7 +9766,7 @@ export function App({
                     <div
                       style={{
                         padding: '0.55rem 0.75rem',
-                        borderTop: '1px solid rgba(0, 240, 255, 0.25)',
+                        borderTop: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                         background: 'rgba(4, 10, 18, 0.96)',
                         flexShrink: 0,
                         display: 'flex',
@@ -9783,7 +9784,7 @@ export function App({
                           margin: 0,
                           padding: '0.4rem 0.5rem',
                           background: 'rgba(2, 6, 12, 0.9)',
-                          border: '1px solid rgba(0, 240, 255, 0.25)',
+                          border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                           color: '#a7f3d0',
                           fontSize: '0.68rem',
                           fontFamily: 'JetBrains Mono, monospace',
@@ -9861,13 +9862,13 @@ export function App({
                   <div
                     style={{
                       padding: '0.65rem 0.75rem',
-                      borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+                      borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.45rem',
                     }}
                   >
-                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em' }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.07em' }}>
                       PIVOT LAUNCHER
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem' }}>
@@ -10170,11 +10171,11 @@ export function App({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                background: 'rgba(56, 189, 248, 0.1)',
-                                border: '1px solid rgba(56, 189, 248, 0.35)',
+                                background: 'color-mix(in srgb, var(--accent-bright) 10%, transparent)',
+                                border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                                 padding: '3px 6px',
                                 fontSize: '0.67rem',
-                                color: '#7dd3fc',
+                                color: 'var(--accent-text)',
                               }}
                             >
                               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -10201,7 +10202,7 @@ export function App({
                   {/* BOTTOM: Target / Relay Command */}
                   <div style={{ padding: '0.65rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', flex: 1, overflowY: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.07em' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.07em' }}>
                         TARGET COMMAND
                       </span>
                       <div style={{ display: 'flex', gap: '0.2rem' }}>
@@ -10241,7 +10242,7 @@ export function App({
                               wordBreak: 'break-all',
                               background: 'rgba(2, 6, 23, 0.75)',
                               padding: '0.4rem',
-                              border: '1px solid rgba(0, 240, 255, 0.18)',
+                              border: '1px solid color-mix(in srgb, var(--accent-bright) 18%, transparent)',
                             }}
                           >
                             {targetCmd || 'Configure pivot above to generate command...'}
@@ -10317,7 +10318,7 @@ export function App({
                   <div
                     style={{
                       padding: '0.6rem 0.75rem',
-                      borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+                      borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.42rem',
@@ -10325,7 +10326,7 @@ export function App({
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.07em' }}>
                         STAGING LAUNCHER &amp; MONITOR
                       </span>
                       <button
@@ -10618,7 +10619,7 @@ export function App({
                   <div
                     style={{
                       padding: '0.55rem 0.75rem',
-                      borderBottom: '1px solid rgba(0, 240, 255, 0.16)',
+                      borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 16%, transparent)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.35rem',
@@ -10628,7 +10629,7 @@ export function App({
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.67rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.07em' }}>
+                      <span style={{ fontSize: '0.67rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.07em' }}>
                         FILES &amp; FOLDERS ({sidebarTransferFiles.length})
                       </span>
                       <button
@@ -10707,9 +10708,9 @@ export function App({
                                 padding: '4px 6px',
                                 borderRadius: '3px',
                                 cursor: 'pointer',
-                                background: isSelected ? 'rgba(0, 240, 255, 0.16)' : 'rgba(15, 23, 42, 0.6)',
-                                border: isSelected ? '1px solid rgba(0, 240, 255, 0.65)' : '1px solid rgba(148, 163, 184, 0.16)',
-                                color: f.isDir ? '#38bdf8' : '#e2e8f0',
+                                background: isSelected ? 'color-mix(in srgb, var(--accent-bright) 16%, transparent)' : 'rgba(15, 23, 42, 0.6)',
+                                border: isSelected ? '1px solid color-mix(in srgb, var(--accent-bright) 65%, transparent)' : '1px solid rgba(148, 163, 184, 0.16)',
+                                color: f.isDir ? 'var(--accent-bright)' : '#e2e8f0',
                                 fontSize: '0.69rem',
                                 fontFamily: 'JetBrains Mono, monospace',
                               }}
@@ -10791,12 +10792,12 @@ export function App({
                               margin: '0 0 0.4rem 0',
                               fontSize: '0.66rem',
                               fontFamily: 'JetBrains Mono, monospace',
-                              color: '#00f0ff',
+                              color: 'var(--accent-bright)',
                               whiteSpace: 'pre-wrap',
                               wordBreak: 'break-all',
                               background: 'rgba(2, 6, 23, 0.75)',
                               padding: '0.35rem',
-                              border: '1px solid rgba(0, 240, 255, 0.18)',
+                              border: '1px solid color-mix(in srgb, var(--accent-bright) 18%, transparent)',
                               maxHeight: '58px',
                               overflowY: 'auto',
                             }}
@@ -10967,7 +10968,7 @@ export function App({
                     </div>
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '0.1rem 0 0.3rem 0' }}>
-                    Target: <strong style={{ color: '#00f0ff' }}>{activeTab?.title || 'Global Workspace'}</strong>
+                    Target: <strong style={{ color: 'var(--accent-bright)' }}>{activeTab?.title || 'Global Workspace'}</strong>
                   </div>
                   <textarea
                     className="drawer-scratchpad-textarea"
@@ -11010,7 +11011,7 @@ export function App({
                           type="button"
                           className="btn-secondary btn-sm"
                           onClick={() => void handleTerminalTotpClick()}
-                          aria-label="🔐 2FA / TOTP"
+                          aria-label="2FA / TOTP"
                           title="Quick Inject 2FA code into active terminal"
                         >
                           Inject
@@ -11027,7 +11028,7 @@ export function App({
                     </div>
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '0.1rem 0 0.35rem 0' }}>
-                    Host: <strong style={{ color: '#00f0ff' }}>{activeTab?.title || 'Global Only'}</strong>
+                    Host: <strong style={{ color: 'var(--accent-bright)' }}>{activeTab?.title || 'Global Only'}</strong>
                   </div>
                   <div className="drawer-filter-bar">
                     <button
@@ -11095,8 +11096,8 @@ export function App({
                               <span
                                 className="drawer-badge"
                                 style={{
-                                  borderColor: isHostBound ? 'rgba(0, 240, 255, 0.5)' : 'rgba(56, 189, 248, 0.35)',
-                                  color: isHostBound ? '#00f0ff' : '#38bdf8',
+                                  borderColor: isHostBound ? 'color-mix(in srgb, var(--accent-bright) 50%, transparent)' : 'color-mix(in srgb, var(--accent-bright) 35%, transparent)',
+                                  color: isHostBound ? 'var(--accent-bright)' : 'var(--accent-bright)',
                                 }}
                               >
                                 {isHostBound ? 'ACTIVE HOST' : tok.hostId ? 'HOST LINKED' : 'GLOBAL'}
@@ -11112,7 +11113,7 @@ export function App({
                                 alignItems: 'center',
                                 padding: '6px 8px',
                                 background: 'rgba(2, 6, 14, 0.85)',
-                                border: '1px solid rgba(0, 240, 255, 0.22)',
+                                border: '1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent)',
                                 borderRadius: '3px',
                                 marginTop: '4px',
                                 fontFamily: 'JetBrains Mono, Consolas, monospace',
@@ -11123,7 +11124,7 @@ export function App({
                                   fontSize: '0.96rem',
                                   fontWeight: 700,
                                   letterSpacing: '0.1em',
-                                  color: remaining <= 5 ? '#f87171' : '#00f0ff',
+                                  color: remaining <= 5 ? '#f87171' : 'var(--accent-bright)',
                                 }}
                               >
                                 {formattedCode}
@@ -11186,7 +11187,7 @@ export function App({
                     </div>
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#94a3b8', padding: '0.1rem 0 0.35rem 0', display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
-                    <span>Host: <strong style={{ color: '#00f0ff' }}>{activeTab?.title || 'Any'}</strong></span>
+                    <span>Host: <strong style={{ color: 'var(--accent-bright)' }}>{activeTab?.title || 'Any'}</strong></span>
                     <span>Eng: <strong style={{ color: '#fbbf24' }}>{activeEngagement?.name || 'Global'}</strong></span>
                   </div>
                   <div className="drawer-filter-bar">
@@ -11372,7 +11373,7 @@ export function App({
                             <span>{grp.label}</span>
                             <span className="tab-group-badge">{grp.tabs.length}</span>
                             <span className={`tab-group-chevron ${isCollapsed ? 'collapsed' : ''}`}>
-                              ▾
+                              <CyberIcon name="chevron-down" size={14} />
                             </span>
                           </button>
 
@@ -11627,10 +11628,10 @@ export function App({
                           <div className="add-to-view-zone-selector">
                             {(
                               [
-                                { zone: 'right', label: '◨ Right' },
-                                { zone: 'bottom', label: '⬓ Bottom' },
-                                { zone: 'left', label: '◧ Left' },
-                                { zone: 'top', label: '⬒ Top' },
+                                { zone: 'right', label: 'Right' },
+                                { zone: 'bottom', label: 'Bottom' },
+                                { zone: 'left', label: 'Left' },
+                                { zone: 'top', label: 'Top' },
                               ] as const
                             ).map((item) => (
                               <button
@@ -12169,7 +12170,27 @@ export function App({
                         isSplitPane={false}
                       />
                     ) : (
-                      renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)
+                      <div
+                        className={`terminal-bg-wrap${
+                          globalSettings.terminalBg && globalSettings.terminalBg !== 'none' ? ' has-bg' : ''
+                        }`}
+                        style={
+                          {
+                            '--term-surface': `color-mix(in srgb, var(--bg-base) ${Math.round(
+                              (globalSettings.terminalBgOpacity ?? 0.75) * 100
+                            )}%, transparent)`,
+                          } as React.CSSProperties
+                        }
+                      >
+                        <TerminalBackground
+                          treatment={globalSettings.terminalBg ?? 'none'}
+                          animate={globalSettings.terminalBgAnimate ?? true}
+                          colorTheme={globalSettings.colorTheme}
+                        />
+                        <div className="terminal-bg-content">
+                          {renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)}
+                        </div>
+                      </div>
                     )}
                   </div>
                 );
@@ -12324,10 +12345,10 @@ export function App({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    ⚡ Command Palette &amp; Quick Connect
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                    <CyberIcon name="bolt" size={14} /> Command Palette &amp; Quick Connect
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     FUZZY-ROUTER // HOSTS · NOTES · SCRIPTS · NETCAT · RAW TCP
                   </div>
                 </div>
@@ -12427,7 +12448,7 @@ export function App({
                           #{tag}
                         </span>
                       ))}
-                      <span className="kbd-badge">Connect ↵</span>
+                      <span className="kbd-badge">Connect <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 ))
@@ -12459,7 +12480,7 @@ export function App({
                           marginBottom: '0.4rem',
                         }}
                       >
-                        📝 Notes &amp; Documentation
+                        <CyberIcon name="note" size={14} /> Notes &amp; Documentation
                       </div>
                       {matchedNotes.map((n) => {
                         const hostObj = vaultSummary.hosts.find((h) => h.id === n.hostId);
@@ -12478,7 +12499,7 @@ export function App({
                           >
                             <div className="palette-item-main">
                               <strong>
-                                {n.isFolder ? '📁 ' : '📄 '}
+                                {n.isFolder ? <CyberIcon name="folder" size={14} /> : <CyberIcon name="file" size={14} />}
                                 {n.title}
                               </strong>
                               <span>
@@ -12488,7 +12509,7 @@ export function App({
                               </span>
                             </div>
                             <div className="palette-tags">
-                              <span className="kbd-badge">Open Note ↵</span>
+                              <span className="kbd-badge">Open Note <CyberIcon name="return" size={14} /></span>
                             </div>
                           </button>
                         );
@@ -12517,11 +12538,11 @@ export function App({
                     }}
                   >
                     <div className="palette-item-main">
-                      <strong>🌐 Network Topology Map</strong>
+                      <strong><CyberIcon name="globe" size={14} /> Network Topology Map</strong>
                       <span>Interactive network graph &amp; jump chain visualizer</span>
                     </div>
                     <div className="palette-tags">
-                      <span className="kbd-badge">Open Map ↵</span>
+                      <span className="kbd-badge">Open Map <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );
@@ -12550,11 +12571,11 @@ export function App({
                     }}
                   >
                     <div className="palette-item-main">
-                      <strong>⚡ Raw TCP Socket &amp; Listener</strong>
+                      <strong><CyberIcon name="bolt" size={14} /> Raw TCP Socket &amp; Listener</strong>
                       <span>Direct Netcat outgoing client or inbound reverse shell catcher</span>
                     </div>
                     <div className="palette-tags">
-                      <span className="kbd-badge">Raw TCP ↵</span>
+                      <span className="kbd-badge">Raw TCP <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );
@@ -12594,7 +12615,7 @@ export function App({
                       <span>HTTP/SMB staging server, target download one-liners &amp; SHA-256/MD5 verifier</span>
                     </div>
                     <div className="palette-tags">
-                      <span className="kbd-badge">Open Staging ↵</span>
+                      <span className="kbd-badge">Open Staging <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );
@@ -12629,7 +12650,7 @@ export function App({
                       <span>Start/stop ligolo-ng TUN or chisel reverse SOCKS5 pivots, routes &amp; agent one-liners</span>
                     </div>
                     <div className="palette-tags">
-                      <span className="kbd-badge">Open Pivot ↵</span>
+                      <span className="kbd-badge">Open Pivot <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );
@@ -12662,7 +12683,7 @@ export function App({
                       <span>On-demand throttled TCP connect probes, SOCKS5 checks &amp; ligolo session status</span>
                     </div>
                     <div className="palette-tags">
-                      <span className="kbd-badge">Check Health ↵</span>
+                      <span className="kbd-badge">Check Health <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );
@@ -12697,7 +12718,7 @@ export function App({
                       <span>HTTP 5985 / HTTPS 5986 interactive Evil-WinRM parity shell, PtH &amp; file transfer</span>
                     </div>
                     <div className="palette-tags">
-                      <span className="kbd-badge">Open WinRM ↵</span>
+                      <span className="kbd-badge">Open WinRM <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );
@@ -12736,11 +12757,11 @@ export function App({
                     }}
                   >
                     <div className="palette-item-main">
-                      <strong>▶ Connect Raw TCP to {targetHost}:{targetPort}</strong>
+                      <strong><CyberIcon name="play" size={14} /> Connect Raw TCP to {targetHost}:{targetPort}</strong>
                       <span>Direct raw socket connection</span>
                     </div>
                     <div className="palette-tags">
-                      <span className="kbd-badge">Connect ↵</span>
+                      <span className="kbd-badge">Connect <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );
@@ -12767,11 +12788,11 @@ export function App({
                     }}
                   >
                     <div className="palette-item-main">
-                      <strong>⚡ Start Listener on :{port}</strong>
+                      <strong><CyberIcon name="bolt" size={14} /> Start Listener on :{port}</strong>
                       <span>Inbound raw socket listener / reverse shell catcher</span>
                     </div>
                     <div className="palette-tags">
-                      <span className="kbd-badge">Listen ↵</span>
+                      <span className="kbd-badge">Listen <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );
@@ -12821,10 +12842,10 @@ export function App({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    {editingHostId ? '⚙️ Edit SSH Host' : '➕ New SSH Host'}
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                    {editingHostId ? <><CyberIcon name="gear" size={14} /> Edit SSH Host</> : <><CyberIcon name="plus" size={14} /> New SSH Host</>}
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     VAULT-TARGET // SECURE HOST CONFIGURATION
                   </div>
                 </div>
@@ -12884,10 +12905,10 @@ export function App({
                   className="cyber-hud-select"
                   style={{ width: '100%' }}
                 >
-                  <option value="">🌐 No Engagement (Casual / Global Host)</option>
+                  <option value=""><CyberIcon name="globe" size={14} /> No Engagement (Casual / Global Host)</option>
                   {engagementsList.map((eng) => (
                     <option key={eng.id} value={eng.id}>
-                      🎯 {eng.name}
+                      <CyberIcon name="target" size={14} /> {eng.name}
                     </option>
                   ))}
                 </select>
@@ -12951,7 +12972,7 @@ export function App({
                       aria-label={showHostPass ? 'Hide Password' : 'Show Password'}
                       style={{ padding: '0.4rem 0.75rem', height: '34px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
                     >
-                      {showHostPass ? '🔒 Hide' : '👁 Show'}
+                      {showHostPass ? <><CyberIcon name="eye-off" size={14} /> Hide</> : <><CyberIcon name="eye" size={14} /> Show</>}
                     </button>
                   </div>
                 </div>
@@ -12998,7 +13019,7 @@ export function App({
                 />
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(0, 240, 255, 0.2)', paddingTop: '10px', marginTop: '4px' }}>
+              <div style={{ borderTop: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', paddingTop: '10px', marginTop: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <label className="cyber-label" style={{ margin: 0 }}>
                     Proxy &amp; Bastion Settings
@@ -13012,7 +13033,7 @@ export function App({
                     }}
                     title="Open Proxy Profiles to configure authenticated SOCKS5 proxies"
                   >
-                    🛡️ Manage Proxy Profiles (SOCKS5 Auth)
+                    <CyberIcon name="shield" size={14} /> Manage Proxy Profiles (SOCKS5 Auth)
                   </button>
                 </div>
 
@@ -13038,8 +13059,8 @@ export function App({
 
                 {!hostProxyProfileId && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', background: 'rgba(0, 240, 255, 0.05)', padding: '6px 10px', borderLeft: '2px solid #00f0ff' }}>
-                      💡 <strong>Tip:</strong> For authenticated SOCKS5 proxies, use <em>Manage Proxy Profiles</em> above (credentials stored encrypted in vault). Custom ProxyJump format: <code>[user@]bastion[:port]</code>. Custom ProxyCommand supports inline auth flags (e.g. <code>ncat --proxy-auth user:pass --proxy-type socks5 proxy:1080 %h %p</code>).
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)', padding: '6px 10px', borderLeft: '2px solid var(--accent-bright)' }}>
+                      <CyberIcon name="bolt" size={14} /> <strong>Tip:</strong> For authenticated SOCKS5 proxies, use <em>Manage Proxy Profiles</em> above (credentials stored encrypted in vault). Custom ProxyJump format: <code>[user@]bastion[:port]</code>. Custom ProxyCommand supports inline auth flags (e.g. <code>ncat --proxy-auth user:pass --proxy-type socks5 proxy:1080 %h %p</code>).
                     </div>
                     <div>
                       <label className="cyber-label">Custom ProxyJump (Bastion Chain)</label>
@@ -13144,10 +13165,10 @@ export function App({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    🔑 SSH Keychain Manager
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                    <CyberIcon name="key" size={14} /> SSH Keychain Manager
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     VAULT-CRYPTO // ED25519 · RSA-3072 · OPENSSH · PUTTY PPK
                   </div>
                 </div>
@@ -13230,7 +13251,7 @@ export function App({
 
               {modalError && <div className="status-banner error">{modalError}</div>}
 
-              <div style={{ borderTop: '1px solid rgba(0, 240, 255, 0.2)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+              <div style={{ borderTop: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
                 <label className="cyber-label" style={{ marginBottom: '0.5rem' }}>Stored Keys in Encrypted Vault</label>
                 <div className="palette-results" aria-label="Saved SSH Keys" style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {(vaultSummary.keys || []).length === 0 ? (
@@ -13240,7 +13261,7 @@ export function App({
                       <div key={k.id} className="cyber-rule-card" style={{ padding: '0.6rem 0.85rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
-                            <strong style={{ color: '#00f0ff', fontSize: '0.85rem' }}>
+                            <strong style={{ color: 'var(--accent-bright)', fontSize: '0.85rem' }}>
                               {k.label} ({k.type})
                             </strong>
                             <div style={{ color: '#94a3b8', fontSize: '0.72rem', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>{k.fingerprint}</div>
@@ -13308,10 +13329,10 @@ export function App({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    ⚙️ Import OpenSSH Config
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                    <CyberIcon name="gear" size={14} /> Import OpenSSH Config
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     SSH-INGEST // ~/.ssh/config PARSER (HostName, User, Port, IdentityFile, ProxyJump)
                   </div>
                 </div>
@@ -13347,8 +13368,8 @@ export function App({
                 required
               />
               {sshConfigResult && (
-                <div className="info-banner" aria-label="SSH Config Import Summary" style={{ background: 'rgba(0, 240, 255, 0.08)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.65rem 0.85rem' }}>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#38bdf8' }}>
+                <div className="info-banner" aria-label="SSH Config Import Summary" style={{ background: 'color-mix(in srgb, var(--accent-bright) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '0.65rem 0.85rem' }}>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--accent-bright)' }}>
                     Imported <strong>{sshConfigResult.entries.length}</strong> host(s).
                   </p>
                   {sshConfigResult.warnings.length > 0 && (
@@ -13413,10 +13434,10 @@ export function App({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    🔒 Initialize Encrypted Vault
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                    <CyberIcon name="lock" size={14} /> Initialize Encrypted Vault
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     VAULT-INIT // ARGON2ID + XCHACHA20-POLY1305 KEY DERIVATION
                   </div>
                 </div>
@@ -13437,7 +13458,7 @@ export function App({
               </div>
               <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5 }}>
                 Choose how you want to protect your local SSH vault (you can change this anytime in{' '}
-                <strong style={{ color: '#00f0ff' }}>Vault Security</strong>):
+                <strong style={{ color: 'var(--accent-bright)' }}>Vault Security</strong>):
               </p>
               <div>
                 <label className="cyber-label">Master Password</label>
@@ -13465,7 +13486,7 @@ export function App({
                 />
               </div>
               {helloPending && (
-                <div className="info-banner" style={{ background: 'rgba(0, 240, 255, 0.08)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.65rem 0.85rem', color: '#38bdf8' }}>
+                <div className="info-banner" style={{ background: 'color-mix(in srgb, var(--accent-bright) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '0.65rem 0.85rem', color: 'var(--accent-bright)' }}>
                   Waiting for Windows Hello / Security Key confirmation window...
                 </div>
               )}
@@ -13545,10 +13566,10 @@ export function App({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    🔓 Unlock Encrypted Vault
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                    <CyberIcon name="unlock" size={14} /> Unlock Encrypted Vault
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     VAULT-ACCESS // ENTER MASTER PASSWORD OR USE HARDWARE KEY
                   </div>
                 </div>
@@ -13587,7 +13608,7 @@ export function App({
               >
                 {helloPending
                   ? 'Waiting for Windows Hello / Security Key...'
-                  : '🔑 Unlock with Windows Hello / Security Key'}
+                  : <><CyberIcon name="key" size={14} /> Unlock with Windows Hello / Security Key</>}
               </button>
               {!passwordless && (
                 <div>
@@ -13604,7 +13625,7 @@ export function App({
                 </div>
               )}
               {helloPending && (
-                <div className="info-banner" style={{ background: 'rgba(0, 240, 255, 0.08)', border: '1px solid rgba(0, 240, 255, 0.3)', padding: '0.65rem 0.85rem', color: '#38bdf8' }}>
+                <div className="info-banner" style={{ background: 'color-mix(in srgb, var(--accent-bright) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)', padding: '0.65rem 0.85rem', color: 'var(--accent-bright)' }}>
                   Please complete the Windows Security prompt (check your taskbar if not focused).
                 </div>
               )}
@@ -13674,10 +13695,10 @@ export function App({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    🛡️ Vault Security &amp; Windows Hello
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                    <CyberIcon name="shield" size={14} /> Vault Security &amp; Windows Hello
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     VAULT-KEY // MASTER PASSWORD ROTATION &amp; HARDWARE CREDENTIALS
                   </div>
                 </div>
@@ -13726,7 +13747,7 @@ export function App({
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
               </div>
-              <div className="quick-unlock-box" style={{ background: 'rgba(0, 240, 255, 0.05)', border: '1px solid rgba(0, 240, 255, 0.25)', padding: '0.65rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="quick-unlock-box" style={{ background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', padding: '0.65rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                   Windows Hello / DPAPI Key:{' '}
                   <strong style={{ color: quickUnlockReady ? '#10b981' : '#f59e0b' }}>
@@ -13845,11 +13866,11 @@ export function App({
               <div className="dialog-title">
                 <span className="cyber-hazard-stripes">///</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em' }}>
-                    <span>⚡ </span>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
+                    <span><CyberIcon name="bolt" size={14} /> </span>
                     <span>Serial / UART Console Connection</span>
                   </h3>
-                  <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                     HARDWARE-LINK // COM &amp; USB-UART SERIAL TELEMETRY
                   </div>
                 </div>
@@ -13881,18 +13902,18 @@ export function App({
                       }
                     >
                       {serialPorts.some((p) => p.isConnected) && (
-                        <optgroup label="🟢 Connected & Active Hardware">
+                        <optgroup label=" Connected & Active Hardware">
                           {serialPorts
                             .filter((p) => p.isConnected)
                             .map((p) => (
                               <option key={p.port} value={p.port}>
-                                {p.port} — {p.description} {p.isUsb ? '(USB 🟢)' : '(Active 🟢)'}
+                                {p.port} — {p.description} {p.isUsb ? '(USB)' : '(Active)'}
                               </option>
                             ))}
                         </optgroup>
                       )}
                       {serialPorts.some((p) => !p.isConnected) && (
-                        <optgroup label="⚪ Available / Offline Ports">
+                        <optgroup label=" Available / Offline Ports">
                           {serialPorts
                             .filter((p) => !p.isConnected)
                             .map((p) => (
@@ -13926,7 +13947,7 @@ export function App({
                     disabled={serialLoading}
                     style={{ whiteSpace: 'nowrap' }}
                   >
-                    {serialLoading ? '...' : '🔄 Refresh'}
+                    {serialLoading ? '...' : <><CyberIcon name="refresh" size={14} /> Refresh</>}
                   </button>
                 </div>
               </div>
@@ -13935,7 +13956,7 @@ export function App({
                 const selectedPortInfo = serialPorts.find((p) => p.port === serialConfig.port);
                 if (selectedPortInfo) {
                   return (
-                    <div className="serial-hardware-card" style={{ background: 'rgba(5, 9, 16, 0.9)', border: '1px solid rgba(0, 240, 255, 0.25)', padding: '0.65rem 0.85rem' }}>
+                    <div className="serial-hardware-card" style={{ background: 'rgba(5, 9, 16, 0.9)', border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', padding: '0.65rem 0.85rem' }}>
                       <div className="serial-hw-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                         <span
                           className={`serial-hw-badge ${
@@ -13943,10 +13964,10 @@ export function App({
                           }`}
                         >
                           {selectedPortInfo.isConnected
-                            ? '● Connected & Active'
-                            : '○ Offline / No Device'}
+                            ? 'Connected & Active'
+                            : 'Offline / No Device'}
                         </span>
-                        <span className="serial-hw-type" style={{ fontSize: '0.72rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>
+                        <span className="serial-hw-type" style={{ fontSize: '0.72rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace' }}>
                           {selectedPortInfo.deviceType || 'Serial Port'}
                         </span>
                       </div>
@@ -13966,7 +13987,7 @@ export function App({
                         {selectedPortInfo.hardwareId && (
                           <div className="serial-hw-row">
                             <span className="serial-hw-label" style={{ color: '#94a3b8', marginRight: '6px' }}>Hardware ID:</span>
-                            <span className="serial-hw-val font-mono" style={{ color: '#00f0ff' }}>
+                            <span className="serial-hw-val font-mono" style={{ color: 'var(--accent-bright)' }}>
                               {selectedPortInfo.hardwareId}
                             </span>
                           </div>
@@ -13977,8 +13998,8 @@ export function App({
                 }
                 if (serialPorts.length === 0) {
                   return (
-                    <div className="serial-no-ports-banner" style={{ background: 'rgba(0, 240, 255, 0.05)', border: '1px solid rgba(0, 240, 255, 0.2)', padding: '0.6rem 0.85rem', fontSize: '0.75rem', color: '#94a3b8' }}>
-                      ℹ No active hardware detected. Connect your USB-UART adapter (FTDI, CP210x, CH340), Arduino, ESP32, or Raspberry Pi Pico, and click <strong>🔄 Refresh</strong>.
+                    <div className="serial-no-ports-banner" style={{ background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', padding: '0.6rem 0.85rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                      ℹ No active hardware detected. Connect your USB-UART adapter (FTDI, CP210x, CH340), Arduino, ESP32, or Raspberry Pi Pico, and click <strong><CyberIcon name="refresh" size={14} /> Refresh</strong>.
                     </div>
                   );
                 }
@@ -13993,7 +14014,7 @@ export function App({
                   title="Probe and auto-detect COM port and baud rate"
                   disabled={serialDetecting}
                 >
-                  {serialDetecting ? 'Probing...' : '⚡ Auto Detect Port & Baud'}
+                  {serialDetecting ? 'Probing...' : <><CyberIcon name="bolt" size={14} /> Auto Detect Port & Baud</>}
                 </button>
                 {serialDetectResult && (
                   <span className="serial-autodetect-badge" style={{ fontSize: '0.72rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', border: '1px solid #10b981' }}>
@@ -14053,14 +14074,14 @@ export function App({
                 type="button"
                 className="advanced-toggle-btn"
                 onClick={() => setShowSerialAdvanced((prev) => !prev)}
-                style={{ color: '#00f0ff', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 0' }}
+                style={{ color: 'var(--accent-bright)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 0' }}
               >
-                <span>{showSerialAdvanced ? '▼' : '►'}</span>
+                <span>{showSerialAdvanced ? <CyberIcon name="chevron-down" size={14} /> : <CyberIcon name="chevron-right" size={14} />}</span>
                 <span>Advanced Parameters (Data Bits, Parity, Stop Bits, Flow Control)</span>
               </button>
 
               {showSerialAdvanced && (
-                <div className="advanced-serial-panel" style={{ background: 'rgba(5, 9, 16, 0.6)', border: '1px solid rgba(0, 240, 255, 0.2)', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div className="advanced-serial-panel" style={{ background: 'rgba(5, 9, 16, 0.6)', border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   <div className="form-grid-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
                     <div>
                       <label className="cyber-label" htmlFor="serial-data-bits">

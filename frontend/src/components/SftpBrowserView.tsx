@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { CyberIcon } from './CyberIcon';
 import { FileItem, TransferTask, TransferProgressEvent } from '../types/sftp';
 import { RemoteEditSession } from '../types/remoteEdit';
 
@@ -426,7 +427,7 @@ export function SftpBrowserView({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontWeight: 600, fontSize: '14px', color: '#58a6ff' }}>
+          <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--accent-bright)' }}>
             SFTP Browser
           </span>
           <span style={{ color: '#8b949e' }}>•</span>
@@ -507,7 +508,7 @@ export function SftpBrowserView({
                 cursor: 'pointer',
               }}
             >
-              ⬆ Up
+              <CyberIcon name="chevron-up" size={14} /> Up
             </button>
             <input
               type="text"
@@ -538,7 +539,7 @@ export function SftpBrowserView({
                 cursor: 'pointer',
               }}
             >
-              ↻
+              <CyberIcon name="refresh" size={14} />
             </button>
             {selectedLocalItem && !(selectedLocalItem.IsDir ?? selectedLocalItem.isDir) && (
               <button
@@ -555,7 +556,7 @@ export function SftpBrowserView({
                   fontWeight: 600,
                 }}
               >
-                Upload ➔
+                Upload <CyberIcon name="arrow-right" size={14} />
               </button>
             )}
           </div>
@@ -590,7 +591,7 @@ export function SftpBrowserView({
                 }
               }}
             >
-              Name {localSortBy === 'name' ? (localSortAsc ? '▲' : '▼') : ''}
+              Name {localSortBy === 'name' ? (localSortAsc ? <CyberIcon name="chevron-up" size={12} /> : <CyberIcon name="chevron-down" size={12} />) : ''}
             </div>
             <div
               style={{ cursor: 'pointer', textAlign: 'right' }}
@@ -602,7 +603,7 @@ export function SftpBrowserView({
                 }
               }}
             >
-              Size {localSortBy === 'size' ? (localSortAsc ? '▲' : '▼') : ''}
+              Size {localSortBy === 'size' ? (localSortAsc ? <CyberIcon name="chevron-up" size={12} /> : <CyberIcon name="chevron-down" size={12} />) : ''}
             </div>
             <div
               style={{ cursor: 'pointer', textAlign: 'right' }}
@@ -614,7 +615,7 @@ export function SftpBrowserView({
                 }
               }}
             >
-              Modified {localSortBy === 'modTime' ? (localSortAsc ? '▲' : '▼') : ''}
+              Modified {localSortBy === 'modTime' ? (localSortAsc ? <CyberIcon name="chevron-up" size={12} /> : <CyberIcon name="chevron-down" size={12} />) : ''}
             </div>
             <div style={{ textAlign: 'right' }}>Mode</div>
           </div>
@@ -660,7 +661,7 @@ export function SftpBrowserView({
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      <span>{isDir ? '📁' : '📄'}</span>
+                      <span>{isDir ? <CyberIcon name="folder" size={14} /> : <CyberIcon name="file" size={14} />}</span>
                       <span
                         style={{
                           color: isDir ? '#79c0ff' : '#e6edf3',
@@ -713,7 +714,7 @@ export function SftpBrowserView({
               borderBottom: '1px solid #21262d',
             }}
           >
-            <span style={{ fontWeight: 600, color: '#58a6ff', fontSize: '12px' }}>REMOTE</span>
+            <span style={{ fontWeight: 600, color: 'var(--accent-bright)', fontSize: '12px' }}>REMOTE</span>
             <button
               title="Go Up"
               onClick={() => loadRemoteDir(getParentPath(remotePath))}
@@ -726,7 +727,7 @@ export function SftpBrowserView({
                 cursor: 'pointer',
               }}
             >
-              ⬆ Up
+              <CyberIcon name="chevron-up" size={14} /> Up
             </button>
             <input
               type="text"
@@ -757,7 +758,7 @@ export function SftpBrowserView({
                 cursor: 'pointer',
               }}
             >
-              ↻
+              <CyberIcon name="refresh" size={14} />
             </button>
             <button
               title="New Folder"
@@ -771,7 +772,7 @@ export function SftpBrowserView({
                 cursor: 'pointer',
               }}
             >
-              📁+
+              <CyberIcon name="folder" size={14} />+
             </button>
             {selectedRemoteItem && (
               <>
@@ -791,7 +792,7 @@ export function SftpBrowserView({
                         fontWeight: 600,
                       }}
                     >
-                      ✏️ Edit
+                      <CyberIcon name="edit" size={14} /> Edit
                     </button>
                     <button
                       title="Download to Local"
@@ -807,7 +808,7 @@ export function SftpBrowserView({
                         fontWeight: 600,
                       }}
                     >
-                      ⬅ Download
+                      <CyberIcon name="download" size={14} /> Download
                     </button>
                   </>
                 )}
@@ -827,7 +828,7 @@ export function SftpBrowserView({
                     fontSize: '12px',
                   }}
                 >
-                  🗑
+                  <CyberIcon name="trash" size={14} />
                 </button>
               </>
             )}
@@ -863,7 +864,7 @@ export function SftpBrowserView({
                 }
               }}
             >
-              Name {remoteSortBy === 'name' ? (remoteSortAsc ? '▲' : '▼') : ''}
+              Name {remoteSortBy === 'name' ? (remoteSortAsc ? <CyberIcon name="chevron-up" size={12} /> : <CyberIcon name="chevron-down" size={12} />) : ''}
             </div>
             <div
               style={{ cursor: 'pointer', textAlign: 'right' }}
@@ -875,7 +876,7 @@ export function SftpBrowserView({
                 }
               }}
             >
-              Size {remoteSortBy === 'size' ? (remoteSortAsc ? '▲' : '▼') : ''}
+              Size {remoteSortBy === 'size' ? (remoteSortAsc ? <CyberIcon name="chevron-up" size={12} /> : <CyberIcon name="chevron-down" size={12} />) : ''}
             </div>
             <div
               style={{ cursor: 'pointer', textAlign: 'right' }}
@@ -887,7 +888,7 @@ export function SftpBrowserView({
                 }
               }}
             >
-              Modified {remoteSortBy === 'modTime' ? (remoteSortAsc ? '▲' : '▼') : ''}
+              Modified {remoteSortBy === 'modTime' ? (remoteSortAsc ? <CyberIcon name="chevron-up" size={12} /> : <CyberIcon name="chevron-down" size={12} />) : ''}
             </div>
             <div style={{ textAlign: 'right' }}>Mode</div>
           </div>
@@ -935,7 +936,7 @@ export function SftpBrowserView({
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      <span>{isDir ? '📁' : '📄'}</span>
+                      <span>{isDir ? <CyberIcon name="folder" size={14} /> : <CyberIcon name="file" size={14} />}</span>
                       <span
                         style={{
                           color: isDir ? '#79c0ff' : '#e6edf3',
@@ -1015,7 +1016,7 @@ export function SftpBrowserView({
                   fontSize: '10px',
                 }}
               >
-                ▼ Minimize
+                <CyberIcon name="chevron-down" size={14} /> Minimize
               </button>
             </div>
           </div>
@@ -1039,7 +1040,7 @@ export function SftpBrowserView({
                       ? '#f85149'
                       : task.status === 'cancelled'
                         ? '#d29922'
-                        : '#58a6ff';
+                        : 'var(--accent-bright)';
 
                 return (
                   <div
@@ -1056,8 +1057,8 @@ export function SftpBrowserView({
                       fontSize: '11px',
                     }}
                   >
-                    <span style={{ fontWeight: 600, color: task.direction === 'upload' ? '#7ee787' : '#58a6ff' }}>
-                      {task.direction === 'upload' ? '⬆ UP' : '⬇ DOWN'}
+                    <span style={{ fontWeight: 600, color: task.direction === 'upload' ? '#7ee787' : 'var(--accent-bright)' }}>
+                      {task.direction === 'upload' ? <><CyberIcon name="upload" size={12} /> UP</> : <><CyberIcon name="download" size={12} /> DOWN</>}
                     </span>
                     <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <span style={{ color: '#c9d1d9' }}>{task.direction === 'upload' ? task.localPath : task.remotePath}</span>
@@ -1118,7 +1119,7 @@ export function SftpBrowserView({
                           padding: '0 4px',
                         }}
                       >
-                        ✕
+                        <CyberIcon name="close" size={14} />
                       </button>
                     )}
                   </div>
@@ -1151,7 +1152,7 @@ export function SftpBrowserView({
               width: '320px',
             }}
           >
-            <h4 style={{ margin: '0 0 10px', color: '#58a6ff' }}>Create Remote Folder</h4>
+            <h4 style={{ margin: '0 0 10px', color: 'var(--accent-bright)' }}>Create Remote Folder</h4>
             <input
               type="text"
               autoFocus

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { CyberIcon } from './CyberIcon';
 
 export interface TerminalContextMenuProps {
   x: number;
@@ -86,7 +87,7 @@ export function TerminalContextMenu({
 
       {hostLabel && (
         <div className="menu-host-badge font-mono">
-          <span>🖥️ {hostLabel}</span>
+          <span><CyberIcon name="desktop" size={14} /> {hostLabel}</span>
         </div>
       )}
 
@@ -100,7 +101,7 @@ export function TerminalContextMenu({
             onClose();
           }}
         >
-          <span className="item-icon">📋</span>
+          <span className="item-icon"><CyberIcon name="clipboard" size={14} /></span>
           <span className="item-label">Copy Selection</span>
           <span className="item-shortcut">Ctrl+C</span>
         </button>
@@ -114,7 +115,7 @@ export function TerminalContextMenu({
             onClose();
           }}
         >
-          <span className="item-icon">🔑</span>
+          <span className="item-icon"><CyberIcon name="key" size={14} /></span>
           <span className="item-label">Save as Credential...</span>
           <span className="item-tag">VAULT</span>
         </button>
@@ -128,7 +129,7 @@ export function TerminalContextMenu({
             onClose();
           }}
         >
-          <span className="item-icon">🛡️</span>
+          <span className="item-icon"><CyberIcon name="shield" size={14} /></span>
           <span className="item-label">Save as Evidence...</span>
           <span className="item-tag">PROOF</span>
         </button>
@@ -143,7 +144,7 @@ export function TerminalContextMenu({
               onClose();
             }}
           >
-            <span className="item-icon">📝</span>
+            <span className="item-icon"><CyberIcon name="note" size={14} /></span>
             <span className="item-label">Save to Notes (Recon)...</span>
             <span className="item-tag" style={{ color: '#a78bfa' }}>RECON</span>
           </button>
@@ -160,7 +161,7 @@ export function TerminalContextMenu({
               onClose();
             }}
           >
-            <span className="item-icon">🎯</span>
+            <span className="item-icon"><CyberIcon name="target" size={14} /></span>
             <span className="item-label">Create Finding from Selection...</span>
             <span className="item-tag" style={{ color: '#ff0055', borderColor: 'rgba(255, 0, 85, 0.4)' }}>
               REPORT
@@ -178,7 +179,7 @@ export function TerminalContextMenu({
               onClose();
             }}
           >
-            <span className="item-icon">⚡</span>
+            <span className="item-icon"><CyberIcon name="bolt" size={14} /></span>
             <span className="item-label">Execute in Terminal</span>
           </button>
         )}
@@ -191,7 +192,7 @@ export function TerminalContextMenu({
           role="menuitem"
           onClick={onClose}
         >
-          <span className="item-icon">✕</span>
+          <span className="item-icon"><CyberIcon name="close" size={14} /></span>
           <span className="item-label">Dismiss</span>
           <span className="item-shortcut">Esc</span>
         </button>

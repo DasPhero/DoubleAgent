@@ -180,10 +180,10 @@ export function ProxychainsExportModal({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <CyberIcon name="chain" size={16} /> Export proxychains.conf
               </h3>
-              <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, Consolas, monospace', marginTop: '2px', letterSpacing: '0.04em' }}>
                 CHAIN-ROUTER // RFC-COMPLIANT CONFIGURATION FOR PROXYCHAINS-NG
               </div>
             </div>
@@ -206,7 +206,7 @@ export function ProxychainsExportModal({
             justifyContent: 'space-between',
             padding: '8px 20px',
             background: 'rgba(6, 12, 22, 0.9)',
-            borderBottom: '1px solid rgba(56, 189, 248, 0.2)',
+            borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
             gap: '8px',
             flexWrap: 'wrap',
           }}
@@ -395,9 +395,9 @@ export function ProxychainsExportModal({
                                 padding: '1px 6px',
                                 borderRadius: '4px',
                                 fontFamily: 'JetBrains Mono, Consolas, monospace',
-                                background: p.engagementId ? 'rgba(245, 158, 11, 0.14)' : 'rgba(56, 189, 248, 0.12)',
-                                border: `1px solid ${p.engagementId ? 'rgba(245, 158, 11, 0.35)' : 'rgba(56, 189, 248, 0.3)'}`,
-                                color: p.engagementId ? '#fbbf24' : '#38bdf8',
+                                background: p.engagementId ? 'rgba(245, 158, 11, 0.14)' : 'color-mix(in srgb, var(--accent-bright) 12%, transparent)',
+                                border: `1px solid ${p.engagementId ? 'rgba(245, 158, 11, 0.35)' : 'color-mix(in srgb, var(--accent-bright) 30%, transparent)'}`,
+                                color: p.engagementId ? '#fbbf24' : 'var(--accent-bright)',
                               }}
                             >
                               {getEngagementName(p.engagementId)}

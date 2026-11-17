@@ -478,12 +478,12 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
               width: 32,
               height: 32,
               borderRadius: 6,
-              background: 'rgba(56, 189, 248, 0.14)',
-              border: '1px solid rgba(56, 189, 248, 0.45)',
+              background: 'color-mix(in srgb, var(--accent-bright) 14%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent-bright) 45%, transparent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#38bdf8',
+              color: 'var(--accent-bright)',
             }}
           >
             <CyberIcon name="terminal" size={17} />
@@ -574,8 +574,8 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
           {statusMessage && !errorMessage && (
             <div
               style={{
-                background: 'rgba(56, 189, 248, 0.10)',
-                border: '1px solid rgba(56, 189, 248, 0.38)',
+                background: 'color-mix(in srgb, var(--accent-bright) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 38%, transparent)',
                 color: '#bae6fd',
                 padding: '0.42rem 0.65rem',
                 borderRadius: 4,
@@ -608,7 +608,7 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', overflowY: 'auto', paddingRight: '0.2rem' }}>
           <div className="cyber-hud-panel" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.06em' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
                 {editingId ? 'EDIT WINRM TARGET PROFILE' : 'NEW WINRM / PSREMOTING TARGET'}
               </span>
               {activeEngagementId && (
@@ -875,10 +875,10 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
                   display: 'block',
                   fontSize: '0.7rem',
                   background: 'rgba(2, 6, 23, 0.7)',
-                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                   borderRadius: 4,
                   padding: '0.35rem 0.5rem',
-                  color: '#7dd3fc',
+                  color: 'var(--accent-text)',
                   wordBreak: 'break-all',
                 }}
               >
@@ -925,7 +925,7 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
                   <div
                     key={p.id}
                     style={{
-                      border: '1px solid rgba(56, 189, 248, 0.22)',
+                      border: '1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent)',
                       background: 'rgba(15, 23, 42, 0.55)',
                       borderRadius: 5,
                       padding: '0.48rem 0.6rem',
@@ -988,7 +988,7 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
           {/* Active Sessions */}
           <div className="cyber-hud-panel" style={{ padding: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2dd4bf', letterSpacing: '0.06em' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
                 ACTIVE WINRM SESSIONS ({sessions.length})
               </span>
               <button
@@ -1017,8 +1017,8 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
                         cursor: 'pointer',
                         borderRadius: 5,
                         padding: '0.45rem 0.6rem',
-                        border: `1px solid ${selected ? 'rgba(56, 189, 248, 0.7)' : 'rgba(100, 116, 139, 0.35)'}`,
-                        background: selected ? 'rgba(56, 189, 248, 0.14)' : 'rgba(15, 23, 42, 0.6)',
+                        border: `1px solid ${selected ? 'color-mix(in srgb, var(--accent-bright) 70%, transparent)' : 'rgba(100, 116, 139, 0.35)'}`,
+                        background: selected ? 'color-mix(in srgb, var(--accent-bright) 14%, transparent)' : 'rgba(15, 23, 42, 0.6)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.55rem',
@@ -1067,7 +1067,7 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
           {/* Structured PowerShell Runner & Evil-WinRM Parity Helpers */}
           <div className="cyber-hud-panel" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#38bdf8', letterSpacing: '0.06em' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.06em' }}>
                 POWERSHELL EXECUTION &amp; EVIL-WINRM PARITY HELPERS
               </span>
               <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
@@ -1134,7 +1134,7 @@ export const WinrmManagerModal: React.FC<WinrmManagerModalProps> = ({
               <div
                 style={{
                   background: 'rgba(2, 6, 23, 0.8)',
-                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                   borderRadius: 5,
                   padding: '0.55rem',
                   fontFamily: 'monospace',

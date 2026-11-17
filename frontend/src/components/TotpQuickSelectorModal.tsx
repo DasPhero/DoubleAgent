@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { CyberIcon } from './CyberIcon';
 import type { TotpSummary, TotpCodeResponse } from '../types/totp';
 
 export interface TotpQuickSelectorModalProps {
@@ -124,7 +125,7 @@ export const TotpQuickSelectorModal: React.FC<TotpQuickSelectorModalProps> = ({
             onClick={onClose}
             aria-label="Close Quick Selector"
           >
-            ✕
+            <CyberIcon name="close" size={14} />
           </button>
         </div>
 
@@ -164,7 +165,7 @@ export const TotpQuickSelectorModal: React.FC<TotpQuickSelectorModalProps> = ({
                           {item.issuer ? item.issuer.toUpperCase() : item.label.toUpperCase()}
                         </span>
                         {isAssignedToHost ? (
-                          <span className="quick-tag-host">🖥 Current Host</span>
+                          <span className="quick-tag-host"><CyberIcon name="desktop" size={14} /> Current Host</span>
                         ) : !item.hostId ? (
                           <span className="quick-tag-standalone">Standalone</span>
                         ) : (
@@ -191,7 +192,7 @@ export const TotpQuickSelectorModal: React.FC<TotpQuickSelectorModalProps> = ({
                       }}
                       disabled={injectingId === item.id}
                     >
-                      {injectingId === item.id ? '...' : '⚡ INSERT'}
+                      {injectingId === item.id ? '...' : <><CyberIcon name="bolt" size={14} /> INSERT</>}
                     </button>
                   </div>
                 </div>
@@ -210,7 +211,7 @@ export const TotpQuickSelectorModal: React.FC<TotpQuickSelectorModalProps> = ({
               onOpenFullVault();
             }}
           >
-            🛡 Manage All Authenticators in Full Vault
+            <CyberIcon name="shield" size={14} /> Manage All Authenticators in Full Vault
           </button>
           <button
             type="button"

@@ -525,7 +525,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
             display: 'flex',
             gap: '0.5rem',
             padding: '0.65rem 1.25rem 0 1.25rem',
-            borderBottom: '1px solid rgba(0, 240, 255, 0.2)',
+            borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
           }}
         >
           <button
@@ -588,7 +588,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                 <div
                   style={{
                     background: 'rgba(6, 13, 26, 0.85)',
-                    border: '1px solid rgba(0, 240, 255, 0.28)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 28%, transparent)',
                     borderRadius: '4px',
                     padding: '0.9rem',
                     display: 'flex',
@@ -597,7 +597,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.08em' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.08em' }}>
                       /// 1. PIVOT RELAY CONFIGURATION
                     </span>
                     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -1022,7 +1022,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                 <div
                   style={{
                     background: 'rgba(6, 13, 26, 0.85)',
-                    border: '1px solid rgba(0, 240, 255, 0.28)',
+                    border: '1px solid color-mix(in srgb, var(--accent-bright) 28%, transparent)',
                     borderRadius: '4px',
                     padding: '0.9rem',
                     display: 'flex',
@@ -1031,7 +1031,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.08em' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.08em' }}>
                       /// 2. OPERATOR &amp; TARGET COMMAND DECK
                     </span>
                     <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>CALLBACK LHOST: {lhost}</span>
@@ -1140,7 +1140,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                   style={{
                     padding: '2.5rem 1rem',
                     textAlign: 'center',
-                    border: '1px dashed rgba(0, 240, 255, 0.25)',
+                    border: '1px dashed color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                     borderRadius: '4px',
                     color: '#94a3b8',
                   }}
@@ -1202,7 +1202,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                           {inst.status.toUpperCase()}
                         </span>
                         <strong style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>{inst.name}</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#00f0ff', fontFamily: 'monospace' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--accent-bright)', fontFamily: 'monospace' }}>
                           {inst.tool} // {inst.bindAddress}:{inst.listenPort}
                         </span>
                         {inst.pid ? (
@@ -1270,7 +1270,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                       style={{
                         margin: 0,
                         background: '#030812',
-                        border: '1px solid rgba(0, 240, 255, 0.2)',
+                        border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                         borderRadius: '3px',
                         padding: '0.6rem',
                         maxHeight: '180px',
@@ -1324,7 +1324,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
           {activeTab === 'routes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.07em' }}>
                   /// VAULT SAVED NETWORK ROUTES
                 </span>
                 <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -1363,7 +1363,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                       key={r.id}
                       style={{
                         background: 'rgba(6, 13, 26, 0.85)',
-                        border: '1px solid rgba(0, 240, 255, 0.25)',
+                        border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                         borderRadius: '4px',
                         padding: '0.8rem',
                         display: 'flex',
@@ -1373,7 +1373,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <strong style={{ color: '#e2e8f0', fontSize: '0.86rem' }}>{r.name}</strong>
-                        <span style={{ fontSize: '0.66rem', color: r.engagementId ? '#fbbf24' : '#00f0ff', border: '1px solid currentColor', padding: '1px 6px', borderRadius: '3px' }}>
+                        <span style={{ fontSize: '0.66rem', color: r.engagementId ? '#fbbf24' : 'var(--accent-bright)', border: '1px solid currentColor', padding: '1px 6px', borderRadius: '3px' }}>
                           {r.engagementId ? 'ENGAGEMENT' : 'GLOBAL'}
                         </span>
                       </div>
@@ -1410,7 +1410,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                 </div>
               )}
 
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#00f0ff', letterSpacing: '0.07em', marginTop: '0.5rem' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-bright)', letterSpacing: '0.07em', marginTop: '0.5rem' }}>
                 /// BUILT-IN STARTER PRESETS
               </span>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '0.75rem' }}>
@@ -1428,7 +1428,7 @@ export const PivotManagerModal: React.FC<PivotManagerModalProps> = ({
                     }}
                   >
                     <strong style={{ color: '#e2e8f0', fontSize: '0.86rem' }}>{p.name}</strong>
-                    <div style={{ fontSize: '0.73rem', color: '#00f0ff', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '0.73rem', color: 'var(--accent-bright)', fontFamily: 'monospace' }}>
                       {p.tool} · port {p.listenPort}
                       {p.socksPort ? ` · SOCKS5 :${p.socksPort}` : ''}
                     </div>
@@ -1482,7 +1482,7 @@ const CommandSnippetBox: React.FC<CommandSnippetBoxProps> = ({
   <div
     style={{
       background: 'rgba(3, 8, 18, 0.9)',
-      border: '1px solid rgba(0, 240, 255, 0.22)',
+      border: '1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent)',
       borderRadius: '4px',
       padding: '0.55rem 0.7rem',
       display: 'flex',
@@ -1493,7 +1493,7 @@ const CommandSnippetBox: React.FC<CommandSnippetBoxProps> = ({
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
         <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#e2e8f0' }}>{title}</span>
-        <span style={{ fontSize: '0.64rem', color: '#00f0ff', border: '1px solid rgba(0,240,255,0.35)', padding: '0 5px', borderRadius: '2px' }}>
+        <span style={{ fontSize: '0.64rem', color: 'var(--accent-bright)', border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)', padding: '0 5px', borderRadius: '2px' }}>
           {badge}
         </span>
       </div>
@@ -1518,7 +1518,7 @@ const CommandSnippetBox: React.FC<CommandSnippetBoxProps> = ({
         margin: 0,
         fontFamily: 'monospace',
         fontSize: '0.74rem',
-        color: '#67e8f9',
+        color: 'var(--accent-text)',
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-all',
       }}

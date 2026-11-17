@@ -246,7 +246,7 @@ export function PortForwardingView({
               <h4
                 style={{
                   margin: '0 0 10px',
-                  color: '#00f0ff',
+                  color: 'var(--accent-bright)',
                   fontSize: '13px',
                   fontFamily: 'JetBrains Mono, monospace',
                   letterSpacing: '0.06em',
@@ -280,8 +280,8 @@ export function PortForwardingView({
                     onChange={(e) => setRuleType(e.target.value as ForwardRuleType)}
                     className="cyber-hud-select"
                   >
-                    <option value="L">Local (-L) • Local Port ➔ Remote Target</option>
-                    <option value="R">Remote (-R) • Remote Port ➔ Local Target</option>
+                    <option value="L">Local (-L) • Local Port &rarr; Remote Target</option>
+                    <option value="R">Remote (-R) • Remote Port &rarr; Local Target</option>
                     <option value="D">Dynamic (-D) • Local SOCKS5 Proxy</option>
                   </select>
                 </div>
@@ -342,7 +342,7 @@ export function PortForwardingView({
                     type="checkbox"
                     checked={autoStart}
                     onChange={(e) => setAutoStart(e.target.checked)}
-                    style={{ accentColor: '#00f0ff', width: '15px', height: '15px' }}
+                    style={{ accentColor: 'var(--accent-bright)', width: '15px', height: '15px' }}
                   />
                   <span>Auto-start tunnel when connecting to host</span>
                 </label>
@@ -438,8 +438,8 @@ export function PortForwardingView({
             <div
               style={{
                 padding: '12px',
-                background: 'rgba(0, 240, 255, 0.05)',
-                border: '1px solid rgba(0, 240, 255, 0.35)',
+                background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                 clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
                 display: 'flex',
                 flexDirection: 'column',
@@ -472,8 +472,8 @@ export function PortForwardingView({
                       <span style={{ color: '#f1f5f9' }}>
                         {tun.bindAddress}:{tun.bindPort}
                       </span>
-                      <span className="cyber-route-arrow">──────▶</span>
-                      <span style={{ color: '#00f0ff' }}>
+                      <span className="cyber-route-arrow"><CyberIcon name="arrow-right" size={16} /></span>
+                      <span style={{ color: 'var(--accent-bright)' }}>
                         {tun.type === 'D' ? 'SOCKS5 Dynamic Proxy' : `${tun.targetHost}:${tun.targetPort}`}
                       </span>
                       <span className="cyber-telemetry-badge">
@@ -502,7 +502,7 @@ export function PortForwardingView({
 
           {/* Scope Filter Bar */}
           {engagements.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '6px 10px', background: 'rgba(6, 13, 24, 0.85)', border: '1px solid rgba(0, 240, 255, 0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '6px 10px', background: 'rgba(6, 13, 24, 0.85)', border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
               <span style={{ fontSize: '11px', color: '#94a3b8', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.05em' }}>
                 SCOPE VIEW:
               </span>
@@ -537,11 +537,11 @@ export function PortForwardingView({
                 textAlign: 'center',
                 color: '#94a3b8',
                 background: 'rgba(8, 14, 24, 0.7)',
-                border: '1px dashed rgba(0, 240, 255, 0.25)',
+                border: '1px dashed color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                 clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
               }}
             >
-              <div style={{ marginBottom: '8px', color: '#00f0ff', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ marginBottom: '8px', color: 'var(--accent-bright)', display: 'flex', justifyContent: 'center' }}>
                 <CyberIcon name="network" size={26} />
               </div>
               <p style={{ margin: '0 0 6px', fontWeight: 800, color: '#f1f5f9', letterSpacing: '0.06em' }}>
@@ -581,9 +581,9 @@ export function PortForwardingView({
                         <span
                           style={{
                             fontSize: '10px',
-                            color: ruleEngagement ? '#00f0ff' : '#94a3b8',
-                            background: ruleEngagement ? 'rgba(0, 240, 255, 0.12)' : 'rgba(148, 163, 184, 0.1)',
-                            border: `1px solid ${ruleEngagement ? 'rgba(0, 240, 255, 0.4)' : 'rgba(148, 163, 184, 0.25)'}`,
+                            color: ruleEngagement ? 'var(--accent-bright)' : '#94a3b8',
+                            background: ruleEngagement ? 'color-mix(in srgb, var(--accent-bright) 12%, transparent)' : 'rgba(148, 163, 184, 0.1)',
+                            border: `1px solid ${ruleEngagement ? 'color-mix(in srgb, var(--accent-bright) 40%, transparent)' : 'rgba(148, 163, 184, 0.25)'}`,
                             padding: '1px 6px',
                             fontFamily: 'JetBrains Mono, monospace',
                           }}
@@ -643,8 +643,8 @@ export function PortForwardingView({
                         <span style={{ color: '#cbd5e1' }}>
                           {rule.bindAddress}:{rule.bindPort}
                         </span>
-                        <span className="cyber-route-arrow">──────▶</span>
-                        <span style={{ color: '#00f0ff' }}>
+                        <span className="cyber-route-arrow"><CyberIcon name="arrow-right" size={16} /></span>
+                        <span style={{ color: 'var(--accent-bright)' }}>
                           {rule.type === 'D'
                             ? 'SOCKS5 Dynamic Proxy'
                             : `${rule.targetHost}:${rule.targetPort}`}
@@ -698,7 +698,7 @@ export function PortForwardingView({
                                     <optgroup label="Connect in background">
                                       {hosts.map((h) => (
                                         <option key={`host-${h.id}`} value={`host:${h.id}`}>
-                                          ⚡ Connect {h.label} ({h.address})
+                                          <CyberIcon name="bolt" size={14} /> Connect {h.label} ({h.address})
                                         </option>
                                       ))}
                                     </optgroup>
@@ -734,7 +734,7 @@ export function PortForwardingView({
                                   }}
                                   style={{ fontSize: '11px', padding: '0.25rem 0.65rem' }}
                                 >
-                                  {startingRuleId === rule.id ? 'Starting...' : '▶ Start Tunnel'}
+                                  {startingRuleId === rule.id ? 'Starting...' : <><CyberIcon name="play" size={14} /> Start Tunnel</>}
                                 </button>
                               </div>
                             ) : associatedHost && onStartTunnelWithHost ? (
@@ -755,8 +755,8 @@ export function PortForwardingView({
                                 title={`Connects to ${associatedHost.label} in background and starts the tunnel`}
                               >
                                 {startingRuleId === rule.id
-                                  ? '⏳ Connecting...'
-                                  : `⚡ Connect ${associatedHost.label} & Start Tunnel`}
+                                  ? <><CyberIcon name="clock" size={14} /> Connecting...</>
+                                  : <><CyberIcon name="bolt" size={14} /> Connect {associatedHost.label} & Start Tunnel</>}
                               </button>
                             ) : hosts.length > 0 && onStartTunnelWithHost ? (
                               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -794,8 +794,8 @@ export function PortForwardingView({
                                   title="Connect to selected host in background and start tunnel"
                                 >
                                   {startingRuleId === rule.id
-                                    ? '⏳ Connecting...'
-                                    : '⚡ Connect & Start Tunnel'}
+                                    ? <><CyberIcon name="clock" size={14} /> Connecting...</>
+                                    : <><CyberIcon name="bolt" size={14} /> Connect & Start Tunnel</>}
                                 </button>
                               </div>
                             ) : (

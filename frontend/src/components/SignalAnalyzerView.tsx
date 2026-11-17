@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { CyberIcon } from './CyberIcon';
 
 export interface DecodedByte {
   byte: number;
@@ -165,7 +166,7 @@ export function SignalAnalyzerView({
       { id: 'rx', label: 'CH 0: RX', color: '#10b981', enabled: enabledChannels.rx },
       { id: 'tx', label: 'CH 1: TX', color: '#f59e0b', enabled: enabledChannels.tx },
       { id: 'dtr', label: 'CH 2: DTR', color: '#8b5cf6', enabled: enabledChannels.dtr },
-      { id: 'rts', label: 'CH 3: RTS', color: '#06b6d4', enabled: enabledChannels.rts },
+      { id: 'rts', label: 'CH 3: RTS', color: 'var(--accent-bright)', enabled: enabledChannels.rts },
     ];
 
     let currentY = 22;
@@ -348,7 +349,7 @@ export function SignalAnalyzerView({
     >
       <div className="signal-analyzer-header">
         <div className="analyzer-title-group">
-          <span className="analyzer-badge">📈 LOGIC ANALYZER</span>
+          <span className="analyzer-badge"><CyberIcon name="chart" size={14} /> LOGIC ANALYZER</span>
           <span className="analyzer-port-info">
             {port} @ {baudRate} baud ({bitPeriodMicroSec} µs/bit)
           </span>
@@ -405,7 +406,7 @@ export function SignalAnalyzerView({
             onClick={() => setIsLive((prev) => !prev)}
             title={isLive ? 'Pause capture' : 'Resume live stream'}
           >
-            {isLive ? '⏸ Pause' : '▶ Live'}
+            {isLive ? <><CyberIcon name="stop" size={14} /> Pause</> : <><CyberIcon name="play" size={14} /> Live</>}
           </button>
           <button
             type="button"

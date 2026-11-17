@@ -172,13 +172,13 @@ export function ShellStabilizeModal({
           <div className="dialog-title">
             <span className="cyber-hazard-stripes">///</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#00f0ff', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: 'var(--accent-bright)', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <CyberIcon name="stabilize" size={16} /> Shell Stabilization &amp; PTY Upgrade
               </h3>
               <div
                 style={{
                   fontSize: '0.7rem',
-                  color: '#38bdf8',
+                  color: 'var(--accent-bright)',
                   fontFamily: 'JetBrains Mono, Consolas, monospace',
                   marginTop: '2px',
                   letterSpacing: '0.04em',
@@ -220,8 +220,8 @@ export function ShellStabilizeModal({
             {/* Active Session Telemetry */}
             <div
               style={{
-                background: 'rgba(0, 240, 255, 0.05)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
+                background: 'color-mix(in srgb, var(--accent-bright) 5%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                 padding: '0.55rem 0.85rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -232,11 +232,11 @@ export function ShellStabilizeModal({
             >
               <div>
                 <span style={{ color: '#94a3b8' }}>TARGET SESSION: </span>
-                <strong style={{ color: '#00f0ff' }}>{sessionTitle || sessionId}</strong>
+                <strong style={{ color: 'var(--accent-bright)' }}>{sessionTitle || sessionId}</strong>
               </div>
               <div>
                 <span style={{ color: '#94a3b8' }}>GEOMETRY: </span>
-                <strong style={{ color: '#38bdf8' }}>
+                <strong style={{ color: 'var(--accent-bright)' }}>
                   {cols}×{rows}
                 </strong>
               </div>
@@ -276,15 +276,15 @@ export function ShellStabilizeModal({
             {targetOs === 'windows' ? (
               <div
                 style={{
-                  background: 'rgba(56, 189, 248, 0.08)',
-                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  background: 'color-mix(in srgb, var(--accent-bright) 8%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)',
                   padding: '0.65rem 0.85rem',
                   fontSize: '0.74rem',
                   lineHeight: '1.4',
                   color: '#bae6fd',
                 }}
               >
-                <strong>Windows vs. Linux Architecture:</strong> Windows targets lack Unix <code style={{ color: '#00f0ff' }}>/dev/pts</code> and <code style={{ color: '#00f0ff' }}>stty</code>. Standard Python PTY spawning and raw mode will fail on Windows. DoubleAgent uses <strong>ConPTY</strong> (Windows 10/11 &amp; Server 2019+) via <code style={{ color: '#00f0ff' }}>Invoke-ConPtyShell</code> to spawn a true interactive pseudo-console with VT100 escape sequences, arrow keys, and full PowerShell PSReadLine support.
+                <strong>Windows vs. Linux Architecture:</strong> Windows targets lack Unix <code style={{ color: 'var(--accent-bright)' }}>/dev/pts</code> and <code style={{ color: 'var(--accent-bright)' }}>stty</code>. Standard Python PTY spawning and raw mode will fail on Windows. DoubleAgent uses <strong>ConPTY</strong> (Windows 10/11 &amp; Server 2019+) via <code style={{ color: 'var(--accent-bright)' }}>Invoke-ConPtyShell</code> to spawn a true interactive pseudo-console with VT100 escape sequences, arrow keys, and full PowerShell PSReadLine support.
               </div>
             ) : null}
 
@@ -453,10 +453,10 @@ export function ShellStabilizeModal({
                       type="checkbox"
                       checked={resetTerminal}
                       onChange={(e) => setResetTerminal(e.target.checked)}
-                      style={{ cursor: 'pointer', accentColor: '#00f0ff' }}
+                      style={{ cursor: 'pointer', accentColor: 'var(--accent-bright)' }}
                     />
                     <span>
-                      <strong style={{ color: '#e2e8f0' }}>Step 4:</strong> Send <code style={{ color: '#00f0ff' }}>reset</code> command after <code style={{ color: '#00f0ff' }}>fg</code> (resets terminal driver &amp; redraws prompt)
+                      <strong style={{ color: '#e2e8f0' }}>Step 4:</strong> Send <code style={{ color: 'var(--accent-bright)' }}>reset</code> command after <code style={{ color: 'var(--accent-bright)' }}>fg</code> (resets terminal driver &amp; redraws prompt)
                     </span>
                   </label>
                 )}
@@ -483,10 +483,10 @@ export function ShellStabilizeModal({
                 className="font-mono"
                 style={{
                   background: 'rgba(2, 6, 12, 0.9)',
-                  border: '1px solid rgba(0, 240, 255, 0.25)',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)',
                   padding: '0.75rem',
                   fontSize: '0.76rem',
-                  color: '#a5f3fc',
+                  color: 'var(--accent-text)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.35rem',

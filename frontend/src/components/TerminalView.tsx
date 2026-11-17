@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { CyberIcon } from './CyberIcon';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
@@ -14,7 +15,11 @@ export interface AppGlobalSettings {
   cursorStyle: 'block' | 'underline' | 'bar';
   cursorBlink: boolean;
   scrollback: number;
-  colorTheme: 'teal' | 'dracula' | 'one-dark' | 'nord' | 'monokai' | 'crimson';
+  colorTheme: 'teal' | 'one-dark' | 'crimson' | 'neon' | 'vice' | 'viper' | 'voltage' | 'plasma';
+  // Glass terminal background (shared HUD art behind the whole terminal space)
+  terminalBg?: 'none' | 'minimal' | 'grid' | 'pulse' | 'watermark' | 'matrix';
+  terminalBgOpacity?: number;
+  terminalBgAnimate?: boolean;
   // Keyboard Shortcuts & Leader Key (F-18 / Roadmap)
   keybindings?: Record<string, string>;
   leaderKeyEnabled?: boolean;
@@ -43,25 +48,27 @@ export const DEFAULT_SETTINGS: AppGlobalSettings = {
   autoReconnect: true,
   maxReconnectAttempts: 5,
   sessionRestoreEnabled: false,
+  terminalBg: 'none',
+  terminalBgOpacity: 0.75,
+  terminalBgAnimate: true,
 };
+
+/**
+ * Terminal theme. When a glass treatment is active the xterm background is made FULLY
+ * transparent (text only) and the translucent "glass" tint is supplied by the pane's CSS
+ * (.terminal-bg-wrap.has-bg .split-pane), so it works regardless of xterm's renderer.
+ */
+export function getTerminalTheme(settings: AppGlobalSettings) {
+  const base = getThemeColors(settings.colorTheme);
+  const bg = settings.terminalBg ?? 'none';
+  if (bg === 'none') {
+    return base;
+  }
+  return { ...base, background: 'rgba(0, 0, 0, 0)' };
+}
 
 export function getThemeColors(theme: string) {
   switch (theme) {
-    case 'dracula':
-      return {
-        background: '#282a36',
-        foreground: '#f8f8f2',
-        cursor: '#bd93f9',
-        selectionBackground: '#44475a',
-        black: '#21222c',
-        red: '#ff5555',
-        green: '#50fa7b',
-        yellow: '#f1fa8c',
-        blue: '#bd93f9',
-        magenta: '#ff79c6',
-        cyan: '#8be9fd',
-        white: '#f8f8f2',
-      };
     case 'one-dark':
       return {
         background: '#21252b',
@@ -77,50 +84,95 @@ export function getThemeColors(theme: string) {
         cyan: '#56b6c2',
         white: '#abb2bf',
       };
-    case 'nord':
-      return {
-        background: '#2e3440',
-        foreground: '#d8dee9',
-        cursor: '#88c0d0',
-        selectionBackground: '#434c5e',
-        black: '#3b4252',
-        red: '#bf616a',
-        green: '#a3be8c',
-        yellow: '#ebcb8b',
-        blue: '#81a1c1',
-        magenta: '#b48ead',
-        cyan: '#88c0d0',
-        white: '#e5e9f0',
-      };
-    case 'monokai':
-      return {
-        background: '#2d2a2e',
-        foreground: '#fcfcfa',
-        cursor: '#ffd866',
-        selectionBackground: '#403e41',
-        black: '#403e41',
-        red: '#ff6188',
-        green: '#a9dc76',
-        yellow: '#ffd866',
-        blue: '#fc9867',
-        magenta: '#ab9df2',
-        cyan: '#78dce8',
-        white: '#fcfcfa',
-      };
     case 'crimson':
       return {
-        background: '#180b0e',
+        background: '#0d0608',
         foreground: '#fecaca',
-        cursor: '#f43f5e',
-        selectionBackground: '#451a1e',
-        black: '#1a0d10',
-        red: '#ef4444',
+        cursor: '#ff2e2e',
+        selectionBackground: '#3d1114',
+        black: '#1a0a0c',
+        red: '#ff2e2e',
         green: '#10b981',
         yellow: '#f59e0b',
         blue: '#3b82f6',
         magenta: '#ec4899',
         cyan: '#06b6d4',
         white: '#f3f4f6',
+      };
+    case 'neon':
+      return {
+        background: '#0c0718',
+        foreground: '#f0e6ff',
+        cursor: '#ff2bd6',
+        selectionBackground: '#3a1d52',
+        black: '#1a0f2e',
+        red: '#ff4d6d',
+        green: '#3ad6a0',
+        yellow: '#ff9e4d',
+        blue: '#7c3aed',
+        magenta: '#ff2bd6',
+        cyan: '#4dd6ff',
+        white: '#f0e6ff',
+      };
+    case 'vice':
+      return {
+        background: '#07131a',
+        foreground: '#d7f5ee',
+        cursor: '#2dd4bf',
+        selectionBackground: '#133a3a',
+        black: '#0a1a1f',
+        red: '#fb7185',
+        green: '#34d399',
+        yellow: '#fde047',
+        blue: '#38bdf8',
+        magenta: '#ff6ec7',
+        cyan: '#2dd4bf',
+        white: '#e6fffb',
+      };
+    case 'viper':
+      return {
+        background: '#0a0f08',
+        foreground: '#d7ffb0',
+        cursor: '#aaff00',
+        selectionBackground: '#1f3a0a',
+        black: '#121a0d',
+        red: '#ff5555',
+        green: '#39ff14',
+        yellow: '#eaff00',
+        blue: '#6ee7ff',
+        magenta: '#d946ef',
+        cyan: '#4dffd0',
+        white: '#e8ffd9',
+      };
+    case 'voltage':
+      return {
+        background: '#0a0f1c',
+        foreground: '#d7e6ff',
+        cursor: '#2f9bff',
+        selectionBackground: '#16305c',
+        black: '#121a2e',
+        red: '#ff5c7a',
+        green: '#34d399',
+        yellow: '#ffe014',
+        blue: '#2f9bff',
+        magenta: '#c07cff',
+        cyan: '#38bdf8',
+        white: '#e6efff',
+      };
+    case 'plasma':
+      return {
+        background: '#0a0609',
+        foreground: '#e6f6fa',
+        cursor: '#ff2b4e',
+        selectionBackground: '#3a0f16',
+        black: '#1a0a0f',
+        red: '#ff2b4e',
+        green: '#2ee6c0',
+        yellow: '#ffd166',
+        blue: '#22d3ee',
+        magenta: '#ff6ec7',
+        cyan: '#22d3ee',
+        white: '#e6f6fa',
       };
     case 'teal':
     default:
@@ -232,12 +284,13 @@ export function resetTerminalFontSize(sessionId: string, defaultSize: number): v
 }
 
 export function applySettingsToAllTerminals(settings: AppGlobalSettings): void {
-  const themeObj = getThemeColors(settings.colorTheme);
+  const themeObj = getTerminalTheme(settings);
   for (const entry of terminalPool.values()) {
     entry.term.options.fontFamily = settings.fontFamily;
     entry.term.options.cursorStyle = settings.cursorStyle;
     entry.term.options.cursorBlink = settings.cursorBlink;
     entry.term.options.lineHeight = settings.lineHeight;
+    entry.term.options.allowTransparency = true;
     entry.term.options.theme = themeObj;
     try {
       entry.fitAddon.fit();
@@ -407,7 +460,7 @@ export function TerminalView({
     let entry = terminalPool.get(sessionId);
 
     if (!entry) {
-      const themeColors = getThemeColors(cfg.colorTheme);
+      const themeColors = getTerminalTheme(cfg);
       const term = new Terminal({
         cursorBlink: cfg.cursorBlink,
         cursorStyle: cfg.cursorStyle,
@@ -416,6 +469,7 @@ export function TerminalView({
         lineHeight: cfg.lineHeight,
         scrollback: cfg.scrollback,
         allowProposedApi: true,
+        allowTransparency: true,
         theme: themeColors,
       });
 
@@ -743,7 +797,7 @@ export function TerminalView({
               }}
               title="Toggle Line Buffering & Local Echo (essential for HTTP/SMTP/Redis)"
             >
-              ⌨ LINE MODE: {lineMode ? 'ON' : 'OFF'}
+              <CyberIcon name="keyboard" size={14} /> LINE MODE: {lineMode ? 'ON' : 'OFF'}
             </button>
             <button
               type="button"
@@ -754,7 +808,7 @@ export function TerminalView({
               }}
               title="Cycle Line Ending Sequence (CRLF / LF / CR)"
             >
-              ↵ {lineEnding.toUpperCase()}
+              <CyberIcon name="return" size={14} /> {lineEnding.toUpperCase()}
             </button>
             <div className="raw-tcp-tty-dropdown-wrap" style={{ position: 'relative' }}>
               <button
@@ -763,7 +817,7 @@ export function TerminalView({
                 onClick={() => setShowTtyMenu((prev) => !prev)}
                 title="Reverse Shell TTY Upgrade Helpers"
               >
-                ⚡ TTY UPGRADE ▾
+                <CyberIcon name="bolt" size={14} /> TTY UPGRADE <CyberIcon name="chevron-down" size={14} />
               </button>
               {showTtyMenu && (
                 <div className="raw-tcp-tty-menu">
@@ -774,7 +828,7 @@ export function TerminalView({
                       setShowTtyMenu(false);
                     }}
                   >
-                    🐍 Spawn Python3 PTY
+                    <CyberIcon name="terminal" size={14} /> Spawn Python3 PTY
                   </button>
                   <button
                     type="button"
@@ -783,7 +837,7 @@ export function TerminalView({
                       setShowTtyMenu(false);
                     }}
                   >
-                    🐍 Spawn Python PTY
+                    <CyberIcon name="terminal" size={14} /> Spawn Python PTY
                   </button>
                   <button
                     type="button"
@@ -792,7 +846,7 @@ export function TerminalView({
                       setShowTtyMenu(false);
                     }}
                   >
-                    📟 Export TERM=xterm-256color
+                    <CyberIcon name="terminal" size={14} /> Export TERM=xterm-256color
                   </button>
                   <button
                     type="button"
@@ -801,7 +855,7 @@ export function TerminalView({
                       setShowTtyMenu(false);
                     }}
                   >
-                    ⚡ Fix stty raw -echo
+                    <CyberIcon name="bolt" size={14} /> Fix stty raw -echo
                   </button>
                   <button
                     type="button"
@@ -810,7 +864,7 @@ export function TerminalView({
                       setShowTtyMenu(false);
                     }}
                   >
-                    🐚 Spawn /bin/sh -i
+                    <CyberIcon name="terminal" size={14} /> Spawn /bin/sh -i
                   </button>
                 </div>
               )}
