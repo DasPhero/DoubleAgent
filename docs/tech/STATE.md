@@ -1,10 +1,15 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `M-GLASS` (Glass Terminal Background + Plasma Theme) — COMPLETED! · `M-ICONS` (Emoji → CyberIcon) — COMPLETED! · `M-THEMES` (Theme Sweep + Colors) — COMPLETED!
+- **Current Milestone:** `F-42` (API Tester & HTTP Repeater View + AI Chat Mode) — COMPLETED! · `M-GLASS` (Glass Terminal Background + Plasma Theme) — COMPLETED! · `M-ICONS` (Emoji → CyberIcon) — COMPLETED! · `M-THEMES` (Theme Sweep + Colors) — COMPLETED!
 - **Next Milestone:** `M-PRESETS`
 - **Stage:** `2-flagship`
 
 ## What Works
+- **API Tester & HTTP Repeater View + AI Chat Mode (`F-42`)**:
+  - **Core & Vault (`backend/core/api_tester.go`, `interfaces.go`, `pentest.go`, `backend/vault/pentest.go`, `merge.go`):** Added `ApiRequestItem` & `ApiEnvironment` encrypted persistence scoped per engagement, included in `.daeng` export/import and 3-way conflict merge (`api_request`, `api_environment`).
+  - **Go HTTP Engine (`backend/apiclient/client.go`, `tools.go`):** Dual Structured + Raw HTTP/1.1 execution via Go `net/http`, SOCKS5/SSH `-D`/Pivot/ProxyProfile dialer routing (`golang.org/x/net/proxy`), Go-only `{{SECRET:id}}` & Vault credential resolution (Golden Rule 2), opt-in TLS `InsecureSkipVerify` + certificate SAN/Subject/Issuer & phase timing telemetry, 4 MiB response cap, session cookie jars, cURL/OpenAPI import, code generators (`curl`/`powershell`/`python`), JWT/Base64/URL/Hex/HTML Inspector, LCS Response Diff, OPSEC-throttled `{{PAYLOAD}}` replay with Lockout Guard (`F-40`), and AI Chat streaming (OpenAI SSE, Anthropic SSE, Ollama NDJSON via `api:ai-chunk` Wails events).
+  - **Bindings & UI (`app.go`, `frontend/src/types/apitester.ts`, `frontend/src/components/ApiTesterView.tsx`, `frontend/src/App.tsx`):** Bound `ExecuteApiRequest`, `ExecuteApiParameterReplay`, `ExecuteApiAiChat`, `InspectApiPayload`, `ParseApiCurl`, `GenerateApiCodeSnippet`, `ImportOpenAPISpec`, `DiffApiResponses`, `ListApiRoutes`, and Vault CRUD; wired workspace tab (`tabType: 'api-tester'`) into **Recon & Exploit ▾**, **Ctrl+K**, Evidence Vault, and Notes.
+  - **Tests:** `backend/apiclient/client_test.go` (`net.Pipe()` offline HTTP/TLS/SSE tests) + `frontend/src/components/ApiTesterView.test.tsx`.
 - **Template Folder Grouping & Settings Reset Fixes (`templates/` + `SettingsView` + `TerminalView`)**:
   - Grouped all external JSON template stores (`command_snippets.json`, `snippet_chains.json`, `payload_templates.json`, `finding_templates.json`, `evidence_templates.json`, `report_templates.json`) under `<UserConfigDir>/DoubleAgent/templates/` by default via unified `ResolveManagedJSONFilePath` (`backend/core/templates_files.go`, `payloads.go`, `chains.go`).
   - Fixed Settings reset flows: `applySettingsToAllTerminals` (`TerminalView.tsx`) now resets `fontSize` and `scrollback`, `handleResetSettings` (`App.tsx`) clears `paneFontSizes` and updates status feedback, `SettingsView` shows inline reset confirmation, `Reset All to Defaults` in Shortcuts replaces blocking native `confirm()` with two-click inline HUD confirmation, and **Files & Templates** adds `ResetManagedFilePath` (`app.go` + `Reset Path` button) to revert custom paths back to the default `templates/` folder.

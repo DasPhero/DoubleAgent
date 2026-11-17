@@ -598,8 +598,10 @@ type VaultPayload struct {
 	Findings      []FindingItem     `json:"findings,omitempty"`
 	PortFindings  []PortFinding     `json:"portFindings,omitempty"`
 	Listeners     []ListenerProfile `json:"listeners,omitempty"`
-	NetworkRoutes []NetworkRoute    `json:"networkRoutes,omitempty"`
-	WinrmProfiles []WinrmProfile    `json:"winrmProfiles,omitempty"`
+	NetworkRoutes   []NetworkRoute    `json:"networkRoutes,omitempty"`
+	WinrmProfiles   []WinrmProfile    `json:"winrmProfiles,omitempty"`
+	ApiRequests     []ApiRequestItem  `json:"apiRequests,omitempty"`
+	ApiEnvironments []ApiEnvironment  `json:"apiEnvironments,omitempty"`
 }
 
 // RemoteEditStatus defines the synchronization status of a remote edited file (F-28).

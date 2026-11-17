@@ -140,6 +140,7 @@ Jedes Feature hat ein prüfbares Akzeptanzkriterium; der Coding Agent darf ein F
 | F-31 | Raw TCP Socket & Listener | v1 | Raw-TCP-Client mit Line-Buffering & Local-Echo (HTTP/Redis/SMTP); Inbound-TCP-Listener zum Fangen von Reverse Shells mit automatischem Terminal-Tab |
 | F-37 | Netzwerkkarte | v1 | Hosts, Subnetze und konfigurierte Tunnel/Jumps als Graph (react-flow); Visualisierung |
 | F-41 | WinRM Client (PowerShell Remoting) | v1 | WinRM Management für Windows Hosts (Port 5985/5986, NTLM/Kerberos/Pass-the-Hash, Evil-WinRM Parität) |
+| F-42 | API Tester & HTTP Repeater View | v1 | Pentest-Modul: Go-seitiger HTTP/Raw-Repeater mit Pivot/SOCKS5-Routing, Vault-Secret-Injektion, Environments, Inspector/Diff, gedrosseltem Parameter-Replay und Evidence-Export |
 | M-PRESETS | Comprehensive Presets Library | v1 | Vollständige Presets für Findings, MITRE ATT&CK Techniken, Snippets und Snippet-Chains |
 | M-THEMES | Multi-Theme Cyberpunk Designs | v1 | Zusätzliche Cyberpunk HUD Farbpaletten (Matrix Green, Solarized Amber, Synthwave, Stealth Gray) |
 

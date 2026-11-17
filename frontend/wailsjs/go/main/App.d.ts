@@ -15,6 +15,8 @@ export function BuildPivotCommands(arg1:core.NetworkRoute,arg2:string):Promise<c
 
 export function BuildWinrmCLICommand(arg1:core.WinrmProfile):Promise<string>;
 
+export function CancelApiExecution(arg1:string):Promise<boolean>;
+
 export function CancelTransfer(arg1:string):Promise<void>;
 
 export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;
@@ -40,6 +42,10 @@ export function ConnectSerial(arg1:core.SerialConfig):Promise<string>;
 export function ConnectWinrmSession(arg1:core.WinrmConnectRequest):Promise<core.WinrmSessionInfo>;
 
 export function CreateRemoteDir(arg1:string,arg2:string):Promise<void>;
+
+export function DeleteApiEnvironment(arg1:string):Promise<void>;
+
+export function DeleteApiRequest(arg1:string):Promise<void>;
 
 export function DeleteCredential(arg1:string):Promise<void>;
 
@@ -91,6 +97,8 @@ export function DetectPivotBinaries():Promise<Array<core.PivotBinaryStatus>>;
 
 export function DetectWinrmTools():Promise<Array<core.WinrmToolStatus>>;
 
+export function DiffApiResponses(arg1:core.ApiResponse,arg2:core.ApiResponse):Promise<core.ApiResponseDiff>;
+
 export function DisconnectSession(arg1:string):Promise<void>;
 
 export function DownloadWinrmFile(arg1:string,arg2:string,arg3:string):Promise<core.WinrmTransferResult>;
@@ -98,6 +106,12 @@ export function DownloadWinrmFile(arg1:string,arg2:string,arg3:string):Promise<c
 export function DuplicateSession(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
 export function EnableQuickUnlock():Promise<void>;
+
+export function ExecuteApiAiChat(arg1:core.ApiAiChatRequest):Promise<core.ApiAiChatResult>;
+
+export function ExecuteApiParameterReplay(arg1:core.ApiReplayBatchRequest):Promise<core.ApiReplayBatchResult>;
+
+export function ExecuteApiRequest(arg1:core.ApiExecuteRequest):Promise<core.ApiResponse>;
 
 export function ExecuteImport(arg1:core.ImportExecuteOptions):Promise<core.ImportExecuteResult>;
 
@@ -120,6 +134,8 @@ export function ExportSessionLog(arg1:string,arg2:string):Promise<void>;
 export function ExportSprayList(arg1:core.SprayExportOptions):Promise<core.SprayExportResult>;
 
 export function ExportTotpTokens(arg1:string):Promise<string>;
+
+export function GenerateApiCodeSnippet(arg1:core.ApiRequestItem,arg2:string,arg3:boolean):Promise<string>;
 
 export function GenerateEvidenceReport(arg1:core.ReportExportRequest):Promise<core.ReportExportResult>;
 
@@ -201,6 +217,8 @@ export function ImportEngagementPackage(arg1:string,arg2:string):Promise<core.En
 
 export function ImportNmapXML(arg1:core.NmapImportRequest):Promise<core.NmapImportSummary>;
 
+export function ImportOpenAPISpec(arg1:string,arg2:string,arg3:string):Promise<Array<core.ApiRequestItem>>;
+
 export function ImportSSHConfig(arg1:string):Promise<core.SSHConfigParseResult>;
 
 export function ImportSSHKey(arg1:string,arg2:string,arg3:string):Promise<core.SshKeySummary>;
@@ -215,6 +233,8 @@ export function InjectSessionPassword(arg1:string):Promise<void>;
 
 export function InjectTotpCode(arg1:string,arg2:string):Promise<void>;
 
+export function InspectApiPayload(arg1:string,arg2:string):Promise<core.ApiDecodedPayload>;
+
 export function LaunchTwoStepSshPivot(arg1:core.TwoStepSshPivotRequest):Promise<core.ForwardTunnelStatus>;
 
 export function ListActiveManagedListeners():Promise<Array<core.ManagedListenerInfo>>;
@@ -224,6 +244,12 @@ export function ListActivePivotInstances():Promise<Array<core.PivotInstanceInfo>
 export function ListActiveRemoteEdits():Promise<Array<core.RemoteEditSession>>;
 
 export function ListActiveWinrmSessions():Promise<Array<core.WinrmSessionInfo>>;
+
+export function ListApiEnvironments(arg1:string):Promise<Array<core.ApiEnvironment>>;
+
+export function ListApiRequests(arg1:string):Promise<Array<core.ApiRequestItem>>;
+
+export function ListApiRoutes():Promise<Array<core.ApiRouteOption>>;
 
 export function ListCredentials(arg1:string,arg2:string):Promise<Array<core.CredentialEntry>>;
 
@@ -287,6 +313,8 @@ export function OpenLocalTerminal(arg1:string,arg2:core.TerminalSize):Promise<st
 
 export function OpenTerminalWithOptions(arg1:string,arg2:core.TerminalSpawnOptions):Promise<string>;
 
+export function ParseApiCurl(arg1:string):Promise<core.ApiRequestItem>;
+
 export function ParseOTPAuthURI(arg1:string):Promise<core.TotpRecord>;
 
 export function ParsePuTTYRegContent(arg1:string):Promise<core.ImportScanResult>;
@@ -300,6 +328,8 @@ export function ReadSessionLog(arg1:string):Promise<string>;
 export function RelocateVaultFile(arg1:string,arg2:boolean):Promise<void>;
 
 export function RenderPayload(arg1:core.PayloadRenderOptions):Promise<core.PayloadRenderResult>;
+
+export function ResetApiCookieJar(arg1:string):Promise<void>;
 
 export function ResetManagedFileDefaults(arg1:string):Promise<core.ExternalManagedFileInfo>;
 
@@ -320,6 +350,10 @@ export function ResolveVaultConflicts(arg1:Record<string, string>,arg2:boolean):
 export function RevealPathInExplorer(arg1:string):Promise<void>;
 
 export function RunRouteHealthCheck(arg1:core.RouteCheckRequest):Promise<core.RouteHealthReport>;
+
+export function SaveApiEnvironment(arg1:core.ApiEnvironment):Promise<core.ApiEnvironment>;
+
+export function SaveApiRequest(arg1:core.ApiRequestItem):Promise<core.ApiRequestItem>;
 
 export function SaveCredential(arg1:core.CredentialEntry):Promise<void>;
 

@@ -26,6 +26,10 @@ export function BuildWinrmCLICommand(arg1) {
   return window['go']['main']['App']['BuildWinrmCLICommand'](arg1);
 }
 
+export function CancelApiExecution(arg1) {
+  return window['go']['main']['App']['CancelApiExecution'](arg1);
+}
+
 export function CancelTransfer(arg1) {
   return window['go']['main']['App']['CancelTransfer'](arg1);
 }
@@ -76,6 +80,14 @@ export function ConnectWinrmSession(arg1) {
 
 export function CreateRemoteDir(arg1, arg2) {
   return window['go']['main']['App']['CreateRemoteDir'](arg1, arg2);
+}
+
+export function DeleteApiEnvironment(arg1) {
+  return window['go']['main']['App']['DeleteApiEnvironment'](arg1);
+}
+
+export function DeleteApiRequest(arg1) {
+  return window['go']['main']['App']['DeleteApiRequest'](arg1);
 }
 
 export function DeleteCredential(arg1) {
@@ -178,6 +190,10 @@ export function DetectWinrmTools() {
   return window['go']['main']['App']['DetectWinrmTools']();
 }
 
+export function DiffApiResponses(arg1, arg2) {
+  return window['go']['main']['App']['DiffApiResponses'](arg1, arg2);
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['main']['App']['DisconnectSession'](arg1);
 }
@@ -192,6 +208,18 @@ export function DuplicateSession(arg1, arg2) {
 
 export function EnableQuickUnlock() {
   return window['go']['main']['App']['EnableQuickUnlock']();
+}
+
+export function ExecuteApiAiChat(arg1) {
+  return window['go']['main']['App']['ExecuteApiAiChat'](arg1);
+}
+
+export function ExecuteApiParameterReplay(arg1) {
+  return window['go']['main']['App']['ExecuteApiParameterReplay'](arg1);
+}
+
+export function ExecuteApiRequest(arg1) {
+  return window['go']['main']['App']['ExecuteApiRequest'](arg1);
 }
 
 export function ExecuteImport(arg1) {
@@ -236,6 +264,10 @@ export function ExportSprayList(arg1) {
 
 export function ExportTotpTokens(arg1) {
   return window['go']['main']['App']['ExportTotpTokens'](arg1);
+}
+
+export function GenerateApiCodeSnippet(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GenerateApiCodeSnippet'](arg1, arg2, arg3);
 }
 
 export function GenerateEvidenceReport(arg1) {
@@ -398,6 +430,10 @@ export function ImportNmapXML(arg1) {
   return window['go']['main']['App']['ImportNmapXML'](arg1);
 }
 
+export function ImportOpenAPISpec(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ImportOpenAPISpec'](arg1, arg2, arg3);
+}
+
 export function ImportSSHConfig(arg1) {
   return window['go']['main']['App']['ImportSSHConfig'](arg1);
 }
@@ -426,6 +462,10 @@ export function InjectTotpCode(arg1, arg2) {
   return window['go']['main']['App']['InjectTotpCode'](arg1, arg2);
 }
 
+export function InspectApiPayload(arg1, arg2) {
+  return window['go']['main']['App']['InspectApiPayload'](arg1, arg2);
+}
+
 export function LaunchTwoStepSshPivot(arg1) {
   return window['go']['main']['App']['LaunchTwoStepSshPivot'](arg1);
 }
@@ -444,6 +484,18 @@ export function ListActiveRemoteEdits() {
 
 export function ListActiveWinrmSessions() {
   return window['go']['main']['App']['ListActiveWinrmSessions']();
+}
+
+export function ListApiEnvironments(arg1) {
+  return window['go']['main']['App']['ListApiEnvironments'](arg1);
+}
+
+export function ListApiRequests(arg1) {
+  return window['go']['main']['App']['ListApiRequests'](arg1);
+}
+
+export function ListApiRoutes() {
+  return window['go']['main']['App']['ListApiRoutes']();
 }
 
 export function ListCredentials(arg1, arg2) {
@@ -570,6 +622,10 @@ export function OpenTerminalWithOptions(arg1, arg2) {
   return window['go']['main']['App']['OpenTerminalWithOptions'](arg1, arg2);
 }
 
+export function ParseApiCurl(arg1) {
+  return window['go']['main']['App']['ParseApiCurl'](arg1);
+}
+
 export function ParseOTPAuthURI(arg1) {
   return window['go']['main']['App']['ParseOTPAuthURI'](arg1);
 }
@@ -596,6 +652,10 @@ export function RelocateVaultFile(arg1, arg2) {
 
 export function RenderPayload(arg1) {
   return window['go']['main']['App']['RenderPayload'](arg1);
+}
+
+export function ResetApiCookieJar(arg1) {
+  return window['go']['main']['App']['ResetApiCookieJar'](arg1);
 }
 
 export function ResetManagedFileDefaults(arg1) {
@@ -636,6 +696,14 @@ export function RevealPathInExplorer(arg1) {
 
 export function RunRouteHealthCheck(arg1) {
   return window['go']['main']['App']['RunRouteHealthCheck'](arg1);
+}
+
+export function SaveApiEnvironment(arg1) {
+  return window['go']['main']['App']['SaveApiEnvironment'](arg1);
+}
+
+export function SaveApiRequest(arg1) {
+  return window['go']['main']['App']['SaveApiRequest'](arg1);
 }
 
 export function SaveCredential(arg1) {

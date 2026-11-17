@@ -1,5 +1,637 @@
 export namespace core {
 	
+	export class ApiAiChatMessage {
+	    role: string;
+	    content: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiAiChatMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.role = source["role"];
+	        this.content = source["content"];
+	    }
+	}
+	export class ApiAuthConfig {
+	    type: string;
+	    token?: string;
+	    username?: string;
+	    password?: string;
+	    headerName?: string;
+	    headerValue?: string;
+	    credentialId?: string;
+	    identityId?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiAuthConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.token = source["token"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.headerName = source["headerName"];
+	        this.headerValue = source["headerValue"];
+	        this.credentialId = source["credentialId"];
+	        this.identityId = source["identityId"];
+	    }
+	}
+	export class ApiAiChatRequest {
+	    streamId?: string;
+	    provider: string;
+	    endpointUrl: string;
+	    model: string;
+	    auth: ApiAuthConfig;
+	    routeId?: string;
+	    tlsSkipVerify?: boolean;
+	    temperature?: number;
+	    maxTokens?: number;
+	    messages: ApiAiChatMessage[];
+	    stream: boolean;
+	    timeoutSec?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiAiChatRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.streamId = source["streamId"];
+	        this.provider = source["provider"];
+	        this.endpointUrl = source["endpointUrl"];
+	        this.model = source["model"];
+	        this.auth = this.convertValues(source["auth"], ApiAuthConfig);
+	        this.routeId = source["routeId"];
+	        this.tlsSkipVerify = source["tlsSkipVerify"];
+	        this.temperature = source["temperature"];
+	        this.maxTokens = source["maxTokens"];
+	        this.messages = this.convertValues(source["messages"], ApiAiChatMessage);
+	        this.stream = source["stream"];
+	        this.timeoutSec = source["timeoutSec"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApiAiChatResult {
+	    streamId: string;
+	    reply: string;
+	    model?: string;
+	    promptTokens?: number;
+	    completionTokens?: number;
+	    rawRequestJson?: string;
+	    rawResponse?: string;
+	    statusCode: number;
+	    durationMs: number;
+	    routeUsed?: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiAiChatResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.streamId = source["streamId"];
+	        this.reply = source["reply"];
+	        this.model = source["model"];
+	        this.promptTokens = source["promptTokens"];
+	        this.completionTokens = source["completionTokens"];
+	        this.rawRequestJson = source["rawRequestJson"];
+	        this.rawResponse = source["rawResponse"];
+	        this.statusCode = source["statusCode"];
+	        this.durationMs = source["durationMs"];
+	        this.routeUsed = source["routeUsed"];
+	        this.error = source["error"];
+	    }
+	}
+	
+	export class ApiDecodedPayload {
+	    input: string;
+	    format: string;
+	    decoded: string;
+	    jwtHeader?: string;
+	    jwtClaims?: string;
+	    jwtAlg?: string;
+	    jwtExpired?: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiDecodedPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.input = source["input"];
+	        this.format = source["format"];
+	        this.decoded = source["decoded"];
+	        this.jwtHeader = source["jwtHeader"];
+	        this.jwtClaims = source["jwtClaims"];
+	        this.jwtAlg = source["jwtAlg"];
+	        this.jwtExpired = source["jwtExpired"];
+	        this.error = source["error"];
+	    }
+	}
+	export class ApiKeyValue {
+	    key: string;
+	    value: string;
+	    enabled: boolean;
+	    isSecret?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiKeyValue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.value = source["value"];
+	        this.enabled = source["enabled"];
+	        this.isSecret = source["isSecret"];
+	    }
+	}
+	export class ApiEnvironment {
+	    id: string;
+	    engagementId?: string;
+	    name: string;
+	    variables?: ApiKeyValue[];
+	    updatedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiEnvironment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.engagementId = source["engagementId"];
+	        this.name = source["name"];
+	        this.variables = this.convertValues(source["variables"], ApiKeyValue);
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApiRequestItem {
+	    id: string;
+	    engagementId?: string;
+	    collectionName?: string;
+	    name: string;
+	    method: string;
+	    url: string;
+	    params?: ApiKeyValue[];
+	    headers?: ApiKeyValue[];
+	    auth: ApiAuthConfig;
+	    bodyType: string;
+	    body?: string;
+	    rawMode?: boolean;
+	    rawRequest?: string;
+	    routeId?: string;
+	    timeoutSec?: number;
+	    followRedirects: boolean;
+	    useCookieJar: boolean;
+	    tlsSkipVerify?: boolean;
+	    tags?: string[];
+	    updatedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiRequestItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.engagementId = source["engagementId"];
+	        this.collectionName = source["collectionName"];
+	        this.name = source["name"];
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.params = this.convertValues(source["params"], ApiKeyValue);
+	        this.headers = this.convertValues(source["headers"], ApiKeyValue);
+	        this.auth = this.convertValues(source["auth"], ApiAuthConfig);
+	        this.bodyType = source["bodyType"];
+	        this.body = source["body"];
+	        this.rawMode = source["rawMode"];
+	        this.rawRequest = source["rawRequest"];
+	        this.routeId = source["routeId"];
+	        this.timeoutSec = source["timeoutSec"];
+	        this.followRedirects = source["followRedirects"];
+	        this.useCookieJar = source["useCookieJar"];
+	        this.tlsSkipVerify = source["tlsSkipVerify"];
+	        this.tags = source["tags"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApiExecuteRequest {
+	    executionId?: string;
+	    sessionId?: string;
+	    envId?: string;
+	    request: ApiRequestItem;
+	    variables?: ApiKeyValue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiExecuteRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.executionId = source["executionId"];
+	        this.sessionId = source["sessionId"];
+	        this.envId = source["envId"];
+	        this.request = this.convertValues(source["request"], ApiRequestItem);
+	        this.variables = this.convertValues(source["variables"], ApiKeyValue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ApiReplayBatchRequest {
+	    executionId?: string;
+	    sessionId?: string;
+	    engagementId?: string;
+	    envId?: string;
+	    request: ApiRequestItem;
+	    variables?: ApiKeyValue[];
+	    payloads: string[];
+	    delayMs?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiReplayBatchRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.executionId = source["executionId"];
+	        this.sessionId = source["sessionId"];
+	        this.engagementId = source["engagementId"];
+	        this.envId = source["envId"];
+	        this.request = this.convertValues(source["request"], ApiRequestItem);
+	        this.variables = this.convertValues(source["variables"], ApiKeyValue);
+	        this.payloads = source["payloads"];
+	        this.delayMs = source["delayMs"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApiTimingInfo {
+	    dialMs: number;
+	    tlsMs: number;
+	    ttfbMs: number;
+	    totalMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiTimingInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dialMs = source["dialMs"];
+	        this.tlsMs = source["tlsMs"];
+	        this.ttfbMs = source["ttfbMs"];
+	        this.totalMs = source["totalMs"];
+	    }
+	}
+	export class ApiTlsInfo {
+	    version?: string;
+	    cipherSuite?: string;
+	    serverName?: string;
+	    subject?: string;
+	    issuer?: string;
+	    dnsNames?: string[];
+	    notAfter?: string;
+	    verified: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiTlsInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.cipherSuite = source["cipherSuite"];
+	        this.serverName = source["serverName"];
+	        this.subject = source["subject"];
+	        this.issuer = source["issuer"];
+	        this.dnsNames = source["dnsNames"];
+	        this.notAfter = source["notAfter"];
+	        this.verified = source["verified"];
+	    }
+	}
+	export class ApiResponse {
+	    requestId?: string;
+	    statusCode: number;
+	    status: string;
+	    proto?: string;
+	    headers?: Record<string, Array<string>>;
+	    rawHeaders?: string;
+	    body: string;
+	    bodyBase64?: string;
+	    isBinary?: boolean;
+	    sizeBytes: number;
+	    truncated?: boolean;
+	    contentType?: string;
+	    effectiveUrl?: string;
+	    routeUsed?: string;
+	    tls?: ApiTlsInfo;
+	    timing: ApiTimingInfo;
+	    redirectChain?: string[];
+	    cookies?: string[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.requestId = source["requestId"];
+	        this.statusCode = source["statusCode"];
+	        this.status = source["status"];
+	        this.proto = source["proto"];
+	        this.headers = source["headers"];
+	        this.rawHeaders = source["rawHeaders"];
+	        this.body = source["body"];
+	        this.bodyBase64 = source["bodyBase64"];
+	        this.isBinary = source["isBinary"];
+	        this.sizeBytes = source["sizeBytes"];
+	        this.truncated = source["truncated"];
+	        this.contentType = source["contentType"];
+	        this.effectiveUrl = source["effectiveUrl"];
+	        this.routeUsed = source["routeUsed"];
+	        this.tls = this.convertValues(source["tls"], ApiTlsInfo);
+	        this.timing = this.convertValues(source["timing"], ApiTimingInfo);
+	        this.redirectChain = source["redirectChain"];
+	        this.cookies = source["cookies"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApiReplayEntryResult {
+	    index: number;
+	    payload: string;
+	    statusCode: number;
+	    status: string;
+	    sizeBytes: number;
+	    totalMs: number;
+	    routeUsed?: string;
+	    error?: string;
+	    response?: ApiResponse;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiReplayEntryResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.payload = source["payload"];
+	        this.statusCode = source["statusCode"];
+	        this.status = source["status"];
+	        this.sizeBytes = source["sizeBytes"];
+	        this.totalMs = source["totalMs"];
+	        this.routeUsed = source["routeUsed"];
+	        this.error = source["error"];
+	        this.response = this.convertValues(source["response"], ApiResponse);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApiReplayBatchResult {
+	    executionId: string;
+	    total: number;
+	    completed: number;
+	    aborted?: boolean;
+	    lockoutWarning?: string;
+	    results: ApiReplayEntryResult[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiReplayBatchResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.executionId = source["executionId"];
+	        this.total = source["total"];
+	        this.completed = source["completed"];
+	        this.aborted = source["aborted"];
+	        this.lockoutWarning = source["lockoutWarning"];
+	        this.results = this.convertValues(source["results"], ApiReplayEntryResult);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	export class ApiResponseDiffLine {
+	    kind: string;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiResponseDiffLine(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.text = source["text"];
+	    }
+	}
+	export class ApiResponseDiff {
+	    statusDelta: string;
+	    sizeDelta: number;
+	    timeDeltaMs: number;
+	    headerLines: ApiResponseDiffLine[];
+	    bodyLines: ApiResponseDiffLine[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiResponseDiff(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.statusDelta = source["statusDelta"];
+	        this.sizeDelta = source["sizeDelta"];
+	        this.timeDeltaMs = source["timeDeltaMs"];
+	        this.headerLines = this.convertValues(source["headerLines"], ApiResponseDiffLine);
+	        this.bodyLines = this.convertValues(source["bodyLines"], ApiResponseDiffLine);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class ApiRouteOption {
+	    id: string;
+	    label: string;
+	    kind: string;
+	    endpoint?: string;
+	    active: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiRouteOption(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.kind = source["kind"];
+	        this.endpoint = source["endpoint"];
+	        this.active = source["active"];
+	    }
+	}
+	
+	
 	export class AppStatus {
 	    name: string;
 	    version: string;
@@ -874,6 +1506,8 @@ export namespace core {
 	    proxyProfiles?: ProxyProfile[];
 	    networkRoutes?: NetworkRoute[];
 	    winrmProfiles?: WinrmProfile[];
+	    apiRequests?: ApiRequestItem[];
+	    apiEnvironments?: ApiEnvironment[];
 	    credentials?: CredentialEntry[];
 	    evidence?: EvidenceItem[];
 	    findings?: FindingItem[];
@@ -899,6 +1533,8 @@ export namespace core {
 	        this.proxyProfiles = this.convertValues(source["proxyProfiles"], ProxyProfile);
 	        this.networkRoutes = this.convertValues(source["networkRoutes"], NetworkRoute);
 	        this.winrmProfiles = this.convertValues(source["winrmProfiles"], WinrmProfile);
+	        this.apiRequests = this.convertValues(source["apiRequests"], ApiRequestItem);
+	        this.apiEnvironments = this.convertValues(source["apiEnvironments"], ApiEnvironment);
 	        this.credentials = this.convertValues(source["credentials"], CredentialEntry);
 	        this.evidence = this.convertValues(source["evidence"], EvidenceItem);
 	        this.findings = this.convertValues(source["findings"], FindingItem);

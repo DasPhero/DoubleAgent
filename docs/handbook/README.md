@@ -40,6 +40,13 @@ Highlighting text in any terminal session displays four quick-save targets:
   - Toggle inclusion of **Open Ports**, **Standalone Evidence**, **Linked Killchain Notes**, and optionally **Internal-Only Vault Artifacts** (`inReport === false`, excluded by default).
   - Preview Markdown / `.docx` scaffold outline or sandboxed HTML5 live inside the modal, click **Export Report** for a single file, or click **Export 1 File Per Host** to write individual host report files plus a `manifest.sha256` into a chosen folder.
 
+- **API Tester & HTTP Repeater + AI Chat Mode (`F-42`)**:
+  - Open via **Recon & Exploit ▾ → Phase 1 → API Tester & HTTP Repeater** or `Ctrl+K`.
+  - **HTTP Repeater:** Send structured requests or toggle **Raw HTTP Mode** (Burp/Caido wire format), pick an outbound route (`Direct`, active SSH `-D` SOCKS5 tunnels, running Pivot proxies, or saved Proxy Profiles), toggle `Skip TLS Verify`, redirects, and session Cookie Jar, inspect Pretty JSON / Raw / Headers / TLS certificates & timings, or decode JWT/Base64/Hex/URL strings in **Inspector**.
+  - **Environments & Chaining:** Define per-engagement `{{VAR}}` sets under **Env Vars** or extract any JSON response field directly into a variable with **Extract Var**, while Vault secrets (`{{SECRET:id}}` or Vault Auth) resolve exclusively inside Go.
+  - **Param Replay & Diff:** Run OPSEC-throttled `{{PAYLOAD}}` sweeps with Lockout Guard warnings (`F-40`), compare any two history responses side-by-side in **Response Diff**, import **cURL / OpenAPI**, export `curl` / `PowerShell` / `Python`, or save findings straight to **Evidence Vault** and **Host Notes**.
+  - **AI Chat Mode:** Switch to **AI Chat Mode** for multi-turn chat against OpenAI-compatible, Anthropic, Ollama, or custom endpoints (with SSE/NDJSON streaming, Vault secret keys, tunnel routing, and **Open in HTTP Repeater**).
+
 - **WinRM / PowerShell Remoting Client View (`F-41`)**:
   - Opens directly as a dockable **WinRM Workspace View** tab (with a **Pop Out** button for modal overlay mode) via **Terminals ▾ $\to$ WinRM / PowerShell Remoting (`F-41`)**, **Recon & Exploit ▾**, or `Ctrl+K`.
   - Use the explicit **Save Scope (`<Engagement>` vs `Global`)** and **Saved Profiles Filter (`Engagement` vs `All`)** pills to control whether targets stay isolated in `.daeng` engagement archives or are reused globally.

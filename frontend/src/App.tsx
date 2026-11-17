@@ -41,6 +41,7 @@ import { BroadcastScope, BroadcastState } from './types/broadcast';
 import { WorkspaceState, ReconnectState, PersistedTabItem, PersistedWorkspaceNode } from './types/workspace';
 import { CyberIcon } from './components/CyberIcon';
 import { NetworkMapView } from './components/NetworkMapView';
+import { ApiTesterView } from './components/ApiTesterView';
 import { RemoteEditorView } from './components/RemoteEditorView';
 import { RemoteEditSession, RemoteConflictInfo } from './types/remoteEdit';
 import { VaultSyncInfo, VaultConflictReport } from './types/vaultSync';
@@ -340,7 +341,7 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm' | 'route-health';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm' | 'route-health' | 'api-tester';
   sftpSessionId?: string;
   notesHostId?: string;
   notesInitialNoteId?: string | null;
@@ -2327,6 +2328,35 @@ export function App({
       refreshRouteHealthEndpoints();
     }
   }, [activeTab?.tabType, refreshRouteHealthEndpoints]);
+
+  const openApiTesterTab = useCallback((): void => {
+    setTabs((prev) => {
+      const existingTab = prev.find((t) => t.tabType === 'api-tester');
+      if (existingTab) {
+        setActiveTabId(existingTab.id);
+        return prev;
+      }
+      tabCounterRef.current += 1;
+      const seq = tabCounterRef.current;
+      const tabId = `api-tester-tab-${seq}`;
+      const paneId = `api-tester-pane-${seq}-1`;
+      const newTab: TabItem = {
+        id: tabId,
+        title: 'API Tester & Repeater',
+        color: '#38bdf8',
+        tabType: 'api-tester',
+        rootNode: {
+          type: 'pane',
+          id: paneId,
+          sessionId: `api-tester-${seq}`,
+          title: 'API Tester & HTTP Repeater',
+        },
+        activePaneId: paneId,
+      };
+      setActiveTabId(tabId);
+      return [...prev, newTab];
+    });
+  }, []);
 
   const openRemoteEditorTab = useCallback(
     (session: RemoteEditSession, hostId?: string): void => {
@@ -5014,6 +5044,7 @@ export function App({
       activeTab.tabType === 'network-map' ||
       activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'route-health' ||
+      activeTab.tabType === 'api-tester' ||
       activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
@@ -5687,6 +5718,7 @@ export function App({
       activeTab.tabType === 'network-map' ||
       activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'route-health' ||
+      activeTab.tabType === 'api-tester' ||
       activeTab.tabType === 'editor'
     ) {
       await handleConnectSavedHost(host);
@@ -5775,7 +5807,8 @@ export function App({
         activeTab.tabType === 'sftp' ||
         activeTab.tabType === 'network-map' ||
         activeTab.tabType === 'winrm' ||
-        activeTab.tabType === 'route-health'
+        activeTab.tabType === 'route-health' ||
+        activeTab.tabType === 'api-tester'
       ) {
         await handleOpenLocalTerminal(shellType);
         return;
@@ -5898,6 +5931,7 @@ export function App({
       activeTab.tabType === 'network-map' ||
       activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'route-health' ||
+      activeTab.tabType === 'api-tester' ||
       activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
@@ -8754,6 +8788,7 @@ export function App({
                 >
                   <div className="tools-sub-header">Phase 1 // Recon &amp; Enumeration</div>
                   {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest', undefined, () => setShowNmapImportModal(true), false, false, 'XML')}
+                  {renderDropdownRow('api-tester', 'API Tester & HTTP Repeater', undefined, () => openApiTesterTab())}
 
                   <div className="nav-dropdown-divider" />
                   <div className="tools-sub-header">Phase 2 // Delivery &amp; Catchers</div>
@@ -11558,6 +11593,7 @@ export function App({
               activeTab.tabType !== 'sftp' &&
               activeTab.tabType !== 'network-map' &&
               activeTab.tabType !== 'route-health' &&
+              activeTab.tabType !== 'api-tester' &&
               activeTab.tabType !== 'editor' && (
               <div className="terminal-toolbar hud-command-strip">
                 <div className="hud-telemetry-readout" title={statusMessage}>
@@ -12106,6 +12142,44 @@ export function App({
                         }}
                         onOpenPivotManager={() => setShowPivotManagerModal(true)}
                         onOpenPortForwarding={() => setShowPortForwardingModal(true)}
+                      />
+                    ) : tab.tabType === 'api-tester' ? (
+                      <ApiTesterView
+                        activeEngagementId={activeEngagement?.id || null}
+                        activeEngagementName={activeEngagement?.name || null}
+                        identities={vaultSummary.identities || []}
+                        eventsOn={getWailsRuntime()?.EventsOn}
+                        onSaveToEvidence={async (title, category, content) => {
+                          await handleSaveSelectionEvidence({
+                            id: `ev-api-${Date.now()}`,
+                            engagementId: activeEngagement?.id || '',
+                            category,
+                            title,
+                            type: 'text',
+                            content,
+                            source: 'api-tester',
+                            inReport: true,
+                            severity: 'info',
+                            capturedAt: new Date().toISOString(),
+                          });
+                        }}
+                        onSaveToNotes={async (title, content) => {
+                          const now = new Date().toISOString();
+                          await handleSaveSelectionNote({
+                            id: `note-api-${Date.now()}`,
+                            hostId: '',
+                            engagementId: activeEngagement?.id || '',
+                            parentId: '',
+                            isFolder: false,
+                            title,
+                            type: 'markdown',
+                            body: content,
+                            order: 0,
+                            createdAt: now,
+                            updatedAt: now,
+                          });
+                        }}
+                        onClose={() => void handleCloseTab(tab.id)}
                       />
                     ) : tab.tabType === 'network-map' ? (
                       <NetworkMapView
@@ -12686,6 +12760,41 @@ export function App({
                     </div>
                     <div className="palette-tags">
                       <span className="kbd-badge">Check Health <CyberIcon name="return" size={14} /></span>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {(() => {
+                const q = paletteQuery.toLowerCase();
+                const showApiTester =
+                  !q ||
+                  'api tester'.includes(q) ||
+                  'http repeater'.includes(q) ||
+                  'postman'.includes(q) ||
+                  'burp'.includes(q) ||
+                  'caido'.includes(q) ||
+                  'ai chat'.includes(q);
+                if (!showApiTester) return null;
+                return (
+                  <button
+                    type="button"
+                    className="palette-item"
+                    onClick={() => {
+                      setShowCommandPalette(false);
+                      setPaletteQuery('');
+                      openApiTesterTab();
+                    }}
+                  >
+                    <div className="palette-item-main">
+                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <CyberIcon name="globe" size={14} />
+                        <span>API Tester &amp; HTTP Repeater</span>
+                      </strong>
+                      <span>HTTP/Raw Repeater, SOCKS5 pivots, Vault secrets, Param Replay, Diff &amp; AI Chat Mode</span>
+                    </div>
+                    <div className="palette-tags">
+                      <span className="kbd-badge">Open View <CyberIcon name="return" size={14} /></span>
                     </div>
                   </button>
                 );

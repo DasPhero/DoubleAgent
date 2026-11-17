@@ -645,7 +645,112 @@ func MergeVaultPayloads(local, remote core.VaultPayload) (core.VaultPayload, cor
 		}
 	}
 
+	// 17. ApiRequests & ApiEnvironments (F-42 API Tester)
+	merged.ApiRequests = mergeSliceByID(
+		local.ApiRequests,
+		remote.ApiRequests,
+		func(v core.ApiRequestItem) string { return v.ID },
+		func(v core.ApiRequestItem) string { return v.Name },
+		func(v core.ApiRequestItem) string { return fmt.Sprintf("%s %s", v.Method, v.URL) },
+		"api_request",
+		&report,
+	)
+	merged.ApiEnvironments = mergeSliceByID(
+		local.ApiEnvironments,
+		remote.ApiEnvironments,
+		func(v core.ApiEnvironment) string { return v.ID },
+		func(v core.ApiEnvironment) string { return v.Name },
+		func(v core.ApiEnvironment) string { return fmt.Sprintf("%d var(s)", len(v.Variables)) },
+		"api_environment",
+		&report,
+	)
+
 	return ensureNonNilSlices(merged), report
+}
+
+func mergeSliceByID[T any](
+	local []T,
+	remote []T,
+	getID func(T) string,
+	getName func(T) string,
+	getSummary func(T) string,
+	entityType string,
+	report *core.VaultConflictReport,
+) []T {
+	localMap := make(map[string]T, len(local))
+	for _, item := range local {
+		localMap[getID(item)] = item
+	}
+	remoteMap := make(map[string]T, len(remote))
+	for _, item := range remote {
+		remoteMap[getID(item)] = item
+	}
+	out := make([]T, 0, len(local))
+	for _, l := range local {
+		id := getID(l)
+		if r, exists := remoteMap[id]; exists {
+			if jsonEqual(l, r) {
+				out = append(out, l)
+			} else {
+				report.HasConflicts = true
+				report.Conflicts = append(report.Conflicts, core.VaultConflictItem{
+					ID:            id,
+					Type:          entityType,
+					Label:         getName(l),
+					LocalSummary:  getSummary(l),
+					RemoteSummary: getSummary(r),
+				})
+				out = append(out, l)
+			}
+		} else {
+			out = append(out, l)
+		}
+	}
+	for _, r := range remote {
+		if _, exists := localMap[getID(r)]; !exists {
+			out = append(out, r)
+			report.AutoMerged++
+		}
+	}
+	return out
+}
+
+func resolveSliceConflictsByID[T any](
+	merged []T,
+	remote []T,
+	resolutions map[string]core.VaultConflictResolution,
+	getID func(T) string,
+	cloneSynced func(T) T,
+) []T {
+	remoteMap := make(map[string]T, len(remote))
+	for _, r := range remote {
+		remoteMap[getID(r)] = r
+	}
+	out := make([]T, 0, len(merged))
+	for _, item := range merged {
+		id := getID(item)
+		res, hasRes := resolutions[id]
+		if !hasRes {
+			out = append(out, item)
+			continue
+		}
+		switch res {
+		case core.ResolutionKeepRemote:
+			if r, ok := remoteMap[id]; ok {
+				out = append(out, r)
+			} else {
+				out = append(out, item)
+			}
+		case core.ResolutionKeepBoth:
+			out = append(out, item)
+			if r, ok := remoteMap[id]; ok {
+				out = append(out, cloneSynced(r))
+			}
+		default:
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 // ResolveVaultConflicts applies user-specified conflict resolutions to the merged payload (F-29).
@@ -1037,6 +1142,29 @@ func ResolveVaultConflicts(local, remote core.VaultPayload, resolutions map[stri
 		}
 	}
 	resolved.WinrmProfiles = finalWinrm
+
+	resolved.ApiRequests = resolveSliceConflictsByID(
+		resolved.ApiRequests,
+		remote.ApiRequests,
+		resolutions,
+		func(v core.ApiRequestItem) string { return v.ID },
+		func(v core.ApiRequestItem) core.ApiRequestItem {
+			v.ID = fmt.Sprintf("%s-synced", v.ID)
+			v.Name = fmt.Sprintf("%s (Synced)", v.Name)
+			return v
+		},
+	)
+	resolved.ApiEnvironments = resolveSliceConflictsByID(
+		resolved.ApiEnvironments,
+		remote.ApiEnvironments,
+		resolutions,
+		func(v core.ApiEnvironment) string { return v.ID },
+		func(v core.ApiEnvironment) core.ApiEnvironment {
+			v.ID = fmt.Sprintf("%s-synced", v.ID)
+			v.Name = fmt.Sprintf("%s (Synced)", v.Name)
+			return v
+		},
+	)
 
 	return ensureNonNilSlices(resolved)
 }

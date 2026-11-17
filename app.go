@@ -19,6 +19,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"doubleagent/backend/apiclient"
 	"doubleagent/backend/core"
 	"doubleagent/backend/data"
 	"doubleagent/backend/health"
@@ -77,6 +78,7 @@ type App struct {
 	pivotMgr                    *pivot.Manager
 	winrmMgr                    *winrm.Manager
 	winrmSessions               map[string]*winrm.ManagedSession
+	apiClient                   *apiclient.Client
 }
 
 type managedListenerInstance struct {
@@ -210,6 +212,7 @@ func NewAppWithDependencies(
 		managedListeners: make(map[string]*managedListenerInstance),
 		fileServers:      make(map[string]*transfer.ManagedServer),
 		winrmSessions:    make(map[string]*winrm.ManagedSession),
+		apiClient:        apiclient.NewClient(),
 	}
 
 	if vaultStore == nil {
@@ -6650,6 +6653,456 @@ func (a *App) SaveReportFileDialog(defaultFilename string, format string) (strin
 		DefaultFilename: strings.TrimSpace(defaultFilename),
 		Filters:         filters,
 	})
+}
+
+// --- API Tester & HTTP Repeater View + AI Chat Mode (F-42) ---
+
+func (a *App) ensureApiClient() *apiclient.Client {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.apiClient == nil {
+		a.apiClient = apiclient.NewClient()
+	}
+	return a.apiClient
+}
+
+func (a *App) buildApiSecretResolver() apiclient.SecretResolver {
+	return func(ref string) (string, error) {
+		if a.vaultStore == nil {
+			return "", errors.New("vault store unavailable")
+		}
+		payload, err := a.vaultStore.GetPayload()
+		if err != nil {
+			return "", err
+		}
+		for _, id := range payload.Identities {
+			if id.ID == ref || strings.EqualFold(id.Label, ref) {
+				if id.Password != "" {
+					return id.Password, nil
+				}
+			}
+		}
+		for _, cred := range payload.Credentials {
+			if cred.ID == ref || strings.EqualFold(cred.Label, ref) {
+				if cred.Secret != "" {
+					return cred.Secret, nil
+				}
+			}
+		}
+		return "", fmt.Errorf("vault secret %q not found", ref)
+	}
+}
+
+func (a *App) buildApiAuthLookup() apiclient.AuthLookup {
+	return func(auth core.ApiAuthConfig) (string, string, error) {
+		if a.vaultStore == nil {
+			return "", "", errors.New("vault store unavailable")
+		}
+		payload, err := a.vaultStore.GetPayload()
+		if err != nil {
+			return "", "", err
+		}
+		if strings.TrimSpace(auth.CredentialID) != "" {
+			for _, cred := range payload.Credentials {
+				if cred.ID == auth.CredentialID {
+					return cred.Username, cred.Secret, nil
+				}
+			}
+			return "", "", fmt.Errorf("credential %q not found in vault", auth.CredentialID)
+		}
+		if strings.TrimSpace(auth.IdentityID) != "" {
+			for _, id := range payload.Identities {
+				if id.ID == auth.IdentityID {
+					return id.Username, id.Password, nil
+				}
+			}
+			return "", "", fmt.Errorf("identity %q not found in vault", auth.IdentityID)
+		}
+		return "", "", errors.New("vault auth requires credentialId or identityId")
+	}
+}
+
+func (a *App) buildApiRouteResolver() apiclient.RouteResolver {
+	return func(routeID string) (apiclient.ProxyTarget, error) {
+		trimmed := strings.TrimSpace(routeID)
+		if trimmed == "" || strings.EqualFold(trimmed, "direct") {
+			return apiclient.ProxyTarget{Label: "Direct", Kind: "direct"}, nil
+		}
+		if strings.HasPrefix(strings.ToLower(trimmed), "socks5://") {
+			addr := strings.TrimPrefix(trimmed, "socks5://")
+			return apiclient.ProxyTarget{Label: "socks5://" + addr, Kind: "socks5", Address: addr}, nil
+		}
+		if strings.HasPrefix(trimmed, "proxy:") {
+			pid := strings.TrimPrefix(trimmed, "proxy:")
+			if a.vaultStore != nil {
+				if payload, err := a.vaultStore.GetPayload(); err == nil {
+					for _, prof := range payload.ProxyProfiles {
+						if prof.ID == pid {
+							if prof.Type != core.ProxyTypeSocks5 || strings.TrimSpace(prof.SocksAddress) == "" {
+								return apiclient.ProxyTarget{}, fmt.Errorf("proxy profile %q is not a SOCKS5 profile", prof.Name)
+							}
+							return apiclient.ProxyTarget{
+								Label:    fmt.Sprintf("Proxy: %s (%s)", prof.Name, prof.SocksAddress),
+								Kind:     "socks5",
+								Address:  prof.SocksAddress,
+								Username: prof.SocksUsername,
+								Password: prof.SocksPassword,
+							}, nil
+						}
+					}
+				}
+			}
+			return apiclient.ProxyTarget{}, fmt.Errorf("proxy profile %q not found", pid)
+		}
+		if strings.HasPrefix(trimmed, "tunnel:") {
+			tid := strings.TrimPrefix(trimmed, "tunnel:")
+			for _, tun := range a.GetActiveTunnels() {
+				if tun.ID == tid && tun.Type == core.ForwardDynamic {
+					host := tun.BindAddress
+					if host == "" || host == "0.0.0.0" {
+						host = "127.0.0.1"
+					}
+					addr := net.JoinHostPort(host, fmt.Sprintf("%d", tun.BindPort))
+					return apiclient.ProxyTarget{
+						Label:   fmt.Sprintf("SSH -D (%s)", addr),
+						Kind:    "socks5",
+						Address: addr,
+					}, nil
+				}
+			}
+			return apiclient.ProxyTarget{}, fmt.Errorf("active dynamic tunnel %q not found", tid)
+		}
+		if strings.HasPrefix(trimmed, "pivot:") && a.pivotMgr != nil {
+			pid := strings.TrimPrefix(trimmed, "pivot:")
+			for _, inst := range a.pivotMgr.List() {
+				if inst.ID == pid && inst.SocksPort > 0 {
+					addr := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", inst.SocksPort))
+					return apiclient.ProxyTarget{
+						Label:   fmt.Sprintf("Pivot %s (%s)", inst.Name, addr),
+						Kind:    "socks5",
+						Address: addr,
+					}, nil
+				}
+			}
+		}
+		return apiclient.ProxyTarget{}, fmt.Errorf("unknown route %q", routeID)
+	}
+}
+
+func (a *App) mergeEnvVariables(envID string, inline []core.ApiKeyValue) []core.ApiKeyValue {
+	var merged []core.ApiKeyValue
+	if strings.TrimSpace(envID) != "" && a.vaultStore != nil {
+		if st, ok := a.vaultStore.(interface {
+			ListApiEnvironments(string) ([]core.ApiEnvironment, error)
+		}); ok {
+			if envs, err := st.ListApiEnvironments(""); err == nil {
+				for _, env := range envs {
+					if env.ID == envID {
+						merged = append(merged, env.Variables...)
+						break
+					}
+				}
+			}
+		}
+	}
+	merged = append(merged, inline...)
+	return merged
+}
+
+// ListApiRoutes returns Direct plus all active SOCKS5 forwards, running Pivot SOCKS5 proxies, and saved SOCKS5 ProxyProfiles (F-42).
+func (a *App) ListApiRoutes() []core.ApiRouteOption {
+	options := []core.ApiRouteOption{
+		{ID: "", Label: "Direct (No Proxy)", Kind: "direct", Active: true},
+	}
+
+	for _, tun := range a.GetActiveTunnels() {
+		if tun.Type != core.ForwardDynamic || tun.BindPort == 0 {
+			continue
+		}
+		host := tun.BindAddress
+		if host == "" || host == "0.0.0.0" {
+			host = "127.0.0.1"
+		}
+		ep := net.JoinHostPort(host, fmt.Sprintf("%d", tun.BindPort))
+		options = append(options, core.ApiRouteOption{
+			ID:       "tunnel:" + tun.ID,
+			Label:    fmt.Sprintf("SSH -D Tunnel (%s)", ep),
+			Kind:     "tunnel-socks5",
+			Endpoint: ep,
+			Active:   strings.EqualFold(tun.Status, "active"),
+		})
+	}
+
+	if a.pivotMgr != nil {
+		for _, inst := range a.pivotMgr.List() {
+			if inst.SocksPort <= 0 {
+				continue
+			}
+			ep := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", inst.SocksPort))
+			options = append(options, core.ApiRouteOption{
+				ID:       "pivot:" + inst.ID,
+				Label:    fmt.Sprintf("Pivot %s (%s)", inst.Name, ep),
+				Kind:     "route",
+				Endpoint: ep,
+				Active:   strings.EqualFold(inst.Status, "running"),
+			})
+		}
+	}
+
+	if a.vaultStore != nil {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			for _, prof := range payload.ProxyProfiles {
+				if prof.Type == core.ProxyTypeSocks5 && strings.TrimSpace(prof.SocksAddress) != "" {
+					options = append(options, core.ApiRouteOption{
+						ID:       "proxy:" + prof.ID,
+						Label:    fmt.Sprintf("Proxy Profile: %s (%s)", prof.Name, prof.SocksAddress),
+						Kind:     "proxy-socks5",
+						Endpoint: prof.SocksAddress,
+						Active:   true,
+					})
+				}
+			}
+		}
+	}
+
+	return options
+}
+
+// ExecuteApiRequest executes a single HTTP repeater request from the Go backend with Vault/SOCKS5 support (F-42).
+func (a *App) ExecuteApiRequest(req core.ApiExecuteRequest) (*core.ApiResponse, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	req.Variables = a.mergeEnvVariables(req.EnvID, req.Variables)
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	return a.ensureApiClient().Execute(
+		baseCtx,
+		req,
+		a.buildApiSecretResolver(),
+		a.buildApiAuthLookup(),
+		a.buildApiRouteResolver(),
+	)
+}
+
+// ExecuteApiParameterReplay runs a throttled {{PAYLOAD}} replay batch with Engagement Lockout-Guard checks (F-42, F-40).
+func (a *App) ExecuteApiParameterReplay(req core.ApiReplayBatchRequest) (*core.ApiReplayBatchResult, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	req.Variables = a.mergeEnvVariables(req.EnvID, req.Variables)
+
+	lockoutThreshold := 0
+	if strings.TrimSpace(req.EngagementID) != "" && a.vaultStore != nil {
+		if payload, err := a.vaultStore.GetPayload(); err == nil {
+			for _, eng := range payload.Engagements {
+				if eng.ID == req.EngagementID && eng.LockoutPolicy.MaxAttemptsPerUser > 0 {
+					lockoutThreshold = eng.LockoutPolicy.MaxAttemptsPerUser
+					break
+				}
+			}
+		}
+	}
+
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	return a.ensureApiClient().ExecuteParameterReplay(
+		baseCtx,
+		req,
+		lockoutThreshold,
+		a.buildApiSecretResolver(),
+		a.buildApiAuthLookup(),
+		a.buildApiRouteResolver(),
+		func(done, total int, entry core.ApiReplayEntryResult) {
+			a.emit(a.ctx, "api:replay-progress", map[string]any{
+				"executionId": req.ExecutionID,
+				"done":        done,
+				"total":       total,
+				"entry":       entry,
+			})
+		},
+	)
+}
+
+// CancelApiExecution aborts an active HTTP request, parameter replay batch, or AI stream (F-42).
+func (a *App) CancelApiExecution(executionID string) bool {
+	return a.ensureApiClient().Cancel(executionID)
+}
+
+// ResetApiCookieJar clears session cookies stored by the API Tester for sessionID (F-42).
+func (a *App) ResetApiCookieJar(sessionID string) {
+	a.ensureApiClient().ResetCookieJar(sessionID)
+}
+
+// ExecuteApiAiChat executes an AI chat endpoint call with live SSE/NDJSON streaming via "api:ai-chunk" events (F-42).
+func (a *App) ExecuteApiAiChat(req core.ApiAiChatRequest) (*core.ApiAiChatResult, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	return a.ensureApiClient().ExecuteAiChat(
+		baseCtx,
+		req,
+		nil,
+		a.buildApiSecretResolver(),
+		a.buildApiAuthLookup(),
+		a.buildApiRouteResolver(),
+		func(ev core.ApiAiStreamChunkEvent) {
+			a.emit(a.ctx, "api:ai-chunk", ev)
+		},
+	)
+}
+
+// InspectApiPayload decodes Base64, URL, Hex, HTML, or JWT tokens cleanly in Go (F-42).
+func (a *App) InspectApiPayload(input string, format string) core.ApiDecodedPayload {
+	return apiclient.InspectPayload(input, format)
+}
+
+// ParseApiCurl parses a pasted cURL command or raw HTTP request into an ApiRequestItem (F-42).
+func (a *App) ParseApiCurl(curlCmd string) (*core.ApiRequestItem, error) {
+	return apiclient.ParseCurlCommand(curlCmd)
+}
+
+// GenerateApiCodeSnippet generates curl, powershell, or python code for an API request (F-42).
+func (a *App) GenerateApiCodeSnippet(req core.ApiRequestItem, lang string, resolveSecrets bool) (string, error) {
+	var resolver apiclient.SecretResolver
+	if resolveSecrets {
+		resolver = a.buildApiSecretResolver()
+	}
+	return apiclient.GenerateCodeSnippet(req, lang, nil, resolver)
+}
+
+// ImportOpenAPISpec converts an OpenAPI v3 / Swagger v2 JSON document into saved ApiRequestItems (F-42).
+func (a *App) ImportOpenAPISpec(specJSON string, engagementID string, collectionName string) ([]core.ApiRequestItem, error) {
+	return apiclient.ParseOpenAPISpec(specJSON, engagementID, collectionName)
+}
+
+// DiffApiResponses computes telemetry and line-by-line header/body diffs between two responses (F-42).
+func (a *App) DiffApiResponses(left core.ApiResponse, right core.ApiResponse) core.ApiResponseDiff {
+	return apiclient.DiffResponses(left, right)
+}
+
+// ListApiRequests returns saved API requests scoped to engagementID from the encrypted Vault (F-42).
+func (a *App) ListApiRequests(engagementID string) ([]core.ApiRequestItem, error) {
+	if a.vaultStore == nil {
+		return nil, errors.New("vault store unavailable")
+	}
+	a.vaultStore.Touch()
+	st, ok := a.vaultStore.(interface {
+		ListApiRequests(string) ([]core.ApiRequestItem, error)
+	})
+	if !ok {
+		return nil, errors.New("vault store does not support API requests")
+	}
+	return st.ListApiRequests(engagementID)
+}
+
+// SaveApiRequest creates or updates a saved API request in the encrypted Vault (F-42).
+func (a *App) SaveApiRequest(item core.ApiRequestItem) (*core.ApiRequestItem, error) {
+	if a.vaultStore == nil {
+		return nil, errors.New("vault store unavailable")
+	}
+	a.vaultStore.Touch()
+	if strings.TrimSpace(item.ID) == "" {
+		item.ID = fmt.Sprintf("api-req-%d", time.Now().UnixNano())
+	}
+	if strings.TrimSpace(item.Name) == "" {
+		item.Name = fmt.Sprintf("%s %s", strings.ToUpper(item.Method), item.URL)
+	}
+	item.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	st, ok := a.vaultStore.(interface {
+		SaveApiRequest(core.ApiRequestItem) error
+	})
+	if !ok {
+		return nil, errors.New("vault store does not support API requests")
+	}
+	if err := st.SaveApiRequest(item); err != nil {
+		return nil, err
+	}
+	if payload, err := a.vaultStore.GetPayload(); err == nil {
+		a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	}
+	return &item, nil
+}
+
+// DeleteApiRequest removes a saved API request by ID from the encrypted Vault (F-42).
+func (a *App) DeleteApiRequest(id string) error {
+	if a.vaultStore == nil {
+		return errors.New("vault store unavailable")
+	}
+	a.vaultStore.Touch()
+	st, ok := a.vaultStore.(interface {
+		DeleteApiRequest(string) error
+	})
+	if !ok {
+		return errors.New("vault store does not support API requests")
+	}
+	if err := st.DeleteApiRequest(id); err != nil {
+		return err
+	}
+	if payload, err := a.vaultStore.GetPayload(); err == nil {
+		a.emit(a.ctx, "vault:updated", core.BuildVaultSummary(payload))
+	}
+	return nil
+}
+
+// ListApiEnvironments returns saved API environments scoped to engagementID from the encrypted Vault (F-42).
+func (a *App) ListApiEnvironments(engagementID string) ([]core.ApiEnvironment, error) {
+	if a.vaultStore == nil {
+		return nil, errors.New("vault store unavailable")
+	}
+	a.vaultStore.Touch()
+	st, ok := a.vaultStore.(interface {
+		ListApiEnvironments(string) ([]core.ApiEnvironment, error)
+	})
+	if !ok {
+		return nil, errors.New("vault store does not support API environments")
+	}
+	return st.ListApiEnvironments(engagementID)
+}
+
+// SaveApiEnvironment creates or updates an API environment in the encrypted Vault (F-42).
+func (a *App) SaveApiEnvironment(env core.ApiEnvironment) (*core.ApiEnvironment, error) {
+	if a.vaultStore == nil {
+		return nil, errors.New("vault store unavailable")
+	}
+	a.vaultStore.Touch()
+	if strings.TrimSpace(env.ID) == "" {
+		env.ID = fmt.Sprintf("api-env-%d", time.Now().UnixNano())
+	}
+	env.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	st, ok := a.vaultStore.(interface {
+		SaveApiEnvironment(core.ApiEnvironment) error
+	})
+	if !ok {
+		return nil, errors.New("vault store does not support API environments")
+	}
+	if err := st.SaveApiEnvironment(env); err != nil {
+		return nil, err
+	}
+	return &env, nil
+}
+
+// DeleteApiEnvironment deletes an API environment by ID from the encrypted Vault (F-42).
+func (a *App) DeleteApiEnvironment(id string) error {
+	if a.vaultStore == nil {
+		return errors.New("vault store unavailable")
+	}
+	a.vaultStore.Touch()
+	st, ok := a.vaultStore.(interface {
+		DeleteApiEnvironment(string) error
+	})
+	if !ok {
+		return errors.New("vault store does not support API environments")
+	}
+	return st.DeleteApiEnvironment(id)
 }
 
 
