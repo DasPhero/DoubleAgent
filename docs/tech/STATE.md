@@ -5,6 +5,8 @@
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Sidebar Tag Filtering for Snippets & Chains (`frontend/src/App.tsx`, `frontend/src/App.test.tsx`)**:
+  - Added `#tag` select dropdowns (`Filter Snippets by Tag`, `Filter Chains by Tag`), clickable `#tag` card badges, and `Filter Chains` text search across both sidebar drawers (`collectUniqueTags`, `matchesTagFilter`, `renderSidebarTagBar`, `renderSidebarCardTags`).
 - **API Tester & HTTP Repeater View + AI Chat Mode (`F-42`)**:
   - **Core & Vault (`backend/core/api_tester.go`, `interfaces.go`, `pentest.go`, `backend/vault/pentest.go`, `merge.go`):** Added `ApiRequestItem` & `ApiEnvironment` encrypted persistence scoped per engagement, included in `.daeng` export/import and 3-way conflict merge (`api_request`, `api_environment`).
   - **Go HTTP Engine (`backend/apiclient/client.go`, `tools.go`):** Dual Structured + Raw HTTP/1.1 execution via Go `net/http`, SOCKS5/SSH `-D`/Pivot/ProxyProfile dialer routing (`golang.org/x/net/proxy`), Go-only `{{SECRET:id}}` & Vault credential resolution (Golden Rule 2), opt-in TLS `InsecureSkipVerify` + certificate SAN/Subject/Issuer & phase timing telemetry, 4 MiB response cap, session cookie jars, cURL/OpenAPI import, code generators (`curl`/`powershell`/`python`), JWT/Base64/URL/Hex/HTML Inspector, LCS Response Diff, OPSEC-throttled `{{PAYLOAD}}` replay with Lockout Guard (`F-40`), and AI Chat streaming (OpenAI SSE, Anthropic SSE, Ollama NDJSON via `api:ai-chunk` Wails events).

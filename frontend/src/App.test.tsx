@@ -3408,4 +3408,106 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       delete (window as unknown as { go?: unknown }).go;
     }
   });
+
+  it('filters Command Snippets and Snippet Chains in the left sidebar by tags (F-15, F-16)', async () => {
+    (window as unknown as { go?: unknown }).go = {
+      main: {
+        App: {
+          HealthCheck: async () => ({
+            name: 'DoubleAgent',
+            version: '0.1.0',
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: true,
+            quickUnlockReady: false,
+          }),
+          GetAppStatus: async () => ({
+            vaultLocked: false,
+            vaultInitialized: true,
+            passwordless: true,
+            quickUnlockReady: false,
+          }),
+          GetVaultSummary: async () => ({
+            groups: [],
+            hosts: [],
+            identities: [],
+            keys: [],
+            proxyProfiles: [],
+            snippets: [
+              {
+                id: 'sn-recon',
+                name: 'Port Sweep',
+                body: 'ss -tulpn',
+                tags: ['recon', 'linux'],
+                confirmBeforeRun: false,
+              },
+              {
+                id: 'sn-privesc',
+                name: 'SUID Check',
+                body: 'find / -perm -4000',
+                tags: ['privesc', 'linux'],
+                confirmBeforeRun: true,
+              },
+            ],
+            snippetChains: [
+              {
+                id: 'ch-web',
+                name: 'Web Foothold Chain',
+                targetOs: 'linux',
+                tags: ['web', 'initial'],
+                steps: [{ id: 's1', title: 'Step 1', command: 'curl -I http://target', confirmBeforeRun: true, stopOnError: true }],
+                stopOnError: true,
+                autoRunWithoutPrompt: false,
+              },
+              {
+                id: 'ch-pivot',
+                name: 'Internal Pivot Chain',
+                targetOs: 'linux',
+                tags: ['pivot', 'lateral'],
+                steps: [{ id: 's1', title: 'Step 1', command: 'ip route', confirmBeforeRun: true, stopOnError: true }],
+                stopOnError: true,
+                autoRunWithoutPrompt: false,
+              },
+            ],
+          }),
+        },
+      },
+    };
+
+    try {
+      render(<App initialLocked={false} />);
+
+      // 1. Snippets Sidebar Tag Dropdown Filter
+      fireEvent.click(screen.getByRole('button', { name: 'Quick Snippets Panel' }));
+      expect(await screen.findByText('Port Sweep')).toBeInTheDocument();
+      expect(screen.getByText('SUID Check')).toBeInTheDocument();
+
+      const snipTagSelect = screen.getByLabelText('Filter Snippets by Tag');
+      fireEvent.change(snipTagSelect, { target: { value: 'privesc' } });
+
+      expect(screen.queryByText('Port Sweep')).not.toBeInTheDocument();
+      expect(screen.getByText('SUID Check')).toBeInTheDocument();
+
+      fireEvent.change(snipTagSelect, { target: { value: 'all' } });
+      expect(screen.getByText('Port Sweep')).toBeInTheDocument();
+
+      // 2. Chains Sidebar Tag Dropdown Filter + Search
+      fireEvent.click(screen.getByRole('button', { name: 'Snippet Chains Panel' }));
+      expect(await screen.findByText('Web Foothold Chain')).toBeInTheDocument();
+      expect(screen.getByText('Internal Pivot Chain')).toBeInTheDocument();
+
+      const chainTagSelect = screen.getByLabelText('Filter Chains by Tag');
+      fireEvent.change(chainTagSelect, { target: { value: 'pivot' } });
+
+      expect(screen.queryByText('Web Foothold Chain')).not.toBeInTheDocument();
+      expect(screen.getByText('Internal Pivot Chain')).toBeInTheDocument();
+
+      fireEvent.change(chainTagSelect, { target: { value: 'all' } });
+      fireEvent.change(screen.getByLabelText('Filter Chains'), { target: { value: 'foothold' } });
+      expect(screen.getByText('Web Foothold Chain')).toBeInTheDocument();
+      expect(screen.queryByText('Internal Pivot Chain')).not.toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { go?: unknown }).go;
+    }
+  });
 });

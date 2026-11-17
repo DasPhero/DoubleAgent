@@ -1152,6 +1152,9 @@ export function App({
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>('hosts');
   const [snippetDrawerQuery, setSnippetDrawerQuery] = useState<string>('');
   const [snippetDrawerOs, setSnippetDrawerOs] = useState<'all' | 'linux' | 'windows'>('all');
+  const [snippetDrawerTag, setSnippetDrawerTag] = useState<string>('all');
+  const [chainDrawerQuery, setChainDrawerQuery] = useState<string>('');
+  const [chainDrawerTag, setChainDrawerTag] = useState<string>('all');
   const [credDrawerQuery, setCredDrawerQuery] = useState<string>('');
   const [credDrawerScope, setCredDrawerScope] = useState<'host_and_engagement' | 'all'>('host_and_engagement');
   const [totpDrawerScope, setTotpDrawerScope] = useState<'host_and_global' | 'all'>('host_and_global');
@@ -4218,12 +4221,90 @@ export function App({
     return Array.from(byId.values());
   }, [externalSnippets, vaultSummary.snippets]);
 
+  const collectUniqueTags = useCallback((items: Array<{ tags?: string[] }>): string[] => {
+    const tagMap = new Map<string, string>();
+    for (const item of items) {
+      for (const rawTag of item.tags || []) {
+        const trimmed = rawTag.trim();
+        if (!trimmed) continue;
+        const lower = trimmed.toLowerCase();
+        if (!tagMap.has(lower)) {
+          tagMap.set(lower, trimmed);
+        }
+      }
+    }
+    return Array.from(tagMap.values()).sort((a, b) => a.localeCompare(b));
+  }, []);
+
+  const snippetDrawerTags = useMemo(
+    () => collectUniqueTags(mergedSnippets),
+    [collectUniqueTags, mergedSnippets]
+  );
+
+  const matchesTagFilter = (tags: string[] | undefined, selectedTag: string): boolean => {
+    if (selectedTag === 'all') return true;
+    const needle = selectedTag.toLowerCase();
+    return (tags || []).some((t) => t.trim().toLowerCase() === needle);
+  };
+
+  const renderSidebarTagBar = (
+    tags: string[],
+    selectedTag: string,
+    onSelect: (nextTag: string) => void,
+    ariaLabel: string
+  ) =>
+    tags.length > 0 ? (
+      <div className="drawer-filter-bar">
+        <select
+          className="sidebar-search"
+          aria-label={ariaLabel}
+          value={selectedTag}
+          onChange={(e) => onSelect(e.target.value)}
+          style={{ width: '100%', padding: '0.28rem 0.45rem', fontSize: '0.73rem' }}
+        >
+          <option value="all">All Tags ({tags.length})</option>
+          {tags.map((tag) => (
+            <option key={tag} value={tag}>
+              #{tag}
+            </option>
+          ))}
+        </select>
+      </div>
+    ) : null;
+
+  const renderSidebarCardTags = (
+    tags: string[] | undefined,
+    selectedTag: string,
+    onSelect: (nextTag: string) => void,
+    kindLabel: string
+  ) =>
+    tags && tags.length > 0 ? (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginBottom: '0.25rem' }}>
+        {tags.map((tag) => {
+          const isActive = selectedTag.toLowerCase() === tag.toLowerCase();
+          return (
+            <button
+              key={tag}
+              type="button"
+              className="drawer-badge"
+              style={{ cursor: 'pointer' }}
+              title={`Filter ${kindLabel} by tag #${tag}`}
+              onClick={() => onSelect(isActive ? 'all' : tag)}
+            >
+              #{tag}
+            </button>
+          );
+        })}
+      </div>
+    ) : null;
+
   const filteredDrawerSnippets = useMemo(() => {
     return mergedSnippets.filter((s) => {
       if (snippetDrawerOs !== 'all') {
         const hasOsTag = (s.tags || []).some((t) => t.toLowerCase() === snippetDrawerOs);
         if (!hasOsTag) return false;
       }
+      if (!matchesTagFilter(s.tags, snippetDrawerTag)) return false;
       if (snippetDrawerQuery) {
         const q = snippetDrawerQuery.toLowerCase();
         const matchesName = (s.name || '').toLowerCase().includes(q);
@@ -4234,7 +4315,7 @@ export function App({
       }
       return true;
     });
-  }, [mergedSnippets, snippetDrawerOs, snippetDrawerQuery]);
+  }, [mergedSnippets, snippetDrawerOs, snippetDrawerTag, snippetDrawerQuery]);
 
   const filteredSidebarPayloads = useMemo(() => {
     const q = sidebarPayloadQuery.toLowerCase().trim();
@@ -4300,6 +4381,32 @@ export function App({
   const drawerChains = useMemo(() => {
     return chains.length > 0 ? chains : (vaultSummary.snippetChains || []);
   }, [chains, vaultSummary.snippetChains]);
+
+  const chainDrawerTags = useMemo(
+    () => collectUniqueTags(drawerChains),
+    [collectUniqueTags, drawerChains]
+  );
+
+  const filteredDrawerChains = useMemo(() => {
+    return drawerChains.filter((c) => {
+      if (!matchesTagFilter(c.tags, chainDrawerTag)) return false;
+      if (chainDrawerQuery) {
+        const q = chainDrawerQuery.toLowerCase();
+        const matchesName = (c.name || '').toLowerCase().includes(q);
+        const matchesDesc = (c.description || '').toLowerCase().includes(q);
+        const matchesCat = (c.category || '').toLowerCase().includes(q);
+        const matchesOs = (c.targetOs || '').toLowerCase().includes(q);
+        const matchesTag = (c.tags || []).some((t) => t.toLowerCase().includes(q));
+        const matchesStep = (c.steps || []).some(
+          (st) => (st.title || '').toLowerCase().includes(q) || (st.command || '').toLowerCase().includes(q)
+        );
+        if (!matchesName && !matchesDesc && !matchesCat && !matchesOs && !matchesTag && !matchesStep) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [drawerChains, chainDrawerTag, chainDrawerQuery]);
 
   const handleSaveScratchpadToHostNotes = async () => {
     if (!scratchpadContent.trim()) {
@@ -9002,9 +9109,6 @@ export function App({
               aria-label="Quick Snippets Panel"
             >
               <CyberIcon name="bolt" size={18} />
-              {vaultSummary.snippets && vaultSummary.snippets.length > 0 && (
-                <span className="activity-bar-badge">{vaultSummary.snippets.length}</span>
-              )}
             </button>
 
             {/* 3. Snippet Chains & Exploits (F-16) */}
@@ -9023,9 +9127,6 @@ export function App({
               aria-label="Snippet Chains Panel"
             >
               <CyberIcon name="chain" size={18} />
-              {drawerChains.length > 0 && (
-                <span className="activity-bar-badge">{drawerChains.length}</span>
-              )}
             </button>
 
             {/* 3b. Payload Generator & Reverse/Bind Shells */}
@@ -9044,9 +9145,6 @@ export function App({
               aria-label="Payload Generator Panel"
             >
               <CyberIcon name="target" size={18} />
-              {sidebarPayloads.length > 0 && (
-                <span className="activity-bar-badge">{sidebarPayloads.length}</span>
-              )}
             </button>
 
             {/* 4. Network Pivoting & Relay Launcher */}
@@ -9065,11 +9163,6 @@ export function App({
               aria-label="Network Pivoting Panel"
             >
               <CyberIcon name="tunnel" size={18} />
-              {(drawerPivots.filter((p) => p.status === 'running').length + activeTunnels.length) > 0 && (
-                <span className="activity-bar-badge" style={{ background: 'var(--accent-bright)', color: '#020617' }}>
-                  {drawerPivots.filter((p) => p.status === 'running').length + activeTunnels.length}
-                </span>
-              )}
             </button>
 
             {/* 5. File Transfer Helper & Staging */}
@@ -9088,11 +9181,6 @@ export function App({
               aria-label="File Transfer Helper Panel"
             >
               <CyberIcon name="upload" size={18} />
-              {dashboardFileServers.length > 0 && (
-                <span className="activity-bar-badge" style={{ background: '#10b981', color: '#020617' }}>
-                  {dashboardFileServers.length}
-                </span>
-              )}
             </button>
 
             {/* 6. Active Listeners */}
@@ -9111,11 +9199,6 @@ export function App({
               aria-label="Active Listeners Panel"
             >
               <CyberIcon name="radar" size={18} />
-              {drawerListeners.length > 0 && (
-                <span className="activity-bar-badge" style={{ background: '#34d399' }}>
-                  {drawerListeners.length}
-                </span>
-              )}
             </button>
 
             {/* Cyberpunk Section Divider between Global Ops and Host-Specific Context */}
@@ -9159,11 +9242,6 @@ export function App({
               aria-label="2FA and TOTP Panel"
             >
               <CyberIcon name="totp" size={18} />
-              {(totpTokensList.length > 0 || (vaultSummary.totpRecords && vaultSummary.totpRecords.length > 0)) && (
-                <span className="activity-bar-badge">
-                  {totpTokensList.length || vaultSummary.totpRecords?.length || 0}
-                </span>
-              )}
             </button>
 
             {/* 7. Credentials & Loot (Host & Engagement Bound) (F-36) */}
@@ -9520,6 +9598,7 @@ export function App({
                       WINDOWS
                     </button>
                   </div>
+                  {renderSidebarTagBar(snippetDrawerTags, snippetDrawerTag, setSnippetDrawerTag, 'Filter Snippets by Tag')}
                   <div className="drawer-items-list">
                     {filteredDrawerSnippets.length === 0 ? (
                       <div className="drawer-empty-state">
@@ -9544,6 +9623,7 @@ export function App({
                             </span>
                           </div>
                           {snip.description && <div className="drawer-card-desc">{snip.description}</div>}
+                          {renderSidebarCardTags(snip.tags, snippetDrawerTag, setSnippetDrawerTag, 'snippets')}
                           <div className="drawer-card-code">
                             <code>{snip.body}</code>
                           </div>
@@ -9592,8 +9672,16 @@ export function App({
                       </button>
                     </div>
                   </div>
+                  <input
+                    className="sidebar-search"
+                    aria-label="Filter Chains"
+                    placeholder="Search chains, tags & steps..."
+                    value={chainDrawerQuery}
+                    onChange={(e) => setChainDrawerQuery(e.target.value)}
+                  />
+                  {renderSidebarTagBar(chainDrawerTags, chainDrawerTag, setChainDrawerTag, 'Filter Chains by Tag')}
                   <div className="drawer-items-list">
-                    {drawerChains.length === 0 ? (
+                    {filteredDrawerChains.length === 0 ? (
                       <div className="drawer-empty-state">
                         <span>No snippet chains found.</span>
                         <button
@@ -9607,13 +9695,14 @@ export function App({
                         </button>
                       </div>
                     ) : (
-                      drawerChains.map((c) => (
+                      filteredDrawerChains.map((c) => (
                         <div key={c.id} className="drawer-card">
                           <div className="drawer-card-header">
                             <span className="drawer-card-title">{c.name}</span>
                             <span className="drawer-badge">{c.steps?.length || 0} STEPS</span>
                           </div>
                           {c.description && <div className="drawer-card-desc">{c.description}</div>}
+                          {renderSidebarCardTags(c.tags, chainDrawerTag, setChainDrawerTag, 'chains')}
                           <div className="drawer-card-meta">
                             <span>OS: {c.targetOs?.toUpperCase() || 'ANY'}</span>
                             <span>MODE: {c.autoRunWithoutPrompt ? 'AUTO' : 'CONFIRM'}</span>
