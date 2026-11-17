@@ -602,6 +602,10 @@ export function ResetManagedFileDefaults(arg1) {
   return window['go']['main']['App']['ResetManagedFileDefaults'](arg1);
 }
 
+export function ResetManagedFilePath(arg1) {
+  return window['go']['main']['App']['ResetManagedFilePath'](arg1);
+}
+
 export function ResetVault() {
   return window['go']['main']['App']['ResetVault']();
 }

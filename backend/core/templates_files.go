@@ -49,6 +49,7 @@ type ExternalManagedFileInfo struct {
 
 // ResolveManagedJSONFilePath resolves an external JSON file path given an optional override and default filename.
 // If customPath is a directory or ends in a separator, it resolves to <dir>/<defaultFileName>.
+// By default, external template JSON files are grouped under <UserConfigDir>/DoubleAgent/templates/.
 func ResolveManagedJSONFilePath(customPath string, defaultFileName string) string {
 	clean := strings.TrimSpace(customPath)
 	if clean != "" {
@@ -61,21 +62,23 @@ func ResolveManagedJSONFilePath(customPath string, defaultFileName string) strin
 		return filepath.Clean(clean)
 	}
 
-	localCandidate := filepath.Join("data", defaultFileName)
-	if fi, err := os.Stat(localCandidate); err == nil && !fi.IsDir() {
-		return localCandidate
-	}
-	rootCandidate := defaultFileName
-	if fi, err := os.Stat(rootCandidate); err == nil && !fi.IsDir() {
-		return rootCandidate
+	for _, candidate := range []string{
+		filepath.Join("templates", defaultFileName),
+		filepath.Join("data", "templates", defaultFileName),
+		filepath.Join("data", defaultFileName),
+		defaultFileName,
+	} {
+		if fi, err := os.Stat(candidate); err == nil && !fi.IsDir() {
+			return candidate
+		}
 	}
 
 	cfgDir, err := os.UserConfigDir()
 	if err == nil && cfgDir != "" {
-		return filepath.Join(cfgDir, "DoubleAgent", defaultFileName)
+		return filepath.Join(cfgDir, "DoubleAgent", "templates", defaultFileName)
 	}
 
-	return filepath.Join(os.TempDir(), "doubleagent-"+defaultFileName)
+	return filepath.Join(os.TempDir(), "doubleagent", "templates", defaultFileName)
 }
 
 func saveJSONFileAtomic(targetPath string, value any) error {

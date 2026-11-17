@@ -5,6 +5,9 @@
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Template Folder Grouping & Settings Reset Fixes (`templates/` + `SettingsView` + `TerminalView`)**:
+  - Grouped all external JSON template stores (`command_snippets.json`, `snippet_chains.json`, `payload_templates.json`, `finding_templates.json`, `evidence_templates.json`, `report_templates.json`) under `<UserConfigDir>/DoubleAgent/templates/` by default via unified `ResolveManagedJSONFilePath` (`backend/core/templates_files.go`, `payloads.go`, `chains.go`).
+  - Fixed Settings reset flows: `applySettingsToAllTerminals` (`TerminalView.tsx`) now resets `fontSize` and `scrollback`, `handleResetSettings` (`App.tsx`) clears `paneFontSizes` and updates status feedback, `SettingsView` shows inline reset confirmation, `Reset All to Defaults` in Shortcuts replaces blocking native `confirm()` with two-click inline HUD confirmation, and **Files & Templates** adds `ResetManagedFilePath` (`app.go` + `Reset Path` button) to revert custom paths back to the default `templates/` folder.
 - **Glass Terminal Background + Plasma Theme (`M-GLASS`)**:
   - **Plasma** (8th theme): Arasaka red chrome (`--accent-bright #ff2b4e`, glowing red borders/headers) over near-black with electric-teal content (`--accent-text #22d3ee`) — a red/teal duotone. Wired across all 4 theme touch points + ANSI palette + swatch.
   - **Glass terminal background** — a shared HUD-art layer rendered **once** behind the whole terminal split space (new `TerminalBackground.tsx`), not per pane; panes become glass via xterm `allowTransparency` + a translucent `theme.background` (`getTerminalTheme`/`withAlpha` in `TerminalView.tsx`). Five treatments: **Minimal, Wide Grid, Pulse** (center-origin soundwave, mirrored, breathing), **Watermark** (reticle with a slow dotted-ring spin, correctly centered via `transform-box: view-box`), **Hacking** (slow canvas cipher rain). Opacity (default 0.75) + Animate toggle in Settings → Appearance → Terminal Background. Art re-tints from `var(--accent-*)`; animations are slow and honor `prefers-reduced-motion`. `.terminal-bg-wrap.has-bg .split-pane` goes transparent so the one shared graphic shows through every split.
@@ -230,7 +233,7 @@
     - Dedicated Vitest test suite in `ListenerManagerModal.test.tsx` (5 tests passing).
 - **Dynamic Payload-Generator with External File Decoupling (`F-33` / Pentest Spec Line 29)**:
   - **Decoupled External Template Architecture (`backend/core/payloads.go`, `interfaces.go`)**:
-    - **No commands compiled into the binary**: All payload templates and command strings are dynamically read and written to an external file (`data/payload_templates.json` in workspace, `<UserConfigDir>/DoubleAgent/payload_templates.json`, or custom configured path).
+    - **No commands compiled into the binary**: All payload templates and command strings are dynamically read and written to an external file (`templates/payload_templates.json` or `data/payload_templates.json` in workspace, `<UserConfigDir>/DoubleAgent/templates/payload_templates.json`, or custom configured path).
     - Data models: `PayloadTemplate` (`ID`, `Name`, `Description`, `OS`, `Shell`, `Kind`, `Command`, `DefaultPort`, `Variables`, `Tags`, `OpsecRisk`, `Notes`), `PayloadRenderOptions`, `PayloadRenderResult`, and `PayloadFileConfig`.
     - Initial templates file pre-structured with 10 reverse/bind shell definitions (Bash, Python3, PowerShell TCP, PowerShell ConPtyShell, Socat PTY, Netcat FIFO, PHP, Ruby, Perl, Linux Bind TCP) with empty commands ready for population by operator engagement packs.
     - Dynamic variable substitution supports `{{LHOST}}`/`{{LPORT}}` as well as `$LHOST`, `%LHOST%`, and custom parameters.

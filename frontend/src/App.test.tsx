@@ -265,7 +265,9 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
     fireEvent.click(screen.getByRole('button', { name: /Settings/i }));
     fireEvent.click(screen.getByRole('button', { name: /Reset to Defaults/i }));
     expect(main).toHaveClass('theme-teal');
+    expect(screen.getByText(/Settings restored to factory defaults/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Close$/i }));
+    expect(screen.getByText('14px')).toBeInTheDocument();
   });
 
   it('organizes Top Bar into Vault/Tools/View menus and supports Host Color Coding with expandable/collapsible Tab Groups (F-09)', () => {

@@ -5694,17 +5694,7 @@ func (a *App) SetManagedFilePath(fileID string, customPath string) (*core.Extern
 		return nil, fmt.Errorf("managed file %q does not support path override here", fileID)
 	}
 
-	list, err := a.ListManagedFiles()
-	if err != nil {
-		return nil, err
-	}
-	for _, item := range list {
-		if item.ID == fileID {
-			copyItem := item
-			return &copyItem, nil
-		}
-	}
-	return nil, fmt.Errorf("managed file %q not found after update", fileID)
+	return a.findManagedFileInfo(fileID, "update")
 }
 
 // ResetManagedFileDefaults restores a JSON template store to its seeded starter presets.
@@ -5738,6 +5728,37 @@ func (a *App) ResetManagedFileDefaults(fileID string) (*core.ExternalManagedFile
 		return nil, fmt.Errorf("cannot reset defaults for managed item %q", fileID)
 	}
 
+	return a.findManagedFileInfo(fileID, "reset")
+}
+
+// ResetManagedFilePath clears any custom path override for a template JSON file or staging directory, reverting to default.
+func (a *App) ResetManagedFilePath(fileID string) (*core.ExternalManagedFileInfo, error) {
+	a.mu.Lock()
+	switch fileID {
+	case "payload_templates":
+		a.payloadFilePath = ""
+	case "snippet_chains":
+		a.chainsFilePath = ""
+	case "command_snippets":
+		a.snippetsFilePath = ""
+	case "finding_templates":
+		a.findingTemplatesFilePath = ""
+	case "evidence_templates":
+		a.evidenceTemplatesFilePath = ""
+	case "report_templates":
+		a.reportTemplatesFilePath = ""
+	case "staging_dir":
+		a.stagingDirPath = ""
+	default:
+		a.mu.Unlock()
+		return nil, fmt.Errorf("managed item %q does not support path reset here", fileID)
+	}
+	a.mu.Unlock()
+
+	return a.findManagedFileInfo(fileID, "path reset")
+}
+
+func (a *App) findManagedFileInfo(fileID string, op string) (*core.ExternalManagedFileInfo, error) {
 	list, err := a.ListManagedFiles()
 	if err != nil {
 		return nil, err
@@ -5748,7 +5769,7 @@ func (a *App) ResetManagedFileDefaults(fileID string) (*core.ExternalManagedFile
 			return &copyItem, nil
 		}
 	}
-	return nil, fmt.Errorf("managed file %q not found after reset", fileID)
+	return nil, fmt.Errorf("managed file %q not found after %s", fileID, op)
 }
 
 // RevealPathInExplorer opens the OS file manager highlighting or opening the target path safely without a shell.

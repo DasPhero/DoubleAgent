@@ -328,37 +328,8 @@ func GetBuiltinSnippetChains() []SnippetChain {
 // ResolveChainsFilePath resolves the target file path for snippet chains.
 // If inputPath is a directory or ends in a path separator, it defaults to "snippet_chains.json" inside that folder.
 // If inputPath is a specific file, that exact file is used.
-// If inputPath is empty, it checks workspace data/snippet_chains.json, then root, then user config dir.
 func ResolveChainsFilePath(inputPath string) string {
-	clean := strings.TrimSpace(inputPath)
-	if clean != "" {
-		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
-			return filepath.Join(clean, "snippet_chains.json")
-		}
-		if strings.HasSuffix(clean, "/") || strings.HasSuffix(clean, string(filepath.Separator)) {
-			return filepath.Join(clean, "snippet_chains.json")
-		}
-		return filepath.Clean(clean)
-	}
-
-	// 1. Check local working directory (e.g. workspace data directory)
-	localCandidate := filepath.Join("data", "snippet_chains.json")
-	if fi, err := os.Stat(localCandidate); err == nil && !fi.IsDir() {
-		return localCandidate
-	}
-	rootCandidate := "snippet_chains.json"
-	if fi, err := os.Stat(rootCandidate); err == nil && !fi.IsDir() {
-		return rootCandidate
-	}
-
-	// 2. User configuration directory: <UserConfigDir>/DoubleAgent/snippet_chains.json
-	cfgDir, err := os.UserConfigDir()
-	if err == nil && cfgDir != "" {
-		return filepath.Join(cfgDir, "DoubleAgent", "snippet_chains.json")
-	}
-
-	// 3. Fallback to temp directory
-	return filepath.Join(os.TempDir(), "doubleagent-snippet_chains.json")
+	return ResolveManagedJSONFilePath(inputPath, "snippet_chains.json")
 }
 
 // GetSnippetChainsFileConfig retrieves status of the external snippet chains file.
@@ -425,4 +396,3 @@ func SaveSnippetChainsToFile(filePath string, chains []SnippetChain) error {
 	}
 	return nil
 }
-

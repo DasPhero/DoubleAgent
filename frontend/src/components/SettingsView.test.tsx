@@ -62,6 +62,18 @@ describe('SettingsView — Files & Templates Manager', () => {
       sizeBytes: 2048,
     }));
     const revealMock = vi.fn(async () => {});
+    const resetPathMock = vi.fn(async () => ({
+      id: 'report_templates',
+      name: 'Report Narrative Templates',
+      kind: 'json',
+      description: 'Report scaffolds.',
+      featureLabel: 'Evidence Vault -> Assessment Report',
+      filePath: 'C:/Users/Test/templates/report_templates.json',
+      defaultName: 'report_templates.json',
+      exists: true,
+      itemCount: 4,
+      sizeBytes: 2048,
+    }));
     const openToolMock = vi.fn();
 
     (window as unknown as { go: unknown }).go = {
@@ -69,6 +81,7 @@ describe('SettingsView — Files & Templates Manager', () => {
         App: {
           ListManagedFiles: listMock,
           ResetManagedFileDefaults: resetMock,
+          ResetManagedFilePath: resetPathMock,
           SelectFileDialog: selectFileMock,
           SetManagedFilePath: setPathMock,
           RevealPathInExplorer: revealMock,
@@ -117,7 +130,51 @@ describe('SettingsView — Files & Templates Manager', () => {
       expect(revealMock).toHaveBeenCalledWith('C:/Users/Test/report_templates.json');
     });
 
+    fireEvent.click(screen.getByRole('button', { name: /Reset Path/i }));
+    await waitFor(() => {
+      expect(resetPathMock).toHaveBeenCalledWith('report_templates');
+    });
+
     fireEvent.click(screen.getByRole('button', { name: /Open Tool/i }));
     expect(openToolMock).toHaveBeenCalledWith('report_templates');
+  });
+
+  it('resets all keyboard shortcuts and leader key settings via two-step inline confirmation', () => {
+    const updateMock = vi.fn();
+    render(
+      <SettingsView
+        activeTab="shortcuts"
+        onTabChange={vi.fn()}
+        globalSettings={{
+          ...DEFAULT_SETTINGS,
+          keybindings: { command_palette: 'Ctrl+Shift+P' },
+          leaderKeyEnabled: true,
+          leaderKey: 'Ctrl+A',
+        }}
+        onUpdateSettings={updateMock}
+        onResetSettings={vi.fn()}
+        vaultLocked={false}
+        passwordless={true}
+        helloPending={false}
+        quickUnlockReady={false}
+        modalError=""
+        onEnableQuickUnlock={vi.fn(async () => {})}
+        onChangePassword={vi.fn(async () => {})}
+        onResetVault={vi.fn(async () => {})}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Reset All to Defaults/i }));
+    expect(updateMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Reset All\?/i }));
+    expect(updateMock).toHaveBeenCalledWith({
+      keybindings: {},
+      customShortcuts: [],
+      leaderKeyEnabled: false,
+      leaderKey: 'Ctrl+B',
+      leaderTimeoutMs: 2000,
+    });
+    expect(screen.getByText(/All keyboard shortcuts and leader key settings restored to defaults/i)).toBeInTheDocument();
   });
 });

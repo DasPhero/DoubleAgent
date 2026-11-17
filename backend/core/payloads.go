@@ -25,35 +25,7 @@ var (
 // If customPath is a directory or ends in a path separator, it defaults to "payload_templates.json" inside that folder.
 // If customPath specifies a file, that exact file is used.
 func ResolveDefaultPayloadFilePath(customPath string) string {
-	clean := strings.TrimSpace(customPath)
-	if clean != "" {
-		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
-			return filepath.Join(clean, "payload_templates.json")
-		}
-		if strings.HasSuffix(clean, "/") || strings.HasSuffix(clean, string(filepath.Separator)) {
-			return filepath.Join(clean, "payload_templates.json")
-		}
-		return filepath.Clean(clean)
-	}
-
-	// 1. Check local working directory (e.g. workspace data directory)
-	localCandidate := filepath.Join("data", "payload_templates.json")
-	if fi, err := os.Stat(localCandidate); err == nil && !fi.IsDir() {
-		return localCandidate
-	}
-	rootCandidate := "payload_templates.json"
-	if fi, err := os.Stat(rootCandidate); err == nil && !fi.IsDir() {
-		return rootCandidate
-	}
-
-	// 2. User configuration directory: <UserConfigDir>/DoubleAgent/payload_templates.json
-	cfgDir, err := os.UserConfigDir()
-	if err == nil && cfgDir != "" {
-		return filepath.Join(cfgDir, "DoubleAgent", "payload_templates.json")
-	}
-
-	// 3. Fallback to temp directory
-	return filepath.Join(os.TempDir(), "doubleagent-payload_templates.json")
+	return ResolveManagedJSONFilePath(customPath, "payload_templates.json")
 }
 
 // LoadPayloadTemplates reads and parses payload templates from the external JSON file (F-33).

@@ -287,6 +287,9 @@ export function applySettingsToAllTerminals(settings: AppGlobalSettings): void {
   const themeObj = getTerminalTheme(settings);
   for (const entry of terminalPool.values()) {
     entry.term.options.fontFamily = settings.fontFamily;
+    entry.term.options.fontSize = settings.fontSize;
+    entry.currentFontSize = settings.fontSize;
+    entry.term.options.scrollback = settings.scrollback;
     entry.term.options.cursorStyle = settings.cursorStyle;
     entry.term.options.cursorBlink = settings.cursorBlink;
     entry.term.options.lineHeight = settings.lineHeight;

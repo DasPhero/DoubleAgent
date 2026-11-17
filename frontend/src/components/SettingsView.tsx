@@ -21,6 +21,7 @@ interface WailsSyncApi {
   ListManagedFiles?: () => Promise<ExternalManagedFileInfo[]>;
   SetManagedFilePath?: (fileId: string, customPath: string) => Promise<ExternalManagedFileInfo>;
   ResetManagedFileDefaults?: (fileId: string) => Promise<ExternalManagedFileInfo>;
+  ResetManagedFilePath?: (fileId: string) => Promise<ExternalManagedFileInfo>;
   RevealPathInExplorer?: (targetPath: string) => Promise<void>;
   SelectFileDialog?: (title: string, filterName: string, filterPattern: string) => Promise<string>;
   SelectDirectoryDialog?: (title: string) => Promise<string>;
@@ -107,6 +108,9 @@ export function SettingsView({
   const [managedFilesLoading, setManagedFilesLoading] = useState<boolean>(false);
   const [managedFileMsg, setManagedFileMsg] = useState<string>('');
   const [managedFileErr, setManagedFileErr] = useState<string>('');
+  const [settingsResetMsg, setSettingsResetMsg] = useState<string>('');
+  const [confirmResetShortcuts, setConfirmResetShortcuts] = useState<boolean>(false);
+  const [shortcutsResetMsg, setShortcutsResetMsg] = useState<string>('');
 
   const loadManagedFiles = React.useCallback(async () => {
     const api = getWailsSyncApi();
@@ -286,18 +290,23 @@ export function SettingsView({
   };
 
   const handleResetAllBindings = () => {
-    if (confirm('Reset all keyboard shortcuts and leader keys to factory defaults?')) {
-      onUpdateSettings({
-        keybindings: {},
-        customShortcuts: [],
-        leaderKeyEnabled: false,
-        leaderKey: 'Ctrl+B',
-        leaderTimeoutMs: 2000,
-      });
-      setRecordingActionId(null);
-      setRecordedCombo('');
-      setConflictWarning('');
+    if (!confirmResetShortcuts) {
+      setConfirmResetShortcuts(true);
+      setShortcutsResetMsg('');
+      return;
     }
+    onUpdateSettings({
+      keybindings: {},
+      customShortcuts: [],
+      leaderKeyEnabled: false,
+      leaderKey: 'Ctrl+B',
+      leaderTimeoutMs: 2000,
+    });
+    setRecordingActionId(null);
+    setRecordedCombo('');
+    setConflictWarning('');
+    setConfirmResetShortcuts(false);
+    setShortcutsResetMsg('All keyboard shortcuts and leader key settings restored to defaults.');
   };
 
   const handleAddCustomShortcut = (e: React.FormEvent) => {
@@ -746,15 +755,26 @@ export function SettingsView({
             </div>
           </section>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'flex-start', marginTop: '0.5rem', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="cyber-btn cyber-btn-secondary"
-              onClick={onResetSettings}
+              onClick={() => {
+                onResetSettings();
+                setSettingsResetMsg('Settings restored to factory defaults.');
+              }}
               title="Restore default settings"
             >
               Reset to Defaults
             </button>
+            {settingsResetMsg && (
+              <span
+                role="status"
+                style={{ fontSize: '0.78rem', color: 'var(--accent-bright)', fontFamily: 'JetBrains Mono, monospace' }}
+              >
+                {settingsResetMsg}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -946,15 +966,34 @@ export function SettingsView({
                   Click Rebind on any action to capture a new key combination. DoubleAgent automatically checks for key conflicts.
                 </span>
               </div>
-              <button
-                type="button"
-                className="cyber-btn cyber-btn-secondary cyber-btn-sm"
-                onClick={handleResetAllBindings}
-                title="Restore all keyboard shortcuts to factory defaults"
-              >
-                <CyberIcon name="refresh" size={14} /> Reset All to Defaults
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={confirmResetShortcuts ? 'cyber-hud-btn btn-sm btn-danger' : 'cyber-btn cyber-btn-secondary cyber-btn-sm'}
+                  onClick={handleResetAllBindings}
+                  title="Restore all keyboard shortcuts to factory defaults"
+                >
+                  <CyberIcon name="refresh" size={14} /> {confirmResetShortcuts ? 'Confirm Reset All?' : 'Reset All to Defaults'}
+                </button>
+                {confirmResetShortcuts && (
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                    onClick={() => setConfirmResetShortcuts(false)}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </div>
+            {shortcutsResetMsg && (
+              <div
+                role="status"
+                style={{ marginBottom: '0.65rem', padding: '0.4rem 0.65rem', border: '1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent)', background: 'color-mix(in srgb, var(--accent-bright) 10%, transparent)', color: 'var(--accent-bright)', fontSize: '0.76rem', fontFamily: 'JetBrains Mono, monospace' }}
+              >
+                {shortcutsResetMsg}
+              </div>
+            )}
 
             {/* Filter Chips & Search Bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -1679,6 +1718,30 @@ export function SettingsView({
                           >
                             <CyberIcon name="folder" size={12} />
                             <span>{isDir ? 'Change Folder' : 'Browse Folder'}</span>
+                          </button>
+                        )}
+
+                        {!isVault && api?.ResetManagedFilePath && (
+                          <button
+                            type="button"
+                            className="cyber-hud-btn btn-sm"
+                            onClick={async () => {
+                              setManagedFileErr('');
+                              setManagedFileMsg('');
+                              try {
+                                const updated = await api.ResetManagedFilePath?.(mf.id);
+                                if (updated) {
+                                  setManagedFileMsg(`Reverted ${mf.name} path to default (${updated.filePath})`);
+                                }
+                                await loadManagedFiles();
+                              } catch (err: unknown) {
+                                setManagedFileErr(err instanceof Error ? err.message : String(err));
+                              }
+                            }}
+                            title="Revert custom path override back to the default templates folder"
+                          >
+                            <CyberIcon name="refresh" size={12} />
+                            <span>Reset Path</span>
                           </button>
                         )}
 

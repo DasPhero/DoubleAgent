@@ -303,6 +303,8 @@ export function RenderPayload(arg1:core.PayloadRenderOptions):Promise<core.Paylo
 
 export function ResetManagedFileDefaults(arg1:string):Promise<core.ExternalManagedFileInfo>;
 
+export function ResetManagedFilePath(arg1:string):Promise<core.ExternalManagedFileInfo>;
+
 export function ResetVault():Promise<void>;
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;

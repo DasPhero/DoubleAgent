@@ -2046,6 +2046,8 @@ export function App({
     setGlobalSettings(DEFAULT_SETTINGS);
     saveSettingsToStorage(DEFAULT_SETTINGS);
     applySettingsToAllTerminals(DEFAULT_SETTINGS);
+    setPaneFontSizes(new Map());
+    setStatusMessage('Global settings restored to defaults.');
   };
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0] || null;
