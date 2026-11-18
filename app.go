@@ -23,6 +23,7 @@ import (
 	"doubleagent/backend/core"
 	"doubleagent/backend/data"
 	"doubleagent/backend/health"
+	"doubleagent/backend/hexrunner"
 	"doubleagent/backend/pivot"
 	"doubleagent/backend/pty"
 	"doubleagent/backend/rawtcp"
@@ -79,6 +80,7 @@ type App struct {
 	winrmMgr                    *winrm.Manager
 	winrmSessions               map[string]*winrm.ManagedSession
 	apiClient                   *apiclient.Client
+	hexRunner                   *hexrunner.Runner
 }
 
 type managedListenerInstance struct {
@@ -213,6 +215,7 @@ func NewAppWithDependencies(
 		fileServers:      make(map[string]*transfer.ManagedServer),
 		winrmSessions:    make(map[string]*winrm.ManagedSession),
 		apiClient:        apiclient.NewClient(),
+		hexRunner:        hexrunner.NewRunner(),
 	}
 
 	if vaultStore == nil {
@@ -7103,6 +7106,95 @@ func (a *App) DeleteApiEnvironment(id string) error {
 		return errors.New("vault store does not support API environments")
 	}
 	return st.DeleteApiEnvironment(id)
+}
+
+// --- F-43: Binary / Hex Payload Runner & Raw Socket Bridge ---
+
+// PreviewHexPayload parses a hex/DSL expression and returns byte count, canonical hex dump, and Base64 preview (F-43).
+func (a *App) PreviewHexPayload(expr string) core.HexParsePreview {
+	return hexrunner.PreviewHexPayload(expr)
+}
+
+// GenerateCyclicPattern returns a De Bruijn cyclic pattern of the requested byte length as uppercase ASCII (F-43).
+func (a *App) GenerateCyclicPattern(length int) (string, error) {
+	if length <= 0 || length > 65536 {
+		return "", errors.New("cyclic pattern length must be between 1 and 65536")
+	}
+	return string(hexrunner.CyclicPattern(length)), nil
+}
+
+// FindCyclicOffset locates a 4-byte ASCII, 0x-hex little-endian dword, or raw hex substring inside the cyclic pattern (F-43).
+func (a *App) FindCyclicOffset(query string) (int, error) {
+	return hexrunner.CyclicOffset(query)
+}
+
+// ExecuteHexLocal launches a local binary directly (no shell, no PTY) and feeds exact binary stdin chunks (F-43).
+func (a *App) ExecuteHexLocal(req core.HexRunRequest) (*core.HexRunResult, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	if a.hexRunner == nil {
+		a.hexRunner = hexrunner.NewRunner()
+	}
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req.TargetType = "local"
+	return a.hexRunner.RunLocal(ctx, req)
+}
+
+// ExecuteHexSsh launches a remote binary over an active SSH session WITHOUT requesting a PTY (F-43).
+func (a *App) ExecuteHexSsh(req core.HexRunRequest) (*core.HexRunResult, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	if a.hexRunner == nil {
+		a.hexRunner = hexrunner.NewRunner()
+	}
+	runner, ok := a.transport.(core.SshBinaryRunner)
+	if !ok {
+		return nil, errors.New("active ssh transport does not support non-PTY raw binary exec")
+	}
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req.TargetType = "ssh"
+	return a.hexRunner.RunSSH(ctx, runner, req)
+}
+
+// CancelHexExecution cancels an active local or SSH hex binary execution by ExecutionID (F-43).
+func (a *App) CancelHexExecution(executionID string) bool {
+	if a.hexRunner == nil {
+		return false
+	}
+	return a.hexRunner.Cancel(executionID)
+}
+
+// SendRawTcpHex compiles a hex/DSL payload expression and writes the exact raw bytes directly to a Raw TCP session (F-43).
+func (a *App) SendRawTcpHex(sessionID string, expr string) (int, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	rawBytes, err := hexrunner.CompilePayload(expr)
+	if err != nil {
+		return 0, err
+	}
+	if len(rawBytes) == 0 {
+		return 0, errors.New("compiled hex payload is empty")
+	}
+	a.mu.Lock()
+	rawSess, isRawTcp := a.rawTcpSessions[sessionID]
+	a.mu.Unlock()
+	if !isRawTcp || rawSess == nil {
+		return 0, core.ErrSessionNotFound
+	}
+	if a.logMgr != nil {
+		a.logMgr.NotifyInput(sessionID, fmt.Sprintf("[HEX %d bytes] ", len(rawBytes)))
+	}
+	n, wErr := rawSess.Write(rawBytes)
+	return n, wErr
 }
 
 

@@ -47,7 +47,7 @@ export interface PersistedTabItem {
   panes?: PersistedPaneItem[];
   rootNode: PersistedWorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm' | 'route-health' | 'api-tester';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm' | 'route-health' | 'api-tester' | 'hex-runner';
   notesHostId?: string;
 }
 

@@ -42,10 +42,16 @@ Highlighting text in any terminal session displays four quick-save targets:
 
 - **API Tester & HTTP Repeater + AI Chat Mode (`F-42`)**:
   - Open via **Recon & Exploit ▾ → Phase 1 → API Tester & HTTP Repeater** or `Ctrl+K`.
-  - **HTTP Repeater:** Send structured requests or toggle **Raw HTTP Mode** (Burp/Caido wire format), pick an outbound route (`Direct`, active SSH `-D` SOCKS5 tunnels, running Pivot proxies, or saved Proxy Profiles), toggle `Skip TLS Verify`, redirects, and session Cookie Jar, inspect Pretty JSON / Raw / Headers / TLS certificates & timings, or decode JWT/Base64/Hex/URL strings in **Inspector**.
+  - **HTTP Repeater:** Send structured requests or toggle **Raw HTTP Mode** (Burp/Caido wire format), pick an outbound route (`Direct`, active SSH `-D` SOCKS5 tunnels, running Pivot proxies, or saved Proxy Profiles), toggle `Skip TLS Verify`, redirects, and session Cookie Jar, inspect Pretty JSON / Raw / Headers / TLS certificates & timings, or decode JWT/Base64/Hex/URL strings in **Inspector**. Choose **Body Type → `hex`** (`application/octet-stream` default) to send raw non-UTF-8 binary payloads compiled from hex/DSL expressions.
   - **Environments & Chaining:** Define per-engagement `{{VAR}}` sets under **Env Vars** or extract any JSON response field directly into a variable with **Extract Var**, while Vault secrets (`{{SECRET:id}}` or Vault Auth) resolve exclusively inside Go.
   - **Param Replay & Diff:** Run OPSEC-throttled `{{PAYLOAD}}` sweeps with Lockout Guard warnings (`F-40`), compare any two history responses side-by-side in **Response Diff**, import **cURL / OpenAPI**, export `curl` / `PowerShell` / `Python`, or save findings straight to **Evidence Vault** and **Host Notes**.
   - **AI Chat Mode:** Switch to **AI Chat Mode** for multi-turn chat against OpenAI-compatible, Anthropic, Ollama, or custom endpoints (with SSE/NDJSON streaming, Vault secret keys, tunnel routing, and **Open in HTTP Repeater**).
+
+- **Binary / Hex Payload Runner & API/Socket Bridge (`F-43`)**:
+  - Open via **Terminals ▾ → Binary / Hex Runner (No-PTY)**, **Recon & Exploit ▾ → Binary / Hex Runner (No-PTY)**, or `Ctrl+K`.
+  - **Exact Binary Stdin/Stdout (No PTY, No Shell Wrapping):** Run local executables directly (`os/exec` without a PTY or shell `-c`) or remote binaries over an active SSH session without requesting a PTY (`ExecRaw`) so `0x00–0xFF` bytes pass verbatim without terminal line-discipline mangling, CR/LF conversion, or ANSI rendering.
+  - **Hex / Exploit DSL & Sequential Chunks:** Author multi-chunk binary payloads with per-chunk millisecond delays using hex pairs (`41 42 00 ff`), `\xHH` escapes, `0xHH`, quoted strings, repeaters (`A*32`, `\x90*16`), little/big-endian integer packers (`u32le(...)`, `u32be(...)`, `u64le(...)`, `u64be(...)`), `cyclic(N)` De Bruijn patterns, and inline offset lookup (`Find Offset`).
+  - **Canonical Inspection & Bridges:** Inspect stdin/stdout/stderr in **Hex Dump**, **Escaped ASCII**, or **Base64**, save canonical captures to **Evidence Vault (`F-18`)**, push raw bytes straight to any open **Raw TCP** socket (`Send to Raw TCP`), or open the compiled payload in **API Tester (`F-42`)** with `bodyType: "hex"`.
 
 - **WinRM / PowerShell Remoting Client View (`F-41`)**:
   - Opens directly as a dockable **WinRM Workspace View** tab (with a **Pop Out** button for modal overlay mode) via **Terminals ▾ $\to$ WinRM / PowerShell Remoting (`F-41`)**, **Recon & Exploit ▾**, or `Ctrl+K`.

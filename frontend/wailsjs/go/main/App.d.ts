@@ -17,6 +17,8 @@ export function BuildWinrmCLICommand(arg1:core.WinrmProfile):Promise<string>;
 
 export function CancelApiExecution(arg1:string):Promise<boolean>;
 
+export function CancelHexExecution(arg1:string):Promise<boolean>;
+
 export function CancelTransfer(arg1:string):Promise<void>;
 
 export function ChangeVaultPassword(arg1:string,arg2:string):Promise<void>;
@@ -113,6 +115,10 @@ export function ExecuteApiParameterReplay(arg1:core.ApiReplayBatchRequest):Promi
 
 export function ExecuteApiRequest(arg1:core.ApiExecuteRequest):Promise<core.ApiResponse>;
 
+export function ExecuteHexLocal(arg1:core.HexRunRequest):Promise<core.HexRunResult>;
+
+export function ExecuteHexSsh(arg1:core.HexRunRequest):Promise<core.HexRunResult>;
+
 export function ExecuteImport(arg1:core.ImportExecuteOptions):Promise<core.ImportExecuteResult>;
 
 export function ExecuteSnippet(arg1:string,arg2:string,arg3:Record<string, string>):Promise<void>;
@@ -135,7 +141,11 @@ export function ExportSprayList(arg1:core.SprayExportOptions):Promise<core.Spray
 
 export function ExportTotpTokens(arg1:string):Promise<string>;
 
+export function FindCyclicOffset(arg1:string):Promise<number>;
+
 export function GenerateApiCodeSnippet(arg1:core.ApiRequestItem,arg2:string,arg3:boolean):Promise<string>;
+
+export function GenerateCyclicPattern(arg1:number):Promise<string>;
 
 export function GenerateEvidenceReport(arg1:core.ReportExportRequest):Promise<core.ReportExportResult>;
 
@@ -323,6 +333,8 @@ export function ParseRouteProbeTargets(arg1:string):Promise<Array<string>>;
 
 export function ParseTermiusContent(arg1:string):Promise<core.ImportScanResult>;
 
+export function PreviewHexPayload(arg1:string):Promise<core.HexParsePreview>;
+
 export function ReadSessionLog(arg1:string):Promise<string>;
 
 export function RelocateVaultFile(arg1:string,arg2:boolean):Promise<void>;
@@ -422,6 +434,8 @@ export function SelectDirectoryDialog(arg1:string):Promise<string>;
 export function SelectFileDialog(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SendPivotInput(arg1:string,arg2:string):Promise<void>;
+
+export function SendRawTcpHex(arg1:string,arg2:string):Promise<number>;
 
 export function SendSerialBreak(arg1:string):Promise<void>;
 

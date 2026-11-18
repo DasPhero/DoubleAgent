@@ -2,6 +2,7 @@
 package ssh
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -482,6 +483,112 @@ func (t *Transport) ResizeShell(_ context.Context, sessionID string, size core.T
 	}
 
 	return sess.shell.WindowChange(int(size.Rows), int(size.Cols))
+}
+
+// ExecRaw runs a command directly via an SSH exec channel WITHOUT requesting a PTY,
+// feeding raw binary bytes to stdin and capturing bounded raw stdout/stderr (F-43).
+func (t *Transport) ExecRaw(ctx context.Context, sessionID string, command string, stdinBytes []byte, maxBytes int) ([]byte, []byte, int, error) {
+	sess, err := t.getSession(sessionID)
+	if err != nil {
+		return nil, nil, -1, err
+	}
+
+	sess.mu.Lock()
+	closed := sess.closed
+	client := sess.client
+	sess.mu.Unlock()
+	if closed || client == nil {
+		return nil, nil, -1, core.ErrSessionNotFound
+	}
+
+	sshSess, err := client.NewSession()
+	if err != nil {
+		return nil, nil, -1, fmt.Errorf("create ssh session: %w", err)
+	}
+	defer func() { _ = sshSess.Close() }()
+
+	if maxBytes <= 0 {
+		maxBytes = 2 * 1024 * 1024
+	}
+
+	stdinPipe, err := sshSess.StdinPipe()
+	if err != nil {
+		return nil, nil, -1, fmt.Errorf("stdin pipe: %w", err)
+	}
+	stdoutPipe, err := sshSess.StdoutPipe()
+	if err != nil {
+		return nil, nil, -1, fmt.Errorf("stdout pipe: %w", err)
+	}
+	stderrPipe, err := sshSess.StderrPipe()
+	if err != nil {
+		return nil, nil, -1, fmt.Errorf("stderr pipe: %w", err)
+	}
+
+	if err := sshSess.Start(command); err != nil {
+		return nil, nil, -1, fmt.Errorf("start remote command: %w", err)
+	}
+
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = sshSess.Signal(ssh.SIGKILL)
+			_ = sshSess.Close()
+		case <-doneCh:
+		}
+	}()
+
+	var wg sync.WaitGroup
+	var outBuf, errBuf bytes.Buffer
+	var outErr, errReadErr error
+
+	readBounded := func(r io.Reader, dst *bytes.Buffer, errOut *error) {
+		defer wg.Done()
+		limited := io.LimitReader(r, int64(maxBytes+1))
+		_, copyErr := io.Copy(dst, limited)
+		// Drain excess data so remote process does not block on broken pipe before Wait.
+		_, _ = io.Copy(io.Discard, r)
+		*errOut = copyErr
+	}
+
+	wg.Add(2)
+	go readBounded(stdoutPipe, &outBuf, &outErr)
+	go readBounded(stderrPipe, &errBuf, &errReadErr)
+
+	var stdinWriteErr error
+	if len(stdinBytes) > 0 {
+		if _, wErr := io.Copy(stdinPipe, bytes.NewReader(stdinBytes)); wErr != nil {
+			stdinWriteErr = wErr
+		}
+	}
+	_ = stdinPipe.Close()
+
+	wg.Wait()
+	waitErr := sshSess.Wait()
+
+	exitCode := 0
+	if waitErr != nil {
+		var exitErr *ssh.ExitError
+		if errors.As(waitErr, &exitErr) {
+			exitCode = exitErr.ExitStatus()
+		} else {
+			return outBuf.Bytes(), errBuf.Bytes(), -1, waitErr
+		}
+	}
+	if ctx.Err() != nil {
+		return outBuf.Bytes(), errBuf.Bytes(), -1, ctx.Err()
+	}
+	if stdinWriteErr != nil && outBuf.Len() == 0 && errBuf.Len() == 0 {
+		return nil, nil, exitCode, stdinWriteErr
+	}
+	if outErr != nil {
+		return outBuf.Bytes(), errBuf.Bytes(), exitCode, outErr
+	}
+	if errReadErr != nil {
+		return outBuf.Bytes(), errBuf.Bytes(), exitCode, errReadErr
+	}
+	return outBuf.Bytes(), errBuf.Bytes(), exitCode, nil
 }
 
 // Disconnect closes any active shell and terminates the underlying SSH connection.

@@ -182,5 +182,12 @@ describe('ApiTesterView — API Tester, Repeater, Diff, Replay & AI Chat Mode (F
 
     fireEvent.click(screen.getByRole('button', { name: /Open in HTTP Repeater/i }));
     expect(screen.getByRole('tab', { name: /HTTP Repeater/i })).toHaveAttribute('aria-selected', 'true');
+
+    // Verify F-42 hex binary body mode is selectable
+    fireEvent.click(screen.getByRole('button', { name: /^body$/i }));
+    const bodyTypeSelect = screen.getByLabelText('Body Type') as HTMLSelectElement;
+    fireEvent.change(bodyTypeSelect, { target: { value: 'hex' } });
+    expect(bodyTypeSelect.value).toBe('hex');
+    expect(screen.getByText(/Exact binary bytes sent/i)).toBeInTheDocument();
   });
 });

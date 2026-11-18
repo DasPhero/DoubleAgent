@@ -1,12 +1,8 @@
-# Binaries and build output
-build/bin/
-*.exe
+# Temp/library build artifacts (executables & build/bin are tracked)
 *.exe~
-*.msi
 *.dll
 *.so
 *.dylib
-*.AppImage
 
 # Test binary, built with `go test -c`
 *.test

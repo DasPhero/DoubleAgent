@@ -1939,6 +1939,126 @@ export namespace core {
 		    return a;
 		}
 	}
+	export class HexExecChunk {
+	    payloadExpr: string;
+	    delayMs?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HexExecChunk(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.payloadExpr = source["payloadExpr"];
+	        this.delayMs = source["delayMs"];
+	    }
+	}
+	export class HexParsePreview {
+	    byteCount: number;
+	    hexCompact: string;
+	    hexDump: string;
+	    base64: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HexParsePreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.byteCount = source["byteCount"];
+	        this.hexCompact = source["hexCompact"];
+	        this.hexDump = source["hexDump"];
+	        this.base64 = source["base64"];
+	        this.error = source["error"];
+	    }
+	}
+	export class HexRunRequest {
+	    executionId?: string;
+	    targetType: string;
+	    sessionId?: string;
+	    executable: string;
+	    args?: string[];
+	    workingDir?: string;
+	    chunks: HexExecChunk[];
+	    timeoutSec?: number;
+	    envVars?: ApiKeyValue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new HexRunRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.executionId = source["executionId"];
+	        this.targetType = source["targetType"];
+	        this.sessionId = source["sessionId"];
+	        this.executable = source["executable"];
+	        this.args = source["args"];
+	        this.workingDir = source["workingDir"];
+	        this.chunks = this.convertValues(source["chunks"], HexExecChunk);
+	        this.timeoutSec = source["timeoutSec"];
+	        this.envVars = this.convertValues(source["envVars"], ApiKeyValue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class HexRunResult {
+	    executionId?: string;
+	    targetType: string;
+	    inputByteCount: number;
+	    inputHexPreview?: string;
+	    exitCode: number;
+	    durationMs: number;
+	    stdoutHexDump: string;
+	    stdoutAscii: string;
+	    stdoutBase64: string;
+	    stdoutBytes: number;
+	    stderrHexDump: string;
+	    stderrAscii: string;
+	    stderrBytes: number;
+	    truncated?: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HexRunResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.executionId = source["executionId"];
+	        this.targetType = source["targetType"];
+	        this.inputByteCount = source["inputByteCount"];
+	        this.inputHexPreview = source["inputHexPreview"];
+	        this.exitCode = source["exitCode"];
+	        this.durationMs = source["durationMs"];
+	        this.stdoutHexDump = source["stdoutHexDump"];
+	        this.stdoutAscii = source["stdoutAscii"];
+	        this.stdoutBase64 = source["stdoutBase64"];
+	        this.stdoutBytes = source["stdoutBytes"];
+	        this.stderrHexDump = source["stderrHexDump"];
+	        this.stderrAscii = source["stderrAscii"];
+	        this.stderrBytes = source["stderrBytes"];
+	        this.truncated = source["truncated"];
+	        this.error = source["error"];
+	    }
+	}
 	
 	
 	

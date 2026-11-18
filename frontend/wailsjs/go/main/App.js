@@ -30,6 +30,10 @@ export function CancelApiExecution(arg1) {
   return window['go']['main']['App']['CancelApiExecution'](arg1);
 }
 
+export function CancelHexExecution(arg1) {
+  return window['go']['main']['App']['CancelHexExecution'](arg1);
+}
+
 export function CancelTransfer(arg1) {
   return window['go']['main']['App']['CancelTransfer'](arg1);
 }
@@ -222,6 +226,14 @@ export function ExecuteApiRequest(arg1) {
   return window['go']['main']['App']['ExecuteApiRequest'](arg1);
 }
 
+export function ExecuteHexLocal(arg1) {
+  return window['go']['main']['App']['ExecuteHexLocal'](arg1);
+}
+
+export function ExecuteHexSsh(arg1) {
+  return window['go']['main']['App']['ExecuteHexSsh'](arg1);
+}
+
 export function ExecuteImport(arg1) {
   return window['go']['main']['App']['ExecuteImport'](arg1);
 }
@@ -266,8 +278,16 @@ export function ExportTotpTokens(arg1) {
   return window['go']['main']['App']['ExportTotpTokens'](arg1);
 }
 
+export function FindCyclicOffset(arg1) {
+  return window['go']['main']['App']['FindCyclicOffset'](arg1);
+}
+
 export function GenerateApiCodeSnippet(arg1, arg2, arg3) {
   return window['go']['main']['App']['GenerateApiCodeSnippet'](arg1, arg2, arg3);
+}
+
+export function GenerateCyclicPattern(arg1) {
+  return window['go']['main']['App']['GenerateCyclicPattern'](arg1);
 }
 
 export function GenerateEvidenceReport(arg1) {
@@ -642,6 +662,10 @@ export function ParseTermiusContent(arg1) {
   return window['go']['main']['App']['ParseTermiusContent'](arg1);
 }
 
+export function PreviewHexPayload(arg1) {
+  return window['go']['main']['App']['PreviewHexPayload'](arg1);
+}
+
 export function ReadSessionLog(arg1) {
   return window['go']['main']['App']['ReadSessionLog'](arg1);
 }
@@ -840,6 +864,10 @@ export function SelectFileDialog(arg1, arg2, arg3) {
 
 export function SendPivotInput(arg1, arg2) {
   return window['go']['main']['App']['SendPivotInput'](arg1, arg2);
+}
+
+export function SendRawTcpHex(arg1, arg2) {
+  return window['go']['main']['App']['SendRawTcpHex'](arg1, arg2);
 }
 
 export function SendSerialBreak(arg1) {

@@ -1,6 +1,7 @@
 package apiclient_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -375,5 +376,46 @@ func TestExecuteAiChatStreamingSSEAndOllama_F42(t *testing.T) {
 	}
 	if olRes.Reply != "Local LLM" || olRes.CompletionTokens != 7 {
 		t.Fatalf("unexpected Ollama response: %+v", olRes)
+	}
+}
+
+func TestHexBodyExecution_F42(t *testing.T) {
+	expected := []byte{0x00, 0x01, 0xfe, 0xff, 0x41, 0x90, 0x90}
+	var gotCT string
+	var gotBody []byte
+
+	client, srv := newPipeClientAndServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotCT = r.Header.Get("Content-Type")
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(gotBody)
+	}), false)
+	defer srv.Close()
+
+	resp, err := client.Execute(context.Background(), core.ApiExecuteRequest{
+		Request: core.ApiRequestItem{
+			ID:       "req-hex-1",
+			Name:     "Hex Payload Probe",
+			Method:   "POST",
+			URL:      srv.URL + "/binary",
+			BodyType: "hex",
+			Body:     "00 01 fe ff 41 \\x90*2",
+		},
+	}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("Execute hex error: %v", err)
+	}
+	if resp.Error != "" || resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected hex API response: %+v", resp)
+	}
+	if gotCT != "application/octet-stream" {
+		t.Fatalf("expected default Content-Type application/octet-stream, got %q", gotCT)
+	}
+	if !bytes.Equal(gotBody, expected) {
+		t.Fatalf("exact raw bytes mismatch: got %x want %x", gotBody, expected)
+	}
+	decodedResp, decErr := base64.StdEncoding.DecodeString(resp.BodyBase64)
+	if decErr != nil || !bytes.Equal(decodedResp, expected) {
+		t.Fatalf("response BodyBase64 mismatch: err=%v decoded=%x", decErr, decodedResp)
 	}
 }

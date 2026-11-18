@@ -58,6 +58,8 @@ export interface ApiTesterViewProps {
   activeEngagementId: string | null;
   activeEngagementName: string | null;
   identities: ApiIdentityOption[];
+  externalDraft?: ApiRequestItem | null;
+  onExternalDraftConsumed?: () => void;
   eventsOn?: (eventName: string, callback: (...data: unknown[]) => void) => () => void;
   onSaveToEvidence?: (title: string, category: string, content: string) => Promise<void>;
   onSaveToNotes?: (title: string, content: string) => Promise<void>;
@@ -153,6 +155,8 @@ function buildRawWireFromRequest(req: ApiRequestItem): string {
   }
   if (req.bodyType === 'json' && !(req.headers || []).some((h) => h.enabled && h.key.toLowerCase() === 'content-type')) {
     lines.push('Content-Type: application/json');
+  } else if (req.bodyType === 'hex' && !(req.headers || []).some((h) => h.enabled && h.key.toLowerCase() === 'content-type')) {
+    lines.push('Content-Type: application/octet-stream');
   }
   lines.push('');
   if (req.bodyType !== 'none' && req.body) {
@@ -175,6 +179,8 @@ export function ApiTesterView({
   activeEngagementId,
   activeEngagementName,
   identities,
+  externalDraft,
+  onExternalDraftConsumed,
   eventsOn,
   onSaveToEvidence,
   onSaveToNotes,
@@ -274,6 +280,23 @@ export function ApiTesterView({
   useEffect(() => {
     void loadWorkspaceData();
   }, [loadWorkspaceData]);
+
+  // Open incoming draft from external tools such as the Binary / Hex Payload Runner (F-43 -> F-42)
+  const consumedDraftIdRef = useRef<string>('');
+  useEffect(() => {
+    if (!externalDraft || externalDraft.id === consumedDraftIdRef.current) return;
+    consumedDraftIdRef.current = externalDraft.id;
+    setMode('repeater');
+    setReqSubTab('body');
+    setReqTabs((prev) => {
+      const next = [...prev, externalDraft];
+      setActiveTabIdx(next.length - 1);
+      return next;
+    });
+    setCurrentResponse(null);
+    setStatusBanner(`Loaded "${externalDraft.name}" (${externalDraft.bodyType}) from Hex Runner.`);
+    onExternalDraftConsumed?.();
+  }, [externalDraft, onExternalDraftConsumed]);
 
   // Listen to real-time AI SSE/NDJSON streaming chunks emitted by Go
   useEffect(() => {
@@ -1339,6 +1362,7 @@ export function ApiTesterView({
                                 <option value="json">application/json</option>
                                 <option value="form">x-www-form-urlencoded</option>
                                 <option value="raw">raw text</option>
+                                <option value="hex">hex / binary (raw bytes)</option>
                               </select>
                               {activeReq.bodyType === 'json' && (
                                 <button
@@ -1349,13 +1373,22 @@ export function ApiTesterView({
                                   Pretty JSON
                                 </button>
                               )}
+                              {activeReq.bodyType === 'hex' && (
+                                <span style={{ fontSize: '0.68rem', color: 'var(--accent-soft)' }}>
+                                  Exact binary bytes sent (supports 41 00 ff, \x90, u32le(...), A*32)
+                                </span>
+                              )}
                             </div>
                             {activeReq.bodyType !== 'none' && (
                               <textarea
                                 aria-label="Request Body"
                                 className="cyber-textarea font-mono"
                                 style={{ flex: 1, minHeight: '180px', fontSize: '0.76rem' }}
-                                placeholder='{"query":"{{VAR}}"}'
+                                placeholder={
+                                  activeReq.bodyType === 'hex'
+                                    ? 'e.g. 41 42 00 ff \\x90*16 u32le(0xdeadbeef)'
+                                    : '{"query":"{{VAR}}"}'
+                                }
                                 value={activeReq.body || ''}
                                 onChange={(e) => updateActiveReq({ body: e.target.value })}
                               />

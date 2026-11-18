@@ -25,6 +25,7 @@ import (
 	"unicode/utf8"
 
 	"doubleagent/backend/core"
+	"doubleagent/backend/hexrunner"
 	"golang.org/x/net/proxy"
 )
 
@@ -924,6 +925,17 @@ func buildHTTPRequest(
 		}
 		bodyReader = strings.NewReader(resolvedBody)
 		defaultContentType = "application/x-www-form-urlencoded"
+	case "hex":
+		resolvedBody, bErr := ResolveTemplateString(item.Body, vars, resolveSecret)
+		if bErr != nil {
+			return nil, "", bErr
+		}
+		rawBytes, hErr := hexrunner.CompilePayload(resolvedBody)
+		if hErr != nil {
+			return nil, "", fmt.Errorf("invalid hex payload body: %w", hErr)
+		}
+		bodyReader = bytes.NewReader(rawBytes)
+		defaultContentType = "application/octet-stream"
 	default: // "raw"
 		resolvedBody, bErr := ResolveTemplateString(item.Body, vars, resolveSecret)
 		if bErr != nil {

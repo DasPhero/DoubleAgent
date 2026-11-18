@@ -1,10 +1,15 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-42` (API Tester & HTTP Repeater View + AI Chat Mode) — COMPLETED! · `M-GLASS` (Glass Terminal Background + Plasma Theme) — COMPLETED! · `M-ICONS` (Emoji → CyberIcon) — COMPLETED! · `M-THEMES` (Theme Sweep + Colors) — COMPLETED!
+- **Current Milestone:** `F-43` (Binary / Hex Payload Runner & API/Socket Bridge) — COMPLETED! · `F-42` (API Tester & HTTP Repeater + Hex Body + AI Chat Mode) — COMPLETED! · `M-GLASS` — COMPLETED! · `M-ICONS` — COMPLETED! · `M-THEMES` — COMPLETED!
 - **Next Milestone:** `M-PRESETS`
 - **Stage:** `2-flagship`
 
 ## What Works
+- **Binary / Hex Payload Runner & API/Socket Bridge (`F-43` + `F-42` Hex Body)**:
+  - **Hex/Exploit Compiler & Execution Engine (`backend/core/hex_runner.go`, `backend/hexrunner/runner.go`):** Pure-Go payload DSL parser (`41 42 00 ff`, `\xHH`, `0xHH`, quoted strings, `A*N`, `u32le/be`, `u64le/be`, `cyclic(N)` De Bruijn sequence generator + `CyclicOffset` lookup), direct `os/exec.CommandContext` execution without PTY or shell wrapping (`RunLocal`) with sequential delayed `io.Pipe()` stdin chunk feeding and `2 MiB` bounded stdout/stderr capture (`HexDump`, `EscapedASCII`, `Base64`).
+  - **Non-PTY SSH Exec & HTTP API Hex Bodies (`backend/ssh/transport.go`, `backend/apiclient/client.go`):** Added `core.SshBinaryRunner` (`ExecRaw`) to `*ssh.Transport` without requesting a PTY, and added `bodyType: "hex"` (`application/octet-stream` default) to `apiclient` `buildHTTPRequest` via `hexrunner.CompilePayload`.
+  - **Bound Surface & UI (`app.go`, `frontend/src/types/hexrunner.ts`, `frontend/src/components/HexRunnerView.tsx`, `ApiTesterView.tsx`, `App.tsx`):** Bound `PreviewHexPayload`, `GenerateCyclicPattern`, `FindCyclicOffset`, `ExecuteHexLocal`, `ExecuteHexSsh`, `CancelHexExecution`, and `SendRawTcpHex`; added dockable `tabType: 'hex-runner'` with **Send to API (`hex`)**, **Send to Raw TCP**, and **Save Evidence (`F-18`)**.
+  - **Tests:** `backend/hexrunner/runner_test.go`, `TestHexBodyExecution_F42` in `backend/apiclient/client_test.go`, `frontend/src/components/HexRunnerView.test.tsx`, and `ApiTesterView.test.tsx`.
 - **Sidebar Tag Filtering for Snippets & Chains (`frontend/src/App.tsx`, `frontend/src/App.test.tsx`)**:
   - Added `#tag` select dropdowns (`Filter Snippets by Tag`, `Filter Chains by Tag`), clickable `#tag` card badges, and `Filter Chains` text search across both sidebar drawers (`collectUniqueTags`, `matchesTagFilter`, `renderSidebarTagBar`, `renderSidebarCardTags`).
 - **API Tester & HTTP Repeater View + AI Chat Mode (`F-42`)**:

@@ -32,7 +32,7 @@ export interface ApiRequestItem {
   params?: ApiKeyValue[];
   headers?: ApiKeyValue[];
   auth: ApiAuthConfig;
-  bodyType: 'none' | 'json' | 'form' | 'raw';
+  bodyType: 'none' | 'json' | 'form' | 'raw' | 'hex';
   body?: string;
   rawMode?: boolean;
   rawRequest?: string;

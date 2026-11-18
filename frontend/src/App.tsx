@@ -42,6 +42,8 @@ import { WorkspaceState, ReconnectState, PersistedTabItem, PersistedWorkspaceNod
 import { CyberIcon } from './components/CyberIcon';
 import { NetworkMapView } from './components/NetworkMapView';
 import { ApiTesterView } from './components/ApiTesterView';
+import { HexRunnerView } from './components/HexRunnerView';
+import type { ApiRequestItem } from './types/apitester';
 import { RemoteEditorView } from './components/RemoteEditorView';
 import { RemoteEditSession, RemoteConflictInfo } from './types/remoteEdit';
 import { VaultSyncInfo, VaultConflictReport } from './types/vaultSync';
@@ -274,47 +276,47 @@ export type WorkspaceDragPayload =
   | { type: 'tab'; tabId: string; title: string }
   | { type: 'host'; hostId: string; label: string }
   | {
-      type: 'tool';
-      toolType:
-        | 'notes'
-        | 'totp'
-        | 'sftp'
-        | 'snippets'
-        | 'local-powershell'
-        | 'local-cmd'
-        | 'local-bash'
-        | 'network-map'
-        | 'editor';
-      hostId?: string;
-      title: string;
-    };
+    type: 'tool';
+    toolType:
+    | 'notes'
+    | 'totp'
+    | 'sftp'
+    | 'snippets'
+    | 'local-powershell'
+    | 'local-cmd'
+    | 'local-bash'
+    | 'network-map'
+    | 'editor';
+    hostId?: string;
+    title: string;
+  };
 
 export type WorkspaceNode =
   | {
-      type: 'pane';
-      id: string;
-      sessionId: string;
-      hostId?: string;
-      title: string;
-      cwd?: string;
-      paneType?: DockablePaneType;
-      notesHostId?: string;
-      sftpSessionId?: string;
-      editSessionId?: string;
-      editRemotePath?: string;
-      isRawTcp?: boolean;
-      rawTcpHost?: string;
-      rawTcpPort?: number;
-      initialLineMode?: boolean;
-      initialLineEnding?: 'crlf' | 'lf' | 'cr';
-    }
+    type: 'pane';
+    id: string;
+    sessionId: string;
+    hostId?: string;
+    title: string;
+    cwd?: string;
+    paneType?: DockablePaneType;
+    notesHostId?: string;
+    sftpSessionId?: string;
+    editSessionId?: string;
+    editRemotePath?: string;
+    isRawTcp?: boolean;
+    rawTcpHost?: string;
+    rawTcpPort?: number;
+    initialLineMode?: boolean;
+    initialLineEnding?: 'crlf' | 'lf' | 'cr';
+  }
   | {
-      type: 'split';
-      id: string;
-      direction: 'horizontal' | 'vertical';
-      children: WorkspaceNode[];
-      ratios?: number[];
-    };
+    type: 'split';
+    id: string;
+    direction: 'horizontal' | 'vertical';
+    children: WorkspaceNode[];
+    ratios?: number[];
+  };
 
 export interface PaneItem {
   id: string;
@@ -341,7 +343,7 @@ export interface TabItem {
   color?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
-  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm' | 'route-health' | 'api-tester';
+  tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm' | 'route-health' | 'api-tester' | 'hex-runner';
   sftpSessionId?: string;
   notesHostId?: string;
   notesInitialNoteId?: string | null;
@@ -1261,7 +1263,7 @@ export function App({
             if (prev && items.some((t) => t.id === prev)) return prev;
             return items[0]?.id || '';
           });
-        }).catch(() => {});
+        }).catch(() => { });
       }
       if (api?.GetLocalNetworkIPs) {
         void api.GetLocalNetworkIPs().then((ips) => {
@@ -1270,7 +1272,7 @@ export function App({
             const vpn = ips.find((i) => i.isVpn) || ips[0];
             setSidebarPayloadLhost((curr) => (curr === '10.10.14.1' ? vpn.ip : curr));
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
     if (activeSidebarPanel === 'listeners') {
@@ -1278,7 +1280,7 @@ export function App({
       if (api?.ListActiveManagedListeners) {
         void api.ListActiveManagedListeners().then((list) => {
           if (list) setDrawerListeners(list);
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
     if (activeSidebarPanel === 'pivot') {
@@ -1286,7 +1288,7 @@ export function App({
       if (api?.ListActivePivotInstances) {
         void api.ListActivePivotInstances().then((list) => {
           if (list) setDrawerPivots(list);
-        }).catch(() => {});
+        }).catch(() => { });
       }
       if (api?.GetLocalNetworkIPs) {
         void api.GetLocalNetworkIPs().then((ips) => {
@@ -1295,7 +1297,7 @@ export function App({
             const vpn = ips.find((i) => i.isVpn) || ips[0];
             setSidebarPivotLhost((curr) => (curr === '10.10.14.1' ? vpn.ip : curr));
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
     if (activeSidebarPanel === 'transfer') {
@@ -1303,7 +1305,7 @@ export function App({
       if (api?.ListFileTransferServers) {
         void api.ListFileTransferServers().then((s) => {
           if (s) setDashboardFileServers(s);
-        }).catch(() => {});
+        }).catch(() => { });
       }
       if (api?.GetLocalNetworkIPs) {
         void api.GetLocalNetworkIPs().then((ips) => {
@@ -1312,7 +1314,7 @@ export function App({
             const vpn = ips.find((i) => i.isVpn) || ips[0];
             setSidebarTransferLhost((curr) => (curr === '10.10.14.1' ? vpn.ip : curr));
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
       if (!sidebarTransferDir && api?.GetDefaultStagingDirectory) {
         void api.GetDefaultStagingDirectory().then((defDir) => {
@@ -1325,12 +1327,12 @@ export function App({
               .catch(() => setSidebarTransferFiles([]))
               .finally(() => setSidebarTransferLoadingFiles(false));
           }
-        }).catch(() => {});
+        }).catch(() => { });
       } else if (sidebarTransferDir && api?.ListHostedTransferFiles) {
         setSidebarTransferLoadingFiles(true);
         void api.ListHostedTransferFiles(sidebarTransferDir)
           .then((files) => setSidebarTransferFiles(files || []))
-          .catch(() => {})
+          .catch(() => { })
           .finally(() => setSidebarTransferLoadingFiles(false));
       }
     }
@@ -1341,7 +1343,7 @@ export function App({
     const api = getWailsBindings();
     const timer = window.setInterval(() => {
       if (api?.ListFileTransferServers) {
-        void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => {});
+        void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => { });
       }
     }, 2200);
     return () => window.clearInterval(timer);
@@ -1367,7 +1369,7 @@ export function App({
         md5: matchedHash?.md5,
       }).then((res) => {
         if (active && res) setSidebarTransferCmdSet(res);
-      }).catch(() => {});
+      }).catch(() => { });
       return () => { active = false; };
     }
   }, [
@@ -1396,7 +1398,7 @@ export function App({
         useTLS: false,
       }).then((cmd) => {
         if (active && cmd) setSidebarTransferExtCmd(cmd);
-      }).catch(() => {});
+      }).catch(() => { });
       return () => { active = false; };
     }
   }, [
@@ -1538,6 +1540,7 @@ export function App({
   const [sidebarPayloadOs, setSidebarPayloadOs] = useState<'all' | 'linux' | 'windows'>('all');
   const [sidebarPayloadLhost, setSidebarPayloadLhost] = useState<string>('10.10.14.1');
   const [sidebarPayloadLport, setSidebarPayloadLport] = useState<number>(443);
+  const [apiTesterDraft, setApiTesterDraft] = useState<ApiRequestItem | null>(null);
   const [sidebarPayloadEncoding, setSidebarPayloadEncoding] = useState<PayloadEncoding>('none');
   const [sidebarPayloadLocalIPs, setSidebarPayloadLocalIPs] = useState<NetworkInterfaceIP[]>([]);
   const [sidebarSelectedPayloadId, setSidebarSelectedPayloadId] = useState<string>('');
@@ -1554,16 +1557,16 @@ export function App({
   const refreshRouteHealthEndpoints = useCallback(() => {
     const api = getWailsBindings();
     if (api?.ListActiveManagedListeners) {
-      void api.ListActiveManagedListeners().then((l) => setDrawerListeners(l || [])).catch(() => {});
+      void api.ListActiveManagedListeners().then((l) => setDrawerListeners(l || [])).catch(() => { });
     }
     if (api?.ListActivePivotInstances) {
-      void api.ListActivePivotInstances().then((p) => setDrawerPivots(p || [])).catch(() => {});
+      void api.ListActivePivotInstances().then((p) => setDrawerPivots(p || [])).catch(() => { });
     }
     if (api?.ListFileTransferServers) {
-      void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => {});
+      void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => { });
     }
     if (api?.GetActiveTunnels) {
-      void api.GetActiveTunnels().then((t) => setActiveTunnels(t || [])).catch(() => {});
+      void api.GetActiveTunnels().then((t) => setActiveTunnels(t || [])).catch(() => { });
     }
   }, []);
   // WinRM / PowerShell Remoting Client state (F-41)
@@ -1582,7 +1585,7 @@ export function App({
       if (api?.ListCredentials) {
         void api.ListCredentials(activeEngagement?.id || '', '').then((list) => {
           if (list) setDrawerCreds(list);
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
   }, [activeSidebarPanel, activeEngagement, showWinrmModal]);
@@ -1614,7 +1617,7 @@ export function App({
       let active = true;
       void api.BuildPivotCommands(route, sidebarPivotLhost.trim() || '10.10.14.1').then((res) => {
         if (active && res) setSidebarPivotCommands(res);
-      }).catch(() => {});
+      }).catch(() => { });
       return () => { active = false; };
     }
     const targetSub = subs[0] || '10.10.20.0/24';
@@ -2083,9 +2086,9 @@ export function App({
         const targetTab = explicitLauncherTarget
           ? prev.find((t) => t.id === explicitLauncherTarget.tabId)
           : prev.find((t) => {
-              const ap = collectPanes(t.rootNode).find((p) => p.id === t.activePaneId);
-              return ap?.paneType === 'launcher';
-            });
+            const ap = collectPanes(t.rootNode).find((p) => p.id === t.activePaneId);
+            return ap?.paneType === 'launcher';
+          });
 
         if (targetTab) {
           const targetPaneId = explicitLauncherTarget
@@ -2106,13 +2109,13 @@ export function App({
           return prev.map((t) =>
             t.id === targetTab.id
               ? {
-                  ...t,
-                  title: wasSingleLauncherPane || t.title === 'New Connection' ? title : t.title,
-                  hostId: wasSingleLauncherPane || !t.hostId ? hostId : t.hostId,
-                  color: wasSingleLauncherPane ? color : t.color,
-                  rootNode: updatedRoot,
-                  activePaneId: paneId,
-                }
+                ...t,
+                title: wasSingleLauncherPane || t.title === 'New Connection' ? title : t.title,
+                hostId: wasSingleLauncherPane || !t.hostId ? hostId : t.hostId,
+                color: wasSingleLauncherPane ? color : t.color,
+                rootNode: updatedRoot,
+                activePaneId: paneId,
+              }
               : t
           );
         }
@@ -2361,6 +2364,35 @@ export function App({
     });
   }, []);
 
+  const openHexRunnerTab = useCallback((): void => {
+    setTabs((prev) => {
+      const existingTab = prev.find((t) => t.tabType === 'hex-runner');
+      if (existingTab) {
+        setActiveTabId(existingTab.id);
+        return prev;
+      }
+      tabCounterRef.current += 1;
+      const seq = tabCounterRef.current;
+      const tabId = `hex-runner-tab-${seq}`;
+      const paneId = `hex-runner-pane-${seq}-1`;
+      const newTab: TabItem = {
+        id: tabId,
+        title: 'Binary / Hex Runner',
+        color: '#f59e0b',
+        tabType: 'hex-runner',
+        rootNode: {
+          type: 'pane',
+          id: paneId,
+          sessionId: `hex-runner-${seq}`,
+          title: 'Binary / Hex Payload Runner (No-PTY)',
+        },
+        activePaneId: paneId,
+      };
+      setActiveTabId(tabId);
+      return [...prev, newTab];
+    });
+  }, []);
+
   const openRemoteEditorTab = useCallback(
     (session: RemoteEditSession, hostId?: string): void => {
       setTabs((prev) => {
@@ -2527,19 +2559,19 @@ export function App({
               setNotes(allNotes || []);
             }
             if (api.GetVaultSyncInfo) {
-              api.GetVaultSyncInfo().then(setSyncInfo).catch(() => {});
+              api.GetVaultSyncInfo().then(setSyncInfo).catch(() => { });
             }
             if (api.ListEngagements) {
-              api.ListEngagements().then(setEngagementsList).catch(() => {});
+              api.ListEngagements().then(setEngagementsList).catch(() => { });
             }
             if (api.GetActiveEngagement) {
-              api.GetActiveEngagement().then(setActiveEngagement).catch(() => {});
+              api.GetActiveEngagement().then(setActiveEngagement).catch(() => { });
             }
             if (api.ListSnippetChains) {
-              api.ListSnippetChains('').then(setChains).catch(() => {});
+              api.ListSnippetChains('').then(setChains).catch(() => { });
             }
             if (api.ListSnippetsFromFile) {
-              api.ListSnippetsFromFile().then(setExternalSnippets).catch(() => {});
+              api.ListSnippetsFromFile().then(setExternalSnippets).catch(() => { });
             }
           }
           return;
@@ -2559,19 +2591,19 @@ export function App({
           setNotes(allNotes || []);
         }
         if (api.GetVaultSyncInfo) {
-          api.GetVaultSyncInfo().then(setSyncInfo).catch(() => {});
+          api.GetVaultSyncInfo().then(setSyncInfo).catch(() => { });
         }
         if (api.ListEngagements) {
-          api.ListEngagements().then(setEngagementsList).catch(() => {});
+          api.ListEngagements().then(setEngagementsList).catch(() => { });
         }
         if (api.GetActiveEngagement) {
-          api.GetActiveEngagement().then(setActiveEngagement).catch(() => {});
+          api.GetActiveEngagement().then(setActiveEngagement).catch(() => { });
         }
         if (api.ListSnippetChains) {
-          api.ListSnippetChains('').then(setChains).catch(() => {});
+          api.ListSnippetChains('').then(setChains).catch(() => { });
         }
         if (api.ListSnippetsFromFile) {
-          api.ListSnippetsFromFile().then(setExternalSnippets).catch(() => {});
+          api.ListSnippetsFromFile().then(setExternalSnippets).catch(() => { });
         }
         if (api.ListForwardRules) {
           const rules = await api.ListForwardRules();
@@ -2632,7 +2664,7 @@ export function App({
         if (Array.isArray(ids) && ids.length > 0) {
           setLiveSessions(new Set(ids));
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
     const rt = getWailsRuntime();
     if (!rt) {
@@ -3245,9 +3277,9 @@ export function App({
       .filter(Boolean);
     const jumpChainList = hostProxyJump
       ? hostProxyJump
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
       : undefined;
 
     if (api) {
@@ -3595,8 +3627,8 @@ export function App({
     const existingTab = tabs.find((t) => t.hostId === host.id);
     const existingSessionId = existingTab
       ? collectPanes(existingTab.rootNode).find(
-          (p) => !p.sessionId.startsWith('serial-') && !p.sessionId.startsWith('local-')
-        )?.sessionId
+        (p) => !p.sessionId.startsWith('serial-') && !p.sessionId.startsWith('local-')
+      )?.sessionId
       : undefined;
 
     if (existingSessionId) {
@@ -4430,8 +4462,8 @@ export function App({
       existingNote && !existingNote.title.startsWith('Scratchpad Loot (')
         ? existingNote.title
         : hostId && hostLabel
-        ? `Scratchpad (${hostLabel})`
-        : 'Scratchpad';
+          ? `Scratchpad (${hostLabel})`
+          : 'Scratchpad';
     const note: NotePage = {
       id: noteId,
       hostId,
@@ -5152,6 +5184,7 @@ export function App({
       activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'route-health' ||
       activeTab.tabType === 'api-tester' ||
+      activeTab.tabType === 'hex-runner' ||
       activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
@@ -5196,10 +5229,10 @@ export function App({
       prev.map((t) =>
         t.id === activeTab.id
           ? {
-              ...t,
-              rootNode: dockNodeInTree(t.rootNode, targetId, newLauncherPane, zone),
-              activePaneId: newPaneId,
-            }
+            ...t,
+            rootNode: dockNodeInTree(t.rootNode, targetId, newLauncherPane, zone),
+            activePaneId: newPaneId,
+          }
           : t
       )
     );
@@ -5826,6 +5859,7 @@ export function App({
       activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'route-health' ||
       activeTab.tabType === 'api-tester' ||
+      activeTab.tabType === 'hex-runner' ||
       activeTab.tabType === 'editor'
     ) {
       await handleConnectSavedHost(host);
@@ -5915,7 +5949,8 @@ export function App({
         activeTab.tabType === 'network-map' ||
         activeTab.tabType === 'winrm' ||
         activeTab.tabType === 'route-health' ||
-        activeTab.tabType === 'api-tester'
+        activeTab.tabType === 'api-tester' ||
+        activeTab.tabType === 'hex-runner'
       ) {
         await handleOpenLocalTerminal(shellType);
         return;
@@ -5950,10 +5985,10 @@ export function App({
         prev.map((t) =>
           t.id === activeTab.id
             ? {
-                ...t,
-                rootNode: dockNodeInTree(t.rootNode, targetId, newPane, zone),
-                activePaneId: newPaneId,
-              }
+              ...t,
+              rootNode: dockNodeInTree(t.rootNode, targetId, newPane, zone),
+              activePaneId: newPaneId,
+            }
             : t
         )
       );
@@ -6039,6 +6074,7 @@ export function App({
       activeTab.tabType === 'winrm' ||
       activeTab.tabType === 'route-health' ||
       activeTab.tabType === 'api-tester' ||
+      activeTab.tabType === 'hex-runner' ||
       activeTab.tabType === 'editor'
     ) {
       tabCounterRef.current += 1;
@@ -6064,10 +6100,10 @@ export function App({
       prev.map((t) =>
         t.id === activeTab.id
           ? {
-              ...t,
-              rootNode: dockNodeInTree(t.rootNode, targetId, newPane, zone),
-              activePaneId: newPane.id,
-            }
+            ...t,
+            rootNode: dockNodeInTree(t.rootNode, targetId, newPane, zone),
+            activePaneId: newPane.id,
+          }
           : t
       )
     );
@@ -6207,10 +6243,10 @@ export function App({
           prev.map((t) =>
             t.id === tab.id
               ? {
-                  ...t,
-                  rootNode: movePaneInTree(t.rootNode, dragPayload.paneId, targetPaneId, zone),
-                  activePaneId: dragPayload.paneId,
-                }
+                ...t,
+                rootNode: movePaneInTree(t.rootNode, dragPayload.paneId, targetPaneId, zone),
+                activePaneId: dragPayload.paneId,
+              }
               : t
           )
         );
@@ -7306,15 +7342,15 @@ export function App({
                 const ledClass = isSessionAlive
                   ? 'live-green'
                   : isConnecting
-                  ? 'connecting'
-                  : 'offline-red';
+                    ? 'connecting'
+                    : 'offline-red';
                 const ledTitle = isSessionAlive
                   ? 'Session Active (Connected)'
                   : isConnecting
-                  ? 'Connecting to host...'
-                  : node.hostId
-                  ? 'Session Disconnected — Click to connect'
-                  : 'Disconnected';
+                    ? 'Connecting to host...'
+                    : node.hostId
+                      ? 'Session Disconnected — Click to connect'
+                      : 'Disconnected';
 
                 return (
                   <span
@@ -7323,9 +7359,9 @@ export function App({
                     onClick={
                       !isSessionAlive && node.hostId
                         ? (e) => {
-                            e.stopPropagation();
-                            void handleConnectPane(node, tab.id);
-                          }
+                          e.stopPropagation();
+                          void handleConnectPane(node, tab.id);
+                        }
                         : undefined
                     }
                     role={!isSessionAlive && node.hostId ? 'button' : undefined}
@@ -7339,7 +7375,7 @@ export function App({
               />
               {isBroadcastingThis && (
                 <span className="pane-broadcast-badge" title="Broadcast Input ACTIVE on this pane">
- BROADCAST
+                  BROADCAST
                 </span>
               )}
               {reconnectStates.has(node.id) && (
@@ -7948,11 +7984,10 @@ export function App({
             </div>
             {idx < childCount - 1 && (
               <div
-                className={`split-resizer-bar split-resizer-${node.direction} ${
-                  activeSplitResize?.splitId === node.id && activeSplitResize?.index === idx
-                    ? 'resizing'
-                    : ''
-                }`}
+                className={`split-resizer-bar split-resizer-${node.direction} ${activeSplitResize?.splitId === node.id && activeSplitResize?.index === idx
+                  ? 'resizing'
+                  : ''
+                  }`}
                 role="separator"
                 aria-orientation={node.direction === 'horizontal' ? 'vertical' : 'horizontal'}
                 aria-label={`Resize Split ${node.direction} ${idx + 1}`}
@@ -8113,7 +8148,7 @@ export function App({
     }
   };
 
-  const executeShortcutActionRef = useRef<(actionId: ShortcutActionId) => void>(() => {});
+  const executeShortcutActionRef = useRef<(actionId: ShortcutActionId) => void>(() => { });
   executeShortcutActionRef.current = executeShortcutAction;
 
   const executeCustomShortcut = (sc: CustomShortcutItem): void => {
@@ -8130,7 +8165,7 @@ export function App({
     }
   };
 
-  const executeCustomShortcutRef = useRef<(sc: CustomShortcutItem) => void>(() => {});
+  const executeCustomShortcutRef = useRef<(sc: CustomShortcutItem) => void>(() => { });
   executeCustomShortcutRef.current = executeCustomShortcut;
 
   useEffect(() => {
@@ -8552,507 +8587,509 @@ export function App({
         )}
 
         <nav className="nav-menu-bar" aria-label="Application Menu">
-            {/* 1. View Dropdown (First Button) */}
-            <div
-              className="nav-menu-container"
-              onMouseEnter={() => handleMenuEnter('view')}
-              onMouseMove={handleMenuMove}
-              onMouseLeave={handleMenuLeave}
-            >
-              <button
-                type="button"
-                className={`nav-menu-trigger ${activeDropdownMenu === 'view' ? 'active' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={activeDropdownMenu === 'view'}
-                onClick={() =>
-                  setActiveDropdownMenu((prev) => (prev === 'view' ? null : 'view'))
-                }
-              >
-                <span>View</span>
-                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
-              </button>
-              {activeDropdownMenu === 'view' && (
-                <div
-                  className="nav-dropdown-menu"
-                  role="menu"
-                  aria-label="View Menu"
-                  onMouseEnter={() => handleMenuEnter('view')}
-                  onMouseMove={handleMenuMove}
-                >
-                  {renderDropdownRow('sidebar-toggle', sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar', 'Ctrl+B', () => setSidebarCollapsed((prev) => !prev))}
-                  <div className="nav-dropdown-divider" />
-                  {renderDropdownRow('new-tab', 'New Connection Tab', 'Ctrl+T', handleOpenNewConnectionTab)}
-                  {renderDropdownRow('new-split', 'New Connection Split', undefined, () => handleOpenNewConnectionSplit('right'))}
-                  {renderDropdownRow('view-map', 'Interactive Network Topology Map', undefined, openNetworkMapTab)}
-                  {renderDropdownRow(
-                    'sftp',
-                    'SFTP File Browser',
-                    undefined,
-                    () => {
-                      if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
-                        openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
-                      }
-                    },
-                    !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
-                  )}
-                  {renderDropdownRow('route-health', 'Route Health Check Dashboard', undefined, openRouteHealthTab)}
-                  {renderDropdownRow('split-h', 'Split Horizontal', undefined, () => void handleSplitPane('horizontal'))}
-                  {renderDropdownRow('split-v', 'Split Vertical', undefined, () => void handleSplitPane('vertical'))}
-                  {renderDropdownRow('find', 'Find in Terminal', 'Ctrl+F', () => {
-                    if (activePane) {
-                      togglePaneSearch(activePane.sessionId);
-                    }
-                  }, !activePane)}
-                  <div className="nav-dropdown-divider" />
-                  {renderDropdownRow('group-tabs', 'Group Tabs by Host', groupTabsByHost ? 'Active' : undefined, () => setGroupTabsByHost((prev) => !prev), false, groupTabsByHost)}
-                  <div className="nav-dropdown-divider" />
-                  {renderDropdownRow('zoom-in', 'Zoom In Pane', 'Ctrl +', () => {
-                    if (activePane) {
-                      const next = changeTerminalFontSize(activePane.sessionId, +1);
-                      setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
-                    }
-                  }, !activePane)}
-                  {renderDropdownRow('zoom-out', 'Zoom Out Pane', 'Ctrl -', () => {
-                    if (activePane) {
-                      const next = changeTerminalFontSize(activePane.sessionId, -1);
-                      setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
-                    }
-                  }, !activePane)}
-                  {renderDropdownRow('zoom-reset', 'Reset Pane Zoom', 'Ctrl 0', () => {
-                    if (activePane) {
-                      resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
-                      setPaneFontSizes((prev) =>
-                        new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
-                      );
-                    }
-                  }, !activePane)}
-                </div>
-              )}
-            </div>
-
-            {/* Cyberpunk delimiter next to View */}
-            <div className="nav-cyber-divider" aria-hidden="true">
-              <span className="cyber-glitch-slashes">//</span>
-            </div>
-
-            {/* 2. Engagement Section: Engagement Selector -> Engagement Dropdown */}
-            <div className="nav-engagement-controls-cluster">
-              {/* Engagement Selector Custom HUD Dropdown */}
-              <div
-                className="nav-menu-container"
-                onMouseEnter={() => handleMenuEnter('engagement-selector')}
-                onMouseMove={handleMenuMove}
-                onMouseLeave={handleMenuLeave}
-              >
-                <button
-                  type="button"
-                  aria-label="Select Active Engagement"
-                  aria-haspopup="true"
-                  aria-expanded={activeDropdownMenu === 'engagement-selector'}
-                  className={`nav-menu-trigger nav-engagement-selector-btn ${activeDropdownMenu === 'engagement-selector' ? 'active' : ''} ${activeEngagement ? 'has-active-engagement' : ''}`}
-                  onClick={() =>
-                    setActiveDropdownMenu((prev) =>
-                      prev === 'engagement-selector' ? null : 'engagement-selector'
-                    )
-                  }
-                  style={{
-                    borderColor: activeEngagement ? 'color-mix(in srgb, var(--accent-bright) 55%, transparent)' : undefined,
-                    color: activeEngagement ? 'var(--accent-bright)' : '#cbd5e1',
-                  }}
-                  title="Switch between Encapsulated Pentest Engagements or Casual Mode"
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', minWidth: 0, overflow: 'hidden' }}>
-                    <span
-                      style={{
-                        width: '7px',
-                        height: '7px',
-                        borderRadius: '50%',
-                        flexShrink: 0,
-                        backgroundColor: activeEngagement ? '#10b981' : '#64748b',
-                        boxShadow: activeEngagement ? '0 0 8px rgba(16, 185, 129, 0.8)' : 'none',
-                      }}
-                    />
-                    <span
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {activeEngagement ? activeEngagement.name : 'No Engagement (Casual)'}
-                    </span>
-                  </span>
-                  <CyberIcon name="chevron-down" size={11} />
-                </button>
-                {activeDropdownMenu === 'engagement-selector' && (
-                  <div
-                    className="nav-dropdown-menu"
-                    role="menu"
-                    aria-label="Select Active Engagement Menu"
-                    onMouseEnter={() => handleMenuEnter('engagement-selector')}
-                    onMouseMove={handleMenuMove}
-                    style={{ minWidth: '250px' }}
-                  >
-                    <div className="nav-dropdown-section-title">Active Engagement Scope</div>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        void handleSelectEngagement('');
-                      }}
-                      style={{
-                        color: !activeEngagement ? 'var(--accent-bright)' : undefined,
-                        backgroundColor: !activeEngagement ? 'color-mix(in srgb, var(--accent-bright) 10%, transparent)' : undefined,
-                      }}
-                    >
-                      <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <CyberIcon name={!activeEngagement ? 'check' : 'shield'} size={12} />
-                        <span>No Engagement (Casual / Global)</span>
-                      </span>
-                      {!activeEngagement && <span className="nav-item-shortcut">ACTIVE</span>}
-                    </button>
-
-                    {engagementsList.length > 0 && (
-                      <>
-                        <div className="nav-dropdown-divider" />
-                        <div className="nav-dropdown-section-title">Saved Engagements ({engagementsList.length})</div>
-                        {engagementsList.map((eng) => {
-                          const isSelected = activeEngagement?.id === eng.id;
-                          return (
-                            <button
-                              key={eng.id}
-                              type="button"
-                              role="menuitem"
-                              className="nav-dropdown-item"
-                              onClick={() => {
-                                setActiveDropdownMenu(null);
-                                void handleSelectEngagement(eng.id);
-                              }}
-                              style={{
-                                color: isSelected ? 'var(--accent-bright)' : undefined,
-                                backgroundColor: isSelected ? 'color-mix(in srgb, var(--accent-bright) 12%, transparent)' : undefined,
-                              }}
-                            >
-                              <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                                <CyberIcon name={isSelected ? 'check' : 'target'} size={12} />
-                                <span>{eng.name}</span>
-                              </span>
-                              {isSelected && <span className="nav-item-shortcut">ACTIVE</span>}
-                            </button>
-                          );
-                        })}
-                      </>
-                    )}
-
-                    <div className="nav-dropdown-divider" />
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="nav-dropdown-item"
-                      onClick={() => {
-                        setActiveDropdownMenu(null);
-                        setEditingEngagement(null);
-                        setShowNewEngagementModal(true);
-                      }}
-                    >
-                      <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--accent-bright)' }}>
-                        <CyberIcon name="plus" size={12} />
-                        <span>New Engagement...</span>
-                      </span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Engagement Dropdown */}
-              <div
-                className="nav-menu-container"
-                onMouseEnter={() => handleMenuEnter('engagement-tools')}
-                onMouseMove={handleMenuMove}
-                onMouseLeave={handleMenuLeave}
-              >
-                <button
-                  type="button"
-                  className={`nav-menu-trigger ${activeDropdownMenu === 'engagement-tools' ? 'active' : ''}`}
-                  aria-haspopup="true"
-                  aria-expanded={activeDropdownMenu === 'engagement-tools'}
-                  onClick={() =>
-                    setActiveDropdownMenu((prev) => (prev === 'engagement-tools' ? null : 'engagement-tools'))
-                  }
-                >
-                  <CyberIcon name="target" size={12} />
-                  <span>Engagement</span>
-                  <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
-                </button>
-                {activeDropdownMenu === 'engagement-tools' && (
-                  <div
-                    className="nav-dropdown-menu"
-                    role="menu"
-                    aria-label="Engagement Specific Tools Menu"
-                    onMouseEnter={() => handleMenuEnter('engagement-tools')}
-                    onMouseMove={handleMenuMove}
-                  >
-                    <div className="tools-sub-header">
-                      {activeEngagement ? `ACTIVE: ${activeEngagement.name}` : 'Casual / Global Mode'}
-                    </div>
-                    {renderDropdownRow('eng-scope', 'Target Scope & Hub', undefined, () => setShowEngagementHubModal(true))}
-                    {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists', undefined, () => setShowCredStoreModal(true))}
-                    {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings', undefined, () => setShowEvidenceModal(true), false, false, 'JSON')}
-                    <div className="nav-dropdown-divider" />
-                    <div className="tools-sub-header">Engagement Archive (.daeng)</div>
-                    {renderDropdownRow('eng-export', 'Export .daeng Package', undefined, () => {
-                      setShowEngagementHubModal(true);
-                    }, false, false, 'FILE')}
-                    {renderDropdownRow('eng-import', 'Import .daeng Package', undefined, () => {
-                      setShowEngagementHubModal(true);
-                    }, false, false, 'FILE')}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Cyberpunk delimiter before Tool Section */}
-            <div className="nav-cyber-divider" aria-hidden="true">
-              <span className="cyber-glitch-slashes">//</span>
-            </div>
-
-            {/* 3. Tool Section: Terminals, Recon & Exploit, Networking & Pivoting, and Intel & Keys */}
-            {/* 3a. Terminals Dropdown */}
-            <div
-              className="nav-menu-container"
-              onMouseEnter={() => handleMenuEnter('terminals')}
-              onMouseMove={handleMenuMove}
-              onMouseLeave={handleMenuLeave}
-            >
-              <button
-                type="button"
-                className={`nav-menu-trigger ${activeDropdownMenu === 'terminals' ? 'active' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={activeDropdownMenu === 'terminals'}
-                onClick={() =>
-                  setActiveDropdownMenu((prev) => (prev === 'terminals' ? null : 'terminals'))
-                }
-              >
-                <CyberIcon name="terminal" size={11} />
-                <span>Terminals</span>
-                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
-              </button>
-              {activeDropdownMenu === 'terminals' && (
-                <div
-                  className="nav-dropdown-menu"
-                  role="menu"
-                  aria-label="Terminals Menu"
-                  onMouseEnter={() => handleMenuEnter('terminals')}
-                  onMouseMove={handleMenuMove}
-                >
-                  <div className="tools-sub-header">Local &amp; Directory Shells</div>
-                  {renderDropdownRow('powershell', 'Local Shell (PowerShell)', undefined, () => void handleOpenLocalTerminal('powershell'))}
-                  {renderDropdownRow('cmd', 'Local Shell (Command Prompt)', undefined, () => void handleOpenLocalTerminal('cmd'))}
-                  {renderDropdownRow('wsl', 'Local Shell (WSL Linux)', undefined, () => void handleOpenLocalTerminal('wsl'))}
-                  {renderDropdownRow('dir-default', 'New in Default Directory', undefined, () => void handleOpenTerminalDirectory('default'))}
-                  {renderDropdownRow('dir-cwd', 'New in Current Directory (CWD)', undefined, () => void handleOpenTerminalDirectory('current'))}
-                  {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', undefined, () => void handleOpenTerminalDirectory('root'))}
-
-                  <div className="nav-dropdown-divider" />
-                  <div className="tools-sub-header">Hardware &amp; Direct Links</div>
-                  {renderDropdownRow('serial', 'Hardware Bus & UART Logic', undefined, () => void handleOpenSerialModal())}
-                  {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat', undefined, () => setShowRawTcpModal(true))}
-                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting', undefined, () => openWinrmTab())}
-                </div>
-              )}
-            </div>
-
-            {/* 3b. Recon & Exploit Dropdown (Active Offensive Pentest Phases) */}
-            <div
-              className="nav-menu-container"
-              onMouseEnter={() => handleMenuEnter('offense')}
-              onMouseMove={handleMenuMove}
-              onMouseLeave={handleMenuLeave}
-            >
-              <button
-                type="button"
-                className={`nav-menu-trigger ${activeDropdownMenu === 'offense' ? 'active' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={activeDropdownMenu === 'offense'}
-                onClick={() =>
-                  setActiveDropdownMenu((prev) => (prev === 'offense' ? null : 'offense'))
-                }
-              >
-                <CyberIcon name="radar" size={11} />
-                <span>Recon &amp; Exploit</span>
-                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
-              </button>
-              {activeDropdownMenu === 'offense' && (
-                <div
-                  className="nav-dropdown-menu"
-                  role="menu"
-                  aria-label="Recon and Exploit Menu"
-                  onMouseEnter={() => handleMenuEnter('offense')}
-                  onMouseMove={handleMenuMove}
-                >
-                  <div className="tools-sub-header">Phase 1 // Recon &amp; Enumeration</div>
-                  {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest', undefined, () => setShowNmapImportModal(true), false, false, 'XML')}
-                  {renderDropdownRow('api-tester', 'API Tester & HTTP Repeater', undefined, () => openApiTesterTab())}
-
-                  <div className="nav-dropdown-divider" />
-                  <div className="tools-sub-header">Phase 2 // Delivery &amp; Catchers</div>
-                  {renderDropdownRow('listener-manager', 'Listener Manager', undefined, () => setShowListenerManagerModal(true))}
-                  {renderDropdownRow('payload-generator', 'Payload Generator // Shells', undefined, () => setShowPayloadGeneratorModal(true), false, false, 'JSON')}
-                  {renderDropdownRow('file-transfer', 'File Transfer Helper // Staging', undefined, () => setShowFileTransferModal(true), false, false, 'DIR')}
-
-                  <div className="nav-dropdown-divider" />
-                  <div className="tools-sub-header">Phase 3 // Execution &amp; Post-Exploit</div>
-                  {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting', undefined, () => openWinrmTab())}
-                  {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true), false, false, 'JSON')}
-                  {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits', undefined, () => {
-                    setChainsHostFilter(activeTab?.hostId || null);
-                    setShowChainsModal(true);
-                  }, false, false, 'JSON')}
-                </div>
-              )}
-            </div>
-
-            {/* 3c. Networking & Pivoting Dropdown */}
-            <div
-              className="nav-menu-container"
-              onMouseEnter={() => handleMenuEnter('networking')}
-              onMouseMove={handleMenuMove}
-              onMouseLeave={handleMenuLeave}
-            >
-              <button
-                type="button"
-                className={`nav-menu-trigger ${activeDropdownMenu === 'networking' ? 'active' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={activeDropdownMenu === 'networking'}
-                onClick={() =>
-                  setActiveDropdownMenu((prev) => (prev === 'networking' ? null : 'networking'))
-                }
-              >
-                <CyberIcon name="tunnel" size={11} />
-                <span>Networking &amp; Pivoting</span>
-                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
-              </button>
-              {activeDropdownMenu === 'networking' && (
-                <div
-                  className="nav-dropdown-menu"
-                  role="menu"
-                  aria-label="Networking and Pivoting Menu"
-                  onMouseEnter={() => handleMenuEnter('networking')}
-                  onMouseMove={handleMenuMove}
-                >
-                  <div className="tools-sub-header">Tunnels, Proxies &amp; Pivoting</div>
-                  {renderDropdownRow(
-                    'tunnels',
-                    'Port Forwarding',
-                    activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
-                    () => setShowPortForwardingModal(true),
-                    false,
-                    activeTunnels.length > 0
-                  )}
-                  {renderDropdownRow('proxy-profiles', 'Proxy Profiles', undefined, () => setShowProxyProfilesModal(true))}
-                  {renderDropdownRow('pivot-manager', 'Pivoting Engine', undefined, () => setShowPivotManagerModal(true))}
-                </div>
-              )}
-            </div>
-
-            {/* 3c. Intel & Keys Dropdown (Information, Logs, Documentation & Auth) */}
-            <div
-              className="nav-menu-container"
-              onMouseEnter={() => handleMenuEnter('intel')}
-              onMouseMove={handleMenuMove}
-              onMouseLeave={handleMenuLeave}
-            >
-              <button
-                type="button"
-                className={`nav-menu-trigger ${activeDropdownMenu === 'intel' ? 'active' : ''}`}
-                aria-haspopup="true"
-                aria-expanded={activeDropdownMenu === 'intel'}
-                onClick={() =>
-                  setActiveDropdownMenu((prev) => (prev === 'intel' ? null : 'intel'))
-                }
-              >
-                <CyberIcon name="shield" size={11} />
-                <span>Intel &amp; Keys</span>
-                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
-              </button>
-              {activeDropdownMenu === 'intel' && (
-                <div
-                  className="nav-dropdown-menu"
-                  role="menu"
-                  aria-label="Intel and Keys Menu"
-                  onMouseEnter={() => handleMenuEnter('intel')}
-                  onMouseMove={handleMenuMove}
-                >
-                  <div className="tools-sub-header">Navigation &amp; Quick Search</div>
-                  {renderDropdownRow('palette', 'Command Palette', 'Ctrl+K', () => {
-                    setPaletteQuery('');
-                    setShowCommandPalette(true);
-                  })}
-
-                  <div className="nav-dropdown-divider" />
-                  <div className="tools-sub-header">Documentation &amp; Audit Transcripts</div>
-                  {renderDropdownRow('notes', 'Host Notes & Docs', undefined, () => {
-                    setNotesModalHostId(activeTab?.hostId);
-                    setNotesModalInitialNoteId(null);
-                    setShowNotesModal(true);
-                  })}
-                  {renderDropdownRow('session-logs', 'Session Logs & Recordings', undefined, () => {
-                    void refreshSessionLogs();
-                    setShowSessionLogsModal(true);
-                  })}
-
-                  <div className="nav-dropdown-divider" />
-                  <div className="tools-sub-header">Authentication &amp; Cryptographic Keys</div>
-                  {renderDropdownRow('totp', 'TOTP Authenticator Generator', undefined, () => setShowTotpModal(true))}
-                  {renderDropdownRow('keychain', 'Keychain & SSH Keys', undefined, () => {
-                    setModalError('');
-                    setShowKeychainModal(true);
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Sync Warning / Conflict Pill */}
-            {syncInfo?.detectedConflict && (
-              <button
-                type="button"
-                className="nav-menu-trigger nav-sync-conflict-btn"
-                style={{
-                  color: '#ef4444',
-                  borderColor: 'rgba(239, 68, 68, 0.6)',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                }}
-                onClick={() => {
-                  setSettingsActiveTab('sync');
-                  setShowGlobalSettingsModal(true);
-                }}
-                title="Cloud sync conflict detected! Click to review and resolve."
-                aria-label="Cloud Sync Conflict"
-              >
-                <CyberIcon name="bolt" size={11} />
-                <span>SYNC CONFLICT ({syncInfo.conflictCount})</span>
-              </button>
-            )}
-
-            {/* Global Settings (floated to the far right) */}
+          {/* 1. View Dropdown (First Button) */}
+          <div
+            className="nav-menu-container"
+            onMouseEnter={() => handleMenuEnter('view')}
+            onMouseMove={handleMenuMove}
+            onMouseLeave={handleMenuLeave}
+          >
             <button
               type="button"
-              className="nav-menu-trigger nav-settings-right"
-              style={{ marginLeft: syncInfo?.detectedConflict ? '0.5rem' : 'auto' }}
+              className={`nav-menu-trigger ${activeDropdownMenu === 'view' ? 'active' : ''}`}
+              aria-haspopup="true"
+              aria-expanded={activeDropdownMenu === 'view'}
+              onClick={() =>
+                setActiveDropdownMenu((prev) => (prev === 'view' ? null : 'view'))
+              }
+            >
+              <span>View</span>
+              <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
+            </button>
+            {activeDropdownMenu === 'view' && (
+              <div
+                className="nav-dropdown-menu"
+                role="menu"
+                aria-label="View Menu"
+                onMouseEnter={() => handleMenuEnter('view')}
+                onMouseMove={handleMenuMove}
+              >
+                {renderDropdownRow('sidebar-toggle', sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar', 'Ctrl+B', () => setSidebarCollapsed((prev) => !prev))}
+                <div className="nav-dropdown-divider" />
+                {renderDropdownRow('new-tab', 'New Connection Tab', 'Ctrl+T', handleOpenNewConnectionTab)}
+                {renderDropdownRow('new-split', 'New Connection Split', undefined, () => handleOpenNewConnectionSplit('right'))}
+                {renderDropdownRow('view-map', 'Interactive Network Topology Map', undefined, openNetworkMapTab)}
+                {renderDropdownRow(
+                  'sftp',
+                  'SFTP File Browser',
+                  undefined,
+                  () => {
+                    if (sessionId && !sessionId.startsWith('local-') && !sessionId.startsWith('serial-')) {
+                      openSftpTab(sessionId, activeTab?.title || 'SFTP', activeTab?.hostId);
+                    }
+                  },
+                  !sessionId || sessionId.startsWith('local-') || sessionId.startsWith('serial-')
+                )}
+                {renderDropdownRow('route-health', 'Route Health Check Dashboard', undefined, openRouteHealthTab)}
+                {renderDropdownRow('split-h', 'Split Horizontal', undefined, () => void handleSplitPane('horizontal'))}
+                {renderDropdownRow('split-v', 'Split Vertical', undefined, () => void handleSplitPane('vertical'))}
+                {renderDropdownRow('find', 'Find in Terminal', 'Ctrl+F', () => {
+                  if (activePane) {
+                    togglePaneSearch(activePane.sessionId);
+                  }
+                }, !activePane)}
+                <div className="nav-dropdown-divider" />
+                {renderDropdownRow('group-tabs', 'Group Tabs by Host', groupTabsByHost ? 'Active' : undefined, () => setGroupTabsByHost((prev) => !prev), false, groupTabsByHost)}
+                <div className="nav-dropdown-divider" />
+                {renderDropdownRow('zoom-in', 'Zoom In Pane', 'Ctrl +', () => {
+                  if (activePane) {
+                    const next = changeTerminalFontSize(activePane.sessionId, +1);
+                    setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+                  }
+                }, !activePane)}
+                {renderDropdownRow('zoom-out', 'Zoom Out Pane', 'Ctrl -', () => {
+                  if (activePane) {
+                    const next = changeTerminalFontSize(activePane.sessionId, -1);
+                    setPaneFontSizes((prev) => new Map(prev.set(activePane.sessionId, next)));
+                  }
+                }, !activePane)}
+                {renderDropdownRow('zoom-reset', 'Reset Pane Zoom', 'Ctrl 0', () => {
+                  if (activePane) {
+                    resetTerminalFontSize(activePane.sessionId, globalSettings.fontSize);
+                    setPaneFontSizes((prev) =>
+                      new Map(prev.set(activePane.sessionId, globalSettings.fontSize))
+                    );
+                  }
+                }, !activePane)}
+              </div>
+            )}
+          </div>
+
+          {/* Cyberpunk delimiter next to View */}
+          <div className="nav-cyber-divider" aria-hidden="true">
+            <span className="cyber-glitch-slashes">//</span>
+          </div>
+
+          {/* 2. Engagement Section: Engagement Selector -> Engagement Dropdown */}
+          <div className="nav-engagement-controls-cluster">
+            {/* Engagement Selector Custom HUD Dropdown */}
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('engagement-selector')}
+              onMouseMove={handleMenuMove}
+              onMouseLeave={handleMenuLeave}
+            >
+              <button
+                type="button"
+                aria-label="Select Active Engagement"
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'engagement-selector'}
+                className={`nav-menu-trigger nav-engagement-selector-btn ${activeDropdownMenu === 'engagement-selector' ? 'active' : ''} ${activeEngagement ? 'has-active-engagement' : ''}`}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) =>
+                    prev === 'engagement-selector' ? null : 'engagement-selector'
+                  )
+                }
+                style={{
+                  borderColor: activeEngagement ? 'color-mix(in srgb, var(--accent-bright) 55%, transparent)' : undefined,
+                  color: activeEngagement ? 'var(--accent-bright)' : '#cbd5e1',
+                }}
+                title="Switch between Encapsulated Pentest Engagements or Casual Mode"
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', minWidth: 0, overflow: 'hidden' }}>
+                  <span
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      flexShrink: 0,
+                      backgroundColor: activeEngagement ? '#10b981' : '#64748b',
+                      boxShadow: activeEngagement ? '0 0 8px rgba(16, 185, 129, 0.8)' : 'none',
+                    }}
+                  />
+                  <span
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {activeEngagement ? activeEngagement.name : 'No Engagement (Casual)'}
+                  </span>
+                </span>
+                <CyberIcon name="chevron-down" size={11} />
+              </button>
+              {activeDropdownMenu === 'engagement-selector' && (
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="Select Active Engagement Menu"
+                  onMouseEnter={() => handleMenuEnter('engagement-selector')}
+                  onMouseMove={handleMenuMove}
+                  style={{ minWidth: '250px' }}
+                >
+                  <div className="nav-dropdown-section-title">Active Engagement Scope</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      void handleSelectEngagement('');
+                    }}
+                    style={{
+                      color: !activeEngagement ? 'var(--accent-bright)' : undefined,
+                      backgroundColor: !activeEngagement ? 'color-mix(in srgb, var(--accent-bright) 10%, transparent)' : undefined,
+                    }}
+                  >
+                    <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <CyberIcon name={!activeEngagement ? 'check' : 'shield'} size={12} />
+                      <span>No Engagement (Casual / Global)</span>
+                    </span>
+                    {!activeEngagement && <span className="nav-item-shortcut">ACTIVE</span>}
+                  </button>
+
+                  {engagementsList.length > 0 && (
+                    <>
+                      <div className="nav-dropdown-divider" />
+                      <div className="nav-dropdown-section-title">Saved Engagements ({engagementsList.length})</div>
+                      {engagementsList.map((eng) => {
+                        const isSelected = activeEngagement?.id === eng.id;
+                        return (
+                          <button
+                            key={eng.id}
+                            type="button"
+                            role="menuitem"
+                            className="nav-dropdown-item"
+                            onClick={() => {
+                              setActiveDropdownMenu(null);
+                              void handleSelectEngagement(eng.id);
+                            }}
+                            style={{
+                              color: isSelected ? 'var(--accent-bright)' : undefined,
+                              backgroundColor: isSelected ? 'color-mix(in srgb, var(--accent-bright) 12%, transparent)' : undefined,
+                            }}
+                          >
+                            <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <CyberIcon name={isSelected ? 'check' : 'target'} size={12} />
+                              <span>{eng.name}</span>
+                            </span>
+                            {isSelected && <span className="nav-item-shortcut">ACTIVE</span>}
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  <div className="nav-dropdown-divider" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setActiveDropdownMenu(null);
+                      setEditingEngagement(null);
+                      setShowNewEngagementModal(true);
+                    }}
+                  >
+                    <span className="nav-item-label" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--accent-bright)' }}>
+                      <CyberIcon name="plus" size={12} />
+                      <span>New Engagement...</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Engagement Dropdown */}
+            <div
+              className="nav-menu-container"
+              onMouseEnter={() => handleMenuEnter('engagement-tools')}
+              onMouseMove={handleMenuMove}
+              onMouseLeave={handleMenuLeave}
+            >
+              <button
+                type="button"
+                className={`nav-menu-trigger ${activeDropdownMenu === 'engagement-tools' ? 'active' : ''}`}
+                aria-haspopup="true"
+                aria-expanded={activeDropdownMenu === 'engagement-tools'}
+                onClick={() =>
+                  setActiveDropdownMenu((prev) => (prev === 'engagement-tools' ? null : 'engagement-tools'))
+                }
+              >
+                <CyberIcon name="target" size={12} />
+                <span>Engagement</span>
+                <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
+              </button>
+              {activeDropdownMenu === 'engagement-tools' && (
+                <div
+                  className="nav-dropdown-menu"
+                  role="menu"
+                  aria-label="Engagement Specific Tools Menu"
+                  onMouseEnter={() => handleMenuEnter('engagement-tools')}
+                  onMouseMove={handleMenuMove}
+                >
+                  <div className="tools-sub-header">
+                    {activeEngagement ? `ACTIVE: ${activeEngagement.name}` : 'Casual / Global Mode'}
+                  </div>
+                  {renderDropdownRow('eng-scope', 'Target Scope & Hub', undefined, () => setShowEngagementHubModal(true))}
+                  {renderDropdownRow('cred-store', 'Credential Pool & Spray Lists', undefined, () => setShowCredStoreModal(true))}
+                  {renderDropdownRow('evidence-vault', 'Evidence Vault & Findings', undefined, () => setShowEvidenceModal(true), false, false, 'JSON')}
+                  <div className="nav-dropdown-divider" />
+                  <div className="tools-sub-header">Engagement Archive (.daeng)</div>
+                  {renderDropdownRow('eng-export', 'Export .daeng Package', undefined, () => {
+                    setShowEngagementHubModal(true);
+                  }, false, false, 'FILE')}
+                  {renderDropdownRow('eng-import', 'Import .daeng Package', undefined, () => {
+                    setShowEngagementHubModal(true);
+                  }, false, false, 'FILE')}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cyberpunk delimiter before Tool Section */}
+          <div className="nav-cyber-divider" aria-hidden="true">
+            <span className="cyber-glitch-slashes">//</span>
+          </div>
+
+          {/* 3. Tool Section: Terminals, Recon & Exploit, Networking & Pivoting, and Intel & Keys */}
+          {/* 3a. Terminals Dropdown */}
+          <div
+            className="nav-menu-container"
+            onMouseEnter={() => handleMenuEnter('terminals')}
+            onMouseMove={handleMenuMove}
+            onMouseLeave={handleMenuLeave}
+          >
+            <button
+              type="button"
+              className={`nav-menu-trigger ${activeDropdownMenu === 'terminals' ? 'active' : ''}`}
+              aria-haspopup="true"
+              aria-expanded={activeDropdownMenu === 'terminals'}
+              onClick={() =>
+                setActiveDropdownMenu((prev) => (prev === 'terminals' ? null : 'terminals'))
+              }
+            >
+              <CyberIcon name="terminal" size={11} />
+              <span>Terminals</span>
+              <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
+            </button>
+            {activeDropdownMenu === 'terminals' && (
+              <div
+                className="nav-dropdown-menu"
+                role="menu"
+                aria-label="Terminals Menu"
+                onMouseEnter={() => handleMenuEnter('terminals')}
+                onMouseMove={handleMenuMove}
+              >
+                <div className="tools-sub-header">Local &amp; Directory Shells</div>
+                {renderDropdownRow('powershell', 'Local Shell (PowerShell)', undefined, () => void handleOpenLocalTerminal('powershell'))}
+                {renderDropdownRow('cmd', 'Local Shell (Command Prompt)', undefined, () => void handleOpenLocalTerminal('cmd'))}
+                {renderDropdownRow('wsl', 'Local Shell (WSL Linux)', undefined, () => void handleOpenLocalTerminal('wsl'))}
+                {renderDropdownRow('dir-default', 'New in Default Directory', undefined, () => void handleOpenTerminalDirectory('default'))}
+                {renderDropdownRow('dir-cwd', 'New in Current Directory (CWD)', undefined, () => void handleOpenTerminalDirectory('current'))}
+                {renderDropdownRow('dir-root', 'New Root Shell in Current Directory', undefined, () => void handleOpenTerminalDirectory('root'))}
+
+                <div className="nav-dropdown-divider" />
+                <div className="tools-sub-header">Hardware &amp; Direct Links</div>
+                {renderDropdownRow('serial', 'Hardware Bus & UART Logic', undefined, () => void handleOpenSerialModal())}
+                {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat', undefined, () => setShowRawTcpModal(true))}
+                {renderDropdownRow('hex-runner', 'Binary / Hex Runner (No-PTY)', undefined, () => openHexRunnerTab())}
+                {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting', undefined, () => openWinrmTab())}
+              </div>
+            )}
+          </div>
+
+          {/* 3b. Recon & Exploit Dropdown (Active Offensive Pentest Phases) */}
+          <div
+            className="nav-menu-container"
+            onMouseEnter={() => handleMenuEnter('offense')}
+            onMouseMove={handleMenuMove}
+            onMouseLeave={handleMenuLeave}
+          >
+            <button
+              type="button"
+              className={`nav-menu-trigger ${activeDropdownMenu === 'offense' ? 'active' : ''}`}
+              aria-haspopup="true"
+              aria-expanded={activeDropdownMenu === 'offense'}
+              onClick={() =>
+                setActiveDropdownMenu((prev) => (prev === 'offense' ? null : 'offense'))
+              }
+            >
+              <CyberIcon name="radar" size={11} />
+              <span>Recon &amp; Exploit</span>
+              <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
+            </button>
+            {activeDropdownMenu === 'offense' && (
+              <div
+                className="nav-dropdown-menu"
+                role="menu"
+                aria-label="Recon and Exploit Menu"
+                onMouseEnter={() => handleMenuEnter('offense')}
+                onMouseMove={handleMenuMove}
+              >
+                <div className="tools-sub-header">Phase 1 // Recon &amp; Enumeration</div>
+                {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest', undefined, () => setShowNmapImportModal(true), false, false, 'XML')}
+                {renderDropdownRow('api-tester', 'API Tester & HTTP Repeater', undefined, () => openApiTesterTab())}
+                {renderDropdownRow('hex-runner', 'Binary / Hex Runner (No-PTY)', undefined, () => openHexRunnerTab(), false, false, 'RAW')}
+
+                <div className="nav-dropdown-divider" />
+                <div className="tools-sub-header">Phase 2 // Delivery &amp; Catchers</div>
+                {renderDropdownRow('listener-manager', 'Listener Manager', undefined, () => setShowListenerManagerModal(true))}
+                {renderDropdownRow('payload-generator', 'Payload Generator // Shells', undefined, () => setShowPayloadGeneratorModal(true), false, false, 'JSON')}
+                {renderDropdownRow('file-transfer', 'File Transfer Helper // Staging', undefined, () => setShowFileTransferModal(true), false, false, 'DIR')}
+
+                <div className="nav-dropdown-divider" />
+                <div className="tools-sub-header">Phase 3 // Execution &amp; Post-Exploit</div>
+                {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting', undefined, () => openWinrmTab())}
+                {renderDropdownRow('snippets', 'Command Snippets & Variables', undefined, () => setShowSnippetsModal(true), false, false, 'JSON')}
+                {renderDropdownRow('snippet-chains', 'Snippet Chains & Exploits', undefined, () => {
+                  setChainsHostFilter(activeTab?.hostId || null);
+                  setShowChainsModal(true);
+                }, false, false, 'JSON')}
+              </div>
+            )}
+          </div>
+
+          {/* 3c. Networking & Pivoting Dropdown */}
+          <div
+            className="nav-menu-container"
+            onMouseEnter={() => handleMenuEnter('networking')}
+            onMouseMove={handleMenuMove}
+            onMouseLeave={handleMenuLeave}
+          >
+            <button
+              type="button"
+              className={`nav-menu-trigger ${activeDropdownMenu === 'networking' ? 'active' : ''}`}
+              aria-haspopup="true"
+              aria-expanded={activeDropdownMenu === 'networking'}
+              onClick={() =>
+                setActiveDropdownMenu((prev) => (prev === 'networking' ? null : 'networking'))
+              }
+            >
+              <CyberIcon name="tunnel" size={11} />
+              <span>Networking &amp; Pivoting</span>
+              <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
+            </button>
+            {activeDropdownMenu === 'networking' && (
+              <div
+                className="nav-dropdown-menu"
+                role="menu"
+                aria-label="Networking and Pivoting Menu"
+                onMouseEnter={() => handleMenuEnter('networking')}
+                onMouseMove={handleMenuMove}
+              >
+                <div className="tools-sub-header">Tunnels, Proxies &amp; Pivoting</div>
+                {renderDropdownRow(
+                  'tunnels',
+                  'Port Forwarding',
+                  activeTunnels.length > 0 ? `${activeTunnels.length} active` : undefined,
+                  () => setShowPortForwardingModal(true),
+                  false,
+                  activeTunnels.length > 0
+                )}
+                {renderDropdownRow('proxy-profiles', 'Proxy Profiles', undefined, () => setShowProxyProfilesModal(true))}
+                {renderDropdownRow('pivot-manager', 'Pivoting Engine', undefined, () => setShowPivotManagerModal(true))}
+              </div>
+            )}
+          </div>
+
+          {/* 3c. Intel & Keys Dropdown (Information, Logs, Documentation & Auth) */}
+          <div
+            className="nav-menu-container"
+            onMouseEnter={() => handleMenuEnter('intel')}
+            onMouseMove={handleMenuMove}
+            onMouseLeave={handleMenuLeave}
+          >
+            <button
+              type="button"
+              className={`nav-menu-trigger ${activeDropdownMenu === 'intel' ? 'active' : ''}`}
+              aria-haspopup="true"
+              aria-expanded={activeDropdownMenu === 'intel'}
+              onClick={() =>
+                setActiveDropdownMenu((prev) => (prev === 'intel' ? null : 'intel'))
+              }
+            >
+              <CyberIcon name="shield" size={11} />
+              <span>Intel &amp; Keys</span>
+              <span style={{ fontSize: '0.65rem' }}><CyberIcon name="chevron-down" size={14} /></span>
+            </button>
+            {activeDropdownMenu === 'intel' && (
+              <div
+                className="nav-dropdown-menu"
+                role="menu"
+                aria-label="Intel and Keys Menu"
+                onMouseEnter={() => handleMenuEnter('intel')}
+                onMouseMove={handleMenuMove}
+              >
+                <div className="tools-sub-header">Navigation &amp; Quick Search</div>
+                {renderDropdownRow('palette', 'Command Palette', 'Ctrl+K', () => {
+                  setPaletteQuery('');
+                  setShowCommandPalette(true);
+                })}
+
+                <div className="nav-dropdown-divider" />
+                <div className="tools-sub-header">Documentation &amp; Audit Transcripts</div>
+                {renderDropdownRow('notes', 'Host Notes & Docs', undefined, () => {
+                  setNotesModalHostId(activeTab?.hostId);
+                  setNotesModalInitialNoteId(null);
+                  setShowNotesModal(true);
+                })}
+                {renderDropdownRow('session-logs', 'Session Logs & Recordings', undefined, () => {
+                  void refreshSessionLogs();
+                  setShowSessionLogsModal(true);
+                })}
+
+                <div className="nav-dropdown-divider" />
+                <div className="tools-sub-header">Authentication &amp; Cryptographic Keys</div>
+                {renderDropdownRow('totp', 'TOTP Authenticator Generator', undefined, () => setShowTotpModal(true))}
+                {renderDropdownRow('keychain', 'Keychain & SSH Keys', undefined, () => {
+                  setModalError('');
+                  setShowKeychainModal(true);
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Sync Warning / Conflict Pill */}
+          {syncInfo?.detectedConflict && (
+            <button
+              type="button"
+              className="nav-menu-trigger nav-sync-conflict-btn"
+              style={{
+                color: '#ef4444',
+                borderColor: 'rgba(239, 68, 68, 0.6)',
+                background: 'rgba(239, 68, 68, 0.12)',
+              }}
               onClick={() => {
-                setSettingsActiveTab('appearance');
+                setSettingsActiveTab('sync');
                 setShowGlobalSettingsModal(true);
               }}
-              title="Global Settings (Ctrl+,)"
-              aria-label="Settings"
+              title="Cloud sync conflict detected! Click to review and resolve."
+              aria-label="Cloud Sync Conflict"
             >
-              <CyberIcon name="gear" size={12} />
-              <span>Settings</span>
+              <CyberIcon name="bolt" size={11} />
+              <span>SYNC CONFLICT ({syncInfo.conflictCount})</span>
             </button>
-          </nav>
+          )}
+
+          {/* Global Settings (floated to the far right) */}
+          <button
+            type="button"
+            className="nav-menu-trigger nav-settings-right"
+            style={{ marginLeft: syncInfo?.detectedConflict ? '0.5rem' : 'auto' }}
+            onClick={() => {
+              setSettingsActiveTab('appearance');
+              setShowGlobalSettingsModal(true);
+            }}
+            title="Global Settings (Ctrl+,)"
+            aria-label="Settings"
+          >
+            <CyberIcon name="gear" size={12} />
+            <span>Settings</span>
+          </button>
+        </nav>
       </header>
 
       <div className="workspace-body">
@@ -9277,9 +9314,8 @@ export function App({
         </div>
 
         <aside
-          className={`hosts-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${
-            sidebarWidth < 280 ? 'narrow' : ''
-          } ${sidebarWidth < 220 ? 'compact' : ''}`}
+          className={`hosts-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${sidebarWidth < 280 ? 'narrow' : ''
+            } ${sidebarWidth < 220 ? 'compact' : ''}`}
           style={{
             width: sidebarCollapsed ? 0 : `${sidebarWidth}px`,
             display: sidebarCollapsed ? 'none' : 'flex',
@@ -9301,255 +9337,255 @@ export function App({
                           className="btn-primary btn-sm"
                           onClick={() => {
                             setEditingHostId(null);
-                        setHostLabel('');
-                        setHostAddr('');
-                        setHostPort('22');
-                        setHostGroupId('');
-                        setHostUser('');
-                        setHostPass('');
-                        setHostTags('');
-                        setHostColor('');
-                        setHostInitialDir('');
-                        setShowAddHostModal(true);
-                      }}
-                    >
-                      + Host
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {vaultLocked ? (
-                <div className="sidebar-locked-notice">
-                  <p>Vault is locked. Unlock to view encrypted hosts, labels, and credentials.</p>
-                </div>
-              ) : (
-                <>
-                  <input
-                    className="sidebar-search"
-                    aria-label="Filter Hosts"
-                    placeholder="Search hosts, IP, labels/tags..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-
-                  {/* Engagement Scope Filter Toggle */}
-                  {activeEngagement ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.6rem 0.35rem 0.6rem', fontSize: '0.72rem' }}>
-                      <span style={{ color: 'var(--accent-bright)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={activeEngagement.name}>
-                        <CyberIcon name="target" size={14} /> {activeEngagement.name}
-                      </span>
-                      <button
-                        type="button"
-                        className="cyber-btn cyber-btn-secondary cyber-btn-sm"
-                        style={{ fontSize: '0.66rem', padding: '1px 6px' }}
-                        onClick={() => setFilterByEngagementScope((prev) => !prev)}
-                        title={filterByEngagementScope ? 'Showing only in-scope hosts for this engagement' : 'Showing all hosts in vault'}
-                      >
-                        {filterByEngagementScope ? <><CyberIcon name="target" size={14} /> In-Scope Only</> : <><CyberIcon name="globe" size={14} /> All Vault Hosts</>}
-                      </button>
-                    </div>
-                  ) : (
-                    engagementsList.length > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.6rem 0.35rem 0.6rem', fontSize: '0.72rem' }}>
-                        <span style={{ color: '#94a3b8' }}><CyberIcon name="globe" size={14} /> Casual Mode (Global Hosts)</span>
-                        <button
-                          type="button"
-                          className="cyber-btn cyber-btn-secondary cyber-btn-sm"
-                          style={{ fontSize: '0.66rem', padding: '1px 6px' }}
-                          onClick={() => setFilterByEngagementScope((prev) => !prev)}
+                            setHostLabel('');
+                            setHostAddr('');
+                            setHostPort('22');
+                            setHostGroupId('');
+                            setHostUser('');
+                            setHostPass('');
+                            setHostTags('');
+                            setHostColor('');
+                            setHostInitialDir('');
+                            setShowAddHostModal(true);
+                          }}
                         >
-                          {filterByEngagementScope ? 'Casual Only' : 'All Hosts'}
+                          + Host
                         </button>
                       </div>
-                    )
-                  )}
-
-                  {/* Multi-Label Filter Bar */}
-                  {allHostTags.length > 0 && (
-                    <div className="sidebar-tags-filter-bar" role="toolbar" aria-label="Filter Hosts by Label">
-                      <button
-                        type="button"
-                        className={`sidebar-tag-pill ${selectedHostTag === 'all' ? 'active' : ''}`}
-                        onClick={() => setSelectedHostTag('all')}
-                      >
-                        All ({vaultSummary.hosts.length})
-                      </button>
-                      {allHostTags.map((tag) => {
-                        const count = vaultSummary.hosts.filter(
-                          (h) => h.tags && h.tags.some((t) => t.toLowerCase() === tag.toLowerCase())
-                        ).length;
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            className={`sidebar-tag-pill ${selectedHostTag.toLowerCase() === tag.toLowerCase() ? 'active' : ''}`}
-                            onClick={() => setSelectedHostTag((prev) => (prev.toLowerCase() === tag.toLowerCase() ? 'all' : tag))}
-                            title={`Filter by label #${tag} (${count} hosts)`}
-                          >
-                            #{tag} ({count})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <div className="sidebar-list">
-                    {filteredHosts.length === 0 ? (
-                      <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                        {selectedHostTag !== 'all' ? (
-                          <>
-                            No hosts found with label <strong>#{selectedHostTag}</strong>.
-                            <br />
-                            <button
-                              type="button"
-                              className="btn-link"
-                              style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--accent-bright)', cursor: 'pointer', background: 'none', border: 'none' }}
-                              onClick={() => setSelectedHostTag('all')}
-                            >
-                              Show all hosts
-                            </button>
-                          </>
-                        ) : searchQuery.trim() ? (
-                          `No hosts match "${searchQuery}".`
-                        ) : (
-                          'No saved hosts in Vault. Click + Host to create one.'
-                        )}
-                      </div>
-                    ) : (
-                      filteredHosts.map((h) => (
-                        <div
-                          key={h.id}
-                          className="host-card rack-blade-card"
-                          draggable
-                          onDoubleClick={() => void handleConnectSavedHost(h)}
-                          onDragStart={() =>
-                            startWorkspaceDrag({
-                              type: 'host',
-                              hostId: h.id,
-                              label: h.label,
-                            })
-                          }
-                          onDragEnd={() => startWorkspaceDrag(null)}
-                          title={`Double-click to connect · Drag ${h.label} onto any terminal pane to split`}
-                        >
-                          <div className="host-info">
-                            <div className="host-title-row">
-                              <span
-                                className="host-color-dot"
-                                style={{
-                                  backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
-                                }}
-                                title={`Host Color: ${getEffectiveHostColor(h.id, h.color, h.label)}`}
-                              />
-                              <strong>{h.label}</strong>
-                              {h.engagementId && (
-                                <span
-                                  style={{
-                                    background: 'color-mix(in srgb, var(--accent-bright) 12%, transparent)',
-                                    border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
-                                    color: 'var(--accent-bright)',
-                                    fontSize: '0.62rem',
-                                    fontWeight: 700,
-                                    padding: '1px 5px',
-                                    borderRadius: '2px',
-                                    marginLeft: 'auto',
-                                  }}
-                                  title={`Bound to engagement: ${engagementsList.find((e) => e.id === h.engagementId)?.name || h.engagementId}`}
-                                >
-                                  <CyberIcon name="target" size={14} /> {engagementsList.find((e) => e.id === h.engagementId)?.name || 'ENGAGED'}
-                                </span>
-                              )}
-                            </div>
-                            <span className="host-address-line">
-                              {h.effectiveUser}@{h.address}:{h.effectivePort}
-                            </span>
-                            {h.initialDir && (
-                              <span className="host-dir-line" title={`Default Directory: ${h.initialDir}`}>
-                                <CyberIcon name="folder" size={10} /> {h.initialDir}
-                              </span>
-                            )}
-                            {h.tags && h.tags.length > 0 && (
-                              <div className="host-tags-list">
-                                {h.tags.map((tag) => (
-                                  <span
-                                    key={tag}
-                                    className="host-tag-badge"
-                                    title={`Filter by label #${tag}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedHostTag(tag);
-                                    }}
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <div className="host-card-actions rack-blade-actions">
-                            <button
-                              type="button"
-                              className="rack-action-btn rack-connect-btn"
-                              title={`Connect to ${h.label}`}
-                              onClick={() => void handleConnectSavedHost(h)}
-                            >
-                              <CyberIcon name="play" size={10} />
-                              <span className="rack-connect-label">Connect</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="rack-action-btn"
-                              title={`Open ${h.label} side-by-side in current workspace view`}
-                              aria-label={`Split Connect ${h.label}`}
-                              onClick={() => void handleConnectHostIntoSplit(h, 'right')}
-                            >
-                              <CyberIcon name="split-h" size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              className="rack-action-btn"
-                              title={`Open SFTP file browser for ${h.label}`}
-                              aria-label={`SFTP for ${h.label}`}
-                              onClick={() => void handleOpenHostSftp(h)}
-                            >
-                              <CyberIcon name="folder" size={12} />
-                              <span className="sr-only">SFTP</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="rack-action-btn"
-                              title={`Open Notes & Docs for ${h.label}`}
-                              aria-label={`Notes for ${h.label}`}
-                              onClick={() => openNotesTab(h.id)}
-                            >
-                              <CyberIcon name="note" size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              className="rack-action-btn"
-                              title={`Edit ${h.label} configuration & labels`}
-                              aria-label={`Edit ${h.label}`}
-                              onClick={() => handleOpenEditHost(h)}
-                            >
-                              <CyberIcon name="edit" size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              className="rack-action-btn rack-delete-btn"
-                              onClick={() => void handleDeleteHost(h.id)}
-                              aria-label={`Delete ${h.label}`}
-                              title={`Delete ${h.label}`}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                      ))
                     )}
                   </div>
-                </>
-              )}
+
+                  {vaultLocked ? (
+                    <div className="sidebar-locked-notice">
+                      <p>Vault is locked. Unlock to view encrypted hosts, labels, and credentials.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        className="sidebar-search"
+                        aria-label="Filter Hosts"
+                        placeholder="Search hosts, IP, labels/tags..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+
+                      {/* Engagement Scope Filter Toggle */}
+                      {activeEngagement ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.6rem 0.35rem 0.6rem', fontSize: '0.72rem' }}>
+                          <span style={{ color: 'var(--accent-bright)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={activeEngagement.name}>
+                            <CyberIcon name="target" size={14} /> {activeEngagement.name}
+                          </span>
+                          <button
+                            type="button"
+                            className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                            style={{ fontSize: '0.66rem', padding: '1px 6px' }}
+                            onClick={() => setFilterByEngagementScope((prev) => !prev)}
+                            title={filterByEngagementScope ? 'Showing only in-scope hosts for this engagement' : 'Showing all hosts in vault'}
+                          >
+                            {filterByEngagementScope ? <><CyberIcon name="target" size={14} /> In-Scope Only</> : <><CyberIcon name="globe" size={14} /> All Vault Hosts</>}
+                          </button>
+                        </div>
+                      ) : (
+                        engagementsList.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0.6rem 0.35rem 0.6rem', fontSize: '0.72rem' }}>
+                            <span style={{ color: '#94a3b8' }}><CyberIcon name="globe" size={14} /> Casual Mode (Global Hosts)</span>
+                            <button
+                              type="button"
+                              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
+                              style={{ fontSize: '0.66rem', padding: '1px 6px' }}
+                              onClick={() => setFilterByEngagementScope((prev) => !prev)}
+                            >
+                              {filterByEngagementScope ? 'Casual Only' : 'All Hosts'}
+                            </button>
+                          </div>
+                        )
+                      )}
+
+                      {/* Multi-Label Filter Bar */}
+                      {allHostTags.length > 0 && (
+                        <div className="sidebar-tags-filter-bar" role="toolbar" aria-label="Filter Hosts by Label">
+                          <button
+                            type="button"
+                            className={`sidebar-tag-pill ${selectedHostTag === 'all' ? 'active' : ''}`}
+                            onClick={() => setSelectedHostTag('all')}
+                          >
+                            All ({vaultSummary.hosts.length})
+                          </button>
+                          {allHostTags.map((tag) => {
+                            const count = vaultSummary.hosts.filter(
+                              (h) => h.tags && h.tags.some((t) => t.toLowerCase() === tag.toLowerCase())
+                            ).length;
+                            return (
+                              <button
+                                key={tag}
+                                type="button"
+                                className={`sidebar-tag-pill ${selectedHostTag.toLowerCase() === tag.toLowerCase() ? 'active' : ''}`}
+                                onClick={() => setSelectedHostTag((prev) => (prev.toLowerCase() === tag.toLowerCase() ? 'all' : tag))}
+                                title={`Filter by label #${tag} (${count} hosts)`}
+                              >
+                                #{tag} ({count})
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div className="sidebar-list">
+                        {filteredHosts.length === 0 ? (
+                          <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                            {selectedHostTag !== 'all' ? (
+                              <>
+                                No hosts found with label <strong>#{selectedHostTag}</strong>.
+                                <br />
+                                <button
+                                  type="button"
+                                  className="btn-link"
+                                  style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--accent-bright)', cursor: 'pointer', background: 'none', border: 'none' }}
+                                  onClick={() => setSelectedHostTag('all')}
+                                >
+                                  Show all hosts
+                                </button>
+                              </>
+                            ) : searchQuery.trim() ? (
+                              `No hosts match "${searchQuery}".`
+                            ) : (
+                              'No saved hosts in Vault. Click + Host to create one.'
+                            )}
+                          </div>
+                        ) : (
+                          filteredHosts.map((h) => (
+                            <div
+                              key={h.id}
+                              className="host-card rack-blade-card"
+                              draggable
+                              onDoubleClick={() => void handleConnectSavedHost(h)}
+                              onDragStart={() =>
+                                startWorkspaceDrag({
+                                  type: 'host',
+                                  hostId: h.id,
+                                  label: h.label,
+                                })
+                              }
+                              onDragEnd={() => startWorkspaceDrag(null)}
+                              title={`Double-click to connect · Drag ${h.label} onto any terminal pane to split`}
+                            >
+                              <div className="host-info">
+                                <div className="host-title-row">
+                                  <span
+                                    className="host-color-dot"
+                                    style={{
+                                      backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
+                                    }}
+                                    title={`Host Color: ${getEffectiveHostColor(h.id, h.color, h.label)}`}
+                                  />
+                                  <strong>{h.label}</strong>
+                                  {h.engagementId && (
+                                    <span
+                                      style={{
+                                        background: 'color-mix(in srgb, var(--accent-bright) 12%, transparent)',
+                                        border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
+                                        color: 'var(--accent-bright)',
+                                        fontSize: '0.62rem',
+                                        fontWeight: 700,
+                                        padding: '1px 5px',
+                                        borderRadius: '2px',
+                                        marginLeft: 'auto',
+                                      }}
+                                      title={`Bound to engagement: ${engagementsList.find((e) => e.id === h.engagementId)?.name || h.engagementId}`}
+                                    >
+                                      <CyberIcon name="target" size={14} /> {engagementsList.find((e) => e.id === h.engagementId)?.name || 'ENGAGED'}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="host-address-line">
+                                  {h.effectiveUser}@{h.address}:{h.effectivePort}
+                                </span>
+                                {h.initialDir && (
+                                  <span className="host-dir-line" title={`Default Directory: ${h.initialDir}`}>
+                                    <CyberIcon name="folder" size={10} /> {h.initialDir}
+                                  </span>
+                                )}
+                                {h.tags && h.tags.length > 0 && (
+                                  <div className="host-tags-list">
+                                    {h.tags.map((tag) => (
+                                      <span
+                                        key={tag}
+                                        className="host-tag-badge"
+                                        title={`Filter by label #${tag}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedHostTag(tag);
+                                        }}
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="host-card-actions rack-blade-actions">
+                                <button
+                                  type="button"
+                                  className="rack-action-btn rack-connect-btn"
+                                  title={`Connect to ${h.label}`}
+                                  onClick={() => void handleConnectSavedHost(h)}
+                                >
+                                  <CyberIcon name="play" size={10} />
+                                  <span className="rack-connect-label">Connect</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn"
+                                  title={`Open ${h.label} side-by-side in current workspace view`}
+                                  aria-label={`Split Connect ${h.label}`}
+                                  onClick={() => void handleConnectHostIntoSplit(h, 'right')}
+                                >
+                                  <CyberIcon name="split-h" size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn"
+                                  title={`Open SFTP file browser for ${h.label}`}
+                                  aria-label={`SFTP for ${h.label}`}
+                                  onClick={() => void handleOpenHostSftp(h)}
+                                >
+                                  <CyberIcon name="folder" size={12} />
+                                  <span className="sr-only">SFTP</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn"
+                                  title={`Open Notes & Docs for ${h.label}`}
+                                  aria-label={`Notes for ${h.label}`}
+                                  onClick={() => openNotesTab(h.id)}
+                                >
+                                  <CyberIcon name="note" size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn"
+                                  title={`Edit ${h.label} configuration & labels`}
+                                  aria-label={`Edit ${h.label}`}
+                                  onClick={() => handleOpenEditHost(h)}
+                                >
+                                  <CyberIcon name="edit" size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rack-action-btn rack-delete-btn"
+                                  onClick={() => void handleDeleteHost(h.id)}
+                                  aria-label={`Delete ${h.label}`}
+                                  title={`Delete ${h.label}`}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -10245,10 +10281,10 @@ export function App({
                         {sidebarPivotBusy
                           ? 'Starting...'
                           : sidebarPivotTool === 'ssh-forward'
-                          ? 'Start 2-Step SSH Tunnel'
-                          : sidebarPivotTool === 'sshuttle'
-                          ? 'Launch sshuttle'
-                          : `Launch ${sidebarPivotTool}`}
+                            ? 'Start 2-Step SSH Tunnel'
+                            : sidebarPivotTool === 'sshuttle'
+                              ? 'Launch sshuttle'
+                              : `Launch ${sidebarPivotTool}`}
                       </span>
                     </button>
 
@@ -10462,13 +10498,13 @@ export function App({
                         onClick={() => {
                           const api = getWailsBindings();
                           if (api?.ListFileTransferServers) {
-                            void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => {});
+                            void api.ListFileTransferServers().then((s) => setDashboardFileServers(s || [])).catch(() => { });
                           }
                           if (sidebarTransferDir.trim() && api?.ListHostedTransferFiles) {
                             setSidebarTransferLoadingFiles(true);
                             void api.ListHostedTransferFiles(sidebarTransferDir.trim())
                               .then((files) => setSidebarTransferFiles(files || []))
-                              .catch(() => {})
+                              .catch(() => { })
                               .finally(() => setSidebarTransferLoadingFiles(false));
                           }
                         }}
@@ -10775,7 +10811,7 @@ export function App({
                             setSidebarTransferLoadingFiles(true);
                             void api.ListHostedTransferFiles(parent)
                               .then((files) => setSidebarTransferFiles(files || []))
-                              .catch(() => {})
+                              .catch(() => { })
                               .finally(() => setSidebarTransferLoadingFiles(false));
                           }
                         }}
@@ -10807,7 +10843,7 @@ export function App({
                                     setSidebarTransferLoadingFiles(true);
                                     void api.ListHostedTransferFiles(nextDir)
                                       .then((files) => setSidebarTransferFiles(files || []))
-                                      .catch(() => {})
+                                      .catch(() => { })
                                       .finally(() => setSidebarTransferLoadingFiles(false));
                                   }
                                 } else {
@@ -10821,7 +10857,7 @@ export function App({
                                         md5: hashed.md5 || '',
                                         size: hashed.size,
                                       });
-                                    }).catch(() => {});
+                                    }).catch(() => { });
                                   }
                                 }
                               }}
@@ -11411,29 +11447,29 @@ export function App({
           )}
         </aside>
 
-    {!sidebarCollapsed && (
-      <div
-        className={`sidebar-resizer ${isResizingSidebar ? 'resizing' : ''}`}
-        onMouseDown={handleSidebarResizeStart}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize sidebar"
-        title="Drag to resize sidebar"
-      >
-        <button
-          type="button"
-          className="sidebar-resizer-collapse-btn"
-          title="Collapse Sidebar (Ctrl+B)"
-          aria-label="Collapse Sidebar"
-          onClick={(e) => {
-            e.stopPropagation();
-            setSidebarCollapsed(true);
-          }}
-        >
-          <CyberIcon name="chevron-left" size={12} />
-        </button>
-      </div>
-    )}
+        {!sidebarCollapsed && (
+          <div
+            className={`sidebar-resizer ${isResizingSidebar ? 'resizing' : ''}`}
+            onMouseDown={handleSidebarResizeStart}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            title="Drag to resize sidebar"
+          >
+            <button
+              type="button"
+              className="sidebar-resizer-collapse-btn"
+              title="Collapse Sidebar (Ctrl+B)"
+              aria-label="Collapse Sidebar"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSidebarCollapsed(true);
+              }}
+            >
+              <CyberIcon name="chevron-left" size={12} />
+            </button>
+          </div>
+        )}
 
         {tabs.length > 0 && activeTab && activePane ? (
           <section className="terminal-workspace" aria-label="Active Terminal Session">
@@ -11457,204 +11493,204 @@ export function App({
             >
               {groupTabsByHost
                 ? (() => {
-                    const groupsMap = new Map<
-                      string,
-                      { key: string; label: string; color: string; tabs: TabItem[] }
-                    >();
-                    for (const t of tabs) {
-                      const key = t.hostId || t.title;
-                      const existing = groupsMap.get(key);
-                      if (existing) {
-                        existing.tabs.push(t);
-                      } else {
-                        groupsMap.set(key, {
-                          key,
-                          label: t.title.replace(/\s*\(.*\)$/, ''),
-                          color: t.color || getEffectiveHostColor(t.hostId, undefined, t.title),
-                          tabs: [t],
-                        });
-                      }
+                  const groupsMap = new Map<
+                    string,
+                    { key: string; label: string; color: string; tabs: TabItem[] }
+                  >();
+                  for (const t of tabs) {
+                    const key = t.hostId || t.title;
+                    const existing = groupsMap.get(key);
+                    if (existing) {
+                      existing.tabs.push(t);
+                    } else {
+                      groupsMap.set(key, {
+                        key,
+                        label: t.title.replace(/\s*\(.*\)$/, ''),
+                        color: t.color || getEffectiveHostColor(t.hostId, undefined, t.title),
+                        tabs: [t],
+                      });
                     }
+                  }
 
-                    return Array.from(groupsMap.values()).map((grp) => {
-                      const isCollapsed = collapsedHostGroups.has(grp.key);
-                      const hasActive = grp.tabs.some((t) => t.id === activeTab.id);
-                      return (
-                        <div
-                          key={grp.key}
-                          className="tab-group-container"
-                          aria-label={`Host Group ${grp.label}`}
-                        >
-                          <button
-                            type="button"
-                            className="tab-group-header"
-                            onClick={() => toggleHostGroupCollapse(grp.key)}
-                            title={`Toggle collapse for host group ${grp.label}`}
-                            aria-label={`Toggle Group ${grp.label}`}
-                          >
-                            <span
-                              className="host-color-dot"
-                              style={{ backgroundColor: grp.color }}
-                            />
-                            <span>{grp.label}</span>
-                            <span className="tab-group-badge">{grp.tabs.length}</span>
-                            <span className={`tab-group-chevron ${isCollapsed ? 'collapsed' : ''}`}>
-                              <CyberIcon name="chevron-down" size={14} />
-                            </span>
-                          </button>
-
-                          {(!isCollapsed || hasActive) && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              {(isCollapsed
-                                ? grp.tabs.filter((t) => t.id === activeTab.id)
-                                : grp.tabs
-                              ).map((tab) => {
-                                const isActive = tab.id === activeTab.id;
-                                const tabPanes = collectPanes(tab.rootNode);
-                                const tabColor =
-                                  tab.color ||
-                                  getEffectiveHostColor(tab.hostId, undefined, tab.title);
-                                return (
-                                  <div
-                                    key={tab.id}
-                                    role="tab"
-                                    aria-selected={isActive}
-                                    aria-label={`Tab ${tab.title}`}
-                                    draggable
-                                    className={`tab-pill ${isActive ? 'active' : ''}`}
-                                    style={{ borderTop: `3px solid ${tabColor}` }}
-                                    onDragStart={() => {
-                                      setDraggedTabId(tab.id);
-                                      startWorkspaceDrag({
-                                        type: 'tab',
-                                        tabId: tab.id,
-                                        title: tab.title,
-                                      });
-                                    }}
-                                    onDragEnd={() => {
-                                      setDraggedTabId(null);
-                                      startWorkspaceDrag(null);
-                                    }}
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={(e) => {
-                                      e.stopPropagation();
-                                      if (draggedTabId && draggedTabId !== tab.id) {
-                                        setTabs((prev) =>
-                                          reorderTabsLocal(prev, draggedTabId, tab.id)
-                                        );
-                                      }
-                                      setDraggedTabId(null);
-                                      startWorkspaceDrag(null);
-                                    }}
-                                    onClick={() => {
-                                      setActiveTabId(tab.id);
-                                      const pane =
-                                        tabPanes.find((p) => p.id === tab.activePaneId) ||
-                                        tabPanes[0];
-                                      if (pane) {
-                                        setTimeout(
-                                          () => focusersRef.current.get(pane.sessionId)?.(),
-                                          50
-                                        );
-                                      }
-                                    }}
-                                  >
-                                    <span
-                                      className="tab-dot"
-                                      style={{
-                                        backgroundColor: tabColor,
-                                        boxShadow: `0 0 6px ${tabColor}`,
-                                      }}
-                                    />
-                                    <span>{tab.title}</span>
-                                    {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
-                                    <button
-                                      type="button"
-                                      className="tab-close-btn"
-                                      aria-label={`Close Tab ${tab.title}`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        void handleCloseTab(tab.id);
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    });
-                  })()
-                : tabs.map((tab) => {
-                    const isActive = tab.id === activeTab.id;
-                    const tabPanes = collectPanes(tab.rootNode);
-                    const tabColor =
-                      tab.color || getEffectiveHostColor(tab.hostId, undefined, tab.title);
+                  return Array.from(groupsMap.values()).map((grp) => {
+                    const isCollapsed = collapsedHostGroups.has(grp.key);
+                    const hasActive = grp.tabs.some((t) => t.id === activeTab.id);
                     return (
                       <div
-                        key={tab.id}
-                        role="tab"
-                        aria-selected={isActive}
-                        aria-label={`Tab ${tab.title}`}
-                        draggable
-                        className={`tab-pill ${isActive ? 'active' : ''}`}
-                        style={{ borderTop: `3px solid ${tabColor}` }}
-                        onDragStart={() => {
-                          setDraggedTabId(tab.id);
-                          startWorkspaceDrag({
-                            type: 'tab',
-                            tabId: tab.id,
-                            title: tab.title,
-                          });
-                        }}
-                        onDragEnd={() => {
-                          setDraggedTabId(null);
-                          startWorkspaceDrag(null);
-                        }}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          e.stopPropagation();
-                          if (draggedTabId && draggedTabId !== tab.id) {
-                            setTabs((prev) => reorderTabsLocal(prev, draggedTabId, tab.id));
-                          }
-                          setDraggedTabId(null);
-                          startWorkspaceDrag(null);
-                        }}
-                        onClick={() => {
-                          setActiveTabId(tab.id);
-                          const pane =
-                            tabPanes.find((p) => p.id === tab.activePaneId) || tabPanes[0];
-                          if (pane) {
-                            setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 50);
-                          }
-                        }}
+                        key={grp.key}
+                        className="tab-group-container"
+                        aria-label={`Host Group ${grp.label}`}
                       >
-                        <span
-                          className="tab-dot"
-                          style={{
-                            backgroundColor: tabColor,
-                            boxShadow: `0 0 6px ${tabColor}`,
-                          }}
-                        />
-                        <span>{tab.title}</span>
-                        {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
                         <button
                           type="button"
-                          className="tab-close-btn"
-                          aria-label={`Close Tab ${tab.title}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleCloseTab(tab.id);
-                          }}
+                          className="tab-group-header"
+                          onClick={() => toggleHostGroupCollapse(grp.key)}
+                          title={`Toggle collapse for host group ${grp.label}`}
+                          aria-label={`Toggle Group ${grp.label}`}
                         >
-                          ×
+                          <span
+                            className="host-color-dot"
+                            style={{ backgroundColor: grp.color }}
+                          />
+                          <span>{grp.label}</span>
+                          <span className="tab-group-badge">{grp.tabs.length}</span>
+                          <span className={`tab-group-chevron ${isCollapsed ? 'collapsed' : ''}`}>
+                            <CyberIcon name="chevron-down" size={14} />
+                          </span>
                         </button>
+
+                        {(!isCollapsed || hasActive) && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            {(isCollapsed
+                              ? grp.tabs.filter((t) => t.id === activeTab.id)
+                              : grp.tabs
+                            ).map((tab) => {
+                              const isActive = tab.id === activeTab.id;
+                              const tabPanes = collectPanes(tab.rootNode);
+                              const tabColor =
+                                tab.color ||
+                                getEffectiveHostColor(tab.hostId, undefined, tab.title);
+                              return (
+                                <div
+                                  key={tab.id}
+                                  role="tab"
+                                  aria-selected={isActive}
+                                  aria-label={`Tab ${tab.title}`}
+                                  draggable
+                                  className={`tab-pill ${isActive ? 'active' : ''}`}
+                                  style={{ borderTop: `3px solid ${tabColor}` }}
+                                  onDragStart={() => {
+                                    setDraggedTabId(tab.id);
+                                    startWorkspaceDrag({
+                                      type: 'tab',
+                                      tabId: tab.id,
+                                      title: tab.title,
+                                    });
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedTabId(null);
+                                    startWorkspaceDrag(null);
+                                  }}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => {
+                                    e.stopPropagation();
+                                    if (draggedTabId && draggedTabId !== tab.id) {
+                                      setTabs((prev) =>
+                                        reorderTabsLocal(prev, draggedTabId, tab.id)
+                                      );
+                                    }
+                                    setDraggedTabId(null);
+                                    startWorkspaceDrag(null);
+                                  }}
+                                  onClick={() => {
+                                    setActiveTabId(tab.id);
+                                    const pane =
+                                      tabPanes.find((p) => p.id === tab.activePaneId) ||
+                                      tabPanes[0];
+                                    if (pane) {
+                                      setTimeout(
+                                        () => focusersRef.current.get(pane.sessionId)?.(),
+                                        50
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <span
+                                    className="tab-dot"
+                                    style={{
+                                      backgroundColor: tabColor,
+                                      boxShadow: `0 0 6px ${tabColor}`,
+                                    }}
+                                  />
+                                  <span>{tab.title}</span>
+                                  {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
+                                  <button
+                                    type="button"
+                                    className="tab-close-btn"
+                                    aria-label={`Close Tab ${tab.title}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleCloseTab(tab.id);
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
-                  })}
+                  });
+                })()
+                : tabs.map((tab) => {
+                  const isActive = tab.id === activeTab.id;
+                  const tabPanes = collectPanes(tab.rootNode);
+                  const tabColor =
+                    tab.color || getEffectiveHostColor(tab.hostId, undefined, tab.title);
+                  return (
+                    <div
+                      key={tab.id}
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-label={`Tab ${tab.title}`}
+                      draggable
+                      className={`tab-pill ${isActive ? 'active' : ''}`}
+                      style={{ borderTop: `3px solid ${tabColor}` }}
+                      onDragStart={() => {
+                        setDraggedTabId(tab.id);
+                        startWorkspaceDrag({
+                          type: 'tab',
+                          tabId: tab.id,
+                          title: tab.title,
+                        });
+                      }}
+                      onDragEnd={() => {
+                        setDraggedTabId(null);
+                        startWorkspaceDrag(null);
+                      }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.stopPropagation();
+                        if (draggedTabId && draggedTabId !== tab.id) {
+                          setTabs((prev) => reorderTabsLocal(prev, draggedTabId, tab.id));
+                        }
+                        setDraggedTabId(null);
+                        startWorkspaceDrag(null);
+                      }}
+                      onClick={() => {
+                        setActiveTabId(tab.id);
+                        const pane =
+                          tabPanes.find((p) => p.id === tab.activePaneId) || tabPanes[0];
+                        if (pane) {
+                          setTimeout(() => focusersRef.current.get(pane.sessionId)?.(), 50);
+                        }
+                      }}
+                    >
+                      <span
+                        className="tab-dot"
+                        style={{
+                          backgroundColor: tabColor,
+                          boxShadow: `0 0 6px ${tabColor}`,
+                        }}
+                      />
+                      <span>{tab.title}</span>
+                      {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
+                      <button
+                        type="button"
+                        className="tab-close-btn"
+                        aria-label={`Close Tab ${tab.title}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleCloseTab(tab.id);
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
               <div className="tabs-bar-controls">
                 <button
                   type="button"
@@ -11683,364 +11719,365 @@ export function App({
               activeTab.tabType !== 'network-map' &&
               activeTab.tabType !== 'route-health' &&
               activeTab.tabType !== 'api-tester' &&
+              activeTab.tabType !== 'hex-runner' &&
               activeTab.tabType !== 'editor' && (
-              <div className="terminal-toolbar hud-command-strip">
-                <div className="hud-telemetry-readout" title={statusMessage}>
-                  <span className="hud-telemetry-dot" />
-                  <span className="hud-telemetry-label">HUD</span>
-                  <strong className="hud-telemetry-msg">
-                    {activePane.title}
-                    {activeTabPanes.length > 1 ? ` · ${activeTabPanes.length} PANES` : ''}
-                  </strong>
-                </div>
+                <div className="terminal-toolbar hud-command-strip">
+                  <div className="hud-telemetry-readout" title={statusMessage}>
+                    <span className="hud-telemetry-dot" />
+                    <span className="hud-telemetry-label">HUD</span>
+                    <strong className="hud-telemetry-msg">
+                      {activePane.title}
+                      {activeTabPanes.length > 1 ? ` · ${activeTabPanes.length} PANES` : ''}
+                    </strong>
+                  </div>
 
-                <div className="terminal-toolbar-actions hud-segmented-deck">
-                  {/* GROUP 1: Split & Workspace View Builder */}
-                  <div className="hud-btn-group">
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
-                      aria-label="New Connection Split"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handleOpenNewConnectionSplit('right')}
-                      title="Open a blank New Connection split pane side-by-side"
-                    >
-                      <CyberIcon name="plus" size={12} />
-                      <span>New Split</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
-                      aria-label="Split Horizontal"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => void handleSplitPane('horizontal')}
-                      title="Split active pane horizontally (side-by-side)"
-                    >
-                      <CyberIcon name="split-h" size={13} />
-                      <span>Split H</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
-                      aria-label="Split Vertical"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => void handleSplitPane('vertical')}
-                      title="Split active pane vertically (stacked)"
-                    >
-                      <CyberIcon name="split-v" size={13} />
-                      <span>Split V</span>
-                    </button>
-
-                    <div className="add-to-view-wrapper" style={{ position: 'relative', display: 'inline-flex' }}>
-                      <button
-                        type="button"
-                        className={`hud-seg-btn ${showAddToViewMenu ? 'active' : ''}`}
-                        aria-label="Add to View"
-                        aria-expanded={showAddToViewMenu}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => setShowAddToViewMenu((prev) => !prev)}
-                        title="Open another host connection, local shell, Notes, TOTP, SFTP, or Snippets side-by-side in this view"
-                      >
-                        <CyberIcon name="grid" size={13} />
-                        <span>+ View</span>
-                        <CyberIcon name="chevron-down" size={11} />
-                      </button>
-                      {showAddToViewMenu && (
-                        <div
-                          className="add-to-view-popover cyber-glass-popover"
-                          role="menu"
-                          aria-label="Add to Workspace View Menu"
-                        >
-                          <div className="add-to-view-section-title">Dock Position</div>
-                          <div className="add-to-view-zone-selector">
-                            {(
-                              [
-                                { zone: 'right', label: 'Right' },
-                                { zone: 'bottom', label: 'Bottom' },
-                                { zone: 'left', label: 'Left' },
-                                { zone: 'top', label: 'Top' },
-                              ] as const
-                            ).map((item) => (
-                              <button
-                                key={item.zone}
-                                type="button"
-                                className={`zone-pill-btn ${addToViewZone === item.zone ? 'active' : ''}`}
-                                onClick={() => setAddToViewZone(item.zone)}
-                              >
-                                {item.label}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className="add-to-view-section-title">
-                            Blank Split ({addToViewZone})
-                          </div>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="add-to-view-item"
-                            onClick={() => {
-                              setShowAddToViewMenu(false);
-                              handleOpenNewConnectionSplit(addToViewZone);
-                            }}
-                          >
-                            <CyberIcon name="plus" size={12} />
-                            <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>
-                              New Connection View
-                            </span>
-                            <small style={{ color: 'var(--text-muted)' }}>Launcher</small>
-                          </button>
-
-                          <div className="add-to-view-section-title">
-                            Connect Host into Split ({addToViewZone})
-                          </div>
-                          {vaultSummary.hosts.length === 0 ? (
-                            <div className="add-to-view-empty">No saved hosts in vault yet.</div>
-                          ) : (
-                            <div className="add-to-view-hosts-list">
-                              {vaultSummary.hosts.map((h) => (
-                                <button
-                                  key={h.id}
-                                  type="button"
-                                  role="menuitem"
-                                  className="add-to-view-item"
-                                  onClick={() => void handleConnectHostIntoSplit(h, addToViewZone)}
-                                >
-                                  <span
-                                    className="host-color-dot"
-                                    style={{
-                                      backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
-                                    }}
-                                  />
-                                  <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>
-                                    {h.label}
-                                  </span>
-                                  <small style={{ color: 'var(--text-muted)' }}>
-                                    {h.effectiveUser}@{h.address}
-                                  </small>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="add-to-view-section-title">
-                            Dock Tools &amp; Widgets (Click or Drag)
-                          </div>
-                          <div className="add-to-view-tools-grid">
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="add-to-view-tool-btn"
-                              draggable
-                              onDragStart={() =>
-                                startWorkspaceDrag({
-                                  type: 'tool',
-                                  toolType: 'notes',
-                                  hostId: activePane?.hostId || activeTab?.hostId,
-                                  title: 'Host Notes',
-                                })
-                              }
-                              onDragEnd={() => startWorkspaceDrag(null)}
-                              onClick={() => void handleDockToolIntoSplit('notes', addToViewZone)}
-                            >
-                              <CyberIcon name="note" size={12} /> Notes Drawer
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="add-to-view-tool-btn"
-                              draggable
-                              onDragStart={() =>
-                                startWorkspaceDrag({
-                                  type: 'tool',
-                                  toolType: 'totp',
-                                  title: '2FA / TOTP',
-                                })
-                              }
-                              onDragEnd={() => startWorkspaceDrag(null)}
-                              onClick={() => void handleDockToolIntoSplit('totp', addToViewZone)}
-                            >
-                              <CyberIcon name="totp" size={12} /> 2FA / TOTP
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="add-to-view-tool-btn"
-                              draggable
-                              onDragStart={() =>
-                                startWorkspaceDrag({
-                                  type: 'tool',
-                                  toolType: 'sftp',
-                                  hostId: activePane?.hostId || activeTab?.hostId,
-                                  title: 'SFTP Browser',
-                                })
-                              }
-                              onDragEnd={() => startWorkspaceDrag(null)}
-                              onClick={() => void handleDockToolIntoSplit('sftp', addToViewZone)}
-                            >
-                              <CyberIcon name="folder" size={12} /> SFTP Browser
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="add-to-view-tool-btn"
-                              draggable
-                              onDragStart={() =>
-                                startWorkspaceDrag({
-                                  type: 'tool',
-                                  toolType: 'snippets',
-                                  title: 'Command Snippets',
-                                })
-                              }
-                              onDragEnd={() => startWorkspaceDrag(null)}
-                              onClick={() => void handleDockToolIntoSplit('snippets', addToViewZone)}
-                            >
-                              <CyberIcon name="bolt" size={12} /> Snippets
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="add-to-view-tool-btn"
-                              draggable
-                              onDragStart={() =>
-                                startWorkspaceDrag({
-                                  type: 'tool',
-                                  toolType: 'network-map',
-                                  title: 'Network Topology Map',
-                                })
-                              }
-                              onDragEnd={() => startWorkspaceDrag(null)}
-                              onClick={() => void handleDockToolIntoSplit('network-map', addToViewZone)}
-                            >
-                              <CyberIcon name="network" size={12} /> Network Map
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="add-to-view-tool-btn"
-                              onClick={() =>
-                                void handleDockToolIntoSplit('local-powershell', addToViewZone)
-                              }
-                            >
-                              <CyberIcon name="terminal" size={12} /> Local PowerShell
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="add-to-view-tool-btn"
-                              onClick={() =>
-                                void handleDockToolIntoSplit('local-bash', addToViewZone)
-                              }
-                            >
-                              <CyberIcon name="terminal" size={12} /> Local Bash / WSL
-                            </button>
-                          </div>
-
-                          {activeTabPanes.length > 1 && (
-                            <>
-                              <div className="add-to-view-section-title">Workspace Layout</div>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                className="add-to-view-item"
-                                onClick={handleEqualizeAllSplits}
-                              >
-                                <CyberIcon name="grid" size={12} />
-                                <span>Equalize All Split Proportions</span>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {activeTabPanes.length > 1 && (
+                  <div className="terminal-toolbar-actions hud-segmented-deck">
+                    {/* GROUP 1: Split & Workspace View Builder */}
+                    <div className="hud-btn-group">
                       <button
                         type="button"
                         className="hud-seg-btn"
-                        aria-label="Next Pane"
+                        aria-label="New Connection Split"
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={handleCyclePaneFocus}
-                        title="Cycle keyboard focus to the next split pane (Alt+ArrowDown)"
+                        onClick={() => handleOpenNewConnectionSplit('right')}
+                        title="Open a blank New Connection split pane side-by-side"
                       >
-                        <CyberIcon name="next-pane" size={13} />
+                        <CyberIcon name="plus" size={12} />
+                        <span>New Split</span>
                       </button>
-                    )}
-                  </div>
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="Split Horizontal"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => void handleSplitPane('horizontal')}
+                        title="Split active pane horizontally (side-by-side)"
+                      >
+                        <CyberIcon name="split-h" size={13} />
+                        <span>Split H</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="Split Vertical"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => void handleSplitPane('vertical')}
+                        title="Split active pane vertically (stacked)"
+                      >
+                        <CyberIcon name="split-v" size={13} />
+                        <span>Split V</span>
+                      </button>
 
-                  {/* GROUP 2: Directory & Root Shell Spawner */}
-                  <div className="hud-btn-group">
+                      <div className="add-to-view-wrapper" style={{ position: 'relative', display: 'inline-flex' }}>
+                        <button
+                          type="button"
+                          className={`hud-seg-btn ${showAddToViewMenu ? 'active' : ''}`}
+                          aria-label="Add to View"
+                          aria-expanded={showAddToViewMenu}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setShowAddToViewMenu((prev) => !prev)}
+                          title="Open another host connection, local shell, Notes, TOTP, SFTP, or Snippets side-by-side in this view"
+                        >
+                          <CyberIcon name="grid" size={13} />
+                          <span>+ View</span>
+                          <CyberIcon name="chevron-down" size={11} />
+                        </button>
+                        {showAddToViewMenu && (
+                          <div
+                            className="add-to-view-popover cyber-glass-popover"
+                            role="menu"
+                            aria-label="Add to Workspace View Menu"
+                          >
+                            <div className="add-to-view-section-title">Dock Position</div>
+                            <div className="add-to-view-zone-selector">
+                              {(
+                                [
+                                  { zone: 'right', label: 'Right' },
+                                  { zone: 'bottom', label: 'Bottom' },
+                                  { zone: 'left', label: 'Left' },
+                                  { zone: 'top', label: 'Top' },
+                                ] as const
+                              ).map((item) => (
+                                <button
+                                  key={item.zone}
+                                  type="button"
+                                  className={`zone-pill-btn ${addToViewZone === item.zone ? 'active' : ''}`}
+                                  onClick={() => setAddToViewZone(item.zone)}
+                                >
+                                  {item.label}
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="add-to-view-section-title">
+                              Blank Split ({addToViewZone})
+                            </div>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="add-to-view-item"
+                              onClick={() => {
+                                setShowAddToViewMenu(false);
+                                handleOpenNewConnectionSplit(addToViewZone);
+                              }}
+                            >
+                              <CyberIcon name="plus" size={12} />
+                              <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>
+                                New Connection View
+                              </span>
+                              <small style={{ color: 'var(--text-muted)' }}>Launcher</small>
+                            </button>
+
+                            <div className="add-to-view-section-title">
+                              Connect Host into Split ({addToViewZone})
+                            </div>
+                            {vaultSummary.hosts.length === 0 ? (
+                              <div className="add-to-view-empty">No saved hosts in vault yet.</div>
+                            ) : (
+                              <div className="add-to-view-hosts-list">
+                                {vaultSummary.hosts.map((h) => (
+                                  <button
+                                    key={h.id}
+                                    type="button"
+                                    role="menuitem"
+                                    className="add-to-view-item"
+                                    onClick={() => void handleConnectHostIntoSplit(h, addToViewZone)}
+                                  >
+                                    <span
+                                      className="host-color-dot"
+                                      style={{
+                                        backgroundColor: getEffectiveHostColor(h.id, h.color, h.label),
+                                      }}
+                                    />
+                                    <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>
+                                      {h.label}
+                                    </span>
+                                    <small style={{ color: 'var(--text-muted)' }}>
+                                      {h.effectiveUser}@{h.address}
+                                    </small>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="add-to-view-section-title">
+                              Dock Tools &amp; Widgets (Click or Drag)
+                            </div>
+                            <div className="add-to-view-tools-grid">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-tool-btn"
+                                draggable
+                                onDragStart={() =>
+                                  startWorkspaceDrag({
+                                    type: 'tool',
+                                    toolType: 'notes',
+                                    hostId: activePane?.hostId || activeTab?.hostId,
+                                    title: 'Host Notes',
+                                  })
+                                }
+                                onDragEnd={() => startWorkspaceDrag(null)}
+                                onClick={() => void handleDockToolIntoSplit('notes', addToViewZone)}
+                              >
+                                <CyberIcon name="note" size={12} /> Notes Drawer
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-tool-btn"
+                                draggable
+                                onDragStart={() =>
+                                  startWorkspaceDrag({
+                                    type: 'tool',
+                                    toolType: 'totp',
+                                    title: '2FA / TOTP',
+                                  })
+                                }
+                                onDragEnd={() => startWorkspaceDrag(null)}
+                                onClick={() => void handleDockToolIntoSplit('totp', addToViewZone)}
+                              >
+                                <CyberIcon name="totp" size={12} /> 2FA / TOTP
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-tool-btn"
+                                draggable
+                                onDragStart={() =>
+                                  startWorkspaceDrag({
+                                    type: 'tool',
+                                    toolType: 'sftp',
+                                    hostId: activePane?.hostId || activeTab?.hostId,
+                                    title: 'SFTP Browser',
+                                  })
+                                }
+                                onDragEnd={() => startWorkspaceDrag(null)}
+                                onClick={() => void handleDockToolIntoSplit('sftp', addToViewZone)}
+                              >
+                                <CyberIcon name="folder" size={12} /> SFTP Browser
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-tool-btn"
+                                draggable
+                                onDragStart={() =>
+                                  startWorkspaceDrag({
+                                    type: 'tool',
+                                    toolType: 'snippets',
+                                    title: 'Command Snippets',
+                                  })
+                                }
+                                onDragEnd={() => startWorkspaceDrag(null)}
+                                onClick={() => void handleDockToolIntoSplit('snippets', addToViewZone)}
+                              >
+                                <CyberIcon name="bolt" size={12} /> Snippets
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-tool-btn"
+                                draggable
+                                onDragStart={() =>
+                                  startWorkspaceDrag({
+                                    type: 'tool',
+                                    toolType: 'network-map',
+                                    title: 'Network Topology Map',
+                                  })
+                                }
+                                onDragEnd={() => startWorkspaceDrag(null)}
+                                onClick={() => void handleDockToolIntoSplit('network-map', addToViewZone)}
+                              >
+                                <CyberIcon name="network" size={12} /> Network Map
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-tool-btn"
+                                onClick={() =>
+                                  void handleDockToolIntoSplit('local-powershell', addToViewZone)
+                                }
+                              >
+                                <CyberIcon name="terminal" size={12} /> Local PowerShell
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="add-to-view-tool-btn"
+                                onClick={() =>
+                                  void handleDockToolIntoSplit('local-bash', addToViewZone)
+                                }
+                              >
+                                <CyberIcon name="terminal" size={12} /> Local Bash / WSL
+                              </button>
+                            </div>
+
+                            {activeTabPanes.length > 1 && (
+                              <>
+                                <div className="add-to-view-section-title">Workspace Layout</div>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="add-to-view-item"
+                                  onClick={handleEqualizeAllSplits}
+                                >
+                                  <CyberIcon name="grid" size={12} />
+                                  <span>Equalize All Split Proportions</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {activeTabPanes.length > 1 && (
+                        <button
+                          type="button"
+                          className="hud-seg-btn"
+                          aria-label="Next Pane"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={handleCyclePaneFocus}
+                          title="Cycle keyboard focus to the next split pane (Alt+ArrowDown)"
+                        >
+                          <CyberIcon name="next-pane" size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* GROUP 2: Directory & Root Shell Spawner */}
+                    <div className="hud-btn-group">
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="New Terminal Default Directory"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => void handleOpenTerminalDirectory('default')}
+                        title="Open new terminal in default working directory"
+                      >
+                        <CyberIcon name="home" size={12} />
+                        <span>~ Dir</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="New Terminal Current Directory"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => void handleOpenTerminalDirectory('current')}
+                        title="Open new terminal in current working directory (CWD)"
+                      >
+                        <CyberIcon name="folder" size={12} />
+                        <span>CWD</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="New Terminal Root in Current Directory"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => void handleOpenTerminalDirectory('root')}
+                        title="Open new root / elevated terminal in current working directory"
+                      >
+                        <CyberIcon name="bolt" size={12} />
+                        <span>Root</span>
+                      </button>
+                    </div>
+
+                    {/* GROUP 3: Security Ops & Shell Upgrade */}
+                    <div className="hud-btn-group">
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="Inject Password"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => void handleInjectPassword()}
+                        title="Injects the stored password directly from the Go Vault into the terminal without pressing Enter"
+                      >
+                        <CyberIcon name="key" size={12} />
+                        <span>Pass</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="Stabilize Shell"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={handleOpenShellStabilize}
+                        title="Upgrade raw/dumb shell to a full interactive PTY terminal"
+                      >
+                        <CyberIcon name="stabilize" size={12} />
+                        <span>Stabilize</span>
+                      </button>
+                    </div>
+
                     <button
                       type="button"
-                      className="hud-seg-btn"
-                      aria-label="New Terminal Default Directory"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => void handleOpenTerminalDirectory('default')}
-                      title="Open new terminal in default working directory"
+                      className="btn-danger btn-sm hud-disconnect-btn"
+                      onClick={() => void handleDisconnect()}
                     >
-                      <CyberIcon name="home" size={12} />
-                      <span>~ Dir</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
-                      aria-label="New Terminal Current Directory"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => void handleOpenTerminalDirectory('current')}
-                      title="Open new terminal in current working directory (CWD)"
-                    >
-                      <CyberIcon name="folder" size={12} />
-                      <span>CWD</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
-                      aria-label="New Terminal Root in Current Directory"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => void handleOpenTerminalDirectory('root')}
-                      title="Open new root / elevated terminal in current working directory"
-                    >
-                      <CyberIcon name="bolt" size={12} />
-                      <span>Root</span>
+                      Disconnect
                     </button>
                   </div>
-
-                  {/* GROUP 3: Security Ops & Shell Upgrade */}
-                  <div className="hud-btn-group">
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
-                      aria-label="Inject Password"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => void handleInjectPassword()}
-                      title="Injects the stored password directly from the Go Vault into the terminal without pressing Enter"
-                    >
-                      <CyberIcon name="key" size={12} />
-                      <span>Pass</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="hud-seg-btn"
-                      aria-label="Stabilize Shell"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={handleOpenShellStabilize}
-                      title="Upgrade raw/dumb shell to a full interactive PTY terminal"
-                    >
-                      <CyberIcon name="stabilize" size={12} />
-                      <span>Stabilize</span>
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn-danger btn-sm hud-disconnect-btn"
-                    onClick={() => void handleDisconnect()}
-                  >
-                    Disconnect
-                  </button>
                 </div>
-              </div>
-            )}
+              )}
 
             <div className="workspace-tabs-content" aria-label="Terminal Split Grid">
               {tabs.map((tab) => {
@@ -12237,6 +12274,8 @@ export function App({
                         activeEngagementId={activeEngagement?.id || null}
                         activeEngagementName={activeEngagement?.name || null}
                         identities={vaultSummary.identities || []}
+                        externalDraft={apiTesterDraft}
+                        onExternalDraftConsumed={() => setApiTesterDraft(null)}
                         eventsOn={getWailsRuntime()?.EventsOn}
                         onSaveToEvidence={async (title, category, content) => {
                           await handleSaveSelectionEvidence({
@@ -12269,6 +12308,71 @@ export function App({
                           });
                         }}
                         onClose={() => void handleCloseTab(tab.id)}
+                      />
+                    ) : tab.tabType === 'hex-runner' ? (
+                      <HexRunnerView
+                        activeEngagementId={activeEngagement?.id || null}
+                        activeEngagementName={activeEngagement?.name || null}
+                        sshSessions={tabs.flatMap((t) =>
+                          collectPanes(t.rootNode)
+                            .filter(
+                              (p) =>
+                                Boolean(p.hostId) &&
+                                !p.paneType &&
+                                !p.isRawTcp &&
+                                !p.sessionId.startsWith('local-') &&
+                                !p.sessionId.startsWith('serial-') &&
+                                !p.sessionId.startsWith('winrm-') &&
+                                !p.sessionId.startsWith('rawtcp-')
+                            )
+                            .map((p) => ({ id: p.sessionId, label: `${p.title} (${p.sessionId.slice(0, 8)})` }))
+                        )}
+                        rawTcpSessions={tabs.flatMap((t) =>
+                          collectPanes(t.rootNode)
+                            .filter((p) => Boolean(p.isRawTcp || p.sessionId.startsWith('rawtcp-')))
+                            .map((p) => ({
+                              id: p.sessionId,
+                              label: p.rawTcpHost ? `${p.rawTcpHost}:${p.rawTcpPort ?? ''}` : p.title,
+                            }))
+                        )}
+                        onSendToApiTester={(draft) => {
+                          setApiTesterDraft({
+                            id: `req-hex-${Date.now()}`,
+                            engagementId: activeEngagement?.id || undefined,
+                            collectionName: 'Default Collection',
+                            name: draft.name,
+                            method: 'POST',
+                            url: 'http://127.0.0.1:8080/binary',
+                            params: [],
+                            headers: [{ key: 'Content-Type', value: 'application/octet-stream', enabled: true }],
+                            auth: { type: 'none' },
+                            bodyType: 'hex',
+                            body: draft.body,
+                            rawMode: false,
+                            rawRequest: '',
+                            routeId: '',
+                            timeoutSec: 20,
+                            followRedirects: true,
+                            useCookieJar: true,
+                            tlsSkipVerify: false,
+                          });
+                          openApiTesterTab();
+                        }}
+                        onSaveToEvidence={async (title, category, content) => {
+                          await handleSaveSelectionEvidence({
+                            id: `ev-hex-${Date.now()}`,
+                            engagementId: activeEngagement?.id || '',
+                            category,
+                            title,
+                            type: 'text',
+                            content,
+                            source: 'hex-runner',
+                            inReport: true,
+                            severity: 'info',
+                            capturedAt: new Date().toISOString(),
+                          });
+                        }}
+                        onClose={() => closeTab(tab.id)}
                       />
                     ) : tab.tabType === 'network-map' ? (
                       <NetworkMapView
@@ -12336,9 +12440,8 @@ export function App({
                       />
                     ) : (
                       <div
-                        className={`terminal-bg-wrap${
-                          globalSettings.terminalBg && globalSettings.terminalBg !== 'none' ? ' has-bg' : ''
-                        }`}
+                        className={`terminal-bg-wrap${globalSettings.terminalBg && globalSettings.terminalBg !== 'none' ? ' has-bg' : ''
+                          }`}
                         style={
                           {
                             '--term-surface': `color-mix(in srgb, var(--bg-base) ${Math.round(
@@ -12528,486 +12631,520 @@ export function App({
               </button>
             </div>
             <div className="dialog-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <p>
-              Fuzzy search saved hosts by <strong>Name</strong>, <strong>Address</strong>, or{' '}
-              <strong>Tags</strong>, or type <code>user@host:port</code> to connect directly.
-            </p>
-            <input
-              aria-label="Command Palette Input"
-              className="cyber-hud-input"
-              placeholder="Search hosts, tags, or type user@host:port..."
-              value={paletteQuery}
-              onChange={(e) => setPaletteQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  if (paletteResponse.quickConnect) {
-                    void handleQuickConnectFromPalette(paletteResponse.quickConnect);
-                  } else if (paletteResponse.hostResults.length > 0) {
-                    const topHost = paletteResponse.hostResults[0].host;
-                    setShowCommandPalette(false);
-                    setPaletteQuery('');
-                    void handleConnectSavedHost(topHost);
-                  }
-                }
-              }}
-              autoFocus
-            />
-
-            {paletteResponse.quickConnect && (
-              <div className="quick-unlock-box">
-                <div className="palette-item-main">
-                  <strong>Quick Connect: {paletteResponse.quickConnect.display}</strong>
-                  <span>Direct SSH connection (Enter or click Connect)</span>
-                </div>
-                <input
-                  aria-label="Quick Connect Password"
-                  type="password"
-                  placeholder="Password (optional)"
-                  value={palettePassword}
-                  onChange={(e) => setPalettePassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="btn-primary btn-sm"
-                  onClick={() => {
+              <p>
+                Fuzzy search saved hosts by <strong>Name</strong>, <strong>Address</strong>, or{' '}
+                <strong>Tags</strong>, or type <code>user@host:port</code> to connect directly.
+              </p>
+              <input
+                aria-label="Command Palette Input"
+                className="cyber-hud-input"
+                placeholder="Search hosts, tags, or type user@host:port..."
+                value={paletteQuery}
+                onChange={(e) => setPaletteQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
                     if (paletteResponse.quickConnect) {
                       void handleQuickConnectFromPalette(paletteResponse.quickConnect);
-                    }
-                  }}
-                >
-                  Quick Connect {paletteResponse.quickConnect.display}
-                </button>
-              </div>
-            )}
-
-            <div className="palette-results" aria-label="Command Palette Results">
-              {vaultLocked ? (
-                <div className="info-banner">
-                  Vault is currently locked. Unlock the vault to search saved hosts, or type{' '}
-                  <code>user@host:port</code> above for direct Quick Connect.
-                </div>
-              ) : paletteResponse.hostResults.length === 0 ? (
-                <p>No saved hosts match &ldquo;{paletteQuery}&rdquo;.</p>
-              ) : (
-                paletteResponse.hostResults.map((item) => (
-                  <button
-                    key={item.host.id}
-                    type="button"
-                    className="palette-item"
-                    onClick={() => {
+                    } else if (paletteResponse.hostResults.length > 0) {
+                      const topHost = paletteResponse.hostResults[0].host;
                       setShowCommandPalette(false);
                       setPaletteQuery('');
-                      void handleConnectSavedHost(item.host);
+                      void handleConnectSavedHost(topHost);
+                    }
+                  }
+                }}
+                autoFocus
+              />
+
+              {paletteResponse.quickConnect && (
+                <div className="quick-unlock-box">
+                  <div className="palette-item-main">
+                    <strong>Quick Connect: {paletteResponse.quickConnect.display}</strong>
+                    <span>Direct SSH connection (Enter or click Connect)</span>
+                  </div>
+                  <input
+                    aria-label="Quick Connect Password"
+                    type="password"
+                    placeholder="Password (optional)"
+                    value={palettePassword}
+                    onChange={(e) => setPalettePassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm"
+                    onClick={() => {
+                      if (paletteResponse.quickConnect) {
+                        void handleQuickConnectFromPalette(paletteResponse.quickConnect);
+                      }
                     }}
                   >
-                    <div className="palette-item-main">
-                      <strong>{item.host.label}</strong>
-                      <span>
-                        {item.host.effectiveUser}@{item.host.address}:{item.host.effectivePort}
-                      </span>
-                    </div>
-                    <div className="palette-tags">
-                      {item.host.tags.map((tag) => (
-                        <span key={tag} className="tag-pill">
-                          #{tag}
-                        </span>
-                      ))}
-                      <span className="kbd-badge">Connect <CyberIcon name="return" size={14} /></span>
-                    </div>
+                    Quick Connect {paletteResponse.quickConnect.display}
                   </button>
-                ))
+                </div>
               )}
 
-              {!vaultLocked &&
-                paletteQuery.trim().length > 0 &&
-                (() => {
-                  const q = paletteQuery.trim().toLowerCase();
-                  const matchedNotes = notes.filter(
-                    (n) =>
-                      n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q)
-                  );
-                  if (matchedNotes.length === 0) return null;
-                  return (
-                    <div
-                      style={{
-                        marginTop: '0.75rem',
-                        paddingTop: '0.5rem',
-                        borderTop: '1px solid var(--border-color)',
+              <div className="palette-results" aria-label="Command Palette Results">
+                {vaultLocked ? (
+                  <div className="info-banner">
+                    Vault is currently locked. Unlock the vault to search saved hosts, or type{' '}
+                    <code>user@host:port</code> above for direct Quick Connect.
+                  </div>
+                ) : paletteResponse.hostResults.length === 0 ? (
+                  <p>No saved hosts match &ldquo;{paletteQuery}&rdquo;.</p>
+                ) : (
+                  paletteResponse.hostResults.map((item) => (
+                    <button
+                      key={item.host.id}
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        void handleConnectSavedHost(item.host);
                       }}
                     >
+                      <div className="palette-item-main">
+                        <strong>{item.host.label}</strong>
+                        <span>
+                          {item.host.effectiveUser}@{item.host.address}:{item.host.effectivePort}
+                        </span>
+                      </div>
+                      <div className="palette-tags">
+                        {item.host.tags.map((tag) => (
+                          <span key={tag} className="tag-pill">
+                            #{tag}
+                          </span>
+                        ))}
+                        <span className="kbd-badge">Connect <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  ))
+                )}
+
+                {!vaultLocked &&
+                  paletteQuery.trim().length > 0 &&
+                  (() => {
+                    const q = paletteQuery.trim().toLowerCase();
+                    const matchedNotes = notes.filter(
+                      (n) =>
+                        n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q)
+                    );
+                    if (matchedNotes.length === 0) return null;
+                    return (
                       <div
                         style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          color: 'var(--text-muted)',
-                          marginBottom: '0.4rem',
+                          marginTop: '0.75rem',
+                          paddingTop: '0.5rem',
+                          borderTop: '1px solid var(--border-color)',
                         }}
                       >
-                        <CyberIcon name="note" size={14} /> Notes &amp; Documentation
+                        <div
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            color: 'var(--text-muted)',
+                            marginBottom: '0.4rem',
+                          }}
+                        >
+                          <CyberIcon name="note" size={14} /> Notes &amp; Documentation
+                        </div>
+                        {matchedNotes.map((n) => {
+                          const hostObj = vaultSummary.hosts.find((h) => h.id === n.hostId);
+                          return (
+                            <button
+                              key={n.id}
+                              type="button"
+                              className="palette-item"
+                              onClick={() => {
+                                setShowCommandPalette(false);
+                                setPaletteQuery('');
+                                setNotesModalHostId(n.hostId || undefined);
+                                setNotesModalInitialNoteId(n.id);
+                                setShowNotesModal(true);
+                              }}
+                            >
+                              <div className="palette-item-main">
+                                <strong>
+                                  {n.isFolder ? <CyberIcon name="folder" size={14} /> : <CyberIcon name="file" size={14} />}
+                                  {n.title}
+                                </strong>
+                                <span>
+                                  {hostObj
+                                    ? `Host: ${hostObj.label} (${hostObj.address})`
+                                    : 'Global Note'}
+                                </span>
+                              </div>
+                              <div className="palette-tags">
+                                <span className="kbd-badge">Open Note <CyberIcon name="return" size={14} /></span>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
-                      {matchedNotes.map((n) => {
-                        const hostObj = vaultSummary.hosts.find((h) => h.id === n.hostId);
-                        return (
-                          <button
-                            key={n.id}
-                            type="button"
-                            className="palette-item"
-                            onClick={() => {
-                              setShowCommandPalette(false);
-                              setPaletteQuery('');
-                              setNotesModalHostId(n.hostId || undefined);
-                              setNotesModalInitialNoteId(n.id);
-                              setShowNotesModal(true);
-                            }}
-                          >
-                            <div className="palette-item-main">
-                              <strong>
-                                {n.isFolder ? <CyberIcon name="folder" size={14} /> : <CyberIcon name="file" size={14} />}
-                                {n.title}
-                              </strong>
-                              <span>
-                                {hostObj
-                                  ? `Host: ${hostObj.label} (${hostObj.address})`
-                                  : 'Global Note'}
-                              </span>
-                            </div>
-                            <div className="palette-tags">
-                              <span className="kbd-badge">Open Note <CyberIcon name="return" size={14} /></span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    );
+                  })()}
+
+                {(() => {
+                  const q = paletteQuery.trim().toLowerCase();
+                  const showNetMap =
+                    !q ||
+                    'network topology map'.includes(q) ||
+                    'map'.includes(q) ||
+                    'topology'.includes(q) ||
+                    'netzwerkkarte'.includes(q);
+                  if (!showNetMap) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        openNetworkMapTab();
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong><CyberIcon name="globe" size={14} /> Network Topology Map</strong>
+                        <span>Interactive network graph &amp; jump chain visualizer</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Open Map <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
                   );
                 })()}
 
-              {(() => {
-                const q = paletteQuery.trim().toLowerCase();
-                const showNetMap =
-                  !q ||
-                  'network topology map'.includes(q) ||
-                  'map'.includes(q) ||
-                  'topology'.includes(q) ||
-                  'netzwerkkarte'.includes(q);
-                if (!showNetMap) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      openNetworkMapTab();
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong><CyberIcon name="globe" size={14} /> Network Topology Map</strong>
-                      <span>Interactive network graph &amp; jump chain visualizer</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Open Map <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
+                {(() => {
+                  const q = paletteQuery.toLowerCase().trim();
+                  const showRaw =
+                    !q ||
+                    'raw'.includes(q) ||
+                    'tcp'.includes(q) ||
+                    'nc'.includes(q) ||
+                    'netcat'.includes(q) ||
+                    'listen'.includes(q) ||
+                    'reverse'.includes(q) ||
+                    'shell'.includes(q);
+                  if (!showRaw) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        setShowRawTcpModal(true);
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong><CyberIcon name="bolt" size={14} /> Raw TCP Socket &amp; Listener</strong>
+                        <span>Direct Netcat outgoing client or inbound reverse shell catcher</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Raw TCP <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
 
-              {(() => {
-                const q = paletteQuery.toLowerCase().trim();
-                const showRaw =
-                  !q ||
-                  'raw'.includes(q) ||
-                  'tcp'.includes(q) ||
-                  'nc'.includes(q) ||
-                  'netcat'.includes(q) ||
-                  'listen'.includes(q) ||
-                  'reverse'.includes(q) ||
-                  'shell'.includes(q);
-                if (!showRaw) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      setShowRawTcpModal(true);
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong><CyberIcon name="bolt" size={14} /> Raw TCP Socket &amp; Listener</strong>
-                      <span>Direct Netcat outgoing client or inbound reverse shell catcher</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Raw TCP <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
+                {(() => {
+                  const q = paletteQuery.toLowerCase().trim();
+                  const showTransfer =
+                    !q ||
+                    'file transfer helper'.includes(q) ||
+                    'transfer'.includes(q) ||
+                    'http'.includes(q) ||
+                    'serve'.includes(q) ||
+                    'upload'.includes(q) ||
+                    'download'.includes(q) ||
+                    'curl'.includes(q) ||
+                    'wget'.includes(q) ||
+                    'certutil'.includes(q) ||
+                    'updog'.includes(q) ||
+                    'hash'.includes(q);
+                  if (!showTransfer) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        setShowFileTransferModal(true);
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <CyberIcon name="upload" size={14} />
+                          <span>File Transfer Helper // HTTP Staging</span>
+                        </strong>
+                        <span>HTTP/SMB staging server, target download one-liners &amp; SHA-256/MD5 verifier</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Open Staging <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
 
-              {(() => {
-                const q = paletteQuery.toLowerCase().trim();
-                const showTransfer =
-                  !q ||
-                  'file transfer helper'.includes(q) ||
-                  'transfer'.includes(q) ||
-                  'http'.includes(q) ||
-                  'serve'.includes(q) ||
-                  'upload'.includes(q) ||
-                  'download'.includes(q) ||
-                  'curl'.includes(q) ||
-                  'wget'.includes(q) ||
-                  'certutil'.includes(q) ||
-                  'updog'.includes(q) ||
-                  'hash'.includes(q);
-                if (!showTransfer) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      setShowFileTransferModal(true);
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <CyberIcon name="upload" size={14} />
-                        <span>File Transfer Helper // HTTP Staging</span>
-                      </strong>
-                      <span>HTTP/SMB staging server, target download one-liners &amp; SHA-256/MD5 verifier</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Open Staging <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
+                {(() => {
+                  const q = paletteQuery.toLowerCase().trim();
+                  const showPivot =
+                    !q ||
+                    'pivoting engine'.includes(q) ||
+                    'ligolo'.includes(q) ||
+                    'chisel'.includes(q) ||
+                    'tunnel'.includes(q) ||
+                    'socks'.includes(q) ||
+                    'route'.includes(q);
+                  if (!showPivot) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        setShowPivotManagerModal(true);
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <CyberIcon name="tunnel" size={14} />
+                          <span>Pivoting Engine // ligolo-ng &amp; chisel</span>
+                        </strong>
+                        <span>Start/stop ligolo-ng TUN or chisel reverse SOCKS5 pivots, routes &amp; agent one-liners</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Open Pivot <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
+                {(() => {
+                  const q = paletteQuery.toLowerCase();
+                  const showHealth =
+                    !q ||
+                    'health'.includes(q) ||
+                    'route'.includes(q) ||
+                    'probe'.includes(q) ||
+                    'opsec'.includes(q) ||
+                    'socks'.includes(q);
+                  if (!showHealth) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        openRouteHealthTab();
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <CyberIcon name="shield" size={14} />
+                          <span>Route Health Check Dashboard</span>
+                        </strong>
+                        <span>On-demand throttled TCP connect probes, SOCKS5 checks &amp; ligolo session status</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Check Health <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
 
-              {(() => {
-                const q = paletteQuery.toLowerCase().trim();
-                const showPivot =
-                  !q ||
-                  'pivoting engine'.includes(q) ||
-                  'ligolo'.includes(q) ||
-                  'chisel'.includes(q) ||
-                  'tunnel'.includes(q) ||
-                  'socks'.includes(q) ||
-                  'route'.includes(q);
-                if (!showPivot) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      setShowPivotManagerModal(true);
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <CyberIcon name="tunnel" size={14} />
-                        <span>Pivoting Engine // ligolo-ng &amp; chisel</span>
-                      </strong>
-                      <span>Start/stop ligolo-ng TUN or chisel reverse SOCKS5 pivots, routes &amp; agent one-liners</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Open Pivot <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
-              {(() => {
-                const q = paletteQuery.toLowerCase();
-                const showHealth =
-                  !q ||
-                  'health'.includes(q) ||
-                  'route'.includes(q) ||
-                  'probe'.includes(q) ||
-                  'opsec'.includes(q) ||
-                  'socks'.includes(q);
-                if (!showHealth) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      openRouteHealthTab();
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <CyberIcon name="shield" size={14} />
-                        <span>Route Health Check Dashboard</span>
-                      </strong>
-                      <span>On-demand throttled TCP connect probes, SOCKS5 checks &amp; ligolo session status</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Check Health <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
+                {(() => {
+                  const q = paletteQuery.toLowerCase();
+                  const showApiTester =
+                    !q ||
+                    'api tester'.includes(q) ||
+                    'http repeater'.includes(q) ||
+                    'postman'.includes(q) ||
+                    'burp'.includes(q) ||
+                    'caido'.includes(q) ||
+                    'ai chat'.includes(q);
+                  if (!showApiTester) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        openApiTesterTab();
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <CyberIcon name="globe" size={14} />
+                          <span>API Tester &amp; HTTP Repeater</span>
+                        </strong>
+                        <span>HTTP/Raw Repeater, SOCKS5 pivots, Vault secrets, Param Replay, Diff &amp; AI Chat Mode</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Open View <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
+                {(() => {
+                  const q = paletteQuery.toLowerCase().trim();
+                  const showHexRunner =
+                    !q ||
+                    'hex runner'.includes(q) ||
+                    'binary'.includes(q) ||
+                    'payload'.includes(q) ||
+                    'cyclic'.includes(q) ||
+                    'nopty'.includes(q) ||
+                    'raw'.includes(q);
+                  if (!showHexRunner) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        openHexRunnerTab();
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <CyberIcon name="bolt" size={14} />
+                          <span>Binary / Hex Payload Runner (No-PTY)</span>
+                        </strong>
+                        <span>Send exact raw bytes (0x00–0xFF), cyclic patterns &amp; delays to binaries, Raw TCP, or HTTP API</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Open View <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
 
-              {(() => {
-                const q = paletteQuery.toLowerCase();
-                const showApiTester =
-                  !q ||
-                  'api tester'.includes(q) ||
-                  'http repeater'.includes(q) ||
-                  'postman'.includes(q) ||
-                  'burp'.includes(q) ||
-                  'caido'.includes(q) ||
-                  'ai chat'.includes(q);
-                if (!showApiTester) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      openApiTesterTab();
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <CyberIcon name="globe" size={14} />
-                        <span>API Tester &amp; HTTP Repeater</span>
-                      </strong>
-                      <span>HTTP/Raw Repeater, SOCKS5 pivots, Vault secrets, Param Replay, Diff &amp; AI Chat Mode</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Open View <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
+                {(() => {
+                  const q = paletteQuery.toLowerCase();
+                  const showWinrm =
+                    !q ||
+                    'winrm'.includes(q) ||
+                    'powershell'.includes(q) ||
+                    'evil-winrm'.includes(q) ||
+                    'remoting'.includes(q) ||
+                    'ntlm'.includes(q) ||
+                    'pth'.includes(q);
+                  if (!showWinrm) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        openWinrmTab();
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <CyberIcon name="terminal" size={14} />
+                          <span>WinRM // PowerShell Remoting Client</span>
+                        </strong>
+                        <span>HTTP 5985 / HTTPS 5986 interactive Evil-WinRM parity shell, PtH &amp; file transfer</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Open WinRM <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
 
-              {(() => {
-                const q = paletteQuery.toLowerCase();
-                const showWinrm =
-                  !q ||
-                  'winrm'.includes(q) ||
-                  'powershell'.includes(q) ||
-                  'evil-winrm'.includes(q) ||
-                  'remoting'.includes(q) ||
-                  'ntlm'.includes(q) ||
-                  'pth'.includes(q);
-                if (!showWinrm) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      openWinrmTab();
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <CyberIcon name="terminal" size={14} />
-                        <span>WinRM // PowerShell Remoting Client</span>
-                      </strong>
-                      <span>HTTP 5985 / HTTPS 5986 interactive Evil-WinRM parity shell, PtH &amp; file transfer</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Open WinRM <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
+                {(() => {
+                  const cleanQ = paletteQuery.trim();
+                  const isNc = cleanQ.startsWith('nc ') || cleanQ.startsWith('tcp://');
+                  if (!isNc) return null;
+                  let targetHost = '';
+                  let targetPort = 8080;
+                  if (cleanQ.startsWith('nc ')) {
+                    const parts = cleanQ.slice(3).trim().split(/\s+/);
+                    targetHost = parts[0] || '';
+                    if (parts[1]) targetPort = parseInt(parts[1], 10) || 8080;
+                  } else if (cleanQ.startsWith('tcp://')) {
+                    const noProto = cleanQ.slice(6);
+                    const parts = noProto.split(':');
+                    targetHost = parts[0] || '';
+                    if (parts[1]) targetPort = parseInt(parts[1], 10) || 8080;
+                  }
+                  if (!targetHost) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item palette-quick-connect"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        void handleConnectRawTcp({
+                          host: targetHost,
+                          port: targetPort,
+                          lineMode: true,
+                          lineEnding: 'crlf',
+                        });
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong><CyberIcon name="play" size={14} /> Connect Raw TCP to {targetHost}:{targetPort}</strong>
+                        <span>Direct raw socket connection</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Connect <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
 
-              {(() => {
-                const cleanQ = paletteQuery.trim();
-                const isNc = cleanQ.startsWith('nc ') || cleanQ.startsWith('tcp://');
-                if (!isNc) return null;
-                let targetHost = '';
-                let targetPort = 8080;
-                if (cleanQ.startsWith('nc ')) {
-                  const parts = cleanQ.slice(3).trim().split(/\s+/);
-                  targetHost = parts[0] || '';
-                  if (parts[1]) targetPort = parseInt(parts[1], 10) || 8080;
-                } else if (cleanQ.startsWith('tcp://')) {
-                  const noProto = cleanQ.slice(6);
-                  const parts = noProto.split(':');
-                  targetHost = parts[0] || '';
-                  if (parts[1]) targetPort = parseInt(parts[1], 10) || 8080;
-                }
-                if (!targetHost) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item palette-quick-connect"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      void handleConnectRawTcp({
-                        host: targetHost,
-                        port: targetPort,
-                        lineMode: true,
-                        lineEnding: 'crlf',
-                      });
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong><CyberIcon name="play" size={14} /> Connect Raw TCP to {targetHost}:{targetPort}</strong>
-                      <span>Direct raw socket connection</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Connect <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
+                {(() => {
+                  const cleanQ = paletteQuery.trim();
+                  if (!cleanQ.startsWith('listen ')) return null;
+                  const portStr = cleanQ.slice(7).trim();
+                  const port = parseInt(portStr, 10);
+                  if (!port || port <= 0 || port > 65535) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item palette-quick-connect"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        void handleStartRawTcpListener({
+                          port,
+                          bindAddress: '0.0.0.0',
+                          autoSpawnTab: true,
+                        });
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong><CyberIcon name="bolt" size={14} /> Start Listener on :{port}</strong>
+                        <span>Inbound raw socket listener / reverse shell catcher</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Listen <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
+              </div>
 
-              {(() => {
-                const cleanQ = paletteQuery.trim();
-                if (!cleanQ.startsWith('listen ')) return null;
-                const portStr = cleanQ.slice(7).trim();
-                const port = parseInt(portStr, 10);
-                if (!port || port <= 0 || port > 65535) return null;
-                return (
-                  <button
-                    type="button"
-                    className="palette-item palette-quick-connect"
-                    onClick={() => {
-                      setShowCommandPalette(false);
-                      setPaletteQuery('');
-                      void handleStartRawTcpListener({
-                        port,
-                        bindAddress: '0.0.0.0',
-                        autoSpawnTab: true,
-                      });
-                    }}
-                  >
-                    <div className="palette-item-main">
-                      <strong><CyberIcon name="bolt" size={14} /> Start Listener on :{port}</strong>
-                      <span>Inbound raw socket listener / reverse shell catcher</span>
-                    </div>
-                    <div className="palette-tags">
-                      <span className="kbd-badge">Listen <CyberIcon name="return" size={14} /></span>
-                    </div>
-                  </button>
-                );
-              })()}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-              <button
-                type="button"
-                className="cyber-btn cyber-btn-secondary"
-                onClick={() => setShowCommandPalette(false)}
-              >
-                Close (Esc)
-              </button>
-            </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="cyber-btn cyber-btn-secondary"
+                  onClick={() => setShowCommandPalette(false)}
+                >
+                  Close (Esc)
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -14159,9 +14296,8 @@ export function App({
                     <div className="serial-hardware-card" style={{ background: 'rgba(5, 9, 16, 0.9)', border: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', padding: '0.65rem 0.85rem' }}>
                       <div className="serial-hw-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                         <span
-                          className={`serial-hw-badge ${
-                            selectedPortInfo.isConnected ? 'connected' : 'offline'
-                          }`}
+                          className={`serial-hw-badge ${selectedPortInfo.isConnected ? 'connected' : 'offline'
+                            }`}
                         >
                           {selectedPortInfo.isConnected
                             ? 'Connected & Active'
@@ -15288,7 +15424,7 @@ export function App({
         />
       )}
 
-          {showWinrmModal && renderWinrmManager(false, () => setShowWinrmModal(false))}
+      {showWinrmModal && renderWinrmManager(false, () => setShowWinrmModal(false))}
 
       {showChainsModal && (
         <SnippetChainsModal
