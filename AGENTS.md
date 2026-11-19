@@ -54,6 +54,13 @@ after the Core stands. Until then, take features only from the Core spec.
 9. **No emojis in the UI.** Strictly require cyberpunk-styled vector SVGs via `CyberIcon.tsx`.
    Never use Unicode emojis in buttons, badges, tabs, headers, dialogs, or terminal
    toolbars. All icons must be crisp vector graphics matching the dark HUD aesthetic.
+10. **Remote Companion Agent (`F-46`) Parity Check.** Whenever implementing any new feature
+    that touches local shells/PTYs, filesystem/directories, network interfaces, listeners,
+    port forwards, outbound sockets, local binary execution, or pivots, ALWAYS evaluate
+    whether the headless Remote Companion Agent (`cmd/doubleagent-agent`, `backend/remoteagent/`,
+    `app_remote_agent.go`) needs a matching RPC handler or context-routing hook — and rebuild
+    `build/bin/doubleagent-agent-linux-{amd64,arm64}` whenever the agent code changes. Vault,
+    keys, notes, evidence, and secrets must ALWAYS remain strictly on the local workstation.
 
 ## Walking skeleton — a runnable binary first, and after every phase
 

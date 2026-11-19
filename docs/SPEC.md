@@ -144,6 +144,7 @@ Jedes Feature hat ein prüfbares Akzeptanzkriterium; der Coding Agent darf ein F
 | F-43 | Binary / Hex Payload Runner | v1 | Pentest-Modul: Non-PTY `os/exec` / SSH-Exec Raw-Byte-Runner für beliebige Hex-Payloads (`0x00–0xFF`), Hex-Dump-Viewer sowie HTTP-API/Raw-TCP-Bridge |
 | F-44 | WebSocket Client Mode | v1 | Pentest-Modul: Persistente Go-seitige `ws://`/`wss://`-Sessions im API Tester mit SOCKS5/Pivot-Routing, Vault-Secrets, Binary/Hex-Frames (`F-43`) und Live-Frame-Log |
 | F-45 | Remote Socket Discovery & 1-Click -L Tunnel | v1 | On-Demand Non-PTY SSH Listener-Erkennung (Linux + Windows), Loopback-Highlighting und 1-Klick `-L` Port-Forwarding inkl. API-Tester-Öffnung |
+| F-46 | Ephemeral Remote Companion Agent over SSH | v1 | Portfreier, auto-deployter Headless-Go-Worker (`doubleagent-agent`) über SSH `stdin`/`stdout` (NDJSON-RPC) auf einem Linux/Kali-Host: native Linux-PTY-Shells, Remote-Verzeichnisse & Hashing, Kali-`LHOST`, Remote-Listener (`F-32`), Remote-HTTP-Staging + 1-Klick-SFTP-Push (`F-31`), Remote-Pivoting (`F-24`), kontextgebundenes Outbound-SSH & Port-Forwarding (`-L`/`-R`/`-D`) sowie Visualisierung in Tabs & Netzwerkkarte (`F-37`); Vault & Secrets verbleiben strikt lokal |
 | M-PRESETS | Comprehensive Presets Library | v1 | Vollständige Presets für Findings, MITRE ATT&CK Techniken, Snippets und Snippet-Chains |
 | M-THEMES | Multi-Theme Cyberpunk Designs | v1 | Zusätzliche Cyberpunk HUD Farbpaletten (Matrix Green, Solarized Amber, Synthwave, Stealth Gray) |
 
