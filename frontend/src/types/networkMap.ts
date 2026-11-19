@@ -25,6 +25,9 @@ export interface TopologyNodeData {
   hostRules?: ForwardRule[];
   jumpHops?: string[];
   notesCount?: number;
+  isRemoteAgent?: boolean;
+  remoteAgentIp?: string;
+  viaAgentLabel?: string;
   onConnect?: (hostId: string) => void;
   onSplitConnect?: (hostId: string) => void;
   onOpenSftp?: (hostId: string, label: string) => void;

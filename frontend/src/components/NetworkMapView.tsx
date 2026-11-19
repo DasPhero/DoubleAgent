@@ -52,14 +52,14 @@ export function formatBytes(bytes?: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
-export function formatTunnelRoute(tun: ForwardTunnelStatus, hostLabel: string): string {
+export function formatTunnelRoute(tun: ForwardTunnelStatus, hostLabel: string, originLabel = 'Client'): string {
   if (tun.type === 'L') {
-    return `Client:${tun.bindPort} -> ${hostLabel}:${tun.targetPort || 'dyn'} (-L Local)`;
+    return `${originLabel}:${tun.bindPort} -> ${hostLabel}:${tun.targetPort || 'dyn'} (-L Local)`;
   }
   if (tun.type === 'R') {
-    return `${hostLabel}:${tun.bindPort} -> Client:${tun.targetPort || 'dyn'} (-R Remote)`;
+    return `${hostLabel}:${tun.bindPort} -> ${originLabel}:${tun.targetPort || 'dyn'} (-R Remote)`;
   }
-  return `Client:${tun.bindPort} -> ${hostLabel} (-D SOCKS5)`;
+  return `${originLabel}:${tun.bindPort} -> ${hostLabel} (-D SOCKS5)`;
 }
 
 export function formatRuleRoute(rule: ForwardRule, hostLabel: string): string {
@@ -130,6 +130,24 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
         </div>
 
         <div className="topo-meta-row">
+          {data.isRemoteAgent && (
+            <span
+              className="tab-via-agent-badge"
+              title={`Active Remote Companion Agent${data.remoteAgentIp ? ` (${data.remoteAgentIp})` : ''}`}
+            >
+              <span className="status-led led-active led-sm" aria-hidden="true" />
+              <span>AGENT CONTEXT</span>
+            </span>
+          )}
+          {data.viaAgentLabel && !data.isRemoteAgent && (
+            <span
+              className="tab-via-agent-badge"
+              title={`Routed via remote companion agent: ${data.viaAgentLabel}`}
+            >
+              <CyberIcon name="pivot-hop" size={11} />
+              <span>via {data.viaAgentLabel}</span>
+            </span>
+          )}
           {data.groupName && (
             <span
               className="topo-group-pill"
@@ -170,16 +188,19 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
               <span className="topo-corner-bracket">///</span>
               <span className="topo-tunnels-box-title">ACTIVE TUNNELS ({data.hostTunnels.length})</span>
             </div>
-            {data.hostTunnels.slice(0, 3).map((tun) => (
-              <div key={tun.id} className="topo-tunnel-route-chip active">
-                <span className="chip-mode">-{tun.type}</span>
-                <div className="chip-endpoints">
-                  <span className="ep-local">Client:{tun.bindPort}</span>
-                  <span className="ep-arrow"><CyberIcon name="arrow-right" size={14} /></span>
-                  <span className="ep-remote">{data.label}:{tun.targetPort || 'dyn'}</span>
+            {data.hostTunnels.slice(0, 3).map((tun) => {
+              const origin = tun.id.includes('-via-') && data.viaAgentLabel ? data.viaAgentLabel : 'Client';
+              return (
+                <div key={tun.id} className="topo-tunnel-route-chip active">
+                  <span className="chip-mode">-{tun.type}</span>
+                  <div className="chip-endpoints">
+                    <span className="ep-local">{origin}:{tun.bindPort}</span>
+                    <span className="ep-arrow"><CyberIcon name="arrow-right" size={14} /></span>
+                    <span className="ep-remote">{data.label}:{tun.targetPort || 'dyn'}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -333,6 +354,10 @@ export interface NetworkMapViewProps {
   activeSessionHostIds?: string[];
   activeTunnels?: ForwardTunnelStatus[];
   forwardRules?: ForwardRule[];
+  activeAgentHostId?: string;
+  activeAgentLabel?: string;
+  activeAgentIp?: string;
+  agentRoutedHostIds?: Record<string, string>;
   onConnectHost?: (hostId: string) => void;
   onSplitConnectHost?: (hostId: string) => void;
   onOpenSftp?: (hostId: string, hostLabel: string) => void;
@@ -350,6 +375,7 @@ const EMPTY_PROXY_PROFILES: ProxyProfileSummary[] = [];
 const EMPTY_STRINGS: string[] = [];
 const EMPTY_TUNNELS: ForwardTunnelStatus[] = [];
 const EMPTY_RULES: ForwardRule[] = [];
+const EMPTY_AGENT_ROUTES: Record<string, string> = {};
 
 export function getEffectiveJumpHopsForHost(
   h: TopologyHostItem,
@@ -383,6 +409,10 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
   activeSessionHostIds = EMPTY_STRINGS,
   activeTunnels = EMPTY_TUNNELS,
   forwardRules = EMPTY_RULES,
+  activeAgentHostId,
+  activeAgentLabel,
+  activeAgentIp,
+  agentRoutedHostIds = EMPTY_AGENT_ROUTES,
   onConnectHost,
   onSplitConnectHost,
   onOpenSftp,
@@ -494,6 +524,9 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     }
 
     // 4. Position Nodes according to Layout Mode
+    if (activeAgentHostId) {
+      bastionIds.add(activeAgentHostId);
+    }
     if (layoutMode === 'hierarchical') {
       // Tier 1: Bastion / Jump hosts
       const bastions = filteredHosts.filter((h) => bastionIds.has(h.id) || bastionIds.has(h.address) || bastionIds.has(h.label));
@@ -532,6 +565,9 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             hostRules: matchingHostRules,
             jumpHops: getEffectiveJumpHopsForHost(h, proxyProfiles),
             notesCount: notes.filter((n) => n.hostId === h.id).length,
+            isRemoteAgent: Boolean(activeAgentHostId && h.id === activeAgentHostId),
+            remoteAgentIp: activeAgentHostId && h.id === activeAgentHostId ? activeAgentIp : undefined,
+            viaAgentLabel: agentRoutedHostIds[h.id],
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
             onOpenSftp,
@@ -602,6 +638,9 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             hostRules: matchingHostRules,
             jumpHops: getEffectiveJumpHopsForHost(h, proxyProfiles),
             notesCount: notes.filter((n) => n.hostId === h.id).length,
+            isRemoteAgent: Boolean(activeAgentHostId && h.id === activeAgentHostId),
+            remoteAgentIp: activeAgentHostId && h.id === activeAgentHostId ? activeAgentIp : undefined,
+            viaAgentLabel: agentRoutedHostIds[h.id],
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
             onOpenSftp,
@@ -649,6 +688,9 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
               hostRules: matchingHostRules,
               jumpHops: getEffectiveJumpHopsForHost(h, proxyProfiles),
               notesCount: notes.filter((n) => n.hostId === h.id).length,
+              isRemoteAgent: Boolean(activeAgentHostId && h.id === activeAgentHostId),
+              remoteAgentIp: activeAgentHostId && h.id === activeAgentHostId ? activeAgentIp : undefined,
+              viaAgentLabel: agentRoutedHostIds[h.id],
               onConnect: onConnectHost,
               onSplitConnect: onSplitConnectHost,
               onOpenSftp,
@@ -698,6 +740,9 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             hostRules: matchingHostRules,
             jumpHops: getEffectiveJumpHopsForHost(h, proxyProfiles),
             notesCount: notes.filter((n) => n.hostId === h.id).length,
+            isRemoteAgent: Boolean(activeAgentHostId && h.id === activeAgentHostId),
+            remoteAgentIp: activeAgentHostId && h.id === activeAgentHostId ? activeAgentIp : undefined,
+            viaAgentLabel: agentRoutedHostIds[h.id],
             onConnect: onConnectHost,
             onSplitConnect: onSplitConnectHost,
             onOpenSftp,
@@ -746,21 +791,77 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
           });
         }
       } else {
-        // Standard Direct SSH edge from Client
-        if (nodeIds.has('client-node') && nodeIds.has(h.id)) {
+        // Check if this host is currently routed through the active Remote Companion Agent (F-46)
+        const routedViaLabel = agentRoutedHostIds[h.id];
+        const isActiveAgentNode = Boolean(activeAgentHostId && h.id === activeAgentHostId);
+        const routeFromAgent =
+          Boolean(routedViaLabel && activeAgentHostId && !isActiveAgentNode && nodeIds.has(activeAgentHostId));
+
+        if (routeFromAgent && activeAgentHostId && nodeIds.has(h.id)) {
+          edges.push({
+            id: `agent-hop-${activeAgentHostId}-${h.id}`,
+            source: activeAgentHostId,
+            target: h.id,
+            animated: true,
+            label: `via ${routedViaLabel}`,
+            labelStyle: {
+              fill: '#6ee7b7',
+              fontWeight: 700,
+              fontFamily: "'JetBrains Mono', Consolas, monospace",
+              fontSize: '10px',
+            },
+            labelBgStyle: {
+              fill: '#051411',
+              fillOpacity: 0.94,
+              stroke: '#10b981',
+              strokeWidth: 1,
+            },
+            labelBgPadding: [8, 4],
+            labelBgBorderRadius: 2,
+            style: { stroke: '#10b981', strokeWidth: 2.5 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#10b981' },
+          });
+        } else if (nodeIds.has('client-node') && nodeIds.has(h.id)) {
           const isSessionActive = activeSessionHostIds.includes(h.id);
           edges.push({
             id: `edge-client-${h.id}`,
             source: 'client-node',
             target: h.id,
-            animated: isSessionActive,
+            animated: isSessionActive || isActiveAgentNode,
+            label: isActiveAgentNode ? 'AGENT RPC' : undefined,
+            labelStyle: isActiveAgentNode
+              ? {
+                  fill: '#6ee7b7',
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono', Consolas, monospace",
+                  fontSize: '10px',
+                }
+              : undefined,
+            labelBgStyle: isActiveAgentNode
+              ? {
+                  fill: '#051411',
+                  fillOpacity: 0.94,
+                  stroke: '#10b981',
+                  strokeWidth: 1,
+                }
+              : undefined,
+            labelBgPadding: isActiveAgentNode ? [8, 4] : undefined,
+            labelBgBorderRadius: isActiveAgentNode ? 2 : undefined,
             style: {
-              stroke: isSessionActive ? 'var(--accent-bright)' : 'color-mix(in srgb, var(--accent-bright) 45%, transparent)',
-              strokeWidth: isSessionActive ? 2.5 : 1.5,
+              stroke: isActiveAgentNode
+                ? '#10b981'
+                : isSessionActive
+                  ? 'var(--accent-bright)'
+                  : 'color-mix(in srgb, var(--accent-bright) 45%, transparent)',
+              strokeWidth: isActiveAgentNode || isSessionActive ? 2.5 : 1.5,
             },
             markerEnd: {
               type: MarkerType.ArrowClosed,
-              color: isSessionActive ? 'var(--accent-bright)' : 'rgba(45, 212, 191, 0.45)',
+              color: isActiveAgentNode
+                ? '#10b981'
+                : isSessionActive
+                  ? 'var(--accent-bright)'
+                  : 'rgba(45, 212, 191, 0.45)',
             },
           });
         }
@@ -771,12 +872,17 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
         isTunnelMatchingHost(t, h.id, h.address, forwardRules)
       );
       hostTunnels.forEach((tun) => {
+        const isViaAgentTunnel =
+          tun.id.includes('-via-') &&
+          Boolean(activeAgentHostId && activeAgentHostId !== h.id && nodeIds.has(activeAgentHostId));
+        const tunnelSource = isViaAgentTunnel && activeAgentHostId ? activeAgentHostId : 'client-node';
+        const originLabel = isViaAgentTunnel && activeAgentLabel ? activeAgentLabel : 'Client';
         edges.push({
           id: `tunnel-edge-${h.id}-${tun.id}`,
-          source: 'client-node',
+          source: tunnelSource,
           target: h.id,
           animated: true,
-          label: formatTunnelRoute(tun, h.label),
+          label: formatTunnelRoute(tun, h.label, originLabel),
           labelStyle: {
             fill: '#ffffff',
             fontWeight: 700,
@@ -846,6 +952,10 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
     onStartTunnel,
     onStopTunnel,
     proxyProfiles,
+    activeAgentHostId,
+    activeAgentLabel,
+    activeAgentIp,
+    agentRoutedHostIds,
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(generatedNodes);

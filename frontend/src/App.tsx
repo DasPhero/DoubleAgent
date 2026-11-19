@@ -1922,6 +1922,44 @@ export function App({
   const [attachingAgentSessionId, setAttachingAgentSessionId] = useState<string | null>(null);
   const [showRemoteDirPicker, setShowRemoteDirPicker] = useState<boolean>(false);
 
+  const topologyAgentInfo = useMemo(() => {
+    const activeAgent = remoteExecContext.mode === 'agent' ? remoteExecContext.activeAgent : null;
+    let activeAgentHostId: string | undefined;
+    if (activeAgent) {
+      // 1. Match the SSH session's pane hostId directly
+      for (const t of tabs) {
+        const panes = collectPanes(t.rootNode);
+        const matched = panes.find((p) => p.sessionId === activeAgent.sessionId && p.hostId);
+        if (matched?.hostId) {
+          activeAgentHostId = matched.hostId;
+          break;
+        }
+      }
+      // 2. Fallback: match by label/hostname/primaryIp in vaultSummary.hosts
+      if (!activeAgentHostId) {
+        const byHost = vaultSummary.hosts.find(
+          (h) =>
+            h.label.toLowerCase() === (activeAgent.hostname || '').toLowerCase() ||
+            h.label.toLowerCase() === (activeAgent.label || '').toLowerCase() ||
+            (activeAgent.primaryIp && h.address === activeAgent.primaryIp)
+        );
+        if (byHost) activeAgentHostId = byHost.id;
+      }
+    }
+    const agentRoutedHostIds: Record<string, string> = {};
+    for (const t of tabs) {
+      if (t.hostId && t.viaAgentLabel) {
+        agentRoutedHostIds[t.hostId] = t.viaAgentLabel;
+      }
+    }
+    return {
+      activeAgentHostId,
+      activeAgentLabel: activeAgent ? activeAgent.hostname || activeAgent.label : undefined,
+      activeAgentIp: activeAgent?.primaryIp || undefined,
+      agentRoutedHostIds,
+    };
+  }, [remoteExecContext, tabs, vaultSummary.hosts]);
+
   const syncContextDependentState = useCallback(async (): Promise<void> => {
     const api = getWailsBindings();
     if (api?.GetLocalNetworkIPs) {
@@ -7462,6 +7500,10 @@ export function App({
                 activeSessionHostIds={getActiveSessionHostIds()}
                 activeTunnels={activeTunnels}
                 forwardRules={forwardRules}
+                activeAgentHostId={topologyAgentInfo.activeAgentHostId}
+                activeAgentLabel={topologyAgentInfo.activeAgentLabel}
+                activeAgentIp={topologyAgentInfo.activeAgentIp}
+                agentRoutedHostIds={topologyAgentInfo.agentRoutedHostIds}
                 onConnectHost={(hostId) => {
                   const h = vaultSummary.hosts.find((x) => x.id === hostId);
                   if (h) void handleConnectSavedHost(h);
@@ -13126,6 +13168,10 @@ export function App({
                         activeSessionHostIds={getActiveSessionHostIds()}
                         activeTunnels={activeTunnels}
                         forwardRules={forwardRules}
+                        activeAgentHostId={topologyAgentInfo.activeAgentHostId}
+                        activeAgentLabel={topologyAgentInfo.activeAgentLabel}
+                        activeAgentIp={topologyAgentInfo.activeAgentIp}
+                        agentRoutedHostIds={topologyAgentInfo.agentRoutedHostIds}
                         onConnectHost={(hostId) => {
                           const h = vaultSummary.hosts.find((x) => x.id === hostId);
                           if (h) void handleConnectSavedHost(h);
