@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=DoubleAgent
+Comment=Cross-platform native SSH client & security workbench
+Exec=doubleagent
+Icon=doubleagent
+Terminal=false
+Type=Application
+Categories=Development;Network;Utility;Security;
+StartupWMClass=DoubleAgent

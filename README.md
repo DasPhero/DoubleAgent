@@ -40,11 +40,32 @@ Dependencies point **downwards only**:
 ## Commands
 
 ```bash
-wails dev                     # Renderer + native app window with hot reload
-wails build                   # Build standalone binary → build/bin/
-go test ./...                 # Run backend unit tests
+wails dev                         # Renderer + native app window with hot reload
+./scripts/build-all.ps1           # Windows host: verify Windows+Linux Go, test, build Windows + Linux (via Docker/WSL)
+./scripts/build-all.sh            # Linux host: verify, test, build Linux + cross-build Windows binary
+wails build                       # Single-OS standalone binary → build/bin/
+go test ./...                     # Run backend unit tests
 go vet ./... && golangci-lint run
-cd frontend && npm run test   # Run frontend unit tests (Vitest)
-cd frontend && npm run build  # Typecheck and bundle frontend assets
+cd frontend && npm run test       # Run frontend unit tests (Vitest)
+cd frontend && npm run build      # Typecheck and bundle frontend assets
 ```
+
+### Building for Both Windows & Linux
+
+- **Output binaries** (written to `build/bin/`):
+  - Windows (`amd64`): `build/bin/DoubleAgent.exe`
+  - Linux (`amd64`): `build/bin/DoubleAgent-linux-amd64` (desktop entry in `build/linux/doubleagent.desktop`)
+- **On Linux (Ubuntu 24.04 / Debian 12+ / Kali / Arch):**
+  ```bash
+  sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+  ./scripts/build-all.sh
+  ./scripts/install-linux.sh        # Installs global `doubleagent` command + app launcher icon (or `--user` for ~/.local/bin)
+  ```
+  `scripts/build-all.sh` auto-detects `webkit2gtk-4.1` (`-tags webkit2_41`) vs `webkit2gtk-4.0`, builds `DoubleAgent-linux-amd64`, and cross-compiles `DoubleAgent.exe` in one step. After installing, launch from any terminal via `doubleagent` (remove anytime with `./scripts/install-linux.sh --uninstall`).
+- **On Windows:**
+  ```powershell
+  ./scripts/build-all.ps1
+  ```
+  Always cross-checks `GOOS=linux GOARCH=amd64` Go vet/build, builds `DoubleAgent.exe`, and builds `DoubleAgent-linux-amd64` automatically when **Docker Desktop** (`Dockerfile.linux-build`) or **WSL2** (with GTK3 + WebKit2GTK) is installed. *(Wails v2 Linux GUI binaries link against GTK3/WebKit2GTK via CGo, so a Linux userspace via Docker, WSL2, a Linux host, or GitHub Actions CI is required for linking the Linux binary.)*
+- **GitHub Actions CI (`.github/workflows/ci.yml`):** Automatically tests and builds both `DoubleAgent-Windows` and `DoubleAgent-Linux` binaries on every push and pull request.
 

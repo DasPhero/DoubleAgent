@@ -77,12 +77,17 @@ pty / crypto package, so it is unit-testable in isolation.
 ## Commands
 
 ```bash
-wails dev            # renderer + app window, hot reload
-wails build          # standalone binary → build/bin
-go test ./...        # backend tests
+wails dev                         # renderer + app window, hot reload
+./scripts/build-all.ps1           # Windows host: tests + Windows binary + Linux binary (via Docker/WSL)
+./scripts/build-all.sh            # Linux host: tests + Linux binary (-tags webkit2_41) + Windows cross-build
+wails build                       # single-OS standalone binary → build/bin/
+go test ./...                     # backend tests
+GOOS=linux GOARCH=amd64 go vet ./backend/... && GOOS=linux GOARCH=amd64 go build ./backend/...
 go vet ./... && golangci-lint run
-cd frontend && npm run test   # frontend (Vitest)
+cd frontend && npm run test       # frontend (Vitest)
 ```
+
+> **Always target Windows + Linux:** Run `GOOS=linux GOARCH=amd64 go vet ./backend/...` and `go build ./backend/...` on Windows hosts and use `./scripts/build-all.ps1` (Docker/WSL) or `./scripts/build-all.sh` (Linux) / GitHub Actions CI (`.github/workflows/ci.yml`) to produce both `build/bin/DoubleAgent.exe` and `build/bin/DoubleAgent-linux-amd64`.
 
 ## Documentation is part of every slice (mandatory)
 
