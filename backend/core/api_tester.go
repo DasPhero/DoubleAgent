@@ -224,6 +224,54 @@ type ApiAiStreamChunkEvent struct {
 	Error    string `json:"error,omitempty"`
 }
 
+// ApiWsConnectRequest configures a persistent WebSocket connection in the Go backend (F-44).
+type ApiWsConnectRequest struct {
+	SessionID     string        `json:"sessionId,omitempty"`
+	URL           string        `json:"url"`
+	Headers       []ApiKeyValue `json:"headers,omitempty"`
+	Auth          ApiAuthConfig `json:"auth"`
+	Subprotocols  []string      `json:"subprotocols,omitempty"`
+	RouteID       string        `json:"routeId,omitempty"`
+	TlsSkipVerify bool          `json:"tlsSkipVerify,omitempty"`
+	TimeoutSec    int           `json:"timeoutSec,omitempty"`
+	Variables     []ApiKeyValue `json:"variables,omitempty"`
+}
+
+// ApiWsConnectResult summarizes the WebSocket handshake outcome and selected route/protocol (F-44).
+type ApiWsConnectResult struct {
+	SessionID        string `json:"sessionId"`
+	EffectiveURL     string `json:"effectiveUrl,omitempty"`
+	Subprotocol      string `json:"subprotocol,omitempty"`
+	StatusCode       int    `json:"statusCode"`
+	ResponseHeaders  string `json:"responseHeaders,omitempty"`
+	RouteUsed        string `json:"routeUsed,omitempty"`
+	DurationMs       int64  `json:"durationMs"`
+	Error            string `json:"error,omitempty"`
+}
+
+// ApiWsSendRequest sends a text, binary (hex/DSL), or ping frame over an active WebSocket session (F-44).
+type ApiWsSendRequest struct {
+	SessionID string        `json:"sessionId"`
+	FrameType string        `json:"frameType"` // "text" | "binary" | "ping"
+	Payload   string        `json:"payload"`
+	Variables []ApiKeyValue `json:"variables,omitempty"`
+}
+
+// ApiWsFrameEvent is emitted via Wails runtime events (`api:ws-frame`) for sent/received frames and lifecycle events (F-44).
+type ApiWsFrameEvent struct {
+	SessionID      string `json:"sessionId"`
+	Direction      string `json:"direction"` // "in" | "out" | "system"
+	FrameType      string `json:"frameType"` // "text" | "binary" | "ping" | "pong" | "close" | "connected" | "error"
+	Payload        string `json:"payload"`
+	PayloadHexDump string `json:"payloadHexDump,omitempty"`
+	PayloadASCII   string `json:"payloadAscii,omitempty"`
+	PayloadBase64  string `json:"payloadBase64,omitempty"`
+	SizeBytes      int    `json:"sizeBytes"`
+	IsBinary       bool   `json:"isBinary,omitempty"`
+	Timestamp      string `json:"timestamp"`
+	Error          string `json:"error,omitempty"`
+}
+
 // SanitizeApiAuthForDisplay returns a copy of ApiAuthConfig with inline secret values replaced by placeholders.
 func SanitizeApiAuthForDisplay(auth ApiAuthConfig) ApiAuthConfig {
 	clean := auth

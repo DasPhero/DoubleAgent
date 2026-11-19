@@ -7197,6 +7197,196 @@ func (a *App) SendRawTcpHex(sessionID string, expr string) (int, error) {
 	return n, wErr
 }
 
+// --- F-44: WebSocket Client Mode (API Tester) ---
+
+// ConnectApiWebSocket opens a persistent WebSocket session inside Go and streams frames via "api:ws-frame" events (F-44).
+func (a *App) ConnectApiWebSocket(req core.ApiWsConnectRequest) (*core.ApiWsConnectResult, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	return a.ensureApiClient().ConnectWebSocket(
+		baseCtx,
+		req,
+		a.buildApiSecretResolver(),
+		a.buildApiAuthLookup(),
+		a.buildApiRouteResolver(),
+		func(ev core.ApiWsFrameEvent) {
+			a.emit(a.ctx, "api:ws-frame", ev)
+		},
+	)
+}
+
+// SendApiWebSocketFrame sends a text, binary (Hex DSL), or ping frame over an open WebSocket session (F-44).
+func (a *App) SendApiWebSocketFrame(req core.ApiWsSendRequest) error {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	return a.ensureApiClient().SendWebSocketFrame(
+		req,
+		a.buildApiSecretResolver(),
+		func(ev core.ApiWsFrameEvent) {
+			a.emit(a.ctx, "api:ws-frame", ev)
+		},
+	)
+}
+
+// DisconnectApiWebSocket closes an active WebSocket session started via ConnectApiWebSocket (F-44).
+func (a *App) DisconnectApiWebSocket(sessionID string) bool {
+	if a.apiClient == nil {
+		return false
+	}
+	return a.apiClient.DisconnectWebSocket(sessionID)
+}
+
+// --- F-45: On-Demand Remote Socket Discovery & 1-Click -L Tunnel ---
+
+// DiscoverRemoteSockets runs a read-only, non-PTY SSH discovery command to list listening sockets on the remote host (F-45).
+func (a *App) DiscoverRemoteSockets(sessionID string) (*core.RemoteSocketScanResult, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	runner, ok := a.transport.(core.SshBinaryRunner)
+	if !ok {
+		return nil, errors.New("active ssh transport does not support non-PTY socket discovery")
+	}
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	return ssh.DiscoverRemoteSockets(baseCtx, runner, sessionID)
+}
+
+// SuggestFreeLocalPort finds an available TCP port on 127.0.0.1 for 1-click -L forwarding (F-45).
+func (a *App) SuggestFreeLocalPort(preferred uint16) (uint16, error) {
+	if preferred >= 1024 {
+		if ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", preferred)); err == nil {
+			_ = ln.Close()
+			return preferred, nil
+		}
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer ln.Close()
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok || addr.Port <= 0 {
+		return 0, errors.New("failed to determine free local TCP port")
+	}
+	return uint16(addr.Port), nil
+}
+
+// QuickStartLocalForward opens a 1-click SSH -L tunnel to a discovered remote socket and optionally saves the rule (F-45).
+func (a *App) QuickStartLocalForward(
+	sessionID string,
+	targetHost string,
+	targetPort uint16,
+	localPort uint16,
+	saveRule bool,
+	engagementID string,
+	label string,
+) (*core.QuickForwardResult, error) {
+	if a.vaultStore != nil {
+		a.vaultStore.Touch()
+	}
+	if strings.TrimSpace(sessionID) == "" {
+		return nil, errors.New("sessionId is required")
+	}
+	if targetPort == 0 {
+		return nil, errors.New("targetPort must be > 0")
+	}
+
+	effectiveTargetHost := strings.TrimSpace(targetHost)
+	switch effectiveTargetHost {
+	case "", "0.0.0.0", "*", "::":
+		effectiveTargetHost = "127.0.0.1"
+	}
+
+	chosenLocalPort := localPort
+	if chosenLocalPort == 0 {
+		p, pErr := a.SuggestFreeLocalPort(targetPort)
+		if pErr != nil {
+			return nil, pErr
+		}
+		chosenLocalPort = p
+	}
+
+	ruleID := fmt.Sprintf("quick-fwd-%d", time.Now().UnixNano())
+	trimmedLabel := strings.TrimSpace(label)
+	if trimmedLabel == "" {
+		trimmedLabel = fmt.Sprintf("Quick -L 127.0.0.1:%d -> %s:%d", chosenLocalPort, effectiveTargetHost, targetPort)
+	}
+
+	if saveRule && a.vaultStore != nil {
+		a.mu.Lock()
+		hostID := a.sessionHostID[sessionID]
+		a.mu.Unlock()
+		rule := core.ForwardRule{
+			ID:           ruleID,
+			HostID:       hostID,
+			EngagementID: strings.TrimSpace(engagementID),
+			Type:         core.ForwardLocal,
+			BindAddress:  "127.0.0.1",
+			BindPort:     chosenLocalPort,
+			TargetHost:   effectiveTargetHost,
+			TargetPort:   targetPort,
+			Label:        trimmedLabel,
+		}
+		if err := a.SaveForwardRule(rule); err != nil {
+			return nil, err
+		}
+		tunID, err := a.StartForwardTunnel(sessionID, ruleID)
+		if err != nil {
+			return nil, err
+		}
+		return &core.QuickForwardResult{
+			TunnelID:   tunID,
+			RuleID:     ruleID,
+			LocalAddr:  "127.0.0.1",
+			LocalPort:  chosenLocalPort,
+			TargetHost: effectiveTargetHost,
+			TargetPort: targetPort,
+			SavedRule:  true,
+		}, nil
+	}
+
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	tunnel, err := a.transport.StartForwardLocal(
+		baseCtx,
+		sessionID,
+		ruleID,
+		"127.0.0.1",
+		chosenLocalPort,
+		effectiveTargetHost,
+		targetPort,
+	)
+	if err != nil {
+		return nil, err
+	}
+	tunnelID := tunnel.GetStatus().ID
+	a.mu.Lock()
+	a.activeTunnels[tunnelID] = tunnel
+	a.mu.Unlock()
+	a.emit(a.ctx, "forward:tunnels-updated", a.GetActiveTunnels())
+
+	return &core.QuickForwardResult{
+		TunnelID:   tunnelID,
+		RuleID:     ruleID,
+		LocalAddr:  "127.0.0.1",
+		LocalPort:  chosenLocalPort,
+		TargetHost: effectiveTargetHost,
+		TargetPort: targetPort,
+		SavedRule:  false,
+	}, nil
+}
+
 
 
 

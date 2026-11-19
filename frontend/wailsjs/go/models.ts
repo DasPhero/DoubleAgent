@@ -632,6 +632,114 @@ export namespace core {
 	}
 	
 	
+	export class ApiWsConnectRequest {
+	    sessionId?: string;
+	    url: string;
+	    headers?: ApiKeyValue[];
+	    auth: ApiAuthConfig;
+	    subprotocols?: string[];
+	    routeId?: string;
+	    tlsSkipVerify?: boolean;
+	    timeoutSec?: number;
+	    variables?: ApiKeyValue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiWsConnectRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.url = source["url"];
+	        this.headers = this.convertValues(source["headers"], ApiKeyValue);
+	        this.auth = this.convertValues(source["auth"], ApiAuthConfig);
+	        this.subprotocols = source["subprotocols"];
+	        this.routeId = source["routeId"];
+	        this.tlsSkipVerify = source["tlsSkipVerify"];
+	        this.timeoutSec = source["timeoutSec"];
+	        this.variables = this.convertValues(source["variables"], ApiKeyValue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ApiWsConnectResult {
+	    sessionId: string;
+	    effectiveUrl?: string;
+	    subprotocol?: string;
+	    statusCode: number;
+	    responseHeaders?: string;
+	    routeUsed?: string;
+	    durationMs: number;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiWsConnectResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.effectiveUrl = source["effectiveUrl"];
+	        this.subprotocol = source["subprotocol"];
+	        this.statusCode = source["statusCode"];
+	        this.responseHeaders = source["responseHeaders"];
+	        this.routeUsed = source["routeUsed"];
+	        this.durationMs = source["durationMs"];
+	        this.error = source["error"];
+	    }
+	}
+	export class ApiWsSendRequest {
+	    sessionId: string;
+	    frameType: string;
+	    payload: string;
+	    variables?: ApiKeyValue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ApiWsSendRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.frameType = source["frameType"];
+	        this.payload = source["payload"];
+	        this.variables = this.convertValues(source["variables"], ApiKeyValue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class AppStatus {
 	    name: string;
 	    version: string;
@@ -3131,6 +3239,30 @@ export namespace core {
 	}
 	
 	
+	export class QuickForwardResult {
+	    tunnelId: string;
+	    ruleId?: string;
+	    localAddr: string;
+	    localPort: number;
+	    targetHost: string;
+	    targetPort: number;
+	    savedRule: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new QuickForwardResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tunnelId = source["tunnelId"];
+	        this.ruleId = source["ruleId"];
+	        this.localAddr = source["localAddr"];
+	        this.localPort = source["localPort"];
+	        this.targetHost = source["targetHost"];
+	        this.targetPort = source["targetPort"];
+	        this.savedRule = source["savedRule"];
+	    }
+	}
 	export class RawTcpConfig {
 	    host: string;
 	    port: number;
@@ -3286,6 +3418,74 @@ export namespace core {
 	        this.hasConflict = source["hasConflict"];
 	        this.errorMessage = source["errorMessage"];
 	    }
+	}
+	export class RemoteSocketEntry {
+	    proto: string;
+	    state: string;
+	    localAddress: string;
+	    localPort: number;
+	    remoteAddress?: string;
+	    process?: string;
+	    pid?: string;
+	    isLoopback: boolean;
+	    platform?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteSocketEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.proto = source["proto"];
+	        this.state = source["state"];
+	        this.localAddress = source["localAddress"];
+	        this.localPort = source["localPort"];
+	        this.remoteAddress = source["remoteAddress"];
+	        this.process = source["process"];
+	        this.pid = source["pid"];
+	        this.isLoopback = source["isLoopback"];
+	        this.platform = source["platform"];
+	    }
+	}
+	export class RemoteSocketScanResult {
+	    sessionId: string;
+	    platform: string;
+	    commandUsed: string;
+	    entries: RemoteSocketEntry[];
+	    rawOutput?: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteSocketScanResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.platform = source["platform"];
+	        this.commandUsed = source["commandUsed"];
+	        this.entries = this.convertValues(source["entries"], RemoteSocketEntry);
+	        this.rawOutput = source["rawOutput"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class ReportTemplate {
 	    id: string;

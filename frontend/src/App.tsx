@@ -43,6 +43,7 @@ import { CyberIcon } from './components/CyberIcon';
 import { NetworkMapView } from './components/NetworkMapView';
 import { ApiTesterView } from './components/ApiTesterView';
 import { HexRunnerView } from './components/HexRunnerView';
+import { RemoteSocketsModal } from './components/RemoteSocketsModal';
 import type { ApiRequestItem } from './types/apitester';
 import { RemoteEditorView } from './components/RemoteEditorView';
 import { RemoteEditSession, RemoteConflictInfo } from './types/remoteEdit';
@@ -1065,7 +1066,7 @@ export interface SerialPortInfo {
   isConnected?: boolean;
 }
 
-export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'payloads' | 'pivot' | 'transfer' | 'listeners' | 'notes' | 'totp' | 'credentials';
+export type SidebarPanel = 'hosts' | 'snippets' | 'chains' | 'payloads' | 'pivot' | 'forwards' | 'transfer' | 'listeners' | 'notes' | 'totp' | 'credentials';
 export type NavDropdownMenu = 'view' | 'engagement-selector' | 'engagement-tools' | 'terminals' | 'offense' | 'networking' | 'intel';
 
 interface WailsRuntime {
@@ -1157,6 +1158,7 @@ export function App({
   const [snippetDrawerTag, setSnippetDrawerTag] = useState<string>('all');
   const [chainDrawerQuery, setChainDrawerQuery] = useState<string>('');
   const [chainDrawerTag, setChainDrawerTag] = useState<string>('all');
+  const [forwardsDrawerQuery, setForwardsDrawerQuery] = useState<string>('');
   const [credDrawerQuery, setCredDrawerQuery] = useState<string>('');
   const [credDrawerScope, setCredDrawerScope] = useState<'host_and_engagement' | 'all'>('host_and_engagement');
   const [totpDrawerScope, setTotpDrawerScope] = useState<'host_and_global' | 'all'>('host_and_global');
@@ -1280,6 +1282,19 @@ export function App({
       if (api?.ListActiveManagedListeners) {
         void api.ListActiveManagedListeners().then((list) => {
           if (list) setDrawerListeners(list);
+        }).catch(() => { });
+      }
+    }
+    if (activeSidebarPanel === 'forwards') {
+      const api = getWailsBindings();
+      if (api?.ListForwardRules) {
+        void api.ListForwardRules().then((rules) => {
+          if (rules) setForwardRules([...rules]);
+        }).catch(() => { });
+      }
+      if (api?.GetActiveTunnels) {
+        void api.GetActiveTunnels().then((tunnels) => {
+          if (tunnels) setActiveTunnels([...tunnels]);
         }).catch(() => { });
       }
     }
@@ -1551,6 +1566,8 @@ export function App({
   const [showFileTransferModal, setShowFileTransferModal] = useState<boolean>(false);
   // Network Pivoting Manager state (F-24)
   const [showPivotManagerModal, setShowPivotManagerModal] = useState<boolean>(false);
+  // Remote Listening Sockets HUD state (F-45)
+  const [showRemoteSocketsModal, setShowRemoteSocketsModal] = useState<boolean>(false);
   // Route Health Check Dashboard state (opened as workspace view tab)
   const [dashboardFileServers, setDashboardFileServers] = useState<FileTransferServerInfo[]>([]);
 
@@ -8896,6 +8913,7 @@ export function App({
                 {renderDropdownRow('serial', 'Hardware Bus & UART Logic', undefined, () => void handleOpenSerialModal())}
                 {renderDropdownRow('raw-tcp', 'Raw TCP / Netcat', undefined, () => setShowRawTcpModal(true))}
                 {renderDropdownRow('hex-runner', 'Binary / Hex Runner (No-PTY)', undefined, () => openHexRunnerTab())}
+                {renderDropdownRow('remote-sockets', 'Remote Listening Sockets (-L)', undefined, () => setShowRemoteSocketsModal(true))}
                 {renderDropdownRow('winrm-client', 'WinRM / PowerShell Remoting', undefined, () => openWinrmTab())}
               </div>
             )}
@@ -8933,6 +8951,7 @@ export function App({
                 {renderDropdownRow('nmap-import', 'Nmap XML Recon Ingest', undefined, () => setShowNmapImportModal(true), false, false, 'XML')}
                 {renderDropdownRow('api-tester', 'API Tester & HTTP Repeater', undefined, () => openApiTesterTab())}
                 {renderDropdownRow('hex-runner', 'Binary / Hex Runner (No-PTY)', undefined, () => openHexRunnerTab(), false, false, 'RAW')}
+                {renderDropdownRow('remote-sockets', 'Remote Sockets & Quick -L Tunnel', undefined, () => setShowRemoteSocketsModal(true), false, false, 'SSH')}
 
                 <div className="nav-dropdown-divider" />
                 <div className="tools-sub-header">Phase 2 // Delivery &amp; Catchers</div>
@@ -9198,6 +9217,24 @@ export function App({
               }}
               title="Network Pivoting & Tunnel Launcher"
               aria-label="Network Pivoting Panel"
+            >
+              <CyberIcon name="pivot-hop" size={18} />
+            </button>
+
+            {/* 4b. Port Forwards Quick Start / Stop */}
+            <button
+              type="button"
+              className={`activity-bar-btn ${activeSidebarPanel === 'forwards' && !sidebarCollapsed ? 'active' : ''}`}
+              onClick={() => {
+                if (activeSidebarPanel === 'forwards' && !sidebarCollapsed) {
+                  setSidebarCollapsed(true);
+                } else {
+                  setActiveSidebarPanel('forwards');
+                  setSidebarCollapsed(false);
+                }
+              }}
+              title="Port Forwards & SSH Tunnels (-L / -R / -D)"
+              aria-label="Port Forwards Panel"
             >
               <CyberIcon name="tunnel" size={18} />
             </button>
@@ -11010,6 +11047,226 @@ export function App({
                 </div>
               )}
 
+              {activeSidebarPanel === 'forwards' && (
+                <div className="drawer-panel drawer-forwards-panel">
+                  <div className="sidebar-header">
+                    <h2>Port Forwards</h2>
+                    <div className="sidebar-actions" style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => void refreshForwardState()}
+                        title="Refresh forward rules and tunnel status"
+                      >
+                        <CyberIcon name="refresh" size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary btn-sm"
+                        onClick={() => setShowPortForwardingModal(true)}
+                        title="Create or edit port forwarding rules (F-13)"
+                      >
+                        + Rules
+                      </button>
+                    </div>
+                  </div>
+                  <div className="drawer-filter-bar">
+                    <input
+                      type="text"
+                      className="drawer-search-input"
+                      placeholder="Filter forwards, ports, or hosts..."
+                      value={forwardsDrawerQuery}
+                      onChange={(e) => setForwardsDrawerQuery(e.target.value)}
+                      aria-label="Filter Port Forwards"
+                    />
+                  </div>
+                  <div className="drawer-items-list">
+                    {(() => {
+                      const q = forwardsDrawerQuery.trim().toLowerCase();
+                      const activeOnlyAdhoc = activeTunnels.filter((t) => {
+                        const tHostLabel = vaultSummary.hosts.find((h) => h.id === t.hostId)?.label || '';
+                        return (
+                          t.status === 'active' &&
+                          !forwardRules.some((r) => r.id === t.ruleId || r.id === t.id) &&
+                          (!q ||
+                            String(t.bindPort).includes(q) ||
+                            String(t.targetPort || '').includes(q) ||
+                            (t.targetHost || '').toLowerCase().includes(q) ||
+                            tHostLabel.toLowerCase().includes(q))
+                        );
+                      });
+                      const matchingRules = forwardRules.filter((r) => {
+                        if (!q) return true;
+                        const hostLabel = vaultSummary.hosts.find((h) => h.id === r.hostId)?.label || '';
+                        return (
+                          (r.label || '').toLowerCase().includes(q) ||
+                          String(r.bindPort).includes(q) ||
+                          String(r.targetPort || '').includes(q) ||
+                          (r.targetHost || '').toLowerCase().includes(q) ||
+                          hostLabel.toLowerCase().includes(q) ||
+                          r.type.toLowerCase().includes(q)
+                        );
+                      });
+
+                      if (matchingRules.length === 0 && activeOnlyAdhoc.length === 0) {
+                        return (
+                          <div className="drawer-empty-state">
+                            <span>No port forward rules match.</span>
+                            <button
+                              type="button"
+                              className="cyber-hud-btn btn-primary btn-sm"
+                              style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                              onClick={() => setShowPortForwardingModal(true)}
+                            >
+                              <CyberIcon name="tunnel" size={12} />
+                              <span>New Forward Rule</span>
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      const sshPanes = tabs.flatMap((t) =>
+                        collectPanes(t.rootNode).filter(
+                          (p) =>
+                            Boolean(p.hostId) &&
+                            !p.paneType &&
+                            !p.isRawTcp &&
+                            !p.sessionId.startsWith('local-') &&
+                            !p.sessionId.startsWith('serial-') &&
+                            !p.sessionId.startsWith('winrm-') &&
+                            !p.sessionId.startsWith('rawtcp-')
+                        )
+                      );
+                      const preferredSshSid =
+                        (activePane && sshPanes.some((p) => p.sessionId === activePane.sessionId)
+                          ? activePane.sessionId
+                          : sshPanes[0]?.sessionId) || '';
+
+                      return (
+                        <>
+                          {activeOnlyAdhoc.map((tun) => {
+                            const tunHostLabel = vaultSummary.hosts.find((h) => h.id === tun.hostId)?.label;
+                            return (
+                              <div key={tun.id} className="drawer-card">
+                                <div className="drawer-card-header">
+                                  <span className="drawer-card-title">
+                                    -{tun.type} Quick Tunnel ({tunHostLabel || 'SSH'})
+                                  </span>
+                                  <span className="drawer-badge" style={{ color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.45)' }}>
+                                    ACTIVE
+                                  </span>
+                                </div>
+                                <div className="drawer-card-meta">
+                                  <span>
+                                    {tun.bindAddress || '127.0.0.1'}:{tun.bindPort}
+                                    {tun.type === 'D' ? ' (SOCKS5)' : ` -> ${tun.targetHost}:${tun.targetPort}`}
+                                  </span>
+                                </div>
+                                <div className="drawer-card-actions">
+                                  <button
+                                    type="button"
+                                    className="drawer-action-btn danger"
+                                    onClick={() => void handleStopForwardTunnel(tun.id)}
+                                    title="Stop active tunnel"
+                                  >
+                                    <CyberIcon name="stop" size={12} />
+                                    <span>Stop</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {matchingRules.map((rule) => {
+                            const host = vaultSummary.hosts.find((h) => h.id === rule.hostId);
+                            const runningTun = activeTunnels.find(
+                              (t) => t.status === 'active' && (t.ruleId === rule.id || t.id === rule.id)
+                            );
+                            const mapping =
+                              rule.type === 'D'
+                                ? `${rule.bindAddress || '127.0.0.1'}:${rule.bindPort} (SOCKS5)`
+                                : `${rule.bindAddress || '127.0.0.1'}:${rule.bindPort} -> ${rule.targetHost}:${rule.targetPort}`;
+
+                            return (
+                              <div key={rule.id} className="drawer-card">
+                                <div className="drawer-card-header">
+                                  <span className="drawer-card-title">
+                                    -{rule.type} {rule.label || mapping}
+                                  </span>
+                                  <span
+                                    className="drawer-badge"
+                                    style={
+                                      runningTun
+                                        ? { color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.45)' }
+                                        : undefined
+                                    }
+                                  >
+                                    {runningTun ? 'ACTIVE' : 'STOPPED'}
+                                  </span>
+                                </div>
+                                <div className="drawer-card-meta">
+                                  <span>{mapping}</span>
+                                  {host && <span>HOST: {host.label}</span>}
+                                </div>
+                                <div className="drawer-card-actions">
+                                  {runningTun ? (
+                                    <button
+                                      type="button"
+                                      className="drawer-action-btn danger"
+                                      onClick={() => void handleStopForwardTunnel(runningTun.id)}
+                                      title="Stop active forward tunnel"
+                                    >
+                                      <CyberIcon name="stop" size={12} />
+                                      <span>Stop</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="drawer-action-btn primary"
+                                      onClick={() => {
+                                        if (rule.hostId) {
+                                          void handleStartTunnelWithHost(rule.hostId, rule.id);
+                                        } else if (preferredSshSid) {
+                                          void handleStartForwardTunnel(preferredSshSid, rule.id);
+                                        } else {
+                                          setStatusMessage('Connect an SSH host or assign a host to this forward rule.');
+                                          setShowPortForwardingModal(true);
+                                        }
+                                      }}
+                                      title={
+                                        rule.hostId
+                                          ? `Start tunnel via ${host?.label || rule.hostId}`
+                                          : preferredSshSid
+                                            ? 'Start tunnel on active SSH session'
+                                            : 'Open manager to pick SSH session'
+                                      }
+                                    >
+                                      <CyberIcon name="play" size={12} />
+                                      <span>Start</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="drawer-action-btn"
+                                    onClick={() => {
+                                      setForwardingModalHostId(rule.hostId || undefined);
+                                      setShowPortForwardingModal(true);
+                                    }}
+                                    title="Edit rule in Port Forwarding Manager"
+                                  >
+                                    <CyberIcon name="edit" size={12} />
+                                    <span>Edit</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {activeSidebarPanel === 'listeners' && (
                 <div className="drawer-panel drawer-listeners-panel">
                   <div className="sidebar-header">
@@ -12066,6 +12323,17 @@ export function App({
                         <CyberIcon name="stabilize" size={12} />
                         <span>Stabilize</span>
                       </button>
+                      <button
+                        type="button"
+                        className="hud-seg-btn"
+                        aria-label="Remote Listening Sockets"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setShowRemoteSocketsModal(true)}
+                        title="Scan listening sockets on active SSH host & 1-click -L forward (F-45)"
+                      >
+                        <CyberIcon name="tunnel" size={12} />
+                        <span>Sockets</span>
+                      </button>
                     </div>
 
                     <button
@@ -12358,6 +12626,29 @@ export function App({
                           });
                           openApiTesterTab();
                         }}
+                        onSendToApiWs={(draft) => {
+                          setApiTesterDraft({
+                            id: `req-ws-${Date.now()}`,
+                            engagementId: activeEngagement?.id || undefined,
+                            collectionName: 'Default Collection',
+                            name: draft.name,
+                            method: 'GET',
+                            url: 'ws://127.0.0.1:8080/ws',
+                            params: [],
+                            headers: [],
+                            auth: { type: 'none' },
+                            bodyType: 'hex',
+                            body: draft.body,
+                            rawMode: false,
+                            rawRequest: '',
+                            routeId: '',
+                            timeoutSec: 20,
+                            followRedirects: true,
+                            useCookieJar: true,
+                            tlsSkipVerify: false,
+                          });
+                          openApiTesterTab();
+                        }}
                         onSaveToEvidence={async (title, category, content) => {
                           await handleSaveSelectionEvidence({
                             id: `ev-hex-${Date.now()}`,
@@ -12372,7 +12663,7 @@ export function App({
                             capturedAt: new Date().toISOString(),
                           });
                         }}
-                        onClose={() => closeTab(tab.id)}
+                        onClose={() => void handleCloseTab(tab.id)}
                       />
                     ) : tab.tabType === 'network-map' ? (
                       <NetworkMapView
@@ -12912,7 +13203,7 @@ export function App({
                     >
                       <div className="palette-item-main">
                         <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <CyberIcon name="tunnel" size={14} />
+                          <CyberIcon name="pivot-hop" size={14} />
                           <span>Pivoting Engine // ligolo-ng &amp; chisel</span>
                         </strong>
                         <span>Start/stop ligolo-ng TUN or chisel reverse SOCKS5 pivots, routes &amp; agent one-liners</span>
@@ -12952,6 +13243,40 @@ export function App({
                       </div>
                       <div className="palette-tags">
                         <span className="kbd-badge">Check Health <CyberIcon name="return" size={14} /></span>
+                      </div>
+                    </button>
+                  );
+                })()}
+                {(() => {
+                  const q = paletteQuery.toLowerCase();
+                  const showRemoteSockets =
+                    !q ||
+                    'remote sockets'.includes(q) ||
+                    'listening'.includes(q) ||
+                    'tunnel'.includes(q) ||
+                    'forward'.includes(q) ||
+                    'ss'.includes(q) ||
+                    'netstat'.includes(q);
+                  if (!showRemoteSockets) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="palette-item"
+                      onClick={() => {
+                        setShowCommandPalette(false);
+                        setPaletteQuery('');
+                        setShowRemoteSocketsModal(true);
+                      }}
+                    >
+                      <div className="palette-item-main">
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <CyberIcon name="tunnel" size={14} />
+                          <span>Remote Listening Sockets &amp; 1-Click -L Forward</span>
+                        </strong>
+                        <span>On-demand non-PTY SSH socket discovery (Linux &amp; Windows) with 1-click -L tunnel &amp; API probe</span>
+                      </div>
+                      <div className="palette-tags">
+                        <span className="kbd-badge">Open Sockets <CyberIcon name="return" size={14} /></span>
                       </div>
                     </button>
                   );
@@ -15480,6 +15805,52 @@ export function App({
           onClose={() => {
             setRunnerModalChain(null);
             setRunnerModalContext(null);
+          }}
+        />
+      )}
+
+      {showRemoteSocketsModal && (
+        <RemoteSocketsModal
+          isOpen={showRemoteSocketsModal}
+          onClose={() => setShowRemoteSocketsModal(false)}
+          sshSessions={tabs.flatMap((t) =>
+            collectPanes(t.rootNode)
+              .filter(
+                (p) =>
+                  Boolean(p.hostId) &&
+                  !p.paneType &&
+                  !p.isRawTcp &&
+                  !p.sessionId.startsWith('local-') &&
+                  !p.sessionId.startsWith('serial-') &&
+                  !p.sessionId.startsWith('winrm-') &&
+                  !p.sessionId.startsWith('rawtcp-')
+              )
+              .map((p) => ({ id: p.sessionId, label: `${p.title} (${p.sessionId.slice(0, 8)})` }))
+          )}
+          defaultSessionId={activePane?.sessionId}
+          activeEngagementId={activeEngagement?.id || null}
+          onOpenApiUrl={(url, label) => {
+            setApiTesterDraft({
+              id: `req-tun-${Date.now()}`,
+              engagementId: activeEngagement?.id || undefined,
+              collectionName: 'Default Collection',
+              name: `Tunnel: ${label}`,
+              method: 'GET',
+              url,
+              params: [],
+              headers: [{ key: 'Accept', value: 'application/json', enabled: true }],
+              auth: { type: 'none' },
+              bodyType: 'none',
+              body: '',
+              rawMode: false,
+              rawRequest: '',
+              routeId: '',
+              timeoutSec: 20,
+              followRedirects: true,
+              useCookieJar: true,
+              tlsSkipVerify: false,
+            });
+            openApiTesterTab();
           }}
         />
       )}

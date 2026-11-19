@@ -205,3 +205,47 @@ export interface ApiAiStreamChunkEvent {
   done: boolean;
   error?: string;
 }
+
+export interface ApiWsConnectRequest {
+  sessionId?: string;
+  url: string;
+  headers?: ApiKeyValue[];
+  auth: ApiAuthConfig;
+  subprotocols?: string[];
+  routeId?: string;
+  tlsSkipVerify?: boolean;
+  timeoutSec?: number;
+  variables?: ApiKeyValue[];
+}
+
+export interface ApiWsConnectResult {
+  sessionId: string;
+  effectiveUrl?: string;
+  subprotocol?: string;
+  statusCode: number;
+  responseHeaders?: string;
+  routeUsed?: string;
+  durationMs: number;
+  error?: string;
+}
+
+export interface ApiWsSendRequest {
+  sessionId: string;
+  frameType: 'text' | 'binary' | 'ping';
+  payload: string;
+  variables?: ApiKeyValue[];
+}
+
+export interface ApiWsFrameEvent {
+  sessionId: string;
+  direction: 'in' | 'out' | 'system';
+  frameType: 'text' | 'binary' | 'ping' | 'pong' | 'close' | 'connected' | 'error';
+  payload: string;
+  payloadHexDump?: string;
+  payloadAscii?: string;
+  payloadBase64?: string;
+  sizeBytes: number;
+  isBinary?: boolean;
+  timestamp: string;
+  error?: string;
+}

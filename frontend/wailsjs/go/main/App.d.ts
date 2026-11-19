@@ -33,6 +33,8 @@ export function ClearWorkspace():Promise<void>;
 
 export function CloseRemoteEdit(arg1:string):Promise<void>;
 
+export function ConnectApiWebSocket(arg1:core.ApiWsConnectRequest):Promise<core.ApiWsConnectResult>;
+
 export function ConnectRawTcp(arg1:core.RawTcpConfig):Promise<string>;
 
 export function ConnectSSH(arg1:core.ConnectRequest):Promise<string>;
@@ -101,7 +103,11 @@ export function DetectWinrmTools():Promise<Array<core.WinrmToolStatus>>;
 
 export function DiffApiResponses(arg1:core.ApiResponse,arg2:core.ApiResponse):Promise<core.ApiResponseDiff>;
 
+export function DisconnectApiWebSocket(arg1:string):Promise<boolean>;
+
 export function DisconnectSession(arg1:string):Promise<void>;
+
+export function DiscoverRemoteSockets(arg1:string):Promise<core.RemoteSocketScanResult>;
 
 export function DownloadWinrmFile(arg1:string,arg2:string,arg3:string):Promise<core.WinrmTransferResult>;
 
@@ -335,6 +341,8 @@ export function ParseTermiusContent(arg1:string):Promise<core.ImportScanResult>;
 
 export function PreviewHexPayload(arg1:string):Promise<core.HexParsePreview>;
 
+export function QuickStartLocalForward(arg1:string,arg2:string,arg3:number,arg4:number,arg5:boolean,arg6:string,arg7:string):Promise<core.QuickForwardResult>;
+
 export function ReadSessionLog(arg1:string):Promise<string>;
 
 export function RelocateVaultFile(arg1:string,arg2:boolean):Promise<void>;
@@ -433,6 +441,8 @@ export function SelectDirectoryDialog(arg1:string):Promise<string>;
 
 export function SelectFileDialog(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function SendApiWebSocketFrame(arg1:core.ApiWsSendRequest):Promise<void>;
+
 export function SendPivotInput(arg1:string,arg2:string):Promise<void>;
 
 export function SendRawTcpHex(arg1:string,arg2:string):Promise<number>;
@@ -488,6 +498,8 @@ export function StopPivotInstance(arg1:string):Promise<void>;
 export function StopRawTcpListener(arg1:string):Promise<void>;
 
 export function StopSessionLogging(arg1:string):Promise<core.SessionLogStatus>;
+
+export function SuggestFreeLocalPort(arg1:number):Promise<number>;
 
 export function UnlockVault(arg1:string):Promise<void>;
 

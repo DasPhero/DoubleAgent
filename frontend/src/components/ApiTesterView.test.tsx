@@ -136,6 +136,15 @@ describe('ApiTesterView — API Tester, Repeater, Diff, Replay & AI Chat Mode (F
       durationMs: 42,
     }));
 
+    const wsConnectMock = vi.fn(async () => ({
+      sessionId: 'ws-1',
+      effectiveUrl: 'ws://127.0.0.1:8080/ws',
+      statusCode: 101,
+      routeUsed: 'Direct',
+      durationMs: 9,
+    }));
+    const wsSendMock = vi.fn(async () => {});
+
     (window as unknown as { go: unknown }).go = {
       main: {
         App: {
@@ -145,6 +154,9 @@ describe('ApiTesterView — API Tester, Repeater, Diff, Replay & AI Chat Mode (F
           ListCredentials: vi.fn(async () => []),
           ParseApiCurl: parseCurlMock,
           ExecuteApiAiChat: aiChatMock,
+          ConnectApiWebSocket: wsConnectMock,
+          SendApiWebSocketFrame: wsSendMock,
+          DisconnectApiWebSocket: vi.fn(async () => true),
         },
       },
     };
@@ -189,5 +201,23 @@ describe('ApiTesterView — API Tester, Repeater, Diff, Replay & AI Chat Mode (F
     fireEvent.change(bodyTypeSelect, { target: { value: 'hex' } });
     expect(bodyTypeSelect.value).toBe('hex');
     expect(screen.getByText(/Exact binary bytes sent/i)).toBeInTheDocument();
+
+    // Verify F-44 WebSocket Client Mode + binary hex frame send
+    fireEvent.click(screen.getByRole('tab', { name: /WebSocket/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Connect WS/i }));
+    await waitFor(() => {
+      expect(wsConnectMock).toHaveBeenCalledTimes(1);
+    });
+    fireEvent.change(screen.getByLabelText('WebSocket Frame Type'), { target: { value: 'binary' } });
+    fireEvent.change(screen.getByLabelText('WebSocket Frame Payload'), { target: { value: '00 ff u32le(0xdeadbeef)' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send WS Frame/i }));
+    await waitFor(() => {
+      expect(wsSendMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          frameType: 'binary',
+          payload: '00 ff u32le(0xdeadbeef)',
+        })
+      );
+    });
   });
 });

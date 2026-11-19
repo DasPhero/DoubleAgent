@@ -68,7 +68,8 @@ export type CyberIconName =
   | 'arrow-right'
   | 'arrow-left'
   | 'arrow-left-right'
-  | 'return';
+  | 'return'
+  | 'pivot-hop';
 
 export interface CyberIconProps {
   name: CyberIconName;
@@ -628,6 +629,17 @@ export const CyberIcon: React.FC<CyberIconProps> = ({
         <svg {...commonProps}>
           <polyline points="9 10 4 15 9 20" />
           <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+        </svg>
+      );
+    case 'pivot-hop':
+      return (
+        <svg {...commonProps}>
+          <circle cx="4.5" cy="6.5" r="2.2" />
+          <circle cx="12" cy="18" r="2.2" />
+          <circle cx="19.5" cy="6.5" r="2.2" />
+          <line x1="5.7" y1="8.3" x2="10.8" y2="16.2" />
+          <line x1="13.2" y1="16.2" x2="18.3" y2="8.3" />
+          <path d="M7 5.2 Q12 2.2 17 5.2" strokeDasharray="2 2" />
         </svg>
       );
   }

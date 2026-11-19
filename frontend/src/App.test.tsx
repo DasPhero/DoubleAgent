@@ -993,6 +993,20 @@ describe('M0 & M1-1 Application Shell, Dark-Red Locked vs Teal Unlocked Theme, a
       // Click backdrop of Port Forwarding modal to close it
       fireEvent.click(forwardModal);
       expect(screen.queryByRole('dialog', { name: 'Port Forwarding & Tunnels' })).not.toBeInTheDocument();
+
+      // 4. Open Port Forwards sidebar panel to list, stop, and restart the rule
+      fireEvent.click(screen.getByRole('button', { name: 'Port Forwards Panel' }));
+      expect(screen.getByRole('heading', { name: 'Port Forwards' })).toBeInTheDocument();
+      expect(await screen.findByText(/Auto-DB/i)).toBeInTheDocument();
+      expect(screen.getByText('ACTIVE')).toBeInTheDocument();
+
+      const sidebarStopBtn = screen.getByRole('button', { name: /^Stop$/i });
+      fireEvent.click(sidebarStopBtn);
+      expect(await screen.findByText('STOPPED')).toBeInTheDocument();
+
+      const sidebarStartBtn = screen.getByRole('button', { name: /^Start$/i });
+      fireEvent.click(sidebarStartBtn);
+      expect(await screen.findByText('ACTIVE')).toBeInTheDocument();
     } finally {
       delete (window as unknown as { go?: unknown }).go;
     }

@@ -52,6 +52,7 @@ export interface HexRunnerViewProps {
   sshSessions: Array<{ id: string; label: string }>;
   rawTcpSessions: Array<{ id: string; label: string }>;
   onSendToApiTester: (draft: { name: string; body: string }) => void;
+  onSendToApiWs?: (draft: { name: string; body: string }) => void;
   onSaveToEvidence?: (title: string, category: string, content: string) => Promise<void>;
   onClose?: () => void;
 }
@@ -63,6 +64,7 @@ export function HexRunnerView({
   sshSessions,
   rawTcpSessions,
   onSendToApiTester,
+  onSendToApiWs,
   onSaveToEvidence,
   onClose,
 }: HexRunnerViewProps): React.JSX.Element {
@@ -363,6 +365,26 @@ export function HexRunnerView({
           >
             <CyberIcon name="globe" size={13} /> Send to API (hex)
           </button>
+          {onSendToApiWs && (
+            <button
+              type="button"
+              className="cyber-hud-btn btn-sm"
+              onClick={() => {
+                if (!combinedPayloadExpr) {
+                  setErrorBanner('Payload expression is empty.');
+                  return;
+                }
+                onSendToApiWs({
+                  name: executable.trim() ? `WS: ${executable.trim().split(/[\\/]/).pop()}` : 'WS Binary Payload',
+                  body: combinedPayloadExpr,
+                });
+                setStatusBanner('Opened payload in WebSocket binary composer (F-44).');
+              }}
+              title="Open compiled hex/DSL payload inside WebSocket Binary Frame Composer (F-44)"
+            >
+              <CyberIcon name="network" size={13} /> Send to API (WS)
+            </button>
+          )}
 
           {rawTcpSessions.length > 0 && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>

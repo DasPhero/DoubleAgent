@@ -1,10 +1,14 @@
 # Project State (`STATE.md`)
 
-- **Current Milestone:** `F-43` (Binary / Hex Payload Runner & API/Socket Bridge) — COMPLETED! · `F-42` (API Tester & HTTP Repeater + Hex Body + AI Chat Mode) — COMPLETED! · `M-GLASS` — COMPLETED! · `M-ICONS` — COMPLETED! · `M-THEMES` — COMPLETED!
+- **Current Milestone:** `F-44` & `F-45` (WebSocket Client Mode + Remote Socket Discovery & 1-Click `-L` Tunnel) — COMPLETED! · `F-43` — COMPLETED! · `F-42` — COMPLETED! · `M-GLASS` — COMPLETED!
 - **Next Milestone:** `M-PRESETS`
 - **Stage:** `2-flagship`
 
 ## What Works
+- **WebSocket Client Mode (`F-44`) & Remote Socket Discovery + 1-Click `-L` Tunnel (`F-45`)**:
+  - **WebSocket Go Client (`backend/core/api_tester.go`, `backend/apiclient/websocket.go`, `app.go`):** Persistent `ws://`/`wss://` sessions via `gorilla/websocket` routed through SOCKS5/SSH `-D`/Pivot `buildTransport` dialer with `TlsSkipVerify`, subprotocol negotiation, Vault `{{SECRET:id}}`/`{{VAR}}` resolution, Text/JSON & Binary (Hex DSL `hexrunner.CompilePayload`) frames, 4 MiB frame cap, live `api:ws-frame` event streaming, and `Send to API (WS)` bridge from `HexRunnerView`.
+  - **Remote Socket Discovery (`backend/core/sockets.go`, `backend/ssh/sockets.go`, `app.go`, `RemoteSocketsModal.tsx`):** On-demand, read-only non-PTY SSH socket enumeration (`DiscoverRemoteSockets`) across Linux (`ss -tulnp`, `netstat -tuln`, `/proc/net/tcp{,6}`) and Windows (`netstat -ano`), loopback sorting/filtering (`127.0.0.1` / `::1`), free local port probing (`SuggestFreeLocalPort`), and 1-click `-L` forwarding (`QuickStartLocalForward`) with direct **+ API Tester** handoff.
+  - **Tests:** `backend/apiclient/websocket_test.go`, `backend/ssh/sockets_test.go`, `frontend/src/components/RemoteSocketsModal.test.tsx`, `frontend/src/components/ApiTesterView.test.tsx`.
 - **Binary / Hex Payload Runner & API/Socket Bridge (`F-43` + `F-42` Hex Body)**:
   - **Hex/Exploit Compiler & Execution Engine (`backend/core/hex_runner.go`, `backend/hexrunner/runner.go`):** Pure-Go payload DSL parser (`41 42 00 ff`, `\xHH`, `0xHH`, quoted strings, `A*N`, `u32le/be`, `u64le/be`, `cyclic(N)` De Bruijn sequence generator + `CyclicOffset` lookup), direct `os/exec.CommandContext` execution without PTY or shell wrapping (`RunLocal`) with sequential delayed `io.Pipe()` stdin chunk feeding and `2 MiB` bounded stdout/stderr capture (`HexDump`, `EscapedASCII`, `Base64`).
   - **Non-PTY SSH Exec & HTTP API Hex Bodies (`backend/ssh/transport.go`, `backend/apiclient/client.go`):** Added `core.SshBinaryRunner` (`ExecRaw`) to `*ssh.Transport` without requesting a PTY, and added `bodyType: "hex"` (`application/octet-stream` default) to `apiclient` `buildHTTPRequest` via `hexrunner.CompilePayload`.

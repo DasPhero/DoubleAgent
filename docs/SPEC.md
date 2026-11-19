@@ -142,6 +142,8 @@ Jedes Feature hat ein prüfbares Akzeptanzkriterium; der Coding Agent darf ein F
 | F-41 | WinRM Client (PowerShell Remoting) | v1 | WinRM Management für Windows Hosts (Port 5985/5986, NTLM/Kerberos/Pass-the-Hash, Evil-WinRM Parität) |
 | F-42 | API Tester & HTTP Repeater View | v1 | Pentest-Modul: Go-seitiger HTTP/Raw-Repeater mit Pivot/SOCKS5-Routing, Vault-Secret-Injektion, Environments, Inspector/Diff, gedrosseltem Parameter-Replay, Hex-Body-Mode und Evidence-Export |
 | F-43 | Binary / Hex Payload Runner | v1 | Pentest-Modul: Non-PTY `os/exec` / SSH-Exec Raw-Byte-Runner für beliebige Hex-Payloads (`0x00–0xFF`), Hex-Dump-Viewer sowie HTTP-API/Raw-TCP-Bridge |
+| F-44 | WebSocket Client Mode | v1 | Pentest-Modul: Persistente Go-seitige `ws://`/`wss://`-Sessions im API Tester mit SOCKS5/Pivot-Routing, Vault-Secrets, Binary/Hex-Frames (`F-43`) und Live-Frame-Log |
+| F-45 | Remote Socket Discovery & 1-Click -L Tunnel | v1 | On-Demand Non-PTY SSH Listener-Erkennung (Linux + Windows), Loopback-Highlighting und 1-Klick `-L` Port-Forwarding inkl. API-Tester-Öffnung |
 | M-PRESETS | Comprehensive Presets Library | v1 | Vollständige Presets für Findings, MITRE ATT&CK Techniken, Snippets und Snippet-Chains |
 | M-THEMES | Multi-Theme Cyberpunk Designs | v1 | Zusätzliche Cyberpunk HUD Farbpaletten (Matrix Green, Solarized Amber, Synthwave, Stealth Gray) |
 

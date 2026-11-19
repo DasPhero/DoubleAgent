@@ -66,13 +66,15 @@ type Client struct {
 	mu          sync.Mutex
 	jars        map[string]*cookiejar.Jar
 	cancels     map[string]context.CancelFunc
+	wsSessions  map[string]*activeWsSession
 }
 
 // NewClient initializes an API client with per-session cookie jars and cancellation tracking.
 func NewClient() *Client {
 	return &Client{
-		jars:    make(map[string]*cookiejar.Jar),
-		cancels: make(map[string]context.CancelFunc),
+		jars:       make(map[string]*cookiejar.Jar),
+		cancels:    make(map[string]context.CancelFunc),
+		wsSessions: make(map[string]*activeWsSession),
 	}
 }
 

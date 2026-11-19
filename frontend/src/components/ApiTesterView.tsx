@@ -18,6 +18,10 @@ import type {
   ApiResponse,
   ApiResponseDiff,
   ApiRouteOption,
+  ApiWsConnectRequest,
+  ApiWsConnectResult,
+  ApiWsFrameEvent,
+  ApiWsSendRequest,
 } from '../types/apitester';
 import type { CredentialEntry } from '../types/pentest';
 
@@ -40,6 +44,9 @@ interface WailsApiTesterBindings {
   SaveApiEnvironment?: (env: ApiEnvironment) => Promise<ApiEnvironment>;
   DeleteApiEnvironment?: (id: string) => Promise<void>;
   ListCredentials?: (engagementId: string, hostId: string) => Promise<CredentialEntry[]>;
+  ConnectApiWebSocket?: (req: ApiWsConnectRequest) => Promise<ApiWsConnectResult>;
+  SendApiWebSocketFrame?: (req: ApiWsSendRequest) => Promise<void>;
+  DisconnectApiWebSocket?: (sessionId: string) => Promise<boolean>;
 }
 
 function getApiBindings(): WailsApiTesterBindings | undefined {
@@ -66,7 +73,7 @@ export interface ApiTesterViewProps {
   onClose?: () => void;
 }
 
-type TesterMode = 'repeater' | 'replay' | 'diff' | 'ai-chat';
+type TesterMode = 'repeater' | 'replay' | 'diff' | 'ai-chat' | 'websocket';
 type ReqSubTab = 'params' | 'headers' | 'auth' | 'body';
 type RespSubTab = 'pretty' | 'raw' | 'headers' | 'tls' | 'cookies' | 'inspector';
 
@@ -258,6 +265,20 @@ export function ApiTesterView({
   const [aiStreamingId, setAiStreamingId] = useState<string>('');
   const [aiLastResult, setAiLastResult] = useState<ApiAiChatResult | null>(null);
 
+  // WebSocket Client Mode state (F-44)
+  const [wsUrl, setWsUrl] = useState<string>('ws://127.0.0.1:8080/ws');
+  const [wsSubprotocols, setWsSubprotocols] = useState<string>('');
+  const [wsRouteId, setWsRouteId] = useState<string>('');
+  const [wsTlsSkip, setWsTlsSkip] = useState<boolean>(false);
+  const [wsAuthToken, setWsAuthToken] = useState<string>('');
+  const [wsHeaders, setWsHeaders] = useState<ApiKeyValue[]>([]);
+  const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [wsSessionId, setWsSessionId] = useState<string>('');
+  const [wsFrameType, setWsFrameType] = useState<'text' | 'binary'>('text');
+  const [wsPayload, setWsPayload] = useState<string>('{"action":"ping"}');
+  const [wsViewFormat, setWsViewFormat] = useState<'auto' | 'hex' | 'ascii' | 'base64'>('auto');
+  const [wsFrames, setWsFrames] = useState<ApiWsFrameEvent[]>([]);
+
   const loadWorkspaceData = useCallback(async () => {
     const api = getApiBindings();
     if (!api) return;
@@ -281,11 +302,21 @@ export function ApiTesterView({
     void loadWorkspaceData();
   }, [loadWorkspaceData]);
 
-  // Open incoming draft from external tools such as the Binary / Hex Payload Runner (F-43 -> F-42)
+  // Open incoming draft from external tools such as Hex Runner (F-43) or Remote Sockets (F-45)
   const consumedDraftIdRef = useRef<string>('');
   useEffect(() => {
     if (!externalDraft || externalDraft.id === consumedDraftIdRef.current) return;
     consumedDraftIdRef.current = externalDraft.id;
+    const lowerUrl = (externalDraft.url || '').trim().toLowerCase();
+    if (lowerUrl.startsWith('ws://') || lowerUrl.startsWith('wss://')) {
+      setMode('websocket');
+      setWsUrl(externalDraft.url);
+      setWsFrameType(externalDraft.bodyType === 'hex' ? 'binary' : 'text');
+      setWsPayload(externalDraft.body || '');
+      setStatusBanner(`Loaded "${externalDraft.name}" into WebSocket client.`);
+      onExternalDraftConsumed?.();
+      return;
+    }
     setMode('repeater');
     setReqSubTab('body');
     setReqTabs((prev) => {
@@ -294,11 +325,11 @@ export function ApiTesterView({
       return next;
     });
     setCurrentResponse(null);
-    setStatusBanner(`Loaded "${externalDraft.name}" (${externalDraft.bodyType}) from Hex Runner.`);
+    setStatusBanner(`Loaded "${externalDraft.name}" (${externalDraft.bodyType}).`);
     onExternalDraftConsumed?.();
   }, [externalDraft, onExternalDraftConsumed]);
 
-  // Listen to real-time AI SSE/NDJSON streaming chunks emitted by Go
+  // Listen to real-time AI SSE/NDJSON streaming chunks and WebSocket frames emitted by Go
   useEffect(() => {
     if (!eventsOn) return;
     const unsubChunk = eventsOn('api:ai-chunk', (rawEv: unknown) => {
@@ -311,10 +342,22 @@ export function ApiTesterView({
         setErrorBanner(ev.error);
       }
     });
+    const unsubWs = eventsOn('api:ws-frame', (rawEv: unknown) => {
+      const ev = rawEv as ApiWsFrameEvent;
+      if (!ev || ev.sessionId !== wsSessionId) return;
+      setWsFrames((prev) => [...prev.slice(-499), ev]);
+      if (ev.frameType === 'close' || ev.frameType === 'error') {
+        setWsConnected(false);
+      }
+      if (ev.error) {
+        setErrorBanner(ev.error);
+      }
+    });
     return () => {
       unsubChunk?.();
+      unsubWs?.();
     };
-  }, [eventsOn, aiStreamingId]);
+  }, [eventsOn, aiStreamingId, wsSessionId]);
 
   const updateActiveReq = (partial: Partial<ApiRequestItem>) => {
     setReqTabs((prev) =>
@@ -647,6 +690,102 @@ export function ApiTesterView({
     setMode('repeater');
   };
 
+  const handleWsConnect = async () => {
+    const api = getApiBindings();
+    if (!api?.ConnectApiWebSocket) {
+      setErrorBanner('Backend ConnectApiWebSocket method unavailable.');
+      return;
+    }
+    const sid = `ws-${Date.now()}`;
+    setWsSessionId(sid);
+    setErrorBanner('');
+    setStatusBanner('Connecting WebSocket...');
+    try {
+      const subList = wsSubprotocols
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const res = await api.ConnectApiWebSocket({
+        sessionId: sid,
+        url: wsUrl.trim(),
+        headers: wsHeaders,
+        auth: wsAuthToken.trim() ? { type: 'bearer', token: wsAuthToken.trim() } : { type: 'none' },
+        subprotocols: subList,
+        routeId: wsRouteId,
+        tlsSkipVerify: wsTlsSkip,
+        timeoutSec: 15,
+        variables: activeEnv?.variables || [],
+      });
+      if (res.error) {
+        setWsConnected(false);
+        setErrorBanner(`WebSocket connect failed: ${res.error}`);
+        setStatusBanner('');
+      } else {
+        setWsConnected(true);
+        setStatusBanner(
+          `WebSocket connected (${res.routeUsed || 'Direct'}, ${res.durationMs}ms${res.subprotocol ? `, subprotocol: ${res.subprotocol}` : ''}).`
+        );
+      }
+    } catch (err) {
+      setWsConnected(false);
+      setErrorBanner(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleWsDisconnect = async () => {
+    const api = getApiBindings();
+    if (wsSessionId && api?.DisconnectApiWebSocket) {
+      await api.DisconnectApiWebSocket(wsSessionId);
+    }
+    setWsConnected(false);
+    setStatusBanner('WebSocket disconnected.');
+  };
+
+  const handleWsSend = async (frameKind: 'text' | 'binary' | 'ping') => {
+    const api = getApiBindings();
+    if (!api?.SendApiWebSocketFrame || !wsSessionId) return;
+    setErrorBanner('');
+    try {
+      await api.SendApiWebSocketFrame({
+        sessionId: wsSessionId,
+        frameType: frameKind,
+        payload: wsPayload,
+        variables: activeEnv?.variables || [],
+      });
+      if (!eventsOn) {
+        setWsFrames((prev) => [
+          ...prev.slice(-499),
+          {
+            sessionId: wsSessionId,
+            direction: 'out',
+            frameType: frameKind,
+            payload: wsPayload,
+            sizeBytes: wsPayload.length,
+            isBinary: frameKind === 'binary',
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+    } catch (err) {
+      setErrorBanner(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleSaveWsEvidence = async () => {
+    if (!onSaveToEvidence || wsFrames.length === 0) return;
+    const lines = [
+      `**WebSocket Endpoint:** \`${wsUrl}\``,
+      `**Frames Captured:** ${wsFrames.length}`,
+      '',
+      ...wsFrames.map(
+        (f) =>
+          `### [${f.direction.toUpperCase()} / ${f.frameType.toUpperCase()} · ${f.sizeBytes}B] ${f.timestamp}\n\`\`\`\n${f.isBinary && f.payloadHexDump ? f.payloadHexDump : f.payload}\n\`\`\``
+      ),
+    ];
+    await onSaveToEvidence(`WebSocket Transcript (${wsUrl})`, 'Web', lines.join('\n'));
+    setStatusBanner('Saved WebSocket transcript to Evidence Vault.');
+  };
+
   const handleSaveEvidence = async () => {
     if (!onSaveToEvidence) return;
     if (mode === 'ai-chat' && aiMessages.length > 0) {
@@ -736,6 +875,7 @@ export function ApiTesterView({
                 { id: 'replay', label: 'Param Replay', icon: 'refresh' },
                 { id: 'diff', label: 'Response Diff', icon: 'compare' },
                 { id: 'ai-chat', label: 'AI Chat Mode', icon: 'rocket' },
+                { id: 'websocket', label: 'WebSocket', icon: 'network' },
               ] as const
             ).map((m) => (
               <button
@@ -1913,6 +2053,244 @@ export function ApiTesterView({
                   </button>
                 )}
               </form>
+            </div>
+          )}
+
+          {mode === 'websocket' && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '0.75rem', gap: '0.6rem', minHeight: 0, overflow: 'hidden' }}>
+              {/* Connection Bar */}
+              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  aria-label="WebSocket URL"
+                  type="text"
+                  className="cyber-input font-mono"
+                  style={{ flex: 2, minWidth: '240px', fontSize: '0.76rem' }}
+                  value={wsUrl}
+                  onChange={(e) => setWsUrl(e.target.value)}
+                  placeholder="ws://127.0.0.1:8080/ws or wss://target.local/socket"
+                />
+                <input
+                  aria-label="WebSocket Subprotocols"
+                  type="text"
+                  className="cyber-input font-mono"
+                  style={{ width: '150px', fontSize: '0.73rem' }}
+                  value={wsSubprotocols}
+                  onChange={(e) => setWsSubprotocols(e.target.value)}
+                  placeholder="Subprotocols (csv)"
+                />
+                <select
+                  aria-label="WebSocket Route"
+                  className="cyber-input"
+                  style={{ width: '170px', fontSize: '0.73rem' }}
+                  value={wsRouteId}
+                  onChange={(e) => setWsRouteId(e.target.value)}
+                >
+                  {routes.map((rt) => (
+                    <option key={rt.id || 'direct'} value={rt.id}>
+                      {rt.label}
+                    </option>
+                  ))}
+                </select>
+                {!wsConnected ? (
+                  <button
+                    type="button"
+                    className="cyber-btn cyber-btn-primary"
+                    onClick={() => void handleWsConnect()}
+                  >
+                    <CyberIcon name="play" size={13} />
+                    <span>Connect WS</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="cyber-hud-btn btn-danger"
+                    onClick={() => void handleWsDisconnect()}
+                  >
+                    <CyberIcon name="stop" size={13} />
+                    <span>Disconnect WS</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Handshake Auth / TLS / Format Bar */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.72rem' }}>
+                <input
+                  aria-label="WebSocket Bearer Token"
+                  type="password"
+                  className="cyber-input font-mono"
+                  style={{ width: '210px', fontSize: '0.72rem' }}
+                  value={wsAuthToken}
+                  onChange={(e) => setWsAuthToken(e.target.value)}
+                  placeholder="Bearer token or {{SECRET:id}}"
+                />
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={wsTlsSkip} onChange={(e) => setWsTlsSkip(e.target.checked)} />
+                  <span>Skip TLS Verify</span>
+                </label>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginLeft: 'auto' }}>
+                  <span>Inspect Mode:</span>
+                  <select
+                    aria-label="WebSocket Frame Display"
+                    className="cyber-input"
+                    style={{ width: '130px', fontSize: '0.72rem' }}
+                    value={wsViewFormat}
+                    onChange={(e) => setWsViewFormat(e.target.value as 'auto' | 'hex' | 'ascii' | 'base64')}
+                  >
+                    <option value="auto">Auto (Text / Hex)</option>
+                    <option value="hex">Hex Dump</option>
+                    <option value="ascii">Escaped ASCII</option>
+                    <option value="base64">Base64</option>
+                  </select>
+                  {onSaveToEvidence && wsFrames.length > 0 && (
+                    <button
+                      type="button"
+                      className="cyber-hud-btn btn-sm"
+                      onClick={() => void handleSaveWsEvidence()}
+                    >
+                      <CyberIcon name="shield" size={12} /> Save Transcript
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="cyber-hud-btn btn-sm"
+                    onClick={() => setWsFrames([])}
+                  >
+                    Clear Frames
+                  </button>
+                </div>
+              </div>
+
+              {/* Optional Handshake Custom Headers */}
+              <details style={{ fontSize: '0.72rem' }}>
+                <summary style={{ cursor: 'pointer', color: 'var(--accent-bright)' }}>
+                  Handshake Headers ({wsHeaders.filter((h) => h.enabled && h.key).length})
+                </summary>
+                <div style={{ marginTop: '0.4rem' }}>
+                  <KeyValueEditor
+                    items={wsHeaders}
+                    keyPlaceholder="Header (e.g. Origin)"
+                    valuePlaceholder="Value or {{SECRET:id}}"
+                    onChange={setWsHeaders}
+                  />
+                </div>
+              </details>
+
+              {/* Live Frame Log (Rendered Strictly as Text Nodes / Pre) */}
+              <div
+                aria-label="WebSocket Frame Log"
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)',
+                  background: 'rgba(4, 8, 16, 0.85)',
+                  padding: '0.55rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem',
+                }}
+              >
+                {wsFrames.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Connect to a `ws://` or `wss://` endpoint to send Text/JSON or raw Binary (`Hex DSL`) frames through Go and your active pivots.
+                  </div>
+                ) : (
+                  wsFrames.map((f, idx) => {
+                    const body =
+                      wsViewFormat === 'hex'
+                        ? f.payloadHexDump || f.payload
+                        : wsViewFormat === 'ascii'
+                          ? f.payloadAscii || f.payload
+                          : wsViewFormat === 'base64'
+                            ? f.payloadBase64 || f.payload
+                            : f.isBinary && f.payloadHexDump
+                              ? f.payloadHexDump
+                              : f.payload;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: '0.4rem 0.55rem',
+                          borderRadius: '4px',
+                          border: '1px solid color-mix(in srgb, var(--accent-bright) 16%, transparent)',
+                          background:
+                            f.direction === 'out'
+                              ? 'color-mix(in srgb, var(--accent-bright) 8%, transparent)'
+                              : f.direction === 'in'
+                                ? 'rgba(15, 23, 42, 0.85)'
+                                : 'rgba(255, 255, 255, 0.04)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.67rem', fontFamily: 'JetBrains Mono, monospace', marginBottom: '0.2rem', color: 'var(--text-muted)' }}>
+                          <span>
+                            <strong style={{ color: f.direction === 'out' ? 'var(--accent-bright)' : f.direction === 'in' ? '#34d399' : '#fbbf24' }}>
+                              {f.direction.toUpperCase()}
+                            </strong>{' '}
+                            · {f.frameType.toUpperCase()} · {f.sizeBytes}B
+                          </span>
+                          <span>{f.timestamp}</span>
+                        </div>
+                        <pre className="font-mono" style={{ margin: 0, fontSize: '0.73rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {f.error ? `ERROR: ${f.error}` : body}
+                        </pre>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Frame Composer */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                  <select
+                    aria-label="WebSocket Frame Type"
+                    className="cyber-input"
+                    style={{ width: '190px', fontSize: '0.73rem' }}
+                    value={wsFrameType}
+                    onChange={(e) => setWsFrameType(e.target.value as 'text' | 'binary')}
+                  >
+                    <option value="text">Text / JSON Frame</option>
+                    <option value="binary">Binary Frame (Hex DSL)</option>
+                  </select>
+                  {wsFrameType === 'binary' && (
+                    <span style={{ fontSize: '0.68rem', color: 'var(--accent-bright)' }}>
+                      Compiles hex/DSL (`41 00 ff`, `\x90*8`, `u32le(0xdeadbeef)`) into binary WS frame
+                    </span>
+                  )}
+                  <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      className="cyber-hud-btn btn-sm"
+                      disabled={!wsConnected}
+                      onClick={() => void handleWsSend('ping')}
+                    >
+                      Send Ping
+                    </button>
+                    <button
+                      type="button"
+                      className="cyber-btn cyber-btn-primary"
+                      disabled={!wsConnected}
+                      onClick={() => void handleWsSend(wsFrameType)}
+                    >
+                      <CyberIcon name="bolt" size={13} />
+                      <span>Send WS Frame</span>
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  aria-label="WebSocket Frame Payload"
+                  className="cyber-textarea font-mono"
+                  rows={3}
+                  style={{ fontSize: '0.75rem' }}
+                  placeholder={
+                    wsFrameType === 'binary'
+                      ? 'e.g. 00 01 fe ff u32le(0xdeadbeef) "PING"'
+                      : '{"type":"subscribe","channel":"admin"}'
+                  }
+                  value={wsPayload}
+                  onChange={(e) => setWsPayload(e.target.value)}
+                />
+              </div>
             </div>
           )}
         </main>

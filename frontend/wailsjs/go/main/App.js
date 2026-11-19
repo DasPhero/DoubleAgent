@@ -62,6 +62,10 @@ export function CloseRemoteEdit(arg1) {
   return window['go']['main']['App']['CloseRemoteEdit'](arg1);
 }
 
+export function ConnectApiWebSocket(arg1) {
+  return window['go']['main']['App']['ConnectApiWebSocket'](arg1);
+}
+
 export function ConnectRawTcp(arg1) {
   return window['go']['main']['App']['ConnectRawTcp'](arg1);
 }
@@ -198,8 +202,16 @@ export function DiffApiResponses(arg1, arg2) {
   return window['go']['main']['App']['DiffApiResponses'](arg1, arg2);
 }
 
+export function DisconnectApiWebSocket(arg1) {
+  return window['go']['main']['App']['DisconnectApiWebSocket'](arg1);
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['main']['App']['DisconnectSession'](arg1);
+}
+
+export function DiscoverRemoteSockets(arg1) {
+  return window['go']['main']['App']['DiscoverRemoteSockets'](arg1);
 }
 
 export function DownloadWinrmFile(arg1, arg2, arg3) {
@@ -666,6 +678,10 @@ export function PreviewHexPayload(arg1) {
   return window['go']['main']['App']['PreviewHexPayload'](arg1);
 }
 
+export function QuickStartLocalForward(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['QuickStartLocalForward'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function ReadSessionLog(arg1) {
   return window['go']['main']['App']['ReadSessionLog'](arg1);
 }
@@ -862,6 +878,10 @@ export function SelectFileDialog(arg1, arg2, arg3) {
   return window['go']['main']['App']['SelectFileDialog'](arg1, arg2, arg3);
 }
 
+export function SendApiWebSocketFrame(arg1) {
+  return window['go']['main']['App']['SendApiWebSocketFrame'](arg1);
+}
+
 export function SendPivotInput(arg1, arg2) {
   return window['go']['main']['App']['SendPivotInput'](arg1, arg2);
 }
@@ -972,6 +992,10 @@ export function StopRawTcpListener(arg1) {
 
 export function StopSessionLogging(arg1) {
   return window['go']['main']['App']['StopSessionLogging'](arg1);
+}
+
+export function SuggestFreeLocalPort(arg1) {
+  return window['go']['main']['App']['SuggestFreeLocalPort'](arg1);
 }
 
 export function UnlockVault(arg1) {
