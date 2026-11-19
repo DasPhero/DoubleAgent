@@ -7,6 +7,19 @@ $ErrorActionPreference = "Stop"
 $RootDir = Split-Path -Parent $PSScriptRoot
 Set-Location $RootDir
 
+# Ensure the Wails CLI is available. `go install` drops it into $GOPATH\bin,
+# which is often not on PATH, so add it and install the module-pinned version if missing.
+$GoBinDir = (go env GOBIN)
+if (-not $GoBinDir) { $GoBinDir = Join-Path (go env GOPATH) "bin" }
+if ($env:Path -notlike "*$GoBinDir*") { $env:Path = "$GoBinDir;$env:Path" }
+if (-not (Get-Command wails -ErrorAction SilentlyContinue)) {
+    $WailsVersion = (go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2 2>$null)
+    if (-not $WailsVersion) { $WailsVersion = "v2.17.1" }
+    Write-Host "==> Wails CLI not found; installing $WailsVersion into $GoBinDir..." -ForegroundColor Cyan
+    go install "github.com/wailsapp/wails/v2/cmd/wails@$WailsVersion"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
 Write-Host "==> Building Frontend (creates frontend/dist for the Go embed)..." -ForegroundColor Cyan
 if (-not (Test-Path frontend/node_modules)) {
     npm --prefix frontend ci

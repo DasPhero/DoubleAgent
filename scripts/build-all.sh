@@ -5,6 +5,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Ensure the Wails CLI is available. `go install` drops it into $GOPATH/bin,
+# which is often not on PATH, so add it and install the module-pinned version if missing.
+GOBIN_DIR="$(go env GOBIN)"
+[ -z "$GOBIN_DIR" ] && GOBIN_DIR="$(go env GOPATH)/bin"
+case ":$PATH:" in *":$GOBIN_DIR:"*) ;; *) export PATH="$GOBIN_DIR:$PATH" ;; esac
+if ! command -v wails >/dev/null 2>&1; then
+  WAILS_VERSION="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2 2>/dev/null || echo v2.17.1)"
+  echo "==> Wails CLI not found; installing ${WAILS_VERSION} into ${GOBIN_DIR}..."
+  go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
+fi
+
 echo "==> Building Frontend (creates frontend/dist for the Go embed)..."
 (
   cd frontend
