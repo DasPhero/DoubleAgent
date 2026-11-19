@@ -1,6 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ExecContextControl } from './ExecContextControl';
+import { RemoteDirPickerModal } from './RemoteDirPickerModal';
 
 describe('ExecContextControl (F-46)', () => {
   it('shows Exec: Local by default and allows attaching to an active SSH session', () => {
@@ -95,5 +96,63 @@ describe('ExecContextControl (F-46)', () => {
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('button', { name: 'Detach kali' }));
     expect(detachMock).toHaveBeenCalledWith('ssh-1');
+  });
+
+  it('RemoteDirPickerModal navigates directories without resetting on parent re-renders (F-46)', async () => {
+    const listDir = vi.fn(async (dirPath: string) => {
+      if (dirPath === '/home/ares') {
+        return {
+          path: '/home/ares',
+          parent: '/home',
+          entries: [
+            { name: 'Desktop', relPath: 'Desktop', fullPath: '/home/ares/Desktop', size: 0, isDir: true, modTime: '' },
+          ],
+        };
+      }
+      return {
+        path: '/home/ares/Desktop',
+        parent: '/home/ares',
+        entries: [],
+      };
+    });
+
+    const { rerender } = render(
+      <RemoteDirPickerModal
+        isOpen={true}
+        agentLabel="ares"
+        initialPath="/home/ares"
+        onListDir={listDir}
+        onMkdir={vi.fn(async () => {})}
+        onSelectDir={vi.fn()}
+        onOpenShellInDir={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Desktop')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Desktop'));
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('/home/ares/Desktop')).toBeInTheDocument();
+    });
+
+    // Simulate parent re-render passing a brand-new inline onListDir closure
+    rerender(
+      <RemoteDirPickerModal
+        isOpen={true}
+        agentLabel="ares"
+        initialPath="/home/ares"
+        onListDir={async (p) => listDir(p)}
+        onMkdir={vi.fn(async () => {})}
+        onSelectDir={vi.fn()}
+        onOpenShellInDir={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByDisplayValue('/home/ares/Desktop')).toBeInTheDocument();
+    expect(listDir).toHaveBeenCalledTimes(2);
   });
 });

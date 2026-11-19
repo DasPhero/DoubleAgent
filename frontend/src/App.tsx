@@ -2042,10 +2042,18 @@ export function App({
         void syncContextDependentState();
       }
     });
+    const offAgentDisconnect = rt.EventsOn('remote-agent:disconnected', (raw: unknown) => {
+      const evt = raw as { hostname?: string; label?: string; reason?: string } | null;
+      const name = evt?.hostname || evt?.label || 'remote host';
+      setStatusMessage(
+        `Remote agent on ${name} disconnected (${evt?.reason || 'SSH closed'}) — reverted to Local Workstation.`
+      );
+    });
     const offListeners = rt.EventsOn('listeners:updated', refreshListenersNow);
     const offListenerIncoming = rt.EventsOn('listener:incoming', refreshListenersNow);
     return () => {
       if (typeof offAgent === 'function') offAgent();
+      if (typeof offAgentDisconnect === 'function') offAgentDisconnect();
       if (typeof offListeners === 'function') offListeners();
       if (typeof offListenerIncoming === 'function') offListenerIncoming();
     };

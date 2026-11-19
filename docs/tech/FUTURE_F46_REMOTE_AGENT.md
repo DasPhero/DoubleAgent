@@ -1,7 +1,7 @@
 # Future Feature Plan: `F-46` — Ephemeral Remote Companion Agent over SSH
 
-> **Status:** Planned / Backlog (not yet implemented).  
-> **Motivation:** Allow running the DoubleAgent GUI on Windows (where Vault, Notes, Evidence, and Reports stay local) while seamlessly executing network-local operations (Listeners, File Staging, Pivots, LHOST discovery) on a headless Linux/Kali SSH host.
+> **Status:** Implemented (Phases 1–4 completed on branch `feat/f46-remote-agent`).  
+> **Motivation:** Allow running the DoubleAgent GUI on Windows (where Vault, Notes, Evidence, and Reports stay local) while seamlessly executing network-local operations (PTY Shells, Directories, Listeners, File Staging, Pivots, LHOST discovery, Context-Routed SSH, and Context-Bound Port Forwards) on a headless Linux/Kali SSH host.
 
 ---
 

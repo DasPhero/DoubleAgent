@@ -169,6 +169,7 @@ func (a *App) handleRemoteAgentEvent(agentSessionID string, event string, params
 func (a *App) handleRemoteAgentDisconnect(agentSessionID string, reason string) {
 	a.mu.Lock()
 	_, existed := a.remoteAgents[agentSessionID]
+	info := a.remoteAgentInfos[agentSessionID]
 	delete(a.remoteAgents, agentSessionID)
 	delete(a.remoteAgentInfos, agentSessionID)
 	if a.activeExecAgentID == agentSessionID {
@@ -196,6 +197,12 @@ func (a *App) handleRemoteAgentDisconnect(agentSessionID string, reason string) 
 		})
 	}
 	if existed {
+		a.emit(a.ctx, "remote-agent:disconnected", map[string]string{
+			"sessionId": agentSessionID,
+			"hostname":  info.Hostname,
+			"label":     info.Label,
+			"reason":    reason,
+		})
 		a.emitRemoteContextUpdate()
 	}
 }

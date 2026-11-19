@@ -62,7 +62,7 @@ export const ExecContextControl: React.FC<ExecContextControlProps> = ({
         }
       >
         {isAgent ? (
-          <span className="status-led led-active led-sm" aria-hidden="true" />
+          <span className="status-led status-led-green" aria-hidden="true" />
         ) : (
           <CyberIcon name="desktop" size={12} />
         )}
@@ -107,7 +107,7 @@ export const ExecContextControl: React.FC<ExecContextControlProps> = ({
                       setOpen(false);
                     }}
                   >
-                    <span className="status-led led-active led-sm" aria-hidden="true" />
+                    <span className="status-led status-led-green" aria-hidden="true" />
                     <span className="exec-context-agent-name">
                       {agent.hostname || agent.label}
                       {agent.primaryIp ? ` (${agent.primaryIp})` : ''}
@@ -161,29 +161,31 @@ export const ExecContextControl: React.FC<ExecContextControlProps> = ({
             </>
           )}
 
-          {attachableSessions.length > 0 && (
-            <>
-              <div className="nav-dropdown-divider" />
-              <div className="nav-dropdown-header">ATTACH TO ACTIVE SSH SESSION</div>
-              {attachableSessions.map((sess) => {
-                const isBusy = busySessionId === sess.sessionId;
-                return (
-                  <button
-                    key={sess.sessionId}
-                    type="button"
-                    className="nav-dropdown-item"
-                    role="menuitem"
-                    disabled={Boolean(busySessionId)}
-                    onClick={() => {
-                      onAttachAgent(sess.sessionId, sess.label);
-                    }}
-                  >
-                    <CyberIcon name="rocket" size={13} />
-                    <span>{isBusy ? `Deploying agent to ${sess.label}...` : `Attach Agent → ${sess.label}`}</span>
-                  </button>
-                );
-              })}
-            </>
+          <div className="nav-dropdown-divider" />
+          <div className="nav-dropdown-header">ATTACH TO ACTIVE SSH SESSION</div>
+          {attachableSessions.length === 0 ? (
+            <div className="exec-context-empty">
+              Connect to a Linux/Kali SSH host first, then attach the ephemeral agent here.
+            </div>
+          ) : (
+            attachableSessions.map((sess) => {
+              const isBusy = busySessionId === sess.sessionId;
+              return (
+                <button
+                  key={sess.sessionId}
+                  type="button"
+                  className="nav-dropdown-item"
+                  role="menuitem"
+                  disabled={Boolean(busySessionId)}
+                  onClick={() => {
+                    onAttachAgent(sess.sessionId, sess.label);
+                  }}
+                >
+                  <CyberIcon name="rocket" size={13} />
+                  <span>{isBusy ? `Deploying agent to ${sess.label}...` : `Attach Agent → ${sess.label}`}</span>
+                </button>
+              );
+            })
           )}
         </div>
       )}
