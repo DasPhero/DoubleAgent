@@ -821,6 +821,7 @@ interface WailsAppBindings {
   OpenRemoteAgentTerminal?: (workingDir: string, size: { cols: number; rows: number }) => Promise<string>;
   ListRemoteAgentDir?: (dirPath: string) => Promise<RemoteDirListing>;
   MakeRemoteAgentDir?: (dirPath: string) => Promise<void>;
+  PushLocalFileToRemoteStaging?: (remoteDestDir: string) => Promise<string>;
   InitializeVault: (masterPassword: string) => Promise<void>;
   InitializeVaultWithHello: () => Promise<void>;
   UnlockVault: (masterPassword: string) => Promise<void>;
@@ -1944,6 +1945,30 @@ export function App({
             setSidebarTransferFiles(files || []);
           }
         }
+      } catch {
+        // ignore
+      }
+    }
+    if (api?.ListFileTransferServers) {
+      try {
+        const srvs = await api.ListFileTransferServers();
+        setDashboardFileServers(srvs || []);
+      } catch {
+        // ignore
+      }
+    }
+    if (api?.ListActiveManagedListeners) {
+      try {
+        const lsts = await api.ListActiveManagedListeners();
+        setDrawerListeners(lsts || []);
+      } catch {
+        // ignore
+      }
+    }
+    if (api?.ListActivePivotInstances) {
+      try {
+        const pivs = await api.ListActivePivotInstances();
+        setDrawerPivots(pivs || []);
       } catch {
         // ignore
       }
@@ -10871,6 +10896,36 @@ export function App({
                       >
                         <CyberIcon name="folder" size={12} />
                       </button>
+                      {remoteExecContext.mode === 'agent' && (
+                        <button
+                          type="button"
+                          className="cyber-hud-btn btn-secondary btn-sm"
+                          style={{ padding: '0 0.45rem', flexShrink: 0 }}
+                          title="Push a local Windows file into this remote staging folder via SFTP"
+                          onClick={() => {
+                            void (async () => {
+                              const api = getWailsBindings();
+                              if (!api?.PushLocalFileToRemoteStaging) return;
+                              setSidebarTransferError('');
+                              try {
+                                const uploadedName = await api.PushLocalFileToRemoteStaging(sidebarTransferDir.trim());
+                                if (uploadedName) {
+                                  setSidebarTransferSelectedFile(uploadedName);
+                                  setStatusMessage(`Pushed ${uploadedName} to remote staging directory.`);
+                                  if (sidebarTransferDir.trim() && api.ListHostedTransferFiles) {
+                                    const files = await api.ListHostedTransferFiles(sidebarTransferDir.trim());
+                                    setSidebarTransferFiles(files || []);
+                                  }
+                                }
+                              } catch (err: unknown) {
+                                setSidebarTransferError(err instanceof Error ? err.message : String(err));
+                              }
+                            })();
+                          }}
+                        >
+                          <CyberIcon name="upload" size={12} />
+                        </button>
+                      )}
                     </div>
 
                     {/* Engine Pills */}

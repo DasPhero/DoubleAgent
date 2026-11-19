@@ -355,6 +355,8 @@ export function ParseTermiusContent(arg1:string):Promise<core.ImportScanResult>;
 
 export function PreviewHexPayload(arg1:string):Promise<core.HexParsePreview>;
 
+export function PushLocalFileToRemoteStaging(arg1:string):Promise<string>;
+
 export function QuickStartLocalForward(arg1:string,arg2:string,arg3:number,arg4:number,arg5:boolean,arg6:string,arg7:string):Promise<core.QuickForwardResult>;
 
 export function ReadSessionLog(arg1:string):Promise<string>;

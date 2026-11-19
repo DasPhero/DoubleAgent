@@ -271,6 +271,102 @@ func (c *Client) HashFile(ctx context.Context, rootDir, relPath string) (*core.H
 	return &entry, nil
 }
 
+// StartListener starts a managed reverse-shell listener on the remote host (F-32, F-46).
+func (c *Client) StartListener(ctx context.Context, profile core.ListenerProfile) (*core.ManagedListenerInfo, error) {
+	var info core.ManagedListenerInfo
+	if err := c.Call(ctx, "listener_start", profile, &info); err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+// StopListener stops an active remote listener by ID.
+func (c *Client) StopListener(ctx context.Context, listenerID string) error {
+	return c.Call(ctx, "listener_stop", StopListenerParams{ListenerID: listenerID}, nil)
+}
+
+// ListListeners lists all active managed listeners running on the remote host.
+func (c *Client) ListListeners(ctx context.Context) ([]core.ManagedListenerInfo, error) {
+	var list []core.ManagedListenerInfo
+	if err := c.Call(ctx, "listener_list", nil, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// WriteRawSession sends bytes to a caught reverse-shell socket on the remote host.
+func (c *Client) WriteRawSession(ctx context.Context, sessionID string, data []byte) error {
+	return c.Call(ctx, "session_write", WriteSessionParams{
+		SessionID: sessionID,
+		DataB64:   base64.StdEncoding.EncodeToString(data),
+	}, nil)
+}
+
+// CloseRawSession closes a caught reverse-shell socket on the remote host.
+func (c *Client) CloseRawSession(ctx context.Context, sessionID string) error {
+	return c.Call(ctx, "session_close", CloseSessionParams{SessionID: sessionID}, nil)
+}
+
+// StartFileServer starts a built-in HTTP staging server on the remote host (F-31, F-46).
+func (c *Client) StartFileServer(ctx context.Context, cfg core.FileTransferServerConfig) (*core.FileTransferServerInfo, error) {
+	var info core.FileTransferServerInfo
+	if err := c.Call(ctx, "fileserver_start", cfg, &info); err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+// StopFileServer stops an active remote HTTP staging server by ID.
+func (c *Client) StopFileServer(ctx context.Context, serverID string) error {
+	return c.Call(ctx, "fileserver_stop", StopFileServerParams{ServerID: serverID}, nil)
+}
+
+// ListFileServers lists all active HTTP staging servers on the remote host.
+func (c *Client) ListFileServers(ctx context.Context) ([]core.FileTransferServerInfo, error) {
+	var list []core.FileTransferServerInfo
+	if err := c.Call(ctx, "fileserver_list", nil, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// DetectPivotBinaries checks which pivot binaries (ligolo-ng, chisel, sshuttle) are installed on the remote host (F-24, F-46).
+func (c *Client) DetectPivotBinaries(ctx context.Context) ([]core.PivotBinaryStatus, error) {
+	var bins []core.PivotBinaryStatus
+	if err := c.Call(ctx, "pivot_detect_binaries", nil, &bins); err != nil {
+		return nil, err
+	}
+	return bins, nil
+}
+
+// StartPivot launches a pivot process (ligolo-ng, chisel, sshuttle) on the remote host.
+func (c *Client) StartPivot(ctx context.Context, route core.NetworkRoute) (*core.PivotInstanceInfo, error) {
+	var info core.PivotInstanceInfo
+	if err := c.Call(ctx, "pivot_start", route, &info); err != nil {
+		return nil, err
+	}
+	return &info, nil
+}
+
+// StopPivot stops a remote pivot process by ID.
+func (c *Client) StopPivot(ctx context.Context, instanceID string) error {
+	return c.Call(ctx, "pivot_stop", StopPivotParams{InstanceID: instanceID}, nil)
+}
+
+// ListPivots lists active and recent pivot instances on the remote host.
+func (c *Client) ListPivots(ctx context.Context) ([]core.PivotInstanceInfo, error) {
+	var list []core.PivotInstanceInfo
+	if err := c.Call(ctx, "pivot_list", nil, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// SendPivotInput writes an interactive console line to a running remote pivot process.
+func (c *Client) SendPivotInput(ctx context.Context, instanceID, input string) error {
+	return c.Call(ctx, "pivot_stdin", PivotStdinParams{InstanceID: instanceID, Input: input}, nil)
+}
+
 // FindLocalAgentBinary locates the cross-compiled headless agent binary for the given Linux arch ("amd64" or "arm64").
 func FindLocalAgentBinary(arch string) (string, error) {
 	filename := fmt.Sprintf("doubleagent-agent-linux-%s", arch)

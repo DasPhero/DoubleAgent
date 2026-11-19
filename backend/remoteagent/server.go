@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"doubleagent/backend/core"
+	"doubleagent/backend/pivot"
 	"doubleagent/backend/pty"
 	"doubleagent/backend/transfer"
 )
@@ -97,23 +98,34 @@ type HashFileParams struct {
 
 // Server serves framed NDJSON-RPC requests over stdin/stdout on the remote Linux host (F-46).
 // When stdin closes (SSH disconnect or client detach), Serve cleanly tears down all active
-// PTYs and resources before returning.
+// PTYs, listeners, caught sockets, staging servers, and pivot processes before returning.
 type Server struct {
 	in  io.Reader
 	out io.Writer
 
-	writeMu sync.Mutex
-	mu      sync.Mutex
-	ptys    map[string]pty.Session
+	writeMu     sync.Mutex
+	mu          sync.Mutex
+	ptys        map[string]pty.Session
+	listeners   map[string]*agentListener
+	rawSessions map[string]core.RawTcpSession
+	fileServers map[string]*transfer.ManagedServer
+	pivotMgr    *pivot.Manager
 }
 
 // NewServer creates a new headless companion agent RPC server reading from in and writing to out.
 func NewServer(in io.Reader, out io.Writer) *Server {
-	return &Server{
-		in:   in,
-		out:  out,
-		ptys: make(map[string]pty.Session),
+	s := &Server{
+		in:          in,
+		out:         out,
+		ptys:        make(map[string]pty.Session),
+		listeners:   make(map[string]*agentListener),
+		rawSessions: make(map[string]core.RawTcpSession),
+		fileServers: make(map[string]*transfer.ManagedServer),
 	}
+	s.pivotMgr = pivot.NewManager(func(info core.PivotInstanceInfo) {
+		s.emitEvent("pivot:updated", info)
+	})
+	return s
 }
 
 // Serve runs the NDJSON-RPC loop until stdin hits EOF or ctx is canceled.
@@ -273,6 +285,81 @@ func (s *Server) dispatch(ctx context.Context, method string, params json.RawMes
 			return nil, fmt.Errorf("invalid fs_hash params: %w", err)
 		}
 		return s.handleHashFile(p)
+
+	case "listener_start":
+		var prof core.ListenerProfile
+		if err := json.Unmarshal(params, &prof); err != nil {
+			return nil, fmt.Errorf("invalid listener_start params: %w", err)
+		}
+		return s.handleStartListener(ctx, prof)
+
+	case "listener_stop":
+		var p StopListenerParams
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, fmt.Errorf("invalid listener_stop params: %w", err)
+		}
+		return nil, s.handleStopListener(p.ListenerID)
+
+	case "listener_list":
+		return s.handleListListeners(), nil
+
+	case "session_write":
+		var p WriteSessionParams
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, fmt.Errorf("invalid session_write params: %w", err)
+		}
+		return nil, s.handleWriteRawSession(p)
+
+	case "session_close":
+		var p CloseSessionParams
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, fmt.Errorf("invalid session_close params: %w", err)
+		}
+		return nil, s.handleCloseRawSession(p.SessionID)
+
+	case "fileserver_start":
+		var cfg core.FileTransferServerConfig
+		if err := json.Unmarshal(params, &cfg); err != nil {
+			return nil, fmt.Errorf("invalid fileserver_start params: %w", err)
+		}
+		return s.handleStartFileServer(cfg)
+
+	case "fileserver_stop":
+		var p StopFileServerParams
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, fmt.Errorf("invalid fileserver_stop params: %w", err)
+		}
+		return nil, s.handleStopFileServer(ctx, p.ServerID)
+
+	case "fileserver_list":
+		return s.handleListFileServers(), nil
+
+	case "pivot_detect_binaries":
+		return pivot.DetectBinaries(), nil
+
+	case "pivot_start":
+		var route core.NetworkRoute
+		if err := json.Unmarshal(params, &route); err != nil {
+			return nil, fmt.Errorf("invalid pivot_start params: %w", err)
+		}
+		return s.handleStartPivot(ctx, route)
+
+	case "pivot_stop":
+		var p StopPivotParams
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, fmt.Errorf("invalid pivot_stop params: %w", err)
+		}
+		return nil, s.handleStopPivot(p.InstanceID)
+
+	case "pivot_list":
+		return s.handleListPivots(), nil
+
+	case "pivot_stdin":
+		var p PivotStdinParams
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, fmt.Errorf("invalid pivot_stdin params: %w", err)
+		}
+		return nil, s.handlePivotStdin(p)
 
 	default:
 		return nil, fmt.Errorf("unknown agent rpc method: %s", method)
@@ -509,16 +596,53 @@ func (s *Server) handleHashFile(p HashFileParams) (*core.HostedFileEntry, error)
 
 func (s *Server) shutdownAll() {
 	s.mu.Lock()
-	toClose := make([]pty.Session, 0, len(s.ptys))
+	ptysToClose := make([]pty.Session, 0, len(s.ptys))
 	for id, sess := range s.ptys {
 		if sess != nil {
-			toClose = append(toClose, sess)
+			ptysToClose = append(ptysToClose, sess)
 		}
 		delete(s.ptys, id)
 	}
+	listenersToClose := make([]*agentListener, 0, len(s.listeners))
+	for id, l := range s.listeners {
+		if l != nil {
+			listenersToClose = append(listenersToClose, l)
+		}
+		delete(s.listeners, id)
+	}
+	rawToClose := make([]core.RawTcpSession, 0, len(s.rawSessions))
+	for id, sess := range s.rawSessions {
+		if sess != nil {
+			rawToClose = append(rawToClose, sess)
+		}
+		delete(s.rawSessions, id)
+	}
+	serversToStop := make([]*transfer.ManagedServer, 0, len(s.fileServers))
+	for id, srv := range s.fileServers {
+		if srv != nil {
+			serversToStop = append(serversToStop, srv)
+		}
+		delete(s.fileServers, id)
+	}
 	s.mu.Unlock()
 
-	for _, sess := range toClose {
+	for _, sess := range ptysToClose {
 		_ = sess.Close()
+	}
+	for _, l := range listenersToClose {
+		if l.rawListener != nil {
+			_ = l.rawListener.Close()
+		}
+	}
+	for _, sess := range rawToClose {
+		_ = sess.Close()
+	}
+	stopCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	for _, srv := range serversToStop {
+		_ = srv.Stop(stopCtx)
+	}
+	if s.pivotMgr != nil {
+		s.pivotMgr.StopAll()
 	}
 }

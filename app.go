@@ -86,6 +86,7 @@ type App struct {
 	remoteAgentInfos            map[string]core.RemoteAgentInfo
 	activeExecAgentID           string
 	remotePtys                  map[string]string
+	remoteRawSessions           map[string]string
 }
 
 type managedListenerInstance struct {
@@ -221,9 +222,10 @@ func NewAppWithDependencies(
 		winrmSessions:    make(map[string]*winrm.ManagedSession),
 		apiClient:        apiclient.NewClient(),
 		hexRunner:        hexrunner.NewRunner(),
-		remoteAgents:     make(map[string]*remoteagent.Client),
-		remoteAgentInfos: make(map[string]core.RemoteAgentInfo),
-		remotePtys:       make(map[string]string),
+		remoteAgents:      make(map[string]*remoteagent.Client),
+		remoteAgentInfos:  make(map[string]core.RemoteAgentInfo),
+		remotePtys:        make(map[string]string),
+		remoteRawSessions: make(map[string]string),
 	}
 
 	if vaultStore == nil {
@@ -1688,10 +1690,18 @@ func (a *App) WriteTerminal(sessionID string, data string) error {
 	if isRemotePty {
 		remoteAgentClient = a.remoteAgents[remoteAgentOwner]
 	}
+	remoteRawOwner, isRemoteRaw := a.remoteRawSessions[sessionID]
+	var remoteRawClient *remoteagent.Client
+	if isRemoteRaw {
+		remoteRawClient = a.remoteAgents[remoteRawOwner]
+	}
 	a.mu.Unlock()
 
 	if isRemotePty && remoteAgentClient != nil {
 		return remoteAgentClient.WritePTY(a.ctx, sessionID, []byte(data))
+	}
+	if isRemoteRaw && remoteRawClient != nil {
+		return remoteRawClient.WriteRawSession(a.ctx, sessionID, []byte(data))
 	}
 	if isLocal && locSess != nil {
 		_, err := io.WriteString(locSess.Stdin(), data)
@@ -1744,10 +1754,14 @@ func (a *App) ResizeTerminal(sessionID string, cols uint16, rows uint16) error {
 	if isRemotePty {
 		remoteAgentClient = a.remoteAgents[remoteAgentOwner]
 	}
+	_, isRemoteRaw := a.remoteRawSessions[sessionID]
 	a.mu.Unlock()
 
 	if isRemotePty && remoteAgentClient != nil {
 		return remoteAgentClient.ResizePTY(a.ctx, sessionID, cols, rows)
+	}
+	if isRemoteRaw {
+		return nil
 	}
 	if isLocal && locSess != nil {
 		return locSess.Resize(core.TerminalSize{Cols: cols, Rows: rows})
@@ -1815,6 +1829,12 @@ func (a *App) DisconnectSession(sessionID string) error {
 	if isRemotePty {
 		remoteAgentClient = a.remoteAgents[remoteAgentOwner]
 	}
+	remoteRawOwner, isRemoteRaw := a.remoteRawSessions[sessionID]
+	delete(a.remoteRawSessions, sessionID)
+	var remoteRawClient *remoteagent.Client
+	if isRemoteRaw {
+		remoteRawClient = a.remoteAgents[remoteRawOwner]
+	}
 	_, hasAttachedAgent := a.remoteAgents[sessionID]
 	delete(a.activeStreams, sessionID)
 	delete(a.sessionHostID, sessionID)
@@ -1846,6 +1866,9 @@ func (a *App) DisconnectSession(sessionID string) error {
 	}
 	if isRemotePty && remoteAgentClient != nil {
 		return remoteAgentClient.ClosePTY(a.ctx, sessionID)
+	}
+	if isRemoteRaw && remoteRawClient != nil {
+		return remoteRawClient.CloseRawSession(a.ctx, sessionID)
 	}
 	if isLocal && locSess != nil {
 		return locSess.Close()
@@ -3821,6 +3844,19 @@ func (a *App) DeleteListenerProfile(profileID string) error {
 // For 'builtin', starts a native background raw TCP socket listener.
 // For external CLI tools ('nc', 'rlwrap', 'ncat-ssl', 'socat'), initializes a managed profile entry with live command preview.
 func (a *App) StartManagedListener(profile core.ListenerProfile) (*core.ManagedListenerInfo, error) {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 15*time.Second)
+		defer cancel()
+		info, err := client.StartListener(callCtx, profile)
+		if err == nil {
+			a.emit(a.ctx, "listeners:updated", true)
+		}
+		return info, err
+	}
 	if err := core.ValidateListenerProfile(profile); err != nil {
 		return nil, err
 	}
@@ -3945,6 +3981,17 @@ func (a *App) StartManagedListener(profile core.ListenerProfile) (*core.ManagedL
 
 // StopManagedListener terminates an active managed listener and releases its port (F-32).
 func (a *App) StopManagedListener(listenerID string) error {
+	if client, _ := a.getActiveRemoteAgent(); client != nil && strings.HasPrefix(listenerID, "rlst-") {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
+		defer cancel()
+		err := client.StopListener(callCtx, listenerID)
+		a.emit(a.ctx, "listeners:updated", true)
+		return err
+	}
 	a.mu.Lock()
 	inst, ok := a.managedListeners[listenerID]
 	if ok {
@@ -3966,6 +4013,17 @@ func (a *App) StopManagedListener(listenerID string) error {
 
 // ListActiveManagedListeners returns the live operational status and session counts of all running listeners (F-32).
 func (a *App) ListActiveManagedListeners() []core.ManagedListenerInfo {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
+		defer cancel()
+		if list, err := client.ListListeners(callCtx); err == nil {
+			return list
+		}
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -6042,8 +6100,21 @@ func (a *App) GetLocalNetworkIPs() []core.NetworkInterfaceIP {
 	return core.ListLocalIPv4Interfaces()
 }
 
-// StartFileTransferServer launches a native built-in HTTP staging & optional upload catcher server (F-31).
+// StartFileTransferServer launches a native built-in HTTP staging & optional upload catcher server (F-31, F-46).
 func (a *App) StartFileTransferServer(cfg core.FileTransferServerConfig) (*core.FileTransferServerInfo, error) {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 15*time.Second)
+		defer cancel()
+		info, err := client.StartFileServer(callCtx, cfg)
+		if err == nil {
+			a.emit(a.ctx, "transfer:servers-updated", true)
+		}
+		return info, err
+	}
 	if cfg.Port == 0 {
 		cfg.Port = 8000
 	}
@@ -6082,8 +6153,19 @@ func (a *App) StartFileTransferServer(cfg core.FileTransferServerConfig) (*core.
 	return &info, nil
 }
 
-// StopFileTransferServer stops an active HTTP staging server by ID (F-31).
+// StopFileTransferServer stops an active HTTP staging server by ID (F-31, F-46).
 func (a *App) StopFileTransferServer(serverID string) error {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
+		defer cancel()
+		err := client.StopFileServer(callCtx, serverID)
+		a.emit(a.ctx, "transfer:servers-updated", true)
+		return err
+	}
 	a.mu.Lock()
 	srv, ok := a.fileServers[serverID]
 	if ok {
@@ -6102,8 +6184,19 @@ func (a *App) StopFileTransferServer(serverID string) error {
 	return nil
 }
 
-// ListFileTransferServers returns telemetry and recent access events for all active staging servers (F-31).
+// ListFileTransferServers returns telemetry and recent access events for all active staging servers (F-31, F-46).
 func (a *App) ListFileTransferServers() []core.FileTransferServerInfo {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
+		defer cancel()
+		if list, err := client.ListFileServers(callCtx); err == nil {
+			return list
+		}
+	}
 	a.mu.Lock()
 	servers := make([]*transfer.ManagedServer, 0, len(a.fileServers))
 	for _, srv := range a.fileServers {
@@ -6228,13 +6321,37 @@ func (a *App) DeleteNetworkRoute(routeID string) error {
 	return nil
 }
 
-// DetectPivotBinaries checks local PATH for ligolo-ng proxy and chisel executables (F-24).
+// DetectPivotBinaries checks local PATH (or attached remote agent PATH) for ligolo-ng, chisel, and sshuttle (F-24, F-46).
 func (a *App) DetectPivotBinaries() []core.PivotBinaryStatus {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
+		defer cancel()
+		if bins, err := client.DetectPivotBinaries(callCtx); err == nil {
+			return bins
+		}
+	}
 	return pivot.DetectBinaries()
 }
 
-// StartPivotInstance launches a supervised ligolo-ng proxy or chisel server subprocess (F-24).
+// StartPivotInstance launches a supervised ligolo-ng proxy, chisel server, or sshuttle subprocess (F-24, F-46).
 func (a *App) StartPivotInstance(route core.NetworkRoute) (*core.PivotInstanceInfo, error) {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 15*time.Second)
+		defer cancel()
+		info, err := client.StartPivot(callCtx, route)
+		if err == nil && info != nil {
+			a.emit(a.ctx, "pivot:updated", *info)
+		}
+		return info, err
+	}
 	if a.pivotMgr == nil {
 		a.pivotMgr = pivot.NewManager(func(info core.PivotInstanceInfo) {
 			a.emit(a.ctx, "pivot:updated", info)
@@ -6252,8 +6369,19 @@ func (a *App) StartPivotInstance(route core.NetworkRoute) (*core.PivotInstanceIn
 	return &info, nil
 }
 
-// StopPivotInstance terminates or dismisses a pivot instance by ID (F-24).
+// StopPivotInstance terminates or dismisses a pivot instance by ID (F-24, F-46).
 func (a *App) StopPivotInstance(instanceID string) error {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
+		defer cancel()
+		err := client.StopPivot(callCtx, instanceID)
+		a.emit(a.ctx, "pivot:updated", true)
+		return err
+	}
 	if a.pivotMgr == nil {
 		return errors.New("pivot manager not initialized")
 	}
@@ -6262,8 +6390,21 @@ func (a *App) StopPivotInstance(instanceID string) error {
 	return err
 }
 
-// SendPivotInput sends an interactive console line (e.g. session, ifconfig, start) to a running ligolo-proxy (F-24).
+// SendPivotInput sends an interactive console line (e.g. session, ifconfig, start) to a running ligolo-proxy (F-24, F-46).
 func (a *App) SendPivotInput(instanceID string, input string) error {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
+		defer cancel()
+		err := client.SendPivotInput(callCtx, instanceID, input)
+		if err == nil {
+			a.emit(a.ctx, "pivot:updated", true)
+		}
+		return err
+	}
 	if a.pivotMgr == nil {
 		return errors.New("pivot manager not initialized")
 	}
@@ -6274,8 +6415,19 @@ func (a *App) SendPivotInput(instanceID string, input string) error {
 	return err
 }
 
-// ListActivePivotInstances returns all active and recently stopped/errored pivot processes (F-24).
+// ListActivePivotInstances returns all active and recently stopped/errored pivot processes (F-24, F-46).
 func (a *App) ListActivePivotInstances() []core.PivotInstanceInfo {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
+		defer cancel()
+		if list, err := client.ListPivots(callCtx); err == nil {
+			return list
+		}
+	}
 	if a.pivotMgr == nil {
 		return []core.PivotInstanceInfo{}
 	}

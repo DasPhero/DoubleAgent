@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"doubleagent/backend/core"
 )
 
 func TestClientServerRPCLifecycle_F46(t *testing.T) {
@@ -100,5 +102,85 @@ func TestClientServerRPCLifecycle_F46(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for server to exit on stdin EOF")
+	}
+}
+
+func TestPhase2ListenersFileServerAndPivotRPC_F46(t *testing.T) {
+	c2sReader, c2sWriter := io.Pipe()
+	s2cReader, s2cWriter := io.Pipe()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	srv := NewServer(c2sReader, s2cWriter)
+	srvDone := make(chan error, 1)
+	go func() {
+		srvDone <- srv.Serve(ctx)
+		_ = s2cWriter.Close()
+	}()
+
+	client := NewClientFromStreams(
+		c2sWriter,
+		s2cReader,
+		func() error {
+			_ = c2sWriter.Close()
+			_ = s2cReader.Close()
+			return nil
+		},
+		func(_ string, _ json.RawMessage) {},
+		nil,
+	)
+
+	// 1. Remote Listener start/list/stop (external-tool mode requires no port bind in sandbox)
+	lst, err := client.StartListener(ctx, core.ListenerProfile{
+		ID:          "lp-1",
+		Name:        "Kali Test Listener",
+		Kind:        "reverse",
+		Tool:        "nc",
+		BindAddress: "127.0.0.1",
+		BindPort:    4449,
+	})
+	if err != nil {
+		t.Fatalf("StartListener failed: %v", err)
+	}
+	if lst.ID == "" || lst.BindPort != 4449 {
+		t.Fatalf("unexpected listener info: %+v", lst)
+	}
+	listeners, err := client.ListListeners(ctx)
+	if err != nil || len(listeners) != 1 {
+		t.Fatalf("ListListeners expected 1, got %d (err=%v)", len(listeners), err)
+	}
+	if err := client.StopListener(ctx, lst.ID); err != nil {
+		t.Fatalf("StopListener failed: %v", err)
+	}
+	listeners, _ = client.ListListeners(ctx)
+	if len(listeners) != 0 {
+		t.Fatalf("expected 0 listeners after stop, got %d", len(listeners))
+	}
+
+	// 2. Pivot binary detection & empty list
+	bins, err := client.DetectPivotBinaries(ctx)
+	if err != nil || len(bins) == 0 {
+		t.Fatalf("DetectPivotBinaries failed: len=%d err=%v", len(bins), err)
+	}
+	pivots, err := client.ListPivots(ctx)
+	if err != nil || len(pivots) != 0 {
+		t.Fatalf("ListPivots expected 0, got %d (err=%v)", len(pivots), err)
+	}
+
+	// 3. File server list
+	servers, err := client.ListFileServers(ctx)
+	if err != nil || len(servers) != 0 {
+		t.Fatalf("ListFileServers expected 0, got %d (err=%v)", len(servers), err)
+	}
+
+	_ = client.Close()
+	select {
+	case sErr := <-srvDone:
+		if sErr != nil {
+			t.Fatalf("server returned error on EOF: %v", sErr)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for server exit")
 	}
 }

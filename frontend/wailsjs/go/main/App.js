@@ -706,6 +706,10 @@ export function PreviewHexPayload(arg1) {
   return window['go']['main']['App']['PreviewHexPayload'](arg1);
 }
 
+export function PushLocalFileToRemoteStaging(arg1) {
+  return window['go']['main']['App']['PushLocalFileToRemoteStaging'](arg1);
+}
+
 export function QuickStartLocalForward(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['QuickStartLocalForward'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
