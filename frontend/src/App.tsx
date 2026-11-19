@@ -1816,6 +1816,7 @@ export function App({
   const reconnectTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const intentionalDisconnectsRef = useRef<Set<string>>(new Set());
   const saveWorkspaceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const workspaceRestoredRef = useRef<boolean>(false);
   const startAutoReconnectRef = useRef<((pane: PaneItem, tabId: string, attempt?: number, reason?: string) => void) | null>(null);
   const performReconnectRef = useRef<((paneId: string) => Promise<void>) | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>(
@@ -3117,10 +3118,14 @@ export function App({
     const restoreWorkspace = async (): Promise<void> => {
       // If session restore is disabled, keep app clean and do not rehydrate dead restored- sessions
       if (globalSettingsRef.current.sessionRestoreEnabled !== true) {
+        workspaceRestoredRef.current = true;
         return;
       }
       const api = getWailsBindings();
-      if (!api || !api.LoadWorkspace) return;
+      if (!api || !api.LoadWorkspace) {
+        workspaceRestoredRef.current = true;
+        return;
+      }
       try {
         const state = await api.LoadWorkspace();
         if (
@@ -3173,6 +3178,8 @@ export function App({
         }
       } catch (err) {
         console.warn('Workspace restore error:', err);
+      } finally {
+        workspaceRestoredRef.current = true;
       }
     };
     void restoreWorkspace();
@@ -3184,23 +3191,31 @@ export function App({
   // Automatically save workspace layout changes to workspace.json with debounce (F-27)
   useEffect(() => {
     if (globalSettings.sessionRestoreEnabled === false) return;
-    if (tabs.length === 0) return;
+    if (!workspaceRestoredRef.current) return;
 
     if (saveWorkspaceTimeoutRef.current) {
       clearTimeout(saveWorkspaceTimeoutRef.current);
     }
 
-    saveWorkspaceTimeoutRef.current = setTimeout(() => {
+    const persistNow = () => {
       const api = getWailsBindings();
       if (!api || !api.SaveWorkspace) return;
       const state: WorkspaceState = {
         version: 1,
-        activeTabId: activeTabId || '',
+        activeTabId: tabs.length > 0 ? activeTabId || '' : '',
         autoRestore: true,
         tabs: tabs.map(sanitizeTabForPersistence),
       };
       void api.SaveWorkspace(state);
-    }, 600);
+    };
+
+    // Persist immediately when all tabs are closed so reopening never resurrects the last closed tab.
+    if (tabs.length === 0) {
+      persistNow();
+      return;
+    }
+
+    saveWorkspaceTimeoutRef.current = setTimeout(persistNow, 300);
 
     return () => {
       if (saveWorkspaceTimeoutRef.current) {
