@@ -1,7 +1,7 @@
 # Project State (`STATE.md`)
 
 - **Current Milestone:** `F-44` & `F-45` (WebSocket Client Mode + Remote Socket Discovery & 1-Click `-L` Tunnel) — COMPLETED! · `F-43` — COMPLETED! · `F-42` — COMPLETED! · `M-GLASS` — COMPLETED!
-- **Next Milestone:** `M-PRESETS`
+- **Next Milestone:** `M-PRESETS` · **Planned Backlog:** [`F-46` Ephemeral Remote Companion Agent over SSH](./FUTURE_F46_REMOTE_AGENT.md) (auto-deployed headless Linux worker over SSH stdin/stdout for Kali `LHOST`, Remote Listeners, File Staging + Hashing + Push, and Remote Pivots)
 - **Stage:** `2-flagship`
 
 ## What Works

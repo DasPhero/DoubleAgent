@@ -2,8 +2,16 @@
 set -euo pipefail
 
 # DoubleAgent Cross-Platform Build Script (Linux host -> builds Linux + Windows binaries)
+# Pass --linux-only to skip cross-building Windows DoubleAgent.exe.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+LINUX_ONLY=false
+for arg in "$@"; do
+  case "$arg" in
+    --linux-only) LINUX_ONLY=true ;;
+  esac
+done
 
 # Ensure the Wails CLI is available. `go install` drops it into $GOPATH/bin,
 # which is often not on PATH, so add it and install the module-pinned version if missing.
@@ -46,13 +54,13 @@ echo "==> Building Linux amd64 standalone binary..."
 # shellcheck disable=SC2086
 wails build $WAILS_LINUX_TAGS -platform linux/amd64 -o DoubleAgent-linux-amd64
 
-echo "==> Cross-building Windows amd64 standalone binary..."
-wails build -platform windows/amd64 -o DoubleAgent.exe -s
-
-echo "==> Building headless Linux Ephemeral Companion Agents (amd64 & arm64)..."
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o build/bin/doubleagent-agent-linux-amd64 ./cmd/doubleagent-agent
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o build/bin/doubleagent-agent-linux-arm64 ./cmd/doubleagent-agent
-
-echo "==> Build complete:"
-ls -lh build/bin/DoubleAgent-linux-amd64 build/bin/DoubleAgent.exe build/bin/doubleagent-agent-linux-*
+if $LINUX_ONLY; then
+  echo "==> Build complete (Linux only):"
+  ls -lh build/bin/DoubleAgent-linux-amd64
+else
+  echo "==> Cross-building Windows amd64 standalone binary..."
+  wails build -platform windows/amd64 -o DoubleAgent.exe -s
+  echo "==> Build complete:"
+  ls -lh build/bin/DoubleAgent-linux-amd64 build/bin/DoubleAgent.exe
+fi
 echo "==> Tip: run ./scripts/install-linux.sh to install 'doubleagent' globally on Linux."
