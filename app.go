@@ -2022,12 +2022,20 @@ func (a *App) getOrOpenSftp(sessionID string) (core.SftpClient, error) {
 
 // ListLocalDir lists files and folders in a local directory (F-12).
 func (a *App) ListLocalDir(path string) ([]core.FileItem, error) {
-	if path == "" {
-		home, err := os.UserHomeDir()
-		if err == nil && home != "" {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" || trimmed == "." {
+		if home, err := os.UserHomeDir(); err == nil && home != "" {
 			path = home
+		} else if abs, err := filepath.Abs("."); err == nil && abs != "" {
+			path = abs
 		} else {
 			path = "."
+		}
+	} else {
+		path = trimmed
+		// Normalize bare Windows drive letter like "C:" -> "C:/" so os.ReadDir opens the drive root.
+		if len(path) == 2 && path[1] == ':' {
+			path += "/"
 		}
 	}
 

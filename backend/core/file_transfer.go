@@ -440,7 +440,10 @@ func GenerateTargetTransferCommands(opts FileTransferCommandOptions) FileTransfe
 	winDestDir := `C:\Users\Public`
 	customDest := sanitizeTransferArg(opts.TargetDestDir, "")
 	if customDest != "" {
-		if strings.Contains(customDest, ":\\") || strings.HasPrefix(customDest, "\\\\") {
+		if customDest == "." {
+			linuxDestDir = "."
+			winDestDir = "."
+		} else if strings.Contains(customDest, ":\\") || strings.HasPrefix(customDest, "\\\\") {
 			winDestDir = strings.TrimRight(customDest, "\\/")
 		} else {
 			linuxDestDir = strings.TrimRight(customDest, "/")

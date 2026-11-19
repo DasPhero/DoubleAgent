@@ -991,14 +991,33 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                       aria-label="Target Upload Source Path"
                     />
                   ) : (
-                    <input
-                      type="text"
-                      className="cyber-hud-input"
-                      value={targetDestDir}
-                      onChange={(e) => setTargetDestDir(e.target.value)}
-                      placeholder="/dev/shm or C:\Users\Public"
-                      aria-label="Target Destination Folder"
-                    />
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="cyber-hud-input"
+                        value={targetDestDir}
+                        onChange={(e) => setTargetDestDir(e.target.value)}
+                        placeholder=". (current dir) or /dev/shm or C:\Users\Public"
+                        aria-label="Target Destination Folder"
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        className={`cyber-pill-btn ${targetDestDir === '.' ? 'active' : ''}`}
+                        onClick={() => setTargetDestDir('.')}
+                        title="Download into current working directory (.)"
+                      >
+                        Current (.)
+                      </button>
+                      <button
+                        type="button"
+                        className={`cyber-pill-btn ${targetDestDir === '/dev/shm' || targetDestDir === '' ? 'active' : ''}`}
+                        onClick={() => setTargetDestDir('/dev/shm')}
+                        title="Download into /dev/shm"
+                      >
+                        /dev/shm
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

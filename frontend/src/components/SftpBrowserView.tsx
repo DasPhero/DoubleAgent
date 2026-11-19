@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CyberIcon } from './CyberIcon';
 import { FileItem, TransferTask, TransferProgressEvent } from '../types/sftp';
 import { RemoteEditSession } from '../types/remoteEdit';
@@ -52,13 +52,23 @@ function normalizePath(p: string): string {
 }
 
 function getParentPath(p: string): string {
-  const norm = normalizePath(p);
-  if (norm === '.' || norm === '/' || norm === '') return norm;
+  const norm = normalizePath(p).replace(/\/+$/, '');
+  if (norm === '.' || norm === '' || norm === '/') return norm || '/';
+  // Windows drive root: "C:" or "C:/"
+  if (/^[A-Za-z]:$/.test(norm)) {
+    return `${norm}/`;
+  }
   const parts = norm.split('/').filter(Boolean);
   if (parts.length <= 1) {
+    if (/^[A-Za-z]:$/.test(parts[0] || '')) {
+      return `${parts[0]}/`;
+    }
     return norm.startsWith('/') ? '/' : '.';
   }
   parts.pop();
+  if (parts.length === 1 && /^[A-Za-z]:$/.test(parts[0])) {
+    return `${parts[0]}/`;
+  }
   return (norm.startsWith('/') ? '/' : '') + parts.join('/');
 }
 
@@ -111,38 +121,54 @@ export function SftpBrowserView({
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null);
 
+  // Keep a stable ref to api so parent re-renders (e.g. menu hover) never reset SFTP directories.
+  const apiRef = useRef<SftpApi>(api);
+  apiRef.current = api;
+
   // Load Local Files
-  const loadLocalDir = useCallback(
-    async (path: string) => {
-      if (!api.listLocalDir) return;
-      setLocalLoading(true);
-      setLocalError('');
-      try {
-        const items = await api.listLocalDir(path);
-        setLocalItems(items || []);
-        setLocalPath(path);
-        setLocalInputPath(path);
-        setSelectedLocalItem(null);
-      } catch (err: unknown) {
-        setLocalError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setLocalLoading(false);
+  const loadLocalDir = useCallback(async (path: string) => {
+    const fn = apiRef.current.listLocalDir;
+    if (!fn) return;
+    setLocalLoading(true);
+    setLocalError('');
+    try {
+      const items = await fn(path);
+      const list = items || [];
+      setLocalItems(list);
+      let resolvedPath = path;
+      if ((path === '.' || path === '') && list.length > 0 && list[0].path) {
+        resolvedPath = getParentPath(list[0].path);
       }
-    },
-    [api]
-  );
+      setLocalPath(resolvedPath);
+      setLocalInputPath(resolvedPath);
+      setSelectedLocalItem(null);
+    } catch (err: unknown) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLocalLoading(false);
+    }
+  }, []);
 
   // Load Remote Files
   const loadRemoteDir = useCallback(
     async (path: string) => {
-      if (!api.listRemoteDir) return;
+      const fn = apiRef.current.listRemoteDir;
+      if (!fn) return;
       setRemoteLoading(true);
       setRemoteError('');
       try {
-        const items = await api.listRemoteDir(sessionId, path);
-        setRemoteItems(items || []);
-        setRemotePath(path);
-        setRemoteInputPath(path);
+        const items = await fn(sessionId, path);
+        const list = items || [];
+        setRemoteItems(list);
+        let resolvedPath = path;
+        if ((path === '.' || path === '') && list.length > 0 && list[0].path) {
+          const derived = getParentPath(list[0].path);
+          if (derived && derived !== '.') {
+            resolvedPath = derived;
+          }
+        }
+        setRemotePath(resolvedPath);
+        setRemoteInputPath(resolvedPath);
         setSelectedRemoteItem(null);
       } catch (err: unknown) {
         setRemoteError(err instanceof Error ? err.message : String(err));
@@ -150,19 +176,19 @@ export function SftpBrowserView({
         setRemoteLoading(false);
       }
     },
-    [api, sessionId]
+    [sessionId]
   );
 
-  // Initial fetch
+  // Initial fetch (only when sessionId or explicit initial paths change, never on parent hover re-render)
   useEffect(() => {
-    loadLocalDir(initialLocalPath);
-    loadRemoteDir(initialRemotePath);
-    if (api.getActiveTransfers) {
-      api.getActiveTransfers().then((tasks) => {
+    void loadLocalDir(initialLocalPath);
+    void loadRemoteDir(initialRemotePath);
+    if (apiRef.current.getActiveTransfers) {
+      void apiRef.current.getActiveTransfers().then((tasks) => {
         if (tasks) setTransfers(tasks);
       });
     }
-  }, [loadLocalDir, loadRemoteDir, initialLocalPath, initialRemotePath, api]);
+  }, [loadLocalDir, loadRemoteDir, initialLocalPath, initialRemotePath]);
 
   // Subscribe to Wails transfer progress events
   useEffect(() => {
