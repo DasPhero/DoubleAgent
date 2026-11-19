@@ -423,6 +423,8 @@ export function SaveProxychainsFile(arg1:string,arg2:string):Promise<void>;
 
 export function SaveRemoteEditContent(arg1:string,arg2:string,arg3:boolean):Promise<core.RemoteEditResult>;
 
+export function SaveRemoteEditContentWithSudo(arg1:string,arg2:string,arg3:string):Promise<core.RemoteEditResult>;
+
 export function SaveReportFileDialog(arg1:string,arg2:string):Promise<string>;
 
 export function SaveReportTemplateToFile(arg1:core.ReportTemplate):Promise<void>;
@@ -496,6 +498,8 @@ export function StartPivotInstance(arg1:core.NetworkRoute):Promise<core.PivotIns
 export function StartRawTcpListener(arg1:core.RawTcpListenerConfig):Promise<core.RawTcpListenerInfo>;
 
 export function StartRemoteEdit(arg1:string,arg2:string):Promise<core.RemoteEditSession>;
+
+export function StartRemoteEditWithSudo(arg1:string,arg2:string,arg3:string):Promise<core.RemoteEditSession>;
 
 export function StartSessionLogging(arg1:string):Promise<core.SessionLogStatus>;
 

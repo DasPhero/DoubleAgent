@@ -120,6 +120,10 @@ export function SftpBrowserView({
   const [newFolderName, setNewFolderName] = useState<string>('');
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null);
+  const [sudoEditTarget, setSudoEditTarget] = useState<FileItem | null>(null);
+  const [sudoPassword, setSudoPassword] = useState<string>('');
+  const [sudoBusy, setSudoBusy] = useState<boolean>(false);
+  const [sudoError, setSudoError] = useState<string>('');
 
   // Keep a stable ref to api so parent re-renders (e.g. menu hover) never reset SFTP directories.
   const apiRef = useRef<SftpApi>(api);
@@ -320,8 +324,8 @@ export function SftpBrowserView({
     if (isDir) return;
     try {
       let sess: RemoteEditSession | null = null;
-      if (api.startRemoteEdit) {
-        sess = await api.startRemoteEdit(sessionId, item.path);
+      if (apiRef.current.startRemoteEdit) {
+        sess = await apiRef.current.startRemoteEdit(sessionId, item.path);
       } else {
         const appApi = (window as unknown as { go?: { main?: { App?: { StartRemoteEdit?: (sid: string, p: string) => Promise<RemoteEditSession> } } } })?.go?.main?.App;
         if (appApi?.StartRemoteEdit) {
@@ -332,7 +336,45 @@ export function SftpBrowserView({
         onOpenRemoteEdit(sess);
       }
     } catch (err: unknown) {
-      alert(`Start Remote Edit failed: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      const lower = msg.toLowerCase();
+      if (lower.includes('permission') || lower.includes('denied') || lower.includes('status 3')) {
+        setSudoEditTarget(item);
+        setSudoPassword('');
+        setSudoError('');
+        return;
+      }
+      setRemoteError(`Start Remote Edit failed: ${msg}`);
+    }
+  };
+
+  const handleConfirmSudoEdit = async () => {
+    if (!sudoEditTarget) return;
+    setSudoBusy(true);
+    setSudoError('');
+    try {
+      const appApi = (window as unknown as {
+        go?: {
+          main?: {
+            App?: {
+              StartRemoteEditWithSudo?: (sid: string, p: string, pw: string) => Promise<RemoteEditSession>;
+            };
+          };
+        };
+      })?.go?.main?.App;
+      if (!appApi?.StartRemoteEditWithSudo) {
+        throw new Error('Elevated sudo edit binding is unavailable.');
+      }
+      const sess = await appApi.StartRemoteEditWithSudo(sessionId, sudoEditTarget.path, sudoPassword);
+      setSudoEditTarget(null);
+      setSudoPassword('');
+      if (sess && onOpenRemoteEdit) {
+        onOpenRemoteEdit(sess);
+      }
+    } catch (err: unknown) {
+      setSudoError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSudoBusy(false);
     }
   };
 
@@ -1290,6 +1332,86 @@ export function SftpBrowserView({
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Elevated Sudo Edit Password Prompt Modal */}
+      {sudoEditTarget && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Elevated Sudo Edit"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !sudoBusy) {
+              setSudoEditTarget(null);
+              setSudoPassword('');
+            }
+          }}
+        >
+          <div className="cyber-totp-hud-modal" style={{ width: 'min(440px, 92vw)' }}>
+            <div className="cyber-totp-hud-header">
+              <div className="cyber-totp-hud-title-row">
+                <CyberIcon name="shield" size={16} />
+                <span className="cyber-totp-hud-title">ELEVATED EDIT // SUDO REQUIRED</span>
+              </div>
+              <button
+                type="button"
+                className="cyber-btn-close"
+                aria-label="Close"
+                disabled={sudoBusy}
+                onClick={() => {
+                  setSudoEditTarget(null);
+                  setSudoPassword('');
+                }}
+              >
+                <CyberIcon name="close" size={14} />
+              </button>
+            </div>
+            <div style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                Permission denied opening <code>{sudoEditTarget.path}</code>. Enter your <code>sudo</code> password to
+                read this file with root privileges:
+              </p>
+              <input
+                type="password"
+                className="cyber-hud-input"
+                aria-label="Sudo Password"
+                placeholder="sudo password (sent via stdin only)..."
+                autoFocus
+                value={sudoPassword}
+                onChange={(e) => setSudoPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !sudoBusy) {
+                    void handleConfirmSudoEdit();
+                  }
+                }}
+              />
+              {sudoError && <div className="modal-error-banner">{sudoError}</div>}
+              <div className="cyber-dialog-actions">
+                <button
+                  type="button"
+                  className="cyber-hud-btn btn-sm btn-primary"
+                  disabled={sudoBusy}
+                  onClick={() => void handleConfirmSudoEdit()}
+                >
+                  <CyberIcon name="unlock" size={13} />
+                  <span>{sudoBusy ? 'Reading with sudo...' : 'Open with sudo'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="cyber-hud-btn btn-sm btn-cancel"
+                  disabled={sudoBusy}
+                  onClick={() => {
+                    setSudoEditTarget(null);
+                    setSudoPassword('');
+                  }}
+                >
+                  <span>Cancel</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -842,6 +842,10 @@ export function SaveRemoteEditContent(arg1, arg2, arg3) {
   return window['go']['main']['App']['SaveRemoteEditContent'](arg1, arg2, arg3);
 }
 
+export function SaveRemoteEditContentWithSudo(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveRemoteEditContentWithSudo'](arg1, arg2, arg3);
+}
+
 export function SaveReportFileDialog(arg1, arg2) {
   return window['go']['main']['App']['SaveReportFileDialog'](arg1, arg2);
 }
@@ -988,6 +992,10 @@ export function StartRawTcpListener(arg1) {
 
 export function StartRemoteEdit(arg1, arg2) {
   return window['go']['main']['App']['StartRemoteEdit'](arg1, arg2);
+}
+
+export function StartRemoteEditWithSudo(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartRemoteEditWithSudo'](arg1, arg2, arg3);
 }
 
 export function StartSessionLogging(arg1) {

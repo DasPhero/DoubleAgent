@@ -991,7 +991,7 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                       aria-label="Target Upload Source Path"
                     />
                   ) : (
-                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                       <input
                         type="text"
                         className="cyber-hud-input"
@@ -999,24 +999,34 @@ export const FileTransferModal: React.FC<FileTransferModalProps> = ({
                         onChange={(e) => setTargetDestDir(e.target.value)}
                         placeholder=". (current dir) or /dev/shm or C:\Users\Public"
                         aria-label="Target Destination Folder"
-                        style={{ flex: 1 }}
+                        style={{ width: '100%' }}
                       />
-                      <button
-                        type="button"
-                        className={`cyber-pill-btn ${targetDestDir === '.' ? 'active' : ''}`}
-                        onClick={() => setTargetDestDir('.')}
-                        title="Download into current working directory (.)"
-                      >
-                        Current (.)
-                      </button>
-                      <button
-                        type="button"
-                        className={`cyber-pill-btn ${targetDestDir === '/dev/shm' || targetDestDir === '' ? 'active' : ''}`}
-                        onClick={() => setTargetDestDir('/dev/shm')}
-                        title="Download into /dev/shm"
-                      >
-                        /dev/shm
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className={`cyber-pill-btn ${targetDestDir === '.' ? 'active' : ''}`}
+                          onClick={() => setTargetDestDir('.')}
+                          title="Download into current working directory (.)"
+                        >
+                          Current (.)
+                        </button>
+                        <button
+                          type="button"
+                          className={`cyber-pill-btn ${targetDestDir === '/dev/shm' || targetDestDir === '' ? 'active' : ''}`}
+                          onClick={() => setTargetDestDir('/dev/shm')}
+                          title="Download into /dev/shm"
+                        >
+                          /dev/shm
+                        </button>
+                        <button
+                          type="button"
+                          className={`cyber-pill-btn ${targetDestDir === '/tmp' ? 'active' : ''}`}
+                          onClick={() => setTargetDestDir('/tmp')}
+                          title="Download into /tmp"
+                        >
+                          /tmp
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

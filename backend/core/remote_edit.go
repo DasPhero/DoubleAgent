@@ -95,6 +95,73 @@ func (m *RemoteEditManager) StartEdit(ctx context.Context, client SftpClient, se
 	return sess, nil
 }
 
+// StartEditFromContent creates a local staged remote-edit session from already-fetched
+// bytes (used when a file was read via sudo over SSH exec).
+func (m *RemoteEditManager) StartEditFromContent(sessionID, remotePath string, content []byte) (*RemoteEditSession, error) {
+	editID := fmt.Sprintf("edit-%d-%d", time.Now().UnixNano(), rand.Intn(100000))
+	stageDir := filepath.Join(m.stagingBase, editID)
+	if err := os.MkdirAll(stageDir, 0o700); err != nil {
+		return nil, fmt.Errorf("create staging directory: %w", err)
+	}
+
+	filename := filepath.Base(remotePath)
+	if filename == "" || filename == "." || filename == "/" {
+		filename = "remote_file"
+	}
+	localPath := filepath.Join(stageDir, filename)
+
+	if err := os.WriteFile(localPath, content, 0o600); err != nil {
+		_ = os.RemoveAll(stageDir)
+		return nil, fmt.Errorf("write staged file: %w", err)
+	}
+
+	hash, _ := computeFileHash(localPath)
+	sess := &RemoteEditSession{
+		ID:             editID,
+		SessionID:      sessionID,
+		RemotePath:     remotePath,
+		LocalPath:      localPath,
+		Filename:       filename,
+		InitialModTime: time.Now().Unix(),
+		InitialSize:    int64(len(content)),
+		InitialHash:    hash,
+		Status:         RemoteEditStatusActive,
+		LastUploadedAt: time.Now().Unix(),
+		HasConflict:    false,
+	}
+
+	m.mu.Lock()
+	m.sessions[editID] = sess
+	m.mu.Unlock()
+
+	return sess, nil
+}
+
+// UpdateStagedContent writes updated editor content to the local staging copy and refreshes its metadata.
+func (m *RemoteEditManager) UpdateStagedContent(editID, content string) (*RemoteEditSession, error) {
+	sess, err := m.GetSession(editID)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(sess.LocalPath, []byte(content), 0o600); err != nil {
+		return nil, fmt.Errorf("write local staging copy: %w", err)
+	}
+	hash, _ := computeFileHash(sess.LocalPath)
+	now := time.Now().Unix()
+	m.mu.Lock()
+	if s, ok := m.sessions[editID]; ok {
+		s.InitialHash = hash
+		s.InitialSize = int64(len(content))
+		s.InitialModTime = now
+		s.LastUploadedAt = now
+		s.HasConflict = false
+		s.Status = RemoteEditStatusActive
+		sess = s
+	}
+	m.mu.Unlock()
+	return sess, nil
+}
+
 // GetSession returns an active remote edit session by ID.
 func (m *RemoteEditManager) GetSession(editID string) (*RemoteEditSession, error) {
 	m.mu.RLock()

@@ -2392,6 +2392,102 @@ func (a *App) SaveRemoteEditContent(editID string, content string, force bool) (
 	return *res, nil
 }
 
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
+}
+
+// StartRemoteEditWithSudo reads a root/privileged remote file via `sudo -S cat` over SSH exec
+// (password passed strictly via stdin, never in argv) and opens an editable session (F-28).
+func (a *App) StartRemoteEditWithSudo(sessionID string, remotePath string, sudoPassword string) (core.RemoteEditSession, error) {
+	runner, ok := a.transport.(core.SshBinaryRunner)
+	if !ok {
+		return core.RemoteEditSession{}, errors.New("ssh transport does not support ExecRaw for sudo edit")
+	}
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	callCtx, cancel := context.WithTimeout(baseCtx, 20*time.Second)
+	defer cancel()
+
+	cmd := fmt.Sprintf("sudo -S -p '' cat -- %s", shellSingleQuote(remotePath))
+	stdout, stderr, exitCode, err := runner.ExecRaw(callCtx, sessionID, cmd, []byte(sudoPassword+"\n"), 8*1024*1024)
+	if err != nil || exitCode != 0 {
+		errDetail := strings.TrimSpace(string(stderr))
+		if errDetail == "" && err != nil {
+			errDetail = err.Error()
+		}
+		return core.RemoteEditSession{}, fmt.Errorf("sudo read failed (exit %d): %s", exitCode, errDetail)
+	}
+
+	sess, err := a.remoteEditMgr.StartEditFromContent(sessionID, remotePath, stdout)
+	if err != nil {
+		return core.RemoteEditSession{}, err
+	}
+	return *sess, nil
+}
+
+// SaveRemoteEditContentWithSudo saves an edited remote file using `sudo -S` by uploading to a
+// user-owned temp file via SFTP and copying its bytes into the target path in-place (preserving
+// ownership/permissions and never exposing the password in argv) (F-28).
+func (a *App) SaveRemoteEditContentWithSudo(editID string, content string, sudoPassword string) (core.RemoteEditResult, error) {
+	sess, err := a.remoteEditMgr.UpdateStagedContent(editID, content)
+	if err != nil {
+		return core.RemoteEditResult{}, err
+	}
+	runner, ok := a.transport.(core.SshBinaryRunner)
+	if !ok {
+		return core.RemoteEditResult{}, errors.New("ssh transport does not support ExecRaw for sudo save")
+	}
+	client, err := a.getOrOpenSftp(sess.SessionID)
+	if err != nil {
+		return core.RemoteEditResult{}, fmt.Errorf("open sftp for sudo save: %w", err)
+	}
+
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	callCtx, cancel := context.WithTimeout(baseCtx, 30*time.Second)
+	defer cancel()
+
+	remoteTmp := fmt.Sprintf("/tmp/.doubleagent-sudo-%s.tmp", sess.ID)
+	if err := client.Upload(callCtx, sess.LocalPath, remoteTmp, nil); err != nil {
+		return core.RemoteEditResult{}, fmt.Errorf("upload temp staging file: %w", err)
+	}
+
+	cmd := fmt.Sprintf(
+		"sudo -S -p '' sh -c 'cat \"$1\" > \"$2\" && rm -f \"$1\"' _ %s %s",
+		shellSingleQuote(remoteTmp),
+		shellSingleQuote(sess.RemotePath),
+	)
+	_, stderr, exitCode, execErr := runner.ExecRaw(callCtx, sess.SessionID, cmd, []byte(sudoPassword+"\n"), 64*1024)
+	if execErr != nil || exitCode != 0 {
+		// Best-effort cleanup of temp file on failure
+		_ = client.Remove(callCtx, remoteTmp)
+		errDetail := strings.TrimSpace(string(stderr))
+		if errDetail == "" && execErr != nil {
+			errDetail = execErr.Error()
+		}
+		return core.RemoteEditResult{}, fmt.Errorf("sudo save failed (exit %d): %s", exitCode, errDetail)
+	}
+
+	res := core.RemoteEditResult{
+		Success:       true,
+		Conflict:      false,
+		RemoteModTime: sess.InitialModTime,
+		RemoteSize:    sess.InitialSize,
+		Message:       "Saved with sudo privileges.",
+	}
+	a.emit(a.ctx, "remote-edit:status", core.RemoteEditEvent{
+		EditSessionID: editID,
+		Status:        core.RemoteEditStatusActive,
+		HasConflict:   false,
+		Message:       res.Message,
+	})
+	return res, nil
+}
+
 // CheckRemoteConflict checks if the remote server file was modified in parallel by another process/user (F-28).
 func (a *App) CheckRemoteConflict(editID string) (core.RemoteConflictInfo, error) {
 	sess, err := a.remoteEditMgr.GetSession(editID)

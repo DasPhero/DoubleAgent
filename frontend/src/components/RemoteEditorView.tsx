@@ -22,6 +22,13 @@ export interface RemoteEditApi {
     remoteSize: number;
     message: string;
   }>;
+  SaveRemoteEditContentWithSudo?: (editId: string, content: string, sudoPassword: string) => Promise<{
+    success: boolean;
+    conflict: boolean;
+    remoteModTime: number;
+    remoteSize: number;
+    message: string;
+  }>;
   CheckRemoteConflict?: (editId: string) => Promise<RemoteConflictInfo>;
   OpenExternalEditor?: (editId: string) => Promise<void>;
   CloseRemoteEdit?: (editId: string) => Promise<void>;
@@ -50,6 +57,9 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
   // Conflict modal state
   const [conflictInfo, setConflictInfo] = useState<RemoteConflictInfo | null>(null);
   const [showConflictModal, setShowConflictModal] = useState<boolean>(false);
+  const [showSudoSaveModal, setShowSudoSaveModal] = useState<boolean>(false);
+  const [sudoPassword, setSudoPassword] = useState<string>('');
+  const [sudoError, setSudoError] = useState<string>('');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
@@ -160,12 +170,58 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.toLowerCase().includes('conflict')) {
+      const lower = msg.toLowerCase();
+      if (lower.includes('conflict')) {
         void handleManualCheckConflict();
+      } else if (lower.includes('permission') || lower.includes('denied') || lower.includes('status 3')) {
+        setSudoPassword('');
+        setSudoError('');
+        setShowSudoSaveModal(true);
+        setStatusMessage('Root privileges required to save this file.');
+        setStatusType('info');
       } else {
         setStatusMessage(`Upload failed: ${msg}`);
         setStatusType('error');
       }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveWithSudo = async () => {
+    setIsSaving(true);
+    setSudoError('');
+    setStatusMessage('Saving with sudo privileges...');
+    setStatusType('info');
+    try {
+      const api = getApi();
+      const winApp = (window as unknown as {
+        go?: {
+          main?: {
+            App?: {
+              SaveRemoteEditContentWithSudo?: RemoteEditApi['SaveRemoteEditContentWithSudo'];
+            };
+          };
+        };
+      })?.go?.main?.App;
+      const sudoFn = api.SaveRemoteEditContentWithSudo || winApp?.SaveRemoteEditContentWithSudo;
+      if (!sudoFn) {
+        throw new Error('Elevated sudo save binding is unavailable.');
+      }
+      await sudoFn(editSession.id, content, sudoPassword);
+      setInitialContent(content);
+      setShowSudoSaveModal(false);
+      setSudoPassword('');
+      setStatusMessage('Saved and uploaded with sudo privileges.');
+      setStatusType('success');
+      if (onSaved) {
+        onSaved(content);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSudoError(msg);
+      setStatusMessage(`Sudo save failed: ${msg}`);
+      setStatusType('error');
     } finally {
       setIsSaving(false);
     }
@@ -440,6 +496,86 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
                   onClick={() => setShowConflictModal(false)}
                 >
                   <span>Cancel / Keep Local Unsaved</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Elevated Sudo Save Password Prompt Modal */}
+      {showSudoSaveModal && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Elevated Sudo Save"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSaving) {
+              setShowSudoSaveModal(false);
+              setSudoPassword('');
+            }
+          }}
+        >
+          <div className="cyber-totp-hud-modal" style={{ width: 'min(440px, 92vw)' }}>
+            <div className="cyber-totp-hud-header">
+              <div className="cyber-totp-hud-title-row">
+                <CyberIcon name="shield" size={16} />
+                <span className="cyber-totp-hud-title">ELEVATED SAVE // SUDO REQUIRED</span>
+              </div>
+              <button
+                type="button"
+                className="cyber-btn-close"
+                aria-label="Close"
+                disabled={isSaving}
+                onClick={() => {
+                  setShowSudoSaveModal(false);
+                  setSudoPassword('');
+                }}
+              >
+                <CyberIcon name="close" size={14} />
+              </button>
+            </div>
+            <div style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                Permission denied writing <code>{editSession.remotePath}</code>. Enter your <code>sudo</code> password to
+                save with elevated privileges:
+              </p>
+              <input
+                type="password"
+                className="cyber-hud-input"
+                aria-label="Sudo Save Password"
+                placeholder="sudo password (sent via stdin only)..."
+                autoFocus
+                value={sudoPassword}
+                onChange={(e) => setSudoPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isSaving) {
+                    void handleSaveWithSudo();
+                  }
+                }}
+              />
+              {sudoError && <div className="modal-error-banner">{sudoError}</div>}
+              <div className="cyber-dialog-actions">
+                <button
+                  type="button"
+                  className="cyber-hud-btn btn-sm btn-primary"
+                  disabled={isSaving}
+                  onClick={() => void handleSaveWithSudo()}
+                >
+                  <CyberIcon name="save" size={13} />
+                  <span>{isSaving ? 'Saving with sudo...' : 'Save with sudo'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="cyber-hud-btn btn-sm btn-cancel"
+                  disabled={isSaving}
+                  onClick={() => {
+                    setShowSudoSaveModal(false);
+                    setSudoPassword('');
+                  }}
+                >
+                  <span>Cancel</span>
                 </button>
               </div>
             </div>
