@@ -364,6 +364,7 @@ export interface TabItem {
   title: string;
   hostId?: string;
   color?: string;
+  viaAgentLabel?: string;
   rootNode: WorkspaceNode;
   activePaneId: string;
   tabType?: 'terminal' | 'sftp' | 'settings' | 'notes' | 'network-map' | 'editor' | 'winrm' | 'route-health' | 'api-tester' | 'hex-runner';
@@ -2259,7 +2260,7 @@ export function App({
   const targetLauncherRef = useRef<{ tabId: string; paneId: string } | null>(null);
 
   const openSessionTab = useCallback(
-    (newSessionId: string, title: string, hostId?: string, explicitColor?: string): void => {
+    (newSessionId: string, title: string, hostId?: string, explicitColor?: string, viaAgentLabel?: string): void => {
       setLiveSessions((prev) => new Set(prev).add(newSessionId));
       tabCounterRef.current += 1;
       const seq = tabCounterRef.current;
@@ -2299,6 +2300,7 @@ export function App({
                 title: wasSingleLauncherPane || t.title === 'New Connection' ? title : t.title,
                 hostId: wasSingleLauncherPane || !t.hostId ? hostId : t.hostId,
                 color: wasSingleLauncherPane ? color : t.color,
+                viaAgentLabel: wasSingleLauncherPane ? viaAgentLabel : t.viaAgentLabel,
                 rootNode: updatedRoot,
                 activePaneId: paneId,
               }
@@ -2312,6 +2314,7 @@ export function App({
           title,
           hostId,
           color,
+          viaAgentLabel,
           rootNode: {
             type: 'pane',
             id: paneId,
@@ -3218,7 +3221,11 @@ export function App({
       const matchedHost = vaultSummary.hosts.find(
         (h) => h.address.toLowerCase() === qc.address.toLowerCase()
       );
-      openSessionTab(id, qc.display, matchedHost?.id, matchedHost?.color);
+      const viaLabel =
+        remoteExecContext.mode === 'agent' && remoteExecContext.activeAgent
+          ? remoteExecContext.activeAgent.hostname || remoteExecContext.activeAgent.label
+          : undefined;
+      openSessionTab(id, qc.display, matchedHost?.id, matchedHost?.color, viaLabel);
       setPalettePassword('');
       setStatusMessage(`Connected (${qc.display})`);
     } catch (err: unknown) {
@@ -3793,7 +3800,11 @@ export function App({
     try {
       const id = await api.ConnectSavedHost(host.id, { cols: 120, rows: 34 });
       setLiveSessions((prev) => new Set(prev).add(id));
-      openSessionTab(id, host.label, host.id, host.color);
+      const viaLabel =
+        remoteExecContext.mode === 'agent' && remoteExecContext.activeAgent && !host.proxyProfileId
+          ? remoteExecContext.activeAgent.hostname || remoteExecContext.activeAgent.label
+          : undefined;
+      openSessionTab(id, host.label, host.id, host.color, viaLabel);
       if (host.sessionLogging) {
         setActiveLogSessions((prev) => {
           const next = new Set(prev);
@@ -4811,7 +4822,11 @@ export function App({
       const matchedHost = vaultSummary.hosts.find(
         (h) => h.address.toLowerCase() === address.trim().toLowerCase()
       );
-      openSessionTab(id, `${username}@${address}:${port}`, matchedHost?.id, matchedHost?.color);
+      const viaLabel =
+        remoteExecContext.mode === 'agent' && remoteExecContext.activeAgent
+          ? remoteExecContext.activeAgent.hostname || remoteExecContext.activeAgent.label
+          : undefined;
+      openSessionTab(id, `${username}@${address}:${port}`, matchedHost?.id, matchedHost?.color, viaLabel);
       setPassword('');
       setDirectKeyPassphrase('');
       setStatusMessage(`Connected (${username}@${address}:${port})`);
@@ -12279,6 +12294,15 @@ export function App({
                                     }}
                                   />
                                   <span>{tab.title}</span>
+                                  {tab.viaAgentLabel && (
+                                    <span
+                                      className="tab-via-agent-badge"
+                                      title={`SSH routed via remote agent: ${tab.viaAgentLabel}`}
+                                    >
+                                      <CyberIcon name="pivot-hop" size={10} />
+                                      <span>via {tab.viaAgentLabel}</span>
+                                    </span>
+                                  )}
                                   {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
                                   <button
                                     type="button"
@@ -12352,6 +12376,15 @@ export function App({
                         }}
                       />
                       <span>{tab.title}</span>
+                      {tab.viaAgentLabel && (
+                        <span
+                          className="tab-via-agent-badge"
+                          title={`SSH routed via remote agent: ${tab.viaAgentLabel}`}
+                        >
+                          <CyberIcon name="pivot-hop" size={10} />
+                          <span>via {tab.viaAgentLabel}</span>
+                        </span>
+                      )}
                       {tabPanes.length > 1 && <small>({tabPanes.length})</small>}
                       <button
                         type="button"
