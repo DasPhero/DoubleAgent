@@ -7,6 +7,14 @@ $ErrorActionPreference = "Stop"
 $RootDir = Split-Path -Parent $PSScriptRoot
 Set-Location $RootDir
 
+Write-Host "==> Building Frontend (creates frontend/dist for the Go embed)..." -ForegroundColor Cyan
+if (-not (Test-Path frontend/node_modules)) {
+    npm --prefix frontend ci
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+npm --prefix frontend run build
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "==> Checking Go (Windows native + Linux cross-vet/build)..." -ForegroundColor Cyan
 go vet ./...
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -36,6 +44,19 @@ if (-not $SkipTests) {
 Write-Host "==> Building Windows amd64 standalone binary..." -ForegroundColor Cyan
 wails build -platform windows/amd64 -o DoubleAgent.exe
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host "==> Cross-compiling headless Linux Ephemeral Companion Agents (amd64 & arm64)..." -ForegroundColor Cyan
+$env:GOOS = "linux"
+$env:CGO_ENABLED = "0"
+$env:GOARCH = "amd64"
+go build -ldflags="-s -w" -o build/bin/doubleagent-agent-linux-amd64 ./cmd/doubleagent-agent
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$env:GOARCH = "arm64"
+go build -ldflags="-s -w" -o build/bin/doubleagent-agent-linux-arm64 ./cmd/doubleagent-agent
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+Remove-Item Env:GOOS -ErrorAction SilentlyContinue
+Remove-Item Env:GOARCH -ErrorAction SilentlyContinue
+Remove-Item Env:CGO_ENABLED -ErrorAction SilentlyContinue
 
 # Build Linux amd64 binary via Docker or WSL (Wails v2 Linux GUI requires CGo + GTK3 + WebKit2GTK)
 $linuxBuilt = $false

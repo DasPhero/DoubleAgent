@@ -5,17 +5,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "==> Checking Go & Frontend..."
-go vet ./...
-go test -count=1 ./...
-
+echo "==> Building Frontend (creates frontend/dist for the Go embed)..."
 (
   cd frontend
   npm ci --prefer-offline 2>/dev/null || npm install
-  npx tsc --noEmit
   npm run lint
   npm run test -- --run
+  npm run build
 )
+
+echo "==> Checking Go..."
+go vet ./...
+go test -count=1 ./...
 
 # Auto-detect WebKit2GTK 4.1 (Ubuntu 24.04+, Debian 12+, Kali, Arch, Fedora) vs 4.0
 WAILS_LINUX_TAGS=""
@@ -37,6 +38,10 @@ wails build $WAILS_LINUX_TAGS -platform linux/amd64 -o DoubleAgent-linux-amd64
 echo "==> Cross-building Windows amd64 standalone binary..."
 wails build -platform windows/amd64 -o DoubleAgent.exe -s
 
+echo "==> Building headless Linux Ephemeral Companion Agents (amd64 & arm64)..."
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o build/bin/doubleagent-agent-linux-amd64 ./cmd/doubleagent-agent
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o build/bin/doubleagent-agent-linux-arm64 ./cmd/doubleagent-agent
+
 echo "==> Build complete:"
-ls -lh build/bin/DoubleAgent-linux-amd64 build/bin/DoubleAgent.exe
+ls -lh build/bin/DoubleAgent-linux-amd64 build/bin/DoubleAgent.exe build/bin/doubleagent-agent-linux-*
 echo "==> Tip: run ./scripts/install-linux.sh to install 'doubleagent' globally on Linux."
