@@ -1987,14 +1987,27 @@ export function App({
     }
     const rt = getWailsRuntime();
     if (!rt?.EventsOn) return;
-    const off = rt.EventsOn('remote-agent:updated', (raw: unknown) => {
+    const refreshListenersNow = () => {
+      const b = getWailsBindings();
+      if (b?.ListActiveManagedListeners) {
+        void b
+          .ListActiveManagedListeners()
+          .then((list) => setDrawerListeners(list || []))
+          .catch(() => {});
+      }
+    };
+    const offAgent = rt.EventsOn('remote-agent:updated', (raw: unknown) => {
       if (raw && typeof raw === 'object') {
         setRemoteExecContext(raw as RemoteExecutionContext);
         void syncContextDependentState();
       }
     });
+    const offListeners = rt.EventsOn('listeners:updated', refreshListenersNow);
+    const offListenerIncoming = rt.EventsOn('listener:incoming', refreshListenersNow);
     return () => {
-      if (typeof off === 'function') off();
+      if (typeof offAgent === 'function') offAgent();
+      if (typeof offListeners === 'function') offListeners();
+      if (typeof offListenerIncoming === 'function') offListenerIncoming();
     };
   }, [syncContextDependentState]);
 
@@ -11731,6 +11744,30 @@ export function App({
                                 <span>Details</span>
                               </button>
                             )}
+                            <button
+                              type="button"
+                              className="drawer-action-btn"
+                              style={{ color: '#fca5a5', borderColor: 'rgba(239, 68, 68, 0.48)' }}
+                              title={`Stop listener ${l.name || l.id}`}
+                              onClick={() => {
+                                void (async () => {
+                                  const api = getWailsBindings();
+                                  if (!api?.StopManagedListener) return;
+                                  try {
+                                    await api.StopManagedListener(l.id);
+                                    setDrawerListeners((prev) => prev.filter((x) => x.id !== l.id));
+                                    setStatusMessage(`Stopped listener ${l.name || l.id}.`);
+                                  } catch (err: unknown) {
+                                    setStatusMessage(
+                                      `Failed to stop listener: ${err instanceof Error ? err.message : String(err)}`
+                                    );
+                                  }
+                                })();
+                              }}
+                            >
+                              <CyberIcon name="stop" size={12} />
+                              <span>Stop</span>
+                            </button>
                           </div>
                         </div>
                       ))
