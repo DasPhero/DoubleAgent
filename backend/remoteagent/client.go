@@ -367,6 +367,24 @@ func (c *Client) SendPivotInput(ctx context.Context, instanceID, input string) e
 	return c.Call(ctx, "pivot_stdin", PivotStdinParams{InstanceID: instanceID, Input: input}, nil)
 }
 
+// ConnectRawTcp opens an outbound raw TCP socket directly from the remote host (F-31, F-46 Phase 3).
+func (c *Client) ConnectRawTcp(ctx context.Context, cfg core.RawTcpConfig) (string, error) {
+	var res ConnectRawTcpResult
+	if err := c.Call(ctx, "rawtcp_connect", cfg, &res); err != nil {
+		return "", err
+	}
+	return res.SessionID, nil
+}
+
+// ExecuteHexLocal executes a local binary with raw hex stdin directly on the remote host (F-43, F-46 Phase 3).
+func (c *Client) ExecuteHexLocal(ctx context.Context, req core.HexRunRequest) (*core.HexRunResult, error) {
+	var res core.HexRunResult
+	if err := c.Call(ctx, "hex_exec_local", req, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 // FindLocalAgentBinary locates the cross-compiled headless agent binary for the given Linux arch ("amd64" or "arm64").
 func FindLocalAgentBinary(arch string) (string, error) {
 	filename := fmt.Sprintf("doubleagent-agent-linux-%s", arch)

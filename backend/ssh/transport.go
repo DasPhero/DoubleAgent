@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -313,6 +314,12 @@ func (t *Transport) Connect(ctx context.Context, cfg core.SshSessionConfig) (str
 		rawConn, err = dialSocks5(ctx, cfg.SocksProxy, targetAddr, cfg.SocksAuth, timeout)
 		if err != nil {
 			return "", fmt.Errorf("socks5 proxy: %w", err)
+		}
+		closers = append(closers, rawConn)
+	} else if viaID := strings.TrimSpace(cfg.ViaSessionID); viaID != "" {
+		rawConn, err = t.DialViaSession(ctx, viaID, "tcp", targetAddr)
+		if err != nil {
+			return "", fmt.Errorf("dial %s via remote agent session: %w", targetAddr, err)
 		}
 		closers = append(closers, rawConn)
 	} else {
@@ -660,6 +667,22 @@ func (t *Transport) ExecStream(ctx context.Context, sessionID string, command st
 		Wait:   sshSess.Wait,
 		Close:  closeFn,
 	}, nil
+}
+
+// DialViaSession opens an outbound TCP connection originating from an already-connected SSH session (F-46 Phase 3).
+func (t *Transport) DialViaSession(_ context.Context, viaSessionID, network, addr string) (net.Conn, error) {
+	viaSess, err := t.getSession(viaSessionID)
+	if err != nil {
+		return nil, err
+	}
+	viaSess.mu.Lock()
+	closed := viaSess.closed
+	client := viaSess.client
+	viaSess.mu.Unlock()
+	if closed || client == nil {
+		return nil, core.ErrSessionNotFound
+	}
+	return client.Dial(network, addr)
 }
 
 // Disconnect closes any active shell and terminates the underlying SSH connection.

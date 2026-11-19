@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 )
 
 // SshExecStream represents a live, non-PTY SSH exec channel with raw stdin/stdout/stderr
@@ -20,6 +21,16 @@ type SshExecStream struct {
 // that support long-lived non-PTY exec channels (F-46).
 type SshStreamStarter interface {
 	ExecStream(ctx context.Context, sessionID string, command string) (*SshExecStream, error)
+}
+
+// SshContextForwarder is an optional interface implemented by SshTransport backends
+// that can bind port forwards (-L, -R, -D) directly on an active remote agent host
+// rather than the local workstation (F-46 Phase 3).
+type SshContextForwarder interface {
+	StartForwardLocalVia(ctx context.Context, viaSessionID, sessionID, ruleID, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (ForwardTunnel, error)
+	StartForwardRemoteVia(ctx context.Context, viaSessionID, sessionID, ruleID, bindAddr string, bindPort uint16, targetHost string, targetPort uint16) (ForwardTunnel, error)
+	StartForwardDynamicVia(ctx context.Context, viaSessionID, sessionID, ruleID, bindAddr string, bindPort uint16) (ForwardTunnel, error)
+	DialViaSession(ctx context.Context, viaSessionID, network, addr string) (net.Conn, error)
 }
 
 // RemoteAgentInfo describes an attached ephemeral companion agent running on a remote Linux host (F-46).

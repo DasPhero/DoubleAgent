@@ -443,3 +443,60 @@ func (a *App) PushLocalFileToRemoteStaging(remoteDestDir string) (string, error)
 	}
 	return fileName, nil
 }
+
+// applyActiveAgentToSshConfig routes outbound SSH connections through the active remote
+// companion agent's live SSH session (automatic ProxyJump) when no explicit proxy is set (F-46 Phase 3).
+func (a *App) applyActiveAgentToSshConfig(cfg *core.SshSessionConfig) {
+	if cfg == nil {
+		return
+	}
+	if cfg.ViaSessionID != "" || cfg.ProxyCommand != "" || cfg.SocksProxy != "" || len(cfg.JumpChain) > 0 {
+		return
+	}
+	if _, info := a.getActiveRemoteAgent(); info != nil && info.SessionID != "" {
+		cfg.ViaSessionID = info.SessionID
+	}
+}
+
+func (a *App) startForwardLocalForContext(
+	ctx context.Context,
+	sessionID, ruleID, bindAddr string,
+	bindPort uint16,
+	targetHost string,
+	targetPort uint16,
+) (core.ForwardTunnel, error) {
+	if _, info := a.getActiveRemoteAgent(); info != nil && info.SessionID != "" {
+		if ctxFwd, ok := a.transport.(core.SshContextForwarder); ok {
+			return ctxFwd.StartForwardLocalVia(ctx, info.SessionID, sessionID, ruleID, bindAddr, bindPort, targetHost, targetPort)
+		}
+	}
+	return a.transport.StartForwardLocal(ctx, sessionID, ruleID, bindAddr, bindPort, targetHost, targetPort)
+}
+
+func (a *App) startForwardRemoteForContext(
+	ctx context.Context,
+	sessionID, ruleID, bindAddr string,
+	bindPort uint16,
+	targetHost string,
+	targetPort uint16,
+) (core.ForwardTunnel, error) {
+	if _, info := a.getActiveRemoteAgent(); info != nil && info.SessionID != "" {
+		if ctxFwd, ok := a.transport.(core.SshContextForwarder); ok {
+			return ctxFwd.StartForwardRemoteVia(ctx, info.SessionID, sessionID, ruleID, bindAddr, bindPort, targetHost, targetPort)
+		}
+	}
+	return a.transport.StartForwardRemote(ctx, sessionID, ruleID, bindAddr, bindPort, targetHost, targetPort)
+}
+
+func (a *App) startForwardDynamicForContext(
+	ctx context.Context,
+	sessionID, ruleID, bindAddr string,
+	bindPort uint16,
+) (core.ForwardTunnel, error) {
+	if _, info := a.getActiveRemoteAgent(); info != nil && info.SessionID != "" {
+		if ctxFwd, ok := a.transport.(core.SshContextForwarder); ok {
+			return ctxFwd.StartForwardDynamicVia(ctx, info.SessionID, sessionID, ruleID, bindAddr, bindPort)
+		}
+	}
+	return a.transport.StartForwardDynamic(ctx, sessionID, ruleID, bindAddr, bindPort)
+}

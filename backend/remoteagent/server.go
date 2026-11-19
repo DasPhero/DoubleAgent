@@ -361,6 +361,20 @@ func (s *Server) dispatch(ctx context.Context, method string, params json.RawMes
 		}
 		return nil, s.handlePivotStdin(p)
 
+	case "rawtcp_connect":
+		var cfg core.RawTcpConfig
+		if err := json.Unmarshal(params, &cfg); err != nil {
+			return nil, fmt.Errorf("invalid rawtcp_connect params: %w", err)
+		}
+		return s.handleConnectRawTcp(ctx, cfg)
+
+	case "hex_exec_local":
+		var req core.HexRunRequest
+		if err := json.Unmarshal(params, &req); err != nil {
+			return nil, fmt.Errorf("invalid hex_exec_local params: %w", err)
+		}
+		return s.handleExecuteHexLocal(ctx, req)
+
 	default:
 		return nil, fmt.Errorf("unknown agent rpc method: %s", method)
 	}

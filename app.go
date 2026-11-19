@@ -972,6 +972,7 @@ func (a *App) ConnectSavedHost(hostID string, size core.TerminalSize) (string, e
 	if err != nil {
 		return "", err
 	}
+	a.applyActiveAgentToSshConfig(&sshCfg)
 
 	sessionID, err := a.transport.Connect(a.ctx, sshCfg)
 	if err != nil {
@@ -1126,6 +1127,7 @@ func (a *App) ConnectSSH(req core.ConnectRequest) (string, error) {
 		}
 	}
 
+	a.applyActiveAgentToSshConfig(&sshCfg)
 	sessionID, err := a.transport.Connect(a.ctx, sshCfg)
 	if err != nil {
 		return "", err
@@ -1468,11 +1470,26 @@ func (a *App) SendSerialBreak(sessionID string) error {
 	return port.SendBreak()
 }
 
-// ConnectRawTcp opens an outgoing raw TCP client socket session (F-31).
+// ConnectRawTcp opens an outgoing raw TCP client socket session (F-31, F-46 Phase 3).
 func (a *App) ConnectRawTcp(cfg core.RawTcpConfig) (string, error) {
 	ctx := a.ctx
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if client, info := a.getActiveRemoteAgent(); client != nil && info != nil {
+		callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		sessionID, err := client.ConnectRawTcp(callCtx, cfg)
+		if err != nil {
+			return "", err
+		}
+		a.mu.Lock()
+		if a.remoteRawSessions == nil {
+			a.remoteRawSessions = make(map[string]string)
+		}
+		a.remoteRawSessions[sessionID] = info.SessionID
+		a.mu.Unlock()
+		return sessionID, nil
 	}
 	sess, err := rawtcp.Dial(ctx, cfg)
 	if err != nil {
@@ -2730,7 +2747,7 @@ func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error
 	var tunnel core.ForwardTunnel
 	switch targetRule.Type {
 	case core.ForwardLocal:
-		tunnel, err = a.transport.StartForwardLocal(
+		tunnel, err = a.startForwardLocalForContext(
 			a.ctx,
 			sessionID,
 			ruleID,
@@ -2740,7 +2757,7 @@ func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error
 			targetRule.TargetPort,
 		)
 	case core.ForwardRemote:
-		tunnel, err = a.transport.StartForwardRemote(
+		tunnel, err = a.startForwardRemoteForContext(
 			a.ctx,
 			sessionID,
 			ruleID,
@@ -2750,7 +2767,7 @@ func (a *App) StartForwardTunnel(sessionID string, ruleID string) (string, error
 			targetRule.TargetPort,
 		)
 	case core.ForwardDynamic:
-		tunnel, err = a.transport.StartForwardDynamic(
+		tunnel, err = a.startForwardDynamicForContext(
 			a.ctx,
 			sessionID,
 			ruleID,
@@ -6544,9 +6561,9 @@ func (a *App) LaunchTwoStepSshPivot(req core.TwoStepSshPivotRequest) (*core.Forw
 		err    error
 	)
 	if fwdType == core.ForwardDynamic {
-		tunnel, err = a.transport.StartForwardDynamic(a.ctx, relaySessionID, ruleID, bindAddr, req.LocalPort)
+		tunnel, err = a.startForwardDynamicForContext(a.ctx, relaySessionID, ruleID, bindAddr, req.LocalPort)
 	} else {
-		tunnel, err = a.transport.StartForwardLocal(a.ctx, relaySessionID, ruleID, bindAddr, req.LocalPort, strings.TrimSpace(req.TargetHost), req.TargetPort)
+		tunnel, err = a.startForwardLocalForContext(a.ctx, relaySessionID, ruleID, bindAddr, req.LocalPort, strings.TrimSpace(req.TargetHost), req.TargetPort)
 	}
 	if err != nil {
 		return nil, err
@@ -7462,19 +7479,22 @@ func (a *App) FindCyclicOffset(query string) (int, error) {
 	return hexrunner.CyclicOffset(query)
 }
 
-// ExecuteHexLocal launches a local binary directly (no shell, no PTY) and feeds exact binary stdin chunks (F-43).
+// ExecuteHexLocal launches a local binary directly (no shell, no PTY) and feeds exact binary stdin chunks (F-43, F-46 Phase 3).
 func (a *App) ExecuteHexLocal(req core.HexRunRequest) (*core.HexRunResult, error) {
 	if a.vaultStore != nil {
 		a.vaultStore.Touch()
-	}
-	if a.hexRunner == nil {
-		a.hexRunner = hexrunner.NewRunner()
 	}
 	ctx := a.ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	req.TargetType = "local"
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		return client.ExecuteHexLocal(ctx, req)
+	}
+	if a.hexRunner == nil {
+		a.hexRunner = hexrunner.NewRunner()
+	}
 	return a.hexRunner.RunLocal(ctx, req)
 }
 
@@ -7692,7 +7712,7 @@ func (a *App) QuickStartLocalForward(
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
-	tunnel, err := a.transport.StartForwardLocal(
+	tunnel, err := a.startForwardLocalForContext(
 		baseCtx,
 		sessionID,
 		ruleID,

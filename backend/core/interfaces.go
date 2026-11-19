@@ -117,6 +117,7 @@ type SshSessionConfig struct {
 	IdentityID      string
 	Timeout         time.Duration
 	AllowLegacyAlgs bool
+	ViaSessionID    string // Active remote companion agent SSH session to dial through (F-46)
 	Auth            SshAuthConfig
 	OnFirstSeenKey  KnownHostDecisionFunc
 	JumpChain       []SshSessionConfig // Intermediate SSH hops (ProxyJump)

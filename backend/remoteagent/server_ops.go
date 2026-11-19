@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"doubleagent/backend/core"
+	"doubleagent/backend/hexrunner"
 	"doubleagent/backend/rawtcp"
 	"doubleagent/backend/transfer"
 )
@@ -364,4 +365,55 @@ func (s *Server) handlePivotStdin(p PivotStdinParams) error {
 		return errors.New("remote pivot manager not initialized")
 	}
 	return s.pivotMgr.SendInput(p.InstanceID, p.Input)
+}
+
+// ConnectRawTcpResult returns the session ID for an outbound raw TCP socket dialed from the remote agent.
+type ConnectRawTcpResult struct {
+	SessionID string `json:"sessionId"`
+}
+
+func (s *Server) handleConnectRawTcp(ctx context.Context, cfg core.RawTcpConfig) (*ConnectRawTcpResult, error) {
+	sess, err := rawtcp.Dial(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	sessionID := "rraw-" + sess.ID()
+	s.mu.Lock()
+	s.rawSessions[sessionID] = sess
+	s.mu.Unlock()
+
+	go func() {
+		buf := make([]byte, 16*1024)
+		for {
+			n, rErr := sess.Read(buf)
+			if n > 0 {
+				s.emitEvent("session:data", SessionDataEvent{
+					SessionID: sessionID,
+					DataB64:   base64.StdEncoding.EncodeToString(buf[:n]),
+				})
+			}
+			if rErr != nil {
+				reason := "remote socket closed"
+				if !errors.Is(rErr, io.EOF) {
+					reason = rErr.Error()
+				}
+				s.mu.Lock()
+				delete(s.rawSessions, sessionID)
+				s.mu.Unlock()
+				_ = sess.Close()
+				s.emitEvent("session:closed", SessionClosedEvent{
+					SessionID: sessionID,
+					Reason:    reason,
+				})
+				return
+			}
+		}
+	}()
+
+	return &ConnectRawTcpResult{SessionID: sessionID}, nil
+}
+
+func (s *Server) handleExecuteHexLocal(ctx context.Context, req core.HexRunRequest) (*core.HexRunResult, error) {
+	runner := hexrunner.NewRunner()
+	return runner.RunLocal(ctx, req)
 }

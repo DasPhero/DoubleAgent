@@ -493,3 +493,219 @@ func handleSocks5Connection(tun *tunnelWrapper, sshClient *ssh.Client, conn net.
 	// 5. Transfer data between client and target
 	tun.pipeWithMetrics(conn, remoteConn)
 }
+
+// StartForwardLocalVia binds a -L listener directly on the active remote agent host (viaSessionID)
+// and forwards incoming connections through sessionID to targetHost:targetPort (F-46 Phase 3).
+func (t *Transport) StartForwardLocalVia(
+	_ context.Context,
+	viaSessionID string,
+	sessionID string,
+	ruleID string,
+	bindAddr string,
+	bindPort uint16,
+	targetHost string,
+	targetPort uint16,
+) (core.ForwardTunnel, error) {
+	viaSess, err := t.getSession(viaSessionID)
+	if err != nil {
+		return nil, fmt.Errorf("agent session %q unavailable: %w", viaSessionID, err)
+	}
+	sess, err := t.getSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if bindAddr == "" {
+		bindAddr = "127.0.0.1"
+	}
+
+	listener, err := viaSess.client.Listen("tcp", net.JoinHostPort(bindAddr, fmt.Sprintf("%d", bindPort)))
+	if err != nil {
+		return nil, fmt.Errorf("remote agent listen failed on %s:%d: %w", bindAddr, bindPort, err)
+	}
+
+	actualPort := bindPort
+	if tcpAddr, ok := listener.Addr().(*net.TCPAddr); ok && actualPort == 0 {
+		actualPort = uint16(tcpAddr.Port)
+	}
+
+	tun := &tunnelWrapper{
+		id:         fmt.Sprintf("tun-L-via-%d", time.Now().UnixNano()),
+		ruleID:     ruleID,
+		sessionID:  sessionID,
+		tunnelType: core.ForwardLocal,
+		bindAddr:   bindAddr,
+		bindPort:   actualPort,
+		targetHost: targetHost,
+		targetPort: targetPort,
+		listener:   listener,
+		conns:      make(map[io.Closer]struct{}),
+	}
+
+	go func() {
+		targetAddr := net.JoinHostPort(targetHost, fmt.Sprintf("%d", targetPort))
+		for {
+			localConn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				tun.mu.Lock()
+				if !tun.closed {
+					tun.errMsg = acceptErr.Error()
+				}
+				tun.mu.Unlock()
+				return
+			}
+
+			go func(lConn net.Conn) {
+				remoteConn, dialErr := sess.client.Dial("tcp", targetAddr)
+				if dialErr != nil {
+					tun.mu.Lock()
+					tun.errMsg = fmt.Sprintf("dial %s failed: %v", targetAddr, dialErr)
+					tun.mu.Unlock()
+					_ = lConn.Close()
+					return
+				}
+				tun.pipeWithMetrics(lConn, remoteConn)
+			}(localConn)
+		}
+	}()
+
+	return tun, nil
+}
+
+// StartForwardRemoteVia listens on sessionID's remote host (-R) and forwards incoming connections
+// to targetHost:targetPort reachable from the active remote agent host (viaSessionID) (F-46 Phase 3).
+func (t *Transport) StartForwardRemoteVia(
+	_ context.Context,
+	viaSessionID string,
+	sessionID string,
+	ruleID string,
+	bindAddr string,
+	bindPort uint16,
+	targetHost string,
+	targetPort uint16,
+) (core.ForwardTunnel, error) {
+	viaSess, err := t.getSession(viaSessionID)
+	if err != nil {
+		return nil, fmt.Errorf("agent session %q unavailable: %w", viaSessionID, err)
+	}
+	sess, err := t.getSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if bindAddr == "" {
+		bindAddr = "127.0.0.1"
+	}
+
+	listener, err := sess.client.Listen("tcp", net.JoinHostPort(bindAddr, fmt.Sprintf("%d", bindPort)))
+	if err != nil {
+		return nil, fmt.Errorf("remote listen failed on %s:%d: %w", bindAddr, bindPort, err)
+	}
+
+	actualPort := bindPort
+	if tcpAddr, ok := listener.Addr().(*net.TCPAddr); ok && actualPort == 0 {
+		actualPort = uint16(tcpAddr.Port)
+	}
+
+	tun := &tunnelWrapper{
+		id:         fmt.Sprintf("tun-R-via-%d", time.Now().UnixNano()),
+		ruleID:     ruleID,
+		sessionID:  sessionID,
+		tunnelType: core.ForwardRemote,
+		bindAddr:   bindAddr,
+		bindPort:   actualPort,
+		targetHost: targetHost,
+		targetPort: targetPort,
+		listener:   listener,
+		conns:      make(map[io.Closer]struct{}),
+	}
+
+	go func() {
+		targetAddr := net.JoinHostPort(targetHost, fmt.Sprintf("%d", targetPort))
+		for {
+			remoteConn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				tun.mu.Lock()
+				if !tun.closed {
+					tun.errMsg = acceptErr.Error()
+				}
+				tun.mu.Unlock()
+				return
+			}
+
+			go func(rConn net.Conn) {
+				agentConn, dialErr := viaSess.client.Dial("tcp", targetAddr)
+				if dialErr != nil {
+					tun.mu.Lock()
+					tun.errMsg = fmt.Sprintf("dial %s via agent failed: %v", targetAddr, dialErr)
+					tun.mu.Unlock()
+					_ = rConn.Close()
+					return
+				}
+				tun.pipeWithMetrics(rConn, agentConn)
+			}(remoteConn)
+		}
+	}()
+
+	return tun, nil
+}
+
+// StartForwardDynamicVia binds a SOCKS5 (-D) listener directly on the active remote agent host (viaSessionID)
+// and routes proxied connections through sessionID (F-46 Phase 3).
+func (t *Transport) StartForwardDynamicVia(
+	_ context.Context,
+	viaSessionID string,
+	sessionID string,
+	ruleID string,
+	bindAddr string,
+	bindPort uint16,
+) (core.ForwardTunnel, error) {
+	viaSess, err := t.getSession(viaSessionID)
+	if err != nil {
+		return nil, fmt.Errorf("agent session %q unavailable: %w", viaSessionID, err)
+	}
+	sess, err := t.getSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if bindAddr == "" {
+		bindAddr = "127.0.0.1"
+	}
+
+	listener, err := viaSess.client.Listen("tcp", net.JoinHostPort(bindAddr, fmt.Sprintf("%d", bindPort)))
+	if err != nil {
+		return nil, fmt.Errorf("remote agent SOCKS5 listen failed on %s:%d: %w", bindAddr, bindPort, err)
+	}
+
+	actualPort := bindPort
+	if tcpAddr, ok := listener.Addr().(*net.TCPAddr); ok && actualPort == 0 {
+		actualPort = uint16(tcpAddr.Port)
+	}
+
+	tun := &tunnelWrapper{
+		id:         fmt.Sprintf("tun-D-via-%d", time.Now().UnixNano()),
+		ruleID:     ruleID,
+		sessionID:  sessionID,
+		tunnelType: core.ForwardDynamic,
+		bindAddr:   bindAddr,
+		bindPort:   actualPort,
+		listener:   listener,
+		conns:      make(map[io.Closer]struct{}),
+	}
+
+	go func() {
+		for {
+			clientConn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				tun.mu.Lock()
+				if !tun.closed {
+					tun.errMsg = acceptErr.Error()
+				}
+				tun.mu.Unlock()
+				return
+			}
+
+			go handleSocks5Connection(tun, sess.client, clientConn)
+		}
+	}()
+
+	return tun, nil
+}
