@@ -54,13 +54,17 @@ echo "==> Building Linux amd64 standalone binary..."
 # shellcheck disable=SC2086
 wails build $WAILS_LINUX_TAGS -platform linux/amd64 -o DoubleAgent-linux-amd64
 
+echo "==> Building headless Linux Ephemeral Companion Agents (amd64 & arm64)..."
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/doubleagent-agent-linux-amd64 ./cmd/doubleagent-agent
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/bin/doubleagent-agent-linux-arm64 ./cmd/doubleagent-agent
+
 if $LINUX_ONLY; then
   echo "==> Build complete (Linux only):"
-  ls -lh build/bin/DoubleAgent-linux-amd64
+  ls -lh build/bin/DoubleAgent-linux-amd64 build/bin/doubleagent-agent-linux-amd64 build/bin/doubleagent-agent-linux-arm64
 else
   echo "==> Cross-building Windows amd64 standalone binary..."
   wails build -platform windows/amd64 -o DoubleAgent.exe -s
   echo "==> Build complete:"
-  ls -lh build/bin/DoubleAgent-linux-amd64 build/bin/DoubleAgent.exe
+  ls -lh build/bin/DoubleAgent-linux-amd64 build/bin/DoubleAgent.exe build/bin/doubleagent-agent-linux-amd64 build/bin/doubleagent-agent-linux-arm64
 fi
 echo "==> Tip: run ./scripts/install-linux.sh to install 'doubleagent' globally on Linux."

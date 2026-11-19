@@ -15,6 +15,14 @@ import {
   setSessionCwd,
 } from './components/TerminalView';
 import { TerminalBackground } from './components/TerminalBackground';
+import { ExecContextControl } from './components/ExecContextControl';
+import { RemoteDirPickerModal } from './components/RemoteDirPickerModal';
+import type {
+  AttachableSshSession,
+  RemoteAgentInfo,
+  RemoteDirListing,
+  RemoteExecutionContext,
+} from './types/remoteAgent';
 import { SignalAnalyzerView } from './components/SignalAnalyzerView';
 import { SftpBrowserView } from './components/SftpBrowserView';
 import { PortForwardingView } from './components/PortForwardingView';
@@ -806,6 +814,13 @@ interface TerminalDataPayload {
 interface WailsAppBindings {
   HealthCheck: () => Promise<AppStatusPayload>;
   IsRemoteDisplayEnvironment?: () => Promise<boolean>;
+  GetRemoteExecutionContext?: () => Promise<RemoteExecutionContext>;
+  AttachRemoteAgent?: (sessionId: string, label: string) => Promise<RemoteAgentInfo>;
+  SetActiveExecutionContext?: (sessionId: string) => Promise<RemoteExecutionContext>;
+  DetachRemoteAgent?: (sessionId: string) => Promise<RemoteExecutionContext>;
+  OpenRemoteAgentTerminal?: (workingDir: string, size: { cols: number; rows: number }) => Promise<string>;
+  ListRemoteAgentDir?: (dirPath: string) => Promise<RemoteDirListing>;
+  MakeRemoteAgentDir?: (dirPath: string) => Promise<void>;
   InitializeVault: (masterPassword: string) => Promise<void>;
   InitializeVaultWithHello: () => Promise<void>;
   UnlockVault: (masterPassword: string) => Promise<void>;
@@ -1889,6 +1904,67 @@ export function App({
   const [leaderArmed, setLeaderArmed] = useState<boolean>(false);
   const leaderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quickConnectInputRef = useRef<HTMLInputElement>(null);
+
+  // Ephemeral Remote Companion Agent Execution Context (F-46)
+  const [remoteExecContext, setRemoteExecContext] = useState<RemoteExecutionContext>({
+    mode: 'local',
+    attachedAgents: [],
+  });
+  const [attachingAgentSessionId, setAttachingAgentSessionId] = useState<string | null>(null);
+  const [showRemoteDirPicker, setShowRemoteDirPicker] = useState<boolean>(false);
+
+  const syncContextDependentState = useCallback(async (): Promise<void> => {
+    const api = getWailsBindings();
+    if (api?.GetLocalNetworkIPs) {
+      try {
+        const ips = await api.GetLocalNetworkIPs();
+        if (Array.isArray(ips) && ips.length > 0) {
+          setSidebarTransferLhost(ips[0].ip);
+          setSidebarPayloadLhost(ips[0].ip);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (api?.GetDefaultStagingDirectory) {
+      try {
+        const defDir = await api.GetDefaultStagingDirectory();
+        if (defDir && defDir.trim()) {
+          const clean = defDir.trim();
+          setSidebarTransferDir(clean);
+          if (api.ListHostedTransferFiles) {
+            const files = await api.ListHostedTransferFiles(clean);
+            setSidebarTransferFiles(files || []);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const api = getWailsBindings();
+    if (api?.GetRemoteExecutionContext) {
+      void api
+        .GetRemoteExecutionContext()
+        .then((ctx) => {
+          if (ctx) setRemoteExecContext(ctx);
+        })
+        .catch(() => {});
+    }
+    const rt = getWailsRuntime();
+    if (!rt?.EventsOn) return;
+    const off = rt.EventsOn('remote-agent:updated', (raw: unknown) => {
+      if (raw && typeof raw === 'object') {
+        setRemoteExecContext(raw as RemoteExecutionContext);
+        void syncContextDependentState();
+      }
+    });
+    return () => {
+      if (typeof off === 'function') off();
+    };
+  }, [syncContextDependentState]);
 
   // Vault File Sync & Conflict State (F-29)
   const [syncInfo, setSyncInfo] = useState<VaultSyncInfo | null>(null);
@@ -5062,13 +5138,77 @@ export function App({
       }
     }
     const title =
-      shellType === 'cmd'
-        ? 'Local (CMD)'
-        : shellType === 'wsl'
-          ? 'Local (WSL)'
-          : 'Local (PowerShell)';
+      remoteExecContext.mode === 'agent' && remoteExecContext.activeAgent
+        ? `Agent (${remoteExecContext.activeAgent.hostname || remoteExecContext.activeAgent.label})`
+        : shellType === 'cmd'
+          ? 'Local (CMD)'
+          : shellType === 'wsl'
+            ? 'Local (WSL)'
+            : 'Local (PowerShell)';
     openSessionTab(sid, title, undefined, '#10b981');
     setStatusMessage(`Started ${title} session.`);
+  };
+
+  const handleAttachRemoteAgent = async (sshSessionId: string, label: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.AttachRemoteAgent) return;
+    setAttachingAgentSessionId(sshSessionId);
+    setStatusMessage(`Deploying ephemeral companion agent to ${label}...`);
+    try {
+      const info = await api.AttachRemoteAgent(sshSessionId, label);
+      setStatusMessage(
+        `Remote Companion Agent active on ${info.hostname}${info.primaryIp ? ` (${info.primaryIp})` : ''}.`
+      );
+      await syncContextDependentState();
+    } catch (err: unknown) {
+      setStatusMessage(`Failed to attach remote agent: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setAttachingAgentSessionId(null);
+    }
+  };
+
+  const handleSelectExecContext = async (sshSessionId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.SetActiveExecutionContext) return;
+    try {
+      const ctx = await api.SetActiveExecutionContext(sshSessionId);
+      setRemoteExecContext(ctx);
+      setStatusMessage(
+        ctx.mode === 'agent' && ctx.activeAgent
+          ? `Execution context switched to ${ctx.activeAgent.hostname}.`
+          : 'Execution context switched to Local Workstation.'
+      );
+      await syncContextDependentState();
+    } catch (err: unknown) {
+      setStatusMessage(`Failed to switch context: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const handleDetachRemoteAgent = async (sshSessionId: string): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.DetachRemoteAgent) return;
+    try {
+      const ctx = await api.DetachRemoteAgent(sshSessionId);
+      setRemoteExecContext(ctx);
+      setStatusMessage('Remote companion agent detached and cleaned up.');
+      await syncContextDependentState();
+    } catch (err: unknown) {
+      setStatusMessage(`Failed to detach remote agent: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const handleOpenRemoteAgentShell = async (workingDir = ''): Promise<void> => {
+    const api = getWailsBindings();
+    if (!api?.OpenRemoteAgentTerminal) return;
+    try {
+      const sid = await api.OpenRemoteAgentTerminal(workingDir, { cols: 120, rows: 34 });
+      const hostName = remoteExecContext.activeAgent?.hostname || 'Remote';
+      const title = workingDir ? `${hostName}:${workingDir.split('/').pop() || '/'}` : `Agent (${hostName})`;
+      openSessionTab(sid, title, undefined, '#10b981');
+      setStatusMessage(`Opened remote shell on ${hostName}${workingDir ? ` in ${workingDir}` : ''}.`);
+    } catch (err: unknown) {
+      setStatusMessage(`Failed to open remote shell: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const handleRefreshSerialPorts = async (): Promise<void> => {
@@ -9141,11 +9281,37 @@ export function App({
             </button>
           )}
 
+          {/* Execution Context Switcher (Local vs Remote Companion Agent, F-46) */}
+          <ExecContextControl
+            context={remoteExecContext}
+            sshSessions={tabs.flatMap((t): AttachableSshSession[] =>
+              collectPanes(t.rootNode)
+                .filter(
+                  (p) =>
+                    liveSessions.has(p.sessionId) &&
+                    (!p.paneType || p.paneType === 'terminal') &&
+                    !p.isRawTcp &&
+                    !p.sessionId.startsWith('local-') &&
+                    !p.sessionId.startsWith('rpty-') &&
+                    !p.sessionId.startsWith('serial-') &&
+                    !p.sessionId.startsWith('winrm-') &&
+                    !p.sessionId.startsWith('rawtcp-')
+                )
+                .map((p) => ({ sessionId: p.sessionId, label: p.title }))
+            )}
+            busySessionId={attachingAgentSessionId}
+            onAttachAgent={(sid, label) => void handleAttachRemoteAgent(sid, label)}
+            onSelectContext={(sid) => void handleSelectExecContext(sid)}
+            onDetachAgent={(sid) => void handleDetachRemoteAgent(sid)}
+            onOpenRemoteShell={() => void handleOpenRemoteAgentShell('')}
+            onBrowseRemoteDirs={() => setShowRemoteDirPicker(true)}
+          />
+
           {/* Global Settings (floated to the far right) */}
           <button
             type="button"
             className="nav-menu-trigger nav-settings-right"
-            style={{ marginLeft: syncInfo?.detectedConflict ? '0.5rem' : 'auto' }}
+            style={{ marginLeft: '0.25rem' }}
             onClick={() => {
               setSettingsActiveTab('appearance');
               setShowGlobalSettingsModal(true);
@@ -10628,6 +10794,10 @@ export function App({
                         style={{ padding: '0 0.45rem', flexShrink: 0 }}
                         onClick={() => {
                           void (async () => {
+                            if (remoteExecContext.mode === 'agent' && remoteExecContext.activeAgent) {
+                              setShowRemoteDirPicker(true);
+                              return;
+                            }
                             const api = getWailsBindings();
                             const selected = await api?.SelectDirectoryDialog?.('Select Staging Directory to Serve');
                             if (selected && selected.trim()) {
@@ -15907,6 +16077,44 @@ export function App({
             });
             openApiTesterTab();
           }}
+        />
+      )}
+      {showRemoteDirPicker && remoteExecContext.activeAgent && (
+        <RemoteDirPickerModal
+          isOpen={showRemoteDirPicker}
+          agentLabel={remoteExecContext.activeAgent.hostname || remoteExecContext.activeAgent.label}
+          initialPath={sidebarTransferDir || remoteExecContext.activeAgent.homeDir || '~'}
+          onListDir={async (dirPath) => {
+            const api = getWailsBindings();
+            if (!api?.ListRemoteAgentDir) {
+              throw new Error('Remote directory listing binding unavailable');
+            }
+            return api.ListRemoteAgentDir(dirPath);
+          }}
+          onMkdir={async (dirPath) => {
+            const api = getWailsBindings();
+            if (!api?.MakeRemoteAgentDir) {
+              throw new Error('Remote mkdir binding unavailable');
+            }
+            await api.MakeRemoteAgentDir(dirPath);
+          }}
+          onSelectDir={(dirPath) => {
+            setSidebarTransferDir(dirPath);
+            setSidebarTransferError('');
+            const api = getWailsBindings();
+            if (api?.ListHostedTransferFiles) {
+              setSidebarTransferLoadingFiles(true);
+              void api
+                .ListHostedTransferFiles(dirPath)
+                .then((files) => setSidebarTransferFiles(files || []))
+                .catch((err: unknown) =>
+                  setSidebarTransferError(err instanceof Error ? err.message : String(err))
+                )
+                .finally(() => setSidebarTransferLoadingFiles(false));
+            }
+          }}
+          onOpenShellInDir={(dirPath) => void handleOpenRemoteAgentShell(dirPath)}
+          onClose={() => setShowRemoteDirPicker(false)}
         />
       )}
     </main>

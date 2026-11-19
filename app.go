@@ -27,6 +27,7 @@ import (
 	"doubleagent/backend/pivot"
 	"doubleagent/backend/pty"
 	"doubleagent/backend/rawtcp"
+	"doubleagent/backend/remoteagent"
 	"doubleagent/backend/report"
 	"doubleagent/backend/serial"
 	"doubleagent/backend/ssh"
@@ -81,6 +82,10 @@ type App struct {
 	winrmSessions               map[string]*winrm.ManagedSession
 	apiClient                   *apiclient.Client
 	hexRunner                   *hexrunner.Runner
+	remoteAgents                map[string]*remoteagent.Client
+	remoteAgentInfos            map[string]core.RemoteAgentInfo
+	activeExecAgentID           string
+	remotePtys                  map[string]string
 }
 
 type managedListenerInstance struct {
@@ -216,6 +221,9 @@ func NewAppWithDependencies(
 		winrmSessions:    make(map[string]*winrm.ManagedSession),
 		apiClient:        apiclient.NewClient(),
 		hexRunner:        hexrunner.NewRunner(),
+		remoteAgents:     make(map[string]*remoteagent.Client),
+		remoteAgentInfos: make(map[string]core.RemoteAgentInfo),
+		remotePtys:       make(map[string]string),
 	}
 
 	if vaultStore == nil {
@@ -277,6 +285,7 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.remoteEditMgr != nil {
 		a.remoteEditMgr.CloseAll()
 	}
+	a.detachAllRemoteAgents()
 }
 
 // HealthCheck returns the current status of DoubleAgent, including Vault initialization and Quick Unlock state.
@@ -1374,8 +1383,12 @@ func (a *App) ResolveHostKeyPrompt(host string, port uint16, trust bool) error {
 	return nil
 }
 
-// OpenLocalTerminal starts a local pseudo-terminal shell (PowerShell, CMD, WSL) per F-23.
+// OpenLocalTerminal starts a local pseudo-terminal shell (PowerShell, CMD, WSL) per F-23,
+// or spawns a remote Linux PTY when an ephemeral Remote Companion Agent is active (F-46).
 func (a *App) OpenLocalTerminal(shellType string, size core.TerminalSize) (string, error) {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		return a.OpenRemoteAgentTerminal("", size)
+	}
 	sess, err := pty.StartShell(a.ctx, shellType, size)
 	if err != nil {
 		return "", err
@@ -1670,8 +1683,16 @@ func (a *App) WriteTerminal(sessionID string, data string) error {
 	rawSess, isRawTcp := a.rawTcpSessions[sessionID]
 	winrmSess, isWinrm := a.winrmSessions[sessionID]
 	streams, isSSH := a.activeStreams[sessionID]
+	remoteAgentOwner, isRemotePty := a.remotePtys[sessionID]
+	var remoteAgentClient *remoteagent.Client
+	if isRemotePty {
+		remoteAgentClient = a.remoteAgents[remoteAgentOwner]
+	}
 	a.mu.Unlock()
 
+	if isRemotePty && remoteAgentClient != nil {
+		return remoteAgentClient.WritePTY(a.ctx, sessionID, []byte(data))
+	}
 	if isLocal && locSess != nil {
 		_, err := io.WriteString(locSess.Stdin(), data)
 		return err
@@ -1718,8 +1739,16 @@ func (a *App) ResizeTerminal(sessionID string, cols uint16, rows uint16) error {
 	_, isSerial := a.serialSessions[sessionID]
 	_, isRawTcp := a.rawTcpSessions[sessionID]
 	_, isWinrm := a.winrmSessions[sessionID]
+	remoteAgentOwner, isRemotePty := a.remotePtys[sessionID]
+	var remoteAgentClient *remoteagent.Client
+	if isRemotePty {
+		remoteAgentClient = a.remoteAgents[remoteAgentOwner]
+	}
 	a.mu.Unlock()
 
+	if isRemotePty && remoteAgentClient != nil {
+		return remoteAgentClient.ResizePTY(a.ctx, sessionID, cols, rows)
+	}
 	if isLocal && locSess != nil {
 		return locSess.Resize(core.TerminalSize{Cols: cols, Rows: rows})
 	}
@@ -1780,6 +1809,13 @@ func (a *App) DisconnectSession(sessionID string) error {
 	delete(a.rawTcpSessions, sessionID)
 	winrmSess, isWinrm := a.winrmSessions[sessionID]
 	delete(a.winrmSessions, sessionID)
+	remoteAgentOwner, isRemotePty := a.remotePtys[sessionID]
+	delete(a.remotePtys, sessionID)
+	var remoteAgentClient *remoteagent.Client
+	if isRemotePty {
+		remoteAgentClient = a.remoteAgents[remoteAgentOwner]
+	}
+	_, hasAttachedAgent := a.remoteAgents[sessionID]
 	delete(a.activeStreams, sessionID)
 	delete(a.sessionHostID, sessionID)
 	delete(a.sessionPasswords, sessionID)
@@ -1805,6 +1841,12 @@ func (a *App) DisconnectSession(sessionID string) error {
 		_, _ = a.logMgr.StopSession(sessionID)
 	}
 
+	if hasAttachedAgent {
+		_, _ = a.DetachRemoteAgent(sessionID)
+	}
+	if isRemotePty && remoteAgentClient != nil {
+		return remoteAgentClient.ClosePTY(a.ctx, sessionID)
+	}
 	if isLocal && locSess != nil {
 		return locSess.Close()
 	}
@@ -5860,8 +5902,11 @@ func (a *App) ImportEngagementFile(filePath string, password string) (*core.Enga
 
 // --- File Transfer Helper & HTTP Staging Engine (Pentest Module F-31) ---
 
-// GetDefaultStagingDirectory returns a practical default directory for staging files (F-31).
+// GetDefaultStagingDirectory returns a practical default directory for staging files (F-31, F-46).
 func (a *App) GetDefaultStagingDirectory() string {
+	if _, info := a.getActiveRemoteAgent(); info != nil && info.StagingDir != "" {
+		return info.StagingDir
+	}
 	a.mu.Lock()
 	custom := a.stagingDirPath
 	a.mu.Unlock()
@@ -5877,8 +5922,19 @@ func (a *App) GetDefaultStagingDirectory() string {
 	return os.TempDir()
 }
 
-// GetLocalNetworkIPs returns non-loopback IPv4 interfaces (prioritizing VPN tun/tap/wg) for LHOST selection (F-31).
+// GetLocalNetworkIPs returns non-loopback IPv4 interfaces (prioritizing VPN tun/tap/wg) for LHOST selection (F-31, F-46).
 func (a *App) GetLocalNetworkIPs() []core.NetworkInterfaceIP {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
+		defer cancel()
+		if ips, err := client.ListNetworkIPs(callCtx); err == nil {
+			return ips
+		}
+	}
 	return core.ListLocalIPv4Interfaces()
 }
 
@@ -5965,13 +6021,35 @@ func (a *App) GenerateFileServerCommand(cfg core.FileTransferServerConfig) strin
 	return core.BuildFileServerCommand(cfg)
 }
 
-// ListHostedTransferFiles enumerates files inside the configured staging directory (F-31).
+// ListHostedTransferFiles enumerates files inside the configured staging directory (F-31, F-46).
 func (a *App) ListHostedTransferFiles(dir string) ([]core.HostedFileEntry, error) {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
+		defer cancel()
+		listing, err := client.ListDir(callCtx, dir)
+		if err != nil {
+			return nil, err
+		}
+		return listing.Entries, nil
+	}
 	return core.ListHostedFiles(dir)
 }
 
-// HashHostedTransferFile computes streaming SHA-256 and MD5 checksums for a staged file inside rootDir (F-31).
+// HashHostedTransferFile computes streaming SHA-256 and MD5 checksums for a staged file inside rootDir (F-31, F-46).
 func (a *App) HashHostedTransferFile(rootDir string, relPath string) (*core.HostedFileEntry, error) {
+	if client, _ := a.getActiveRemoteAgent(); client != nil {
+		baseCtx := a.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		callCtx, cancel := context.WithTimeout(baseCtx, 15*time.Second)
+		defer cancel()
+		return client.HashFile(callCtx, rootDir, relPath)
+	}
 	safePath, err := core.ResolveSafeHostedPath(rootDir, relPath)
 	if err != nil {
 		return nil, err

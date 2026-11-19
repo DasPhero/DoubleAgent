@@ -3341,6 +3341,38 @@ export namespace core {
 		}
 	}
 	
+	export class RemoteAgentInfo {
+	    sessionId: string;
+	    label: string;
+	    hostname: string;
+	    os: string;
+	    arch: string;
+	    homeDir: string;
+	    defaultShell: string;
+	    stagingDir: string;
+	    primaryIp?: string;
+	    connectedAt: string;
+	    active: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteAgentInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.label = source["label"];
+	        this.hostname = source["hostname"];
+	        this.os = source["os"];
+	        this.arch = source["arch"];
+	        this.homeDir = source["homeDir"];
+	        this.defaultShell = source["defaultShell"];
+	        this.stagingDir = source["stagingDir"];
+	        this.primaryIp = source["primaryIp"];
+	        this.connectedAt = source["connectedAt"];
+	        this.active = source["active"];
+	    }
+	}
 	export class RemoteConflictInfo {
 	    hasConflict: boolean;
 	    remotePath: string;
@@ -3364,6 +3396,40 @@ export namespace core {
 	        this.remoteSize = source["remoteSize"];
 	        this.message = source["message"];
 	    }
+	}
+	export class RemoteDirListing {
+	    path: string;
+	    parent: string;
+	    entries: HostedFileEntry[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteDirListing(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.parent = source["parent"];
+	        this.entries = this.convertValues(source["entries"], HostedFileEntry);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class RemoteEditResult {
 	    success: boolean;
@@ -3418,6 +3484,42 @@ export namespace core {
 	        this.hasConflict = source["hasConflict"];
 	        this.errorMessage = source["errorMessage"];
 	    }
+	}
+	export class RemoteExecutionContext {
+	    mode: string;
+	    activeSessionId?: string;
+	    activeAgent?: RemoteAgentInfo;
+	    attachedAgents: RemoteAgentInfo[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RemoteExecutionContext(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.activeSessionId = source["activeSessionId"];
+	        this.activeAgent = this.convertValues(source["activeAgent"], RemoteAgentInfo);
+	        this.attachedAgents = this.convertValues(source["attachedAgents"], RemoteAgentInfo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class RemoteSocketEntry {
 	    proto: string;

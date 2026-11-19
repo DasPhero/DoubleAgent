@@ -10,6 +10,10 @@ export function AssignHostToEngagement(arg1, arg2) {
   return window['go']['main']['App']['AssignHostToEngagement'](arg1, arg2);
 }
 
+export function AttachRemoteAgent(arg1, arg2) {
+  return window['go']['main']['App']['AttachRemoteAgent'](arg1, arg2);
+}
+
 export function AutoDetectSerial(arg1) {
   return window['go']['main']['App']['AutoDetectSerial'](arg1);
 }
@@ -188,6 +192,10 @@ export function DeleteTotpRecord(arg1) {
 
 export function DeleteWinrmProfile(arg1) {
   return window['go']['main']['App']['DeleteWinrmProfile'](arg1);
+}
+
+export function DetachRemoteAgent(arg1) {
+  return window['go']['main']['App']['DetachRemoteAgent'](arg1);
 }
 
 export function DetectPivotBinaries() {
@@ -406,6 +414,10 @@ export function GetRemoteEditContent(arg1) {
   return window['go']['main']['App']['GetRemoteEditContent'](arg1);
 }
 
+export function GetRemoteExecutionContext() {
+  return window['go']['main']['App']['GetRemoteExecutionContext']();
+}
+
 export function GetSessionLogStatus(arg1) {
   return window['go']['main']['App']['GetSessionLogStatus'](arg1);
 }
@@ -594,6 +606,10 @@ export function ListRawTcpListeners() {
   return window['go']['main']['App']['ListRawTcpListeners']();
 }
 
+export function ListRemoteAgentDir(arg1) {
+  return window['go']['main']['App']['ListRemoteAgentDir'](arg1);
+}
+
 export function ListRemoteDir(arg1, arg2) {
   return window['go']['main']['App']['ListRemoteDir'](arg1, arg2);
 }
@@ -642,6 +658,10 @@ export function LockVault() {
   return window['go']['main']['App']['LockVault']();
 }
 
+export function MakeRemoteAgentDir(arg1) {
+  return window['go']['main']['App']['MakeRemoteAgentDir'](arg1);
+}
+
 export function MergeExternalVaultFile(arg1, arg2) {
   return window['go']['main']['App']['MergeExternalVaultFile'](arg1, arg2);
 }
@@ -652,6 +672,10 @@ export function OpenExternalEditor(arg1) {
 
 export function OpenLocalTerminal(arg1, arg2) {
   return window['go']['main']['App']['OpenLocalTerminal'](arg1, arg2);
+}
+
+export function OpenRemoteAgentTerminal(arg1, arg2) {
+  return window['go']['main']['App']['OpenRemoteAgentTerminal'](arg1, arg2);
 }
 
 export function OpenTerminalWithOptions(arg1, arg2) {
@@ -900,6 +924,10 @@ export function SendSerialBreak(arg1) {
 
 export function SetActiveEngagement(arg1) {
   return window['go']['main']['App']['SetActiveEngagement'](arg1);
+}
+
+export function SetActiveExecutionContext(arg1) {
+  return window['go']['main']['App']['SetActiveExecutionContext'](arg1);
 }
 
 export function SetManagedFilePath(arg1, arg2) {

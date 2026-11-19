@@ -591,6 +591,77 @@ func (t *Transport) ExecRaw(ctx context.Context, sessionID string, command strin
 	return outBuf.Bytes(), errBuf.Bytes(), exitCode, nil
 }
 
+// ExecStream starts a long-lived non-PTY command over an SSH exec channel and returns
+// its raw stdin/stdout/stderr streams for NDJSON-RPC communication (F-46).
+func (t *Transport) ExecStream(ctx context.Context, sessionID string, command string) (*core.SshExecStream, error) {
+	sess, err := t.getSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	sess.mu.Lock()
+	closed := sess.closed
+	client := sess.client
+	sess.mu.Unlock()
+	if closed || client == nil {
+		return nil, core.ErrSessionNotFound
+	}
+
+	sshSess, err := client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("create ssh exec stream session: %w", err)
+	}
+
+	stdinPipe, err := sshSess.StdinPipe()
+	if err != nil {
+		_ = sshSess.Close()
+		return nil, fmt.Errorf("stdin pipe: %w", err)
+	}
+	stdoutPipe, err := sshSess.StdoutPipe()
+	if err != nil {
+		_ = sshSess.Close()
+		return nil, fmt.Errorf("stdout pipe: %w", err)
+	}
+	stderrPipe, err := sshSess.StderrPipe()
+	if err != nil {
+		_ = sshSess.Close()
+		return nil, fmt.Errorf("stderr pipe: %w", err)
+	}
+
+	if err := sshSess.Start(command); err != nil {
+		_ = sshSess.Close()
+		return nil, fmt.Errorf("start remote stream command: %w", err)
+	}
+
+	done := make(chan struct{})
+	var closeOnce sync.Once
+	closeFn := func() error {
+		var closeErr error
+		closeOnce.Do(func() {
+			close(done)
+			_ = stdinPipe.Close()
+			closeErr = sshSess.Close()
+		})
+		return closeErr
+	}
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = closeFn()
+		case <-done:
+		}
+	}()
+
+	return &core.SshExecStream{
+		Stdin:  stdinPipe,
+		Stdout: stdoutPipe,
+		Stderr: stderrPipe,
+		Wait:   sshSess.Wait,
+		Close:  closeFn,
+	}, nil
+}
+
 // Disconnect closes any active shell and terminates the underlying SSH connection.
 func (t *Transport) Disconnect(_ context.Context, sessionID string) error {
 	t.mu.Lock()

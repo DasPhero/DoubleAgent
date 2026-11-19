@@ -7,6 +7,8 @@ export function AddEvidenceCategory(arg1:string,arg2:string):Promise<void>;
 
 export function AssignHostToEngagement(arg1:string,arg2:string):Promise<void>;
 
+export function AttachRemoteAgent(arg1:string,arg2:string):Promise<core.RemoteAgentInfo>;
+
 export function AutoDetectSerial(arg1:string):Promise<core.SerialAutoDetectResult>;
 
 export function BroadcastInput(arg1:Array<string>,arg2:string):Promise<void>;
@@ -96,6 +98,8 @@ export function DeleteSnippetFromFile(arg1:string):Promise<void>;
 export function DeleteTotpRecord(arg1:string):Promise<void>;
 
 export function DeleteWinrmProfile(arg1:string):Promise<void>;
+
+export function DetachRemoteAgent(arg1:string):Promise<core.RemoteExecutionContext>;
 
 export function DetectPivotBinaries():Promise<Array<core.PivotBinaryStatus>>;
 
@@ -205,6 +209,8 @@ export function GetRawTcpSessionStats(arg1:string):Promise<core.RawTcpSessionSta
 
 export function GetRemoteEditContent(arg1:string):Promise<string>;
 
+export function GetRemoteExecutionContext():Promise<core.RemoteExecutionContext>;
+
 export function GetSessionLogStatus(arg1:string):Promise<core.SessionLogStatus>;
 
 export function GetShellStabilizePresets():Promise<Array<core.ShellStabilizePreset>>;
@@ -299,6 +305,8 @@ export function ListProxyProfiles():Promise<Array<core.ProxyProfileSummary>>;
 
 export function ListRawTcpListeners():Promise<Array<core.RawTcpListenerInfo>>;
 
+export function ListRemoteAgentDir(arg1:string):Promise<core.RemoteDirListing>;
+
 export function ListRemoteDir(arg1:string,arg2:string):Promise<Array<core.FileItem>>;
 
 export function ListReportTemplates():Promise<Array<core.ReportTemplate>>;
@@ -323,11 +331,15 @@ export function LoadWorkspace():Promise<core.WorkspaceState>;
 
 export function LockVault():Promise<void>;
 
+export function MakeRemoteAgentDir(arg1:string):Promise<void>;
+
 export function MergeExternalVaultFile(arg1:string,arg2:string):Promise<core.VaultConflictReport>;
 
 export function OpenExternalEditor(arg1:string):Promise<void>;
 
 export function OpenLocalTerminal(arg1:string,arg2:core.TerminalSize):Promise<string>;
+
+export function OpenRemoteAgentTerminal(arg1:string,arg2:core.TerminalSize):Promise<string>;
 
 export function OpenTerminalWithOptions(arg1:string,arg2:core.TerminalSpawnOptions):Promise<string>;
 
@@ -452,6 +464,8 @@ export function SendRawTcpHex(arg1:string,arg2:string):Promise<number>;
 export function SendSerialBreak(arg1:string):Promise<void>;
 
 export function SetActiveEngagement(arg1:string):Promise<void>;
+
+export function SetActiveExecutionContext(arg1:string):Promise<core.RemoteExecutionContext>;
 
 export function SetManagedFilePath(arg1:string,arg2:string):Promise<core.ExternalManagedFileInfo>;
 
