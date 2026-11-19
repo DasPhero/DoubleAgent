@@ -3,6 +3,7 @@ package pty
 import (
 	"context"
 	"io"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,9 @@ import (
 )
 
 func TestLocalPTY_Cmd_F23(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("cmd.exe is Windows-only; see TestLocalPTY_WorkingDirAndRoot_F10 for the cross-platform PTY path")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -93,6 +97,9 @@ loop:
 }
 
 func TestLocalPTY_PowerShell_F23(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("powershell.exe is Windows-only; see TestLocalPTY_WorkingDirAndRoot_F10 for the cross-platform PTY path")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

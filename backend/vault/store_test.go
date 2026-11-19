@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -290,19 +291,23 @@ func TestS3_QuickUnlockWithBiometricVerifier_F03(t *testing.T) {
 		t.Fatal("expected vault to be unlocked after approved quick unlock")
 	}
 
-	// Verify that a brand-new Store instance (simulating full app restart) can also unlock via persistent DPAPI .hello file
-	restartedStore := vault.NewStore(vault.StoreOptions{
-		FilePath: vaultPath,
-		KDF:      fastTestKDF(),
-		Verifier: func(_ context.Context, _ string) error {
-			return nil
-		},
-	})
-	if !restartedStore.HasQuickUnlock() {
-		t.Fatal("expected restarted store to detect persisted .hello DPAPI key")
-	}
-	if err := restartedStore.UnlockWithQuickUnlock(context.Background()); err != nil {
-		t.Fatalf("restarted UnlockWithQuickUnlock failed: %v", err)
+	// Verify that a brand-new Store instance (simulating full app restart) can also unlock via
+	// the persistent DPAPI .hello file. DPAPI is Windows-only, so this persistence check only
+	// applies there; on other platforms the quick-unlock key is not persisted across restarts.
+	if runtime.GOOS == "windows" {
+		restartedStore := vault.NewStore(vault.StoreOptions{
+			FilePath: vaultPath,
+			KDF:      fastTestKDF(),
+			Verifier: func(_ context.Context, _ string) error {
+				return nil
+			},
+		})
+		if !restartedStore.HasQuickUnlock() {
+			t.Fatal("expected restarted store to detect persisted .hello DPAPI key")
+		}
+		if err := restartedStore.UnlockWithQuickUnlock(context.Background()); err != nil {
+			t.Fatalf("restarted UnlockWithQuickUnlock failed: %v", err)
+		}
 	}
 }
 
