@@ -177,4 +177,36 @@ describe('SettingsView — Files & Templates Manager', () => {
     });
     expect(screen.getByText(/All keyboard shortcuts and leader key settings restored to defaults/i)).toBeInTheDocument();
   });
+
+  it('toggles Low-Latency / RDP Mode in Appearance settings and disables terminalBg when enabled', () => {
+    const updateMock = vi.fn();
+    render(
+      <SettingsView
+        activeTab="appearance"
+        onTabChange={vi.fn()}
+        globalSettings={{
+          ...DEFAULT_SETTINGS,
+          terminalBg: 'grid',
+          lowLatencyMode: false,
+        }}
+        onUpdateSettings={updateMock}
+        onResetSettings={vi.fn()}
+        vaultLocked={false}
+        passwordless={true}
+        helloPending={false}
+        quickUnlockReady={false}
+        modalError=""
+        onEnableQuickUnlock={vi.fn(async () => {})}
+        onChangePassword={vi.fn(async () => {})}
+        onResetVault={vi.fn(async () => {})}
+      />
+    );
+
+    const select = screen.getByLabelText('Low-Latency RDP Performance Mode');
+    fireEvent.change(select, { target: { value: 'on' } });
+    expect(updateMock).toHaveBeenCalledWith({ lowLatencyMode: true, terminalBg: 'none' });
+
+    fireEvent.change(select, { target: { value: 'off' } });
+    expect(updateMock).toHaveBeenCalledWith({ lowLatencyMode: false });
+  });
 });

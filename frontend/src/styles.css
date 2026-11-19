@@ -10467,6 +10467,38 @@ button.hud-status-pill:hover {
   box-shadow: 0 0 10px color-mix(in srgb, var(--accent-bright) 35%, transparent);
 }
 
+/* ============================================================================
+   Low-Latency / RDP Performance Mode
+   Eliminates CPU-heavy backdrop-filter blurs, glow shadows, filters, and
+   continuous animations so software-rendered WebViews (xrdp / VNC / VMs)
+   stay crisp and responsive.
+   ============================================================================ */
+body.perf-low-latency,
+body.perf-low-latency *,
+body.perf-low-latency *::before,
+body.perf-low-latency *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation: none !important;
+  transition: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+body.perf-low-latency .cyber-glass-popover,
+body.perf-low-latency .modal-card,
+body.perf-low-latency .cyber-dialog-card,
+body.perf-low-latency .nav-dropdown-menu,
+body.perf-low-latency .cmd-palette-modal,
+body.perf-low-latency .settings-modal-card {
+  background: var(--bg-panel, #111622) !important;
+}
+
+body.perf-low-latency .terminal-bg-layer {
+  display: none !important;
+}
+
 
 
 

@@ -599,6 +599,31 @@ export function SettingsView({
                 </div>
               </>
             )}
+
+            <div className="settings-field-row" style={{ marginTop: '0.75rem' }}>
+              <label htmlFor="setting-low-latency">Low-Latency / RDP Mode</label>
+              <select
+                id="setting-low-latency"
+                aria-label="Low-Latency RDP Performance Mode"
+                value={globalSettings.lowLatencyMode ? 'on' : 'off'}
+                onChange={(e) => {
+                  const enabled = e.target.value === 'on';
+                  onUpdateSettings(
+                    enabled
+                      ? { lowLatencyMode: true, terminalBg: 'none' }
+                      : { lowLatencyMode: false }
+                  );
+                }}
+              >
+                <option value="off">Off (Full Visual Effects)</option>
+                <option value="on">On (Fast Software / RDP Rendering)</option>
+              </select>
+            </div>
+            <p className="settings-hint">
+              Disables glass blur, glow shadows, CSS animations, and terminal transparency for smooth
+              responsiveness over xrdp, VNC, or VMs without GPU acceleration. Automatically enabled
+              on Linux remote desktop sessions.
+            </p>
           </section>
 
           <section className="settings-section">

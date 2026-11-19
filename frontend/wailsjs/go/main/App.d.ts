@@ -251,6 +251,8 @@ export function InjectTotpCode(arg1:string,arg2:string):Promise<void>;
 
 export function InspectApiPayload(arg1:string,arg2:string):Promise<core.ApiDecodedPayload>;
 
+export function IsRemoteDisplayEnvironment():Promise<boolean>;
+
 export function LaunchTwoStepSshPivot(arg1:core.TwoStepSshPivotRequest):Promise<core.ForwardTunnelStatus>;
 
 export function ListActiveManagedListeners():Promise<Array<core.ManagedListenerInfo>>;

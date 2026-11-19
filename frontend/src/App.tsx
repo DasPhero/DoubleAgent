@@ -132,6 +132,20 @@ function loadSettingsFromStorage(): AppGlobalSettings {
   return DEFAULT_SETTINGS;
 }
 
+function hasExplicitLowLatencySetting(): boolean {
+  try {
+    const raw =
+      typeof window !== 'undefined' && window.localStorage
+        ? window.localStorage.getItem(SETTINGS_STORAGE_KEY)
+        : null;
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return Object.prototype.hasOwnProperty.call(parsed, 'lowLatencyMode');
+  } catch {
+    return false;
+  }
+}
+
 function saveSettingsToStorage(settings: AppGlobalSettings): void {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -791,6 +805,7 @@ interface TerminalDataPayload {
 
 interface WailsAppBindings {
   HealthCheck: () => Promise<AppStatusPayload>;
+  IsRemoteDisplayEnvironment?: () => Promise<boolean>;
   InitializeVault: (masterPassword: string) => Promise<void>;
   InitializeVaultWithHello: () => Promise<void>;
   UnlockVault: (masterPassword: string) => Promise<void>;
@@ -1834,7 +1849,40 @@ export function App({
   const globalSettingsRef = useRef<AppGlobalSettings>(globalSettings);
   useEffect(() => {
     globalSettingsRef.current = globalSettings;
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('perf-low-latency', Boolean(globalSettings.lowLatencyMode));
+    }
   }, [globalSettings]);
+
+  // Auto-enable Low-Latency / RDP Mode on Linux xrdp or unavailable DRI GPU
+  // unless the user has explicitly persisted a preference.
+  useEffect(() => {
+    if (initialSettings?.lowLatencyMode !== undefined || hasExplicitLowLatencySetting()) {
+      return;
+    }
+    const api = getWailsBindings();
+    if (!api?.IsRemoteDisplayEnvironment) {
+      return;
+    }
+    let active = true;
+    void api
+      .IsRemoteDisplayEnvironment()
+      .then((isRemote) => {
+        if (!active || !isRemote) return;
+        setGlobalSettings((prev) => {
+          if (prev.lowLatencyMode) return prev;
+          const next: AppGlobalSettings = { ...prev, lowLatencyMode: true, terminalBg: 'none' };
+          applySettingsToAllTerminals(next);
+          return next;
+        });
+      })
+      .catch(() => {
+        // ignore detection errors
+      });
+    return () => {
+      active = false;
+    };
+  }, [initialSettings?.lowLatencyMode]);
   const [showGlobalSettingsModal, setShowGlobalSettingsModal] = useState<boolean>(false);
   const [settingsActiveTab, setSettingsActiveTab] = useState<SettingsTabId>('appearance');
   const [paneFontSizes, setPaneFontSizes] = useState<Map<string, number>>(new Map());
@@ -12731,8 +12779,13 @@ export function App({
                       />
                     ) : (
                       <div
-                        className={`terminal-bg-wrap${globalSettings.terminalBg && globalSettings.terminalBg !== 'none' ? ' has-bg' : ''
-                          }`}
+                        className={`terminal-bg-wrap${
+                          !globalSettings.lowLatencyMode &&
+                          globalSettings.terminalBg &&
+                          globalSettings.terminalBg !== 'none'
+                            ? ' has-bg'
+                            : ''
+                        }`}
                         style={
                           {
                             '--term-surface': `color-mix(in srgb, var(--bg-base) ${Math.round(
@@ -12741,11 +12794,13 @@ export function App({
                           } as React.CSSProperties
                         }
                       >
-                        <TerminalBackground
-                          treatment={globalSettings.terminalBg ?? 'none'}
-                          animate={globalSettings.terminalBgAnimate ?? true}
-                          colorTheme={globalSettings.colorTheme}
-                        />
+                        {!globalSettings.lowLatencyMode && (
+                          <TerminalBackground
+                            treatment={globalSettings.terminalBg ?? 'none'}
+                            animate={globalSettings.terminalBgAnimate ?? true}
+                            colorTheme={globalSettings.colorTheme}
+                          />
+                        )}
                         <div className="terminal-bg-content">
                           {renderWorkspaceNode(tab.rootNode, tab, tabPanes.length)}
                         </div>

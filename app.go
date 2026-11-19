@@ -7387,6 +7387,12 @@ func (a *App) QuickStartLocalForward(
 	}, nil
 }
 
+// IsRemoteDisplayEnvironment reports whether DoubleAgent detected a remote display
+// environment (such as Linux xrdp or unavailable DRI render node) or DOUBLEAGENT_RDP_MODE=1.
+func (a *App) IsRemoteDisplayEnvironment() bool {
+	return isRemoteDisplayEnvironment()
+}
+
 
 
 

@@ -498,6 +498,10 @@ export function InspectApiPayload(arg1, arg2) {
   return window['go']['main']['App']['InspectApiPayload'](arg1, arg2);
 }
 
+export function IsRemoteDisplayEnvironment() {
+  return window['go']['main']['App']['IsRemoteDisplayEnvironment']();
+}
+
 export function LaunchTwoStepSshPivot(arg1) {
   return window['go']['main']['App']['LaunchTwoStepSshPivot'](arg1);
 }

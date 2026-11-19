@@ -20,6 +20,8 @@ export interface AppGlobalSettings {
   terminalBg?: 'none' | 'minimal' | 'grid' | 'pulse' | 'watermark' | 'matrix';
   terminalBgOpacity?: number;
   terminalBgAnimate?: boolean;
+  // Low-Latency / RDP Performance Mode (disables blur, glow shadows, animations, and terminal transparency)
+  lowLatencyMode?: boolean;
   // Keyboard Shortcuts & Leader Key (F-18 / Roadmap)
   keybindings?: Record<string, string>;
   leaderKeyEnabled?: boolean;
@@ -51,6 +53,7 @@ export const DEFAULT_SETTINGS: AppGlobalSettings = {
   terminalBg: 'none',
   terminalBgOpacity: 0.75,
   terminalBgAnimate: true,
+  lowLatencyMode: false,
 };
 
 /**
@@ -61,7 +64,7 @@ export const DEFAULT_SETTINGS: AppGlobalSettings = {
 export function getTerminalTheme(settings: AppGlobalSettings) {
   const base = getThemeColors(settings.colorTheme);
   const bg = settings.terminalBg ?? 'none';
-  if (bg === 'none') {
+  if (settings.lowLatencyMode || bg === 'none') {
     return base;
   }
   return { ...base, background: 'rgba(0, 0, 0, 0)' };
@@ -285,6 +288,7 @@ export function resetTerminalFontSize(sessionId: string, defaultSize: number): v
 
 export function applySettingsToAllTerminals(settings: AppGlobalSettings): void {
   const themeObj = getTerminalTheme(settings);
+  const useTransparency = !settings.lowLatencyMode && (settings.terminalBg ?? 'none') !== 'none';
   for (const entry of terminalPool.values()) {
     entry.term.options.fontFamily = settings.fontFamily;
     entry.term.options.fontSize = settings.fontSize;
@@ -293,7 +297,7 @@ export function applySettingsToAllTerminals(settings: AppGlobalSettings): void {
     entry.term.options.cursorStyle = settings.cursorStyle;
     entry.term.options.cursorBlink = settings.cursorBlink;
     entry.term.options.lineHeight = settings.lineHeight;
-    entry.term.options.allowTransparency = true;
+    entry.term.options.allowTransparency = useTransparency;
     entry.term.options.theme = themeObj;
     try {
       entry.fitAddon.fit();
@@ -464,6 +468,7 @@ export function TerminalView({
 
     if (!entry) {
       const themeColors = getTerminalTheme(cfg);
+      const useTransparency = !cfg.lowLatencyMode && (cfg.terminalBg ?? 'none') !== 'none';
       const term = new Terminal({
         cursorBlink: cfg.cursorBlink,
         cursorStyle: cfg.cursorStyle,
@@ -472,7 +477,7 @@ export function TerminalView({
         lineHeight: cfg.lineHeight,
         scrollback: cfg.scrollback,
         allowProposedApi: true,
-        allowTransparency: true,
+        allowTransparency: useTransparency,
         theme: themeColors,
       });
 
