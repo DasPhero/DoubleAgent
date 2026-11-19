@@ -57,6 +57,11 @@ jobs:
       - name: Build Standalone Binary (Windows)
         if: runner.os == 'Windows'
         run: wails build -platform windows/amd64 -o DoubleAgent.exe
+      - name: Build Headless Linux Remote Companion Agents (amd64 & arm64)
+        shell: bash
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/doubleagent-agent-linux-amd64 ./cmd/doubleagent-agent
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/bin/doubleagent-agent-linux-arm64 ./cmd/doubleagent-agent
       - name: Upload Standalone Binary Artifact
         uses: actions/upload-artifact@v4
         with:

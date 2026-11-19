@@ -86,6 +86,7 @@ Feature IDs (F-xx) trace to [docs/SPEC.md](./docs/SPEC.md) and the pentest-modul
 - **Binary / hex payload runner** (F-43) — non-PTY `os/exec` / SSH-exec raw-byte runner for arbitrary hex payloads, with a hex/ASCII/Base64 dump viewer and an API/raw-TCP bridge.
 - **WebSocket client** (F-44) — persistent `ws://`/`wss://` sessions with SOCKS5/pivot routing, vault secrets, text and binary/hex frames, and a live frame log.
 - **Remote socket discovery & 1-click -L tunnel** (F-45) — on-demand non-PTY discovery of listening sockets (Linux + Windows), loopback highlighting and one-click `-L` forwarding into the API tester.
+- **Ephemeral Remote Companion Agent** (F-46) — auto-deployed, zero-port headless Linux Go worker (`doubleagent-agent`) over SSH `stdin`/`stdout` so you can run the native Windows UI (keeping Vault/Notes/Evidence local) while executing Linux PTY shells, directories, `LHOST`, listeners, HTTP staging servers, pivots, context-routed SSH, and context-bound port forwards on Kali.
 - **WinRM / PowerShell remoting** (F-41) — direct WinRM execution (HTTP 5985 / HTTPS 5986; NTLM/Kerberos/Basic; Evil-WinRM parity) with command execution and file transfer.
 - **Reporting export** — export the evidence vault per host as Markdown/HTML.
 
@@ -135,6 +136,15 @@ cd frontend && npm run build      # Typecheck and bundle frontend assets
 - **Output binaries** (written to `build/bin/`):
   - Windows (`amd64`): `build/bin/DoubleAgent.exe`
   - Linux (`amd64`): `build/bin/DoubleAgent-linux-amd64` (desktop entry in `build/linux/doubleagent.desktop`)
+  - Headless Remote Companion Agent (`F-46`, keep alongside `DoubleAgent.exe` / `DoubleAgent-linux-amd64`):
+    - `build/bin/doubleagent-agent-linux-amd64`
+    - `build/bin/doubleagent-agent-linux-arm64`
+  - To build only the headless agents manually from any OS (pure Go, `CGO_ENABLED=0`, no Docker/WSL needed):
+    ```bash
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/bin/doubleagent-agent-linux-amd64 ./cmd/doubleagent-agent
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/bin/doubleagent-agent-linux-arm64 ./cmd/doubleagent-agent
+    ```
+    *(Both `./scripts/build-all.ps1`, `./scripts/build-all.sh`, and GitHub Actions CI build these automatically.)*
 - **On Linux (Ubuntu 24.04 / Debian 12+ / Kali / Arch):**
   ```bash
   sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
