@@ -256,7 +256,7 @@ export function ProxychainsExportModal({
             style={{
               padding: '20px',
               overflowY: 'auto',
-              borderRight: '1px solid var(--border-color)',
+              borderRight: '1px solid var(--border-subtle)',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
@@ -269,7 +269,7 @@ export function ProxychainsExportModal({
                   fontSize: '0.8rem',
                   fontWeight: 600,
                   marginBottom: '6px',
-                  color: 'var(--text-bright)',
+                  color: 'var(--text-main)',
                 }}
               >
                 Chaining Mode
@@ -303,7 +303,7 @@ export function ProxychainsExportModal({
             </div>
 
             {/* Toggles */}
-            <div style={{ display: 'flex', gap: '20px', background: 'var(--bg-tertiary)', padding: '10px 14px', borderRadius: '6px' }}>
+            <div style={{ display: 'flex', gap: '20px', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '6px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
                 <input
                   type="checkbox"
@@ -353,7 +353,7 @@ export function ProxychainsExportModal({
             {/* Proxy Table */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-bright)' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>
                   Proxy Chain List ({activeProxies.length})
                 </label>
               </div>
@@ -361,9 +361,9 @@ export function ProxychainsExportModal({
                 style={{
                   maxHeight: '160px',
                   overflowY: 'auto',
-                  border: '1px solid var(--border-color)',
+                  border: '1px solid var(--border-subtle)',
                   borderRadius: '6px',
-                  background: 'var(--bg-primary)',
+                  background: 'var(--bg-base)',
                 }}
               >
                 {activeProxies.length === 0 ? (
@@ -373,7 +373,7 @@ export function ProxychainsExportModal({
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left' }}>
+                      <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', textAlign: 'left' }}>
                         <th style={{ padding: '6px 10px' }}>Type</th>
                         <th style={{ padding: '6px 10px' }}>Address</th>
                         <th style={{ padding: '6px 10px' }}>Scope</th>
@@ -384,7 +384,7 @@ export function ProxychainsExportModal({
                     <tbody>
                       {activeProxies.map((p, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                          <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--accent)' }}>{p.type}</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--accent-bright)' }}>{p.type}</td>
                           <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>
                             {p.host}:{p.port}
                           </td>
@@ -429,14 +429,14 @@ export function ProxychainsExportModal({
             <form
               onSubmit={handleAddProxy}
               style={{
-                background: 'var(--bg-secondary)',
+                background: 'var(--bg-panel)',
                 padding: '12px',
                 borderRadius: '6px',
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-bright)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)' }}>
                   + Add Proxy Hop to Chain
                 </span>
                 <select
@@ -516,11 +516,11 @@ export function ProxychainsExportModal({
               padding: '20px',
               display: 'flex',
               flexDirection: 'column',
-              background: 'var(--bg-primary)',
+              background: 'var(--bg-base)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-bright)' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
                 Generated proxychains.conf Preview
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -535,7 +535,7 @@ export function ProxychainsExportModal({
                 padding: '14px',
                 borderRadius: '6px',
                 background: '#0d1117',
-                border: '1px solid var(--border-color)',
+                border: '1px solid var(--border-subtle)',
                 fontFamily: 'Consolas, "Fira Code", monospace',
                 fontSize: '0.82rem',
                 color: '#e6edf3',
@@ -554,7 +554,7 @@ export function ProxychainsExportModal({
                   padding: '6px 12px',
                   borderRadius: '4px',
                   fontSize: '0.8rem',
-                  background: saveStatus.includes('successfully') ? 'rgba(45, 212, 191, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  background: saveStatus.includes('successfully') ? 'color-mix(in srgb, var(--accent-bright) 15%, transparent)' : 'rgba(239, 68, 68, 0.15)',
                   color: saveStatus.includes('successfully') ? 'var(--accent-bright)' : '#f87171',
                 }}
               >

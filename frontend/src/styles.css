@@ -18,7 +18,9 @@
   --hud-crimson: #ff003c;
   --hud-amber: #ffaa00;
   --hud-magenta: #ec4899;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, monospace;
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg-base);
   color: var(--text-main);
 }
@@ -334,9 +336,9 @@ body,
 }
 
 .snippet-auto-badge {
-  background: rgba(45, 212, 191, 0.15);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
   color: var(--accent-bright);
-  border: 1px solid rgba(45, 212, 191, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent);
   font-size: 0.68rem;
   padding: 0.05rem 0.35rem;
   border-radius: 9999px;
@@ -430,9 +432,9 @@ body,
 }
 
 .btn-var-pill {
-  background: rgba(45, 212, 191, 0.12);
+  background: color-mix(in srgb, var(--accent-bright) 12%, transparent);
   color: var(--accent-bright);
-  border: 1px solid rgba(45, 212, 191, 0.25);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent);
   border-radius: 4px;
   font-size: 0.72rem;
   padding: 0.15rem 0.4rem;
@@ -441,7 +443,7 @@ body,
 }
 
 .btn-var-pill:hover {
-  background: rgba(45, 212, 191, 0.25);
+  background: color-mix(in srgb, var(--accent-bright) 25%, transparent);
   border-color: var(--accent-bright);
 }
 
@@ -1059,7 +1061,7 @@ body,
   border: 1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent);
   border-left: 3px solid color-mix(in srgb, var(--accent-bright) 60%, transparent);
   clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
-  color: var(--text-bright);
+  color: var(--text-main);
   cursor: pointer;
   transition: all 0.14s ease;
 }
@@ -1272,7 +1274,7 @@ body,
   font-family: Consolas, monospace;
   color: var(--accent-text);
   background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-  border: 1px solid rgba(20, 184, 166, 0.35);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent);
   border-radius: 4px;
   padding: 0.08rem 0.4rem;
   max-width: 260px;
@@ -1517,7 +1519,7 @@ body,
 .host-key-card {
   z-index: 100051 !important;
   border: 2px solid var(--accent-bright) !important;
-  box-shadow: 0 0 32px rgba(45, 212, 191, 0.5) !important;
+  box-shadow: 0 0 32px color-mix(in srgb, var(--accent-bright) 50%, transparent) !important;
 }
 
 .modal-backdrop {
@@ -2095,7 +2097,7 @@ body,
   max-width: 95vw;
   background-color: #0c131f !important;
   opacity: 1 !important;
-  border: 1px solid rgba(20, 184, 166, 0.45);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 45%, transparent);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.85rem;
@@ -2556,11 +2558,11 @@ body,
 
 .serial-pin-btn:hover {
   border-color: var(--accent-primary);
-  color: var(--text-primary);
+  color: var(--text-main);
 }
 
 .serial-pin-btn.active {
-  background: rgba(45, 212, 191, 0.15);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
   border-color: var(--accent-bright);
   color: var(--accent-bright);
   box-shadow: 0 0 4px var(--accent-glow);
@@ -2595,9 +2597,9 @@ body,
 }
 
 .serial-refresh-btn {
-  background: var(--bg-surface);
+  background: var(--bg-card);
   border: 1px solid var(--border-accent);
-  color: var(--text-primary);
+  color: var(--text-main);
   border-radius: 4px;
   padding: 0.4rem 0.6rem;
   cursor: pointer;
@@ -2663,7 +2665,7 @@ body,
   align-items: center;
   gap: 0.35rem;
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   cursor: pointer;
 }
 
@@ -3042,7 +3044,7 @@ body,
 }
 
 .shortcuts-filter-btn.active {
-  background: rgba(45, 212, 191, 0.15);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
   color: var(--accent-bright);
   border-color: var(--accent-bright);
   font-weight: 600;
@@ -3060,8 +3062,8 @@ body,
 }
 
 .key-badge-custom {
-  background: rgba(45, 212, 191, 0.12);
-  border: 1px solid rgba(45, 212, 191, 0.4);
+  background: color-mix(in srgb, var(--accent-bright) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent);
   color: var(--accent-bright);
   font-weight: 600;
 }
@@ -3098,7 +3100,7 @@ body,
   display: flex;
   flex-direction: column;
   position: relative;
-  background: #060b13;
+  background: var(--bg-base);
   color: #e2e8f0;
   box-sizing: border-box;
 }
@@ -3125,7 +3127,7 @@ body,
   clip-path: none !important;
   box-shadow: none !important;
   overflow: hidden;
-  background: #050a12;
+  background: var(--bg-base);
 }
 
 /* Corner Reticle Accents */
@@ -3167,7 +3169,7 @@ body,
 
 /* HUD Top Header */
 .cyber-totp-hud-header {
-  background: rgba(8, 14, 26, 0.96);
+  background: var(--bg-glass);
   border-bottom: 1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent);
   padding: 0.85rem 1rem 0.85rem 1.25rem;
   display: flex;
@@ -3396,14 +3398,14 @@ body,
 }
 
 .cyber-btn-primary {
-  background: linear-gradient(135deg, var(--accent-bright) 0%, #0099cc 100%);
+  background: linear-gradient(135deg, var(--accent-bright) 0%, color-mix(in srgb, var(--accent-bright) 70%, #000000) 100%);
   border: 1px solid var(--accent-bright);
   color: #040914;
   box-shadow: 0 0 14px color-mix(in srgb, var(--accent-bright) 40%, transparent);
 }
 
 .cyber-btn-primary:hover:not(:disabled) {
-  background: #00ffff;
+  background: color-mix(in srgb, var(--accent-bright) 80%, #ffffff);
   box-shadow: 0 0 22px color-mix(in srgb, var(--accent-bright) 70%, transparent);
   transform: translateY(-1px);
 }
@@ -3695,7 +3697,7 @@ body,
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.9rem 1.25rem;
-  background: rgba(10, 18, 32, 0.96);
+  background: var(--bg-glass);
   border-bottom: 1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent);
 }
 
@@ -4234,14 +4236,14 @@ body,
 }
 
 .cyber-hud-btn.btn-primary {
-  background: linear-gradient(135deg, var(--accent-bright) 0%, #0099cc 100%);
+  background: linear-gradient(135deg, var(--accent-bright) 0%, color-mix(in srgb, var(--accent-bright) 70%, #000000) 100%);
   border-color: var(--accent-bright);
   color: #040914;
   box-shadow: 0 0 12px color-mix(in srgb, var(--accent-bright) 35%, transparent);
 }
 
 .cyber-hud-btn.btn-primary:hover:not(:disabled) {
-  background: #00ffff;
+  background: color-mix(in srgb, var(--accent-bright) 80%, #ffffff);
   color: #020617;
   box-shadow: 0 0 18px color-mix(in srgb, var(--accent-bright) 60%, transparent);
 }
@@ -4319,7 +4321,7 @@ body,
 
 /* Footer Strip */
 .cyber-totp-footer {
-  background: rgba(4, 8, 15, 0.95);
+  background: color-mix(in srgb, var(--bg-base) 95%, transparent);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   padding: 0.65rem 1.25rem;
   display: flex;
@@ -4357,7 +4359,7 @@ body,
   position: relative !important;
   width: 650px;
   max-width: 95vw;
-  background: #070d18 !important;
+  background: var(--bg-base) !important;
   border: 1px solid color-mix(in srgb, var(--accent-bright) 45%, transparent);
   box-shadow: 0 0 45px color-mix(in srgb, var(--accent-bright) 25%, transparent), 0 20px 60px rgba(0, 0, 0, 0.95);
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
@@ -4382,11 +4384,11 @@ body,
   gap: 0.75rem;
   padding: 0.75rem 1.25rem;
   border-top: 1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent);
-  background: rgba(5, 10, 18, 0.95);
+  background: color-mix(in srgb, var(--bg-base) 95%, transparent);
 }
 
 .dialog-header {
-  background: rgba(10, 18, 32, 0.95);
+  background: var(--bg-glass);
   border-bottom: 1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent);
   padding: 0.85rem 1.25rem;
   display: flex;
@@ -4466,7 +4468,7 @@ body,
 }
 
 .dialog-footer {
-  background: rgba(5, 10, 18, 0.95);
+  background: color-mix(in srgb, var(--bg-base) 95%, transparent);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   padding: 0.85rem 1.25rem;
   display: flex;
@@ -4704,7 +4706,7 @@ body,
   margin: 0 0 0.8rem 0;
   padding-bottom: 0.35rem;
   border-bottom: 1px solid var(--border-subtle);
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .markdown-h2 {
@@ -4743,10 +4745,10 @@ body,
 
 .markdown-inline-code {
   background: rgba(255, 255, 255, 0.08);
-  color: var(--accent);
+  color: var(--accent-bright);
   padding: 0.15rem 0.35rem;
   border-radius: 4px;
-  font-family: var(--font-family-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -4784,14 +4786,14 @@ body,
 .code-copy-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-main);
-  border-color: var(--accent);
+  border-color: var(--accent-bright);
 }
 
 .code-content {
   margin: 0;
   padding: 0.75rem;
   overflow-x: auto;
-  font-family: var(--font-family-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.5;
   color: #c9d1d9;
@@ -4800,8 +4802,8 @@ body,
 .markdown-blockquote {
   margin: 0.8rem 0;
   padding: 0.4rem 0.8rem;
-  border-left: 3px solid var(--accent);
-  background: rgba(45, 212, 191, 0.05);
+  border-left: 3px solid var(--accent-bright);
+  background: color-mix(in srgb, var(--accent-bright) 5%, transparent);
   border-radius: 0 4px 4px 0;
   font-style: italic;
   color: var(--text-muted);
@@ -4815,7 +4817,7 @@ body,
 }
 
 .markdown-task-checkbox {
-  accent-color: var(--accent);
+  accent-color: var(--accent-bright);
   cursor: pointer;
 }
 
@@ -4844,11 +4846,11 @@ body,
 .markdown-table th {
   background: rgba(255, 255, 255, 0.04);
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .markdown-link {
-  color: var(--accent);
+  color: var(--accent-bright);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -5218,8 +5220,8 @@ body,
 }
 
 .tree-node-item.selected {
-  background: rgba(45, 212, 191, 0.15);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
+  color: var(--accent-bright);
   font-weight: 500;
 }
 
@@ -5377,7 +5379,7 @@ body,
 
 .note-save-status {
   font-size: 0.72rem;
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 .note-format-toolbar {
@@ -5401,7 +5403,7 @@ body,
 
 .note-format-toolbar button:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: var(--accent);
+  border-color: var(--accent-bright);
   color: var(--text-main);
 }
 
@@ -5447,7 +5449,7 @@ body,
   background: transparent;
   border: none;
   padding: 1.25rem 1.5rem;
-  font-family: var(--font-family-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.86rem;
   line-height: 1.6;
   color: var(--text-main);
@@ -5608,9 +5610,9 @@ body,
 }
 
 .drawer-tab-pill.active {
-  background: rgba(45, 212, 191, 0.15);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
+  border-color: var(--accent-bright);
+  color: var(--accent-bright);
   font-weight: 600;
 }
 
@@ -5664,7 +5666,7 @@ body,
 }
 
 .drawer-save-btn {
-  background: var(--accent);
+  background: var(--accent-bright);
   color: #0b131a;
   border: none;
   border-radius: 4px;
@@ -5760,7 +5762,7 @@ body,
 .pane-notes-btn.active {
   border-color: var(--accent-bright);
   color: var(--accent-text);
-  background: rgba(45, 212, 191, 0.15);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
 }
 
 /* Session Logging & Transcripts (F-21) */
@@ -5845,7 +5847,7 @@ body,
 
 .session-log-item.selected {
   border-color: var(--accent-bright);
-  background: rgba(45, 212, 191, 0.1);
+  background: color-mix(in srgb, var(--accent-bright) 10%, transparent);
 }
 
 .session-log-item-top {
@@ -6003,13 +6005,13 @@ body,
 
 .split-resizer-bar:hover,
 .split-resizer-bar.resizing {
-  background: rgba(20, 184, 166, 0.35);
-  box-shadow: 0 0 10px rgba(20, 184, 166, 0.45);
+  background: color-mix(in srgb, var(--accent-bright) 35%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-bright) 45%, transparent);
 }
 
 .split-resizer-bar:hover::after,
 .split-resizer-bar.resizing::after {
-  background: var(--accent);
+  background: var(--accent-bright);
 }
 
 .pane-drag-handle {
@@ -6040,7 +6042,7 @@ body,
 .split-pane.is-dragging-pane {
   opacity: 0.55;
   border-style: dashed !important;
-  border-color: var(--accent) !important;
+  border-color: var(--accent-bright) !important;
 }
 
 .pane-undock-btn {
@@ -6055,9 +6057,9 @@ body,
 }
 
 .pane-undock-btn:hover {
-  background: rgba(20, 184, 166, 0.18);
-  border-color: var(--accent);
-  color: var(--text-bright);
+  background: color-mix(in srgb, var(--accent-bright) 18%, transparent);
+  border-color: var(--accent-bright);
+  color: var(--text-main);
 }
 
 /* Windows Snap-Assist Style Drop Overlay & Compass */
@@ -6077,10 +6079,10 @@ body,
 
 .pane-snap-highlight {
   position: absolute;
-  background: rgba(20, 184, 166, 0.22);
-  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent-bright) 22%, transparent);
+  border: 2px solid var(--accent-bright);
   border-radius: 8px;
-  box-shadow: inset 0 0 24px rgba(20, 184, 166, 0.25), 0 0 18px rgba(20, 184, 166, 0.3);
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--accent-bright) 25%, transparent), 0 0 18px color-mix(in srgb, var(--accent-bright) 30%, transparent);
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
@@ -6125,8 +6127,8 @@ body,
 
 .pane-snap-badge {
   background: #0c131f;
-  border: 1px solid var(--accent);
-  color: var(--text-bright);
+  border: 1px solid var(--accent-bright);
+  color: var(--text-main);
   font-size: 0.76rem;
   font-weight: 700;
   padding: 0.35rem 0.75rem;
@@ -6168,12 +6170,12 @@ body,
 
 .snap-compass-btn:hover,
 .snap-compass-btn.active {
-  background: var(--accent);
+  background: var(--accent-bright);
   border-color: var(--accent-glow);
   color: #041311;
   font-weight: 700;
   transform: scale(1.05);
-  box-shadow: 0 0 12px rgba(20, 184, 166, 0.55);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-bright) 55%, transparent);
 }
 
 .snap-compass-btn.compass-top {
@@ -6241,7 +6243,7 @@ body,
   background: #0c131f;
   border: 1px solid var(--border-accent);
   border-radius: 10px;
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.92), 0 0 18px rgba(20, 184, 166, 0.25);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.92), 0 0 18px color-mix(in srgb, var(--accent-bright) 25%, transparent);
   padding: 0.65rem;
   z-index: 15000;
   display: flex;
@@ -6278,13 +6280,13 @@ body,
 }
 
 .zone-pill-btn:hover {
-  border-color: var(--accent);
-  color: var(--text-bright);
+  border-color: var(--accent-bright);
+  color: var(--text-main);
 }
 
 .zone-pill-btn.active {
-  background: rgba(20, 184, 166, 0.22);
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-bright) 22%, transparent);
+  border-color: var(--accent-bright);
   color: var(--accent-glow);
   font-weight: 700;
 }
@@ -6313,9 +6315,9 @@ body,
 }
 
 .add-to-view-item:hover {
-  background: rgba(20, 184, 166, 0.15);
-  border-color: var(--accent);
-  color: var(--text-bright);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
+  border-color: var(--accent-bright);
+  color: var(--text-main);
 }
 
 .add-to-view-empty {
@@ -6346,9 +6348,9 @@ body,
 }
 
 .add-to-view-tool-btn:hover {
-  background: rgba(20, 184, 166, 0.16);
-  border-color: var(--accent);
-  color: var(--text-bright);
+  background: color-mix(in srgb, var(--accent-bright) 16%, transparent);
+  border-color: var(--accent-bright);
+  color: var(--text-main);
 }
 
 .host-card[draggable='true'] {
@@ -6389,17 +6391,17 @@ button:hover .cyber-svg-icon {
   align-items: center;
   gap: 0.22rem !important;
   background: rgba(6, 11, 20, 0.78);
-  border: 1px solid rgba(20, 184, 166, 0.28);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 28%, transparent);
   border-radius: 6px;
   padding: 0.18rem 0.35rem;
   backdrop-filter: blur(12px);
-  box-shadow: inset 0 0 12px rgba(20, 184, 166, 0.06);
+  box-shadow: inset 0 0 12px color-mix(in srgb, var(--accent-bright) 6%, transparent);
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .cyber-quick-connect:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 14px rgba(20, 184, 166, 0.22), inset 0 0 10px rgba(20, 184, 166, 0.1);
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent-bright) 22%, transparent), inset 0 0 10px color-mix(in srgb, var(--accent-bright) 10%, transparent);
 }
 
 .quick-connect-prefix {
@@ -6412,7 +6414,7 @@ button:hover .cyber-svg-icon {
   letter-spacing: 0.08em;
   color: var(--accent-glow);
   padding: 0.15rem 0.38rem;
-  background: rgba(20, 184, 166, 0.12);
+  background: color-mix(in srgb, var(--accent-bright) 12%, transparent);
   border-radius: 4px;
   user-select: none;
 }
@@ -6423,13 +6425,13 @@ button:hover .cyber-svg-icon {
   padding: 0.22rem 0.35rem !important;
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 0.75rem !important;
-  color: var(--text-bright);
+  color: var(--text-main);
   border-radius: 4px;
 }
 
 .cyber-quick-connect input:focus {
   background: rgba(15, 23, 42, 0.85) !important;
-  border-color: rgba(20, 184, 166, 0.35) !important;
+  border-color: color-mix(in srgb, var(--accent-bright) 35%, transparent) !important;
   outline: none;
 }
 
@@ -6457,7 +6459,7 @@ button:hover .cyber-svg-icon {
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-bright);
   opacity: 0.75;
   user-select: none;
 }
@@ -6478,7 +6480,7 @@ button:hover .cyber-svg-icon {
   padding: 0.48rem 0.55rem !important;
   background: linear-gradient(135deg, rgba(10, 16, 28, 0.96) 0%, rgba(6, 10, 18, 0.98) 100%) !important;
   border: 1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent) !important;
-  border-left: 3px solid var(--accent, var(--accent-bright)) !important;
+  border-left: 3px solid var(--accent-bright) !important;
   clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px)) !important;
   backdrop-filter: blur(10px);
   transition: all 0.14s ease;
@@ -6759,7 +6761,7 @@ button:hover .cyber-svg-icon {
 
 .split-pane.active > .split-pane-header {
   background: linear-gradient(90deg, rgba(13, 33, 40, 0.95) 0%, rgba(15, 23, 42, 0.92) 100%) !important;
-  border-bottom-color: rgba(20, 184, 166, 0.42) !important;
+  border-bottom-color: color-mix(in srgb, var(--accent-bright) 42%, transparent) !important;
 }
 
 .pane-header-left {
@@ -6804,7 +6806,7 @@ button:hover .cyber-svg-icon {
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 0.73rem;
   font-weight: 700;
-  color: var(--text-bright);
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6847,8 +6849,8 @@ button:hover .cyber-svg-icon {
 
 .pane-hud-btn:hover,
 .pane-hud-btn.active {
-  background: rgba(20, 184, 166, 0.2);
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-bright) 20%, transparent);
+  border-color: var(--accent-bright);
   color: var(--accent-glow);
 }
 
@@ -6880,7 +6882,7 @@ button:hover .cyber-svg-icon {
   min-height: 23px;
   padding: 0 0.65rem;
   background: rgba(6, 10, 18, 0.96);
-  border-top: 1px solid rgba(20, 184, 166, 0.24);
+  border-top: 1px solid color-mix(in srgb, var(--accent-bright) 24%, transparent);
   font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   font-size: 0.66rem;
   color: var(--text-muted);
@@ -6911,8 +6913,8 @@ button:hover .cyber-svg-icon {
 }
 
 .hud-status-pill.unlocked {
-  background: rgba(20, 184, 166, 0.16);
-  border: 1px solid rgba(20, 184, 166, 0.4);
+  background: color-mix(in srgb, var(--accent-bright) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent);
   color: var(--accent-glow);
 }
 
@@ -6943,7 +6945,7 @@ button:hover .cyber-svg-icon {
 }
 
 .hud-status-val {
-  color: var(--text-bright);
+  color: var(--text-main);
 }
 
 .hud-status-msg-inline {
@@ -6968,7 +6970,7 @@ button:hover .cyber-svg-icon {
   width: auto;
   max-width: 175px;
   object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.4));
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent-bright) 40%, transparent));
   flex-shrink: 0;
   user-select: none;
   -webkit-user-drag: none;
@@ -6987,7 +6989,7 @@ button:hover .cyber-svg-icon {
   max-height: 68px;
   object-fit: contain;
   margin: 0 auto 0.5rem auto;
-  filter: drop-shadow(0 0 16px rgba(45, 212, 191, 0.45));
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent-bright) 45%, transparent));
 }
 
 .launcher-direct-connect-panel {
@@ -7493,18 +7495,18 @@ button:hover .cyber-svg-icon {
   width: 26px;
   height: 26px;
   border-radius: 6px;
-  background: rgba(20, 184, 166, 0.14);
-  border: 1px solid rgba(45, 212, 191, 0.45);
+  background: color-mix(in srgb, var(--accent-bright) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 45%, transparent);
   color: var(--accent-glow);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .tab-new-btn:hover {
-  background: rgba(20, 184, 166, 0.28);
+  background: color-mix(in srgb, var(--accent-bright) 28%, transparent);
   border-color: var(--accent-glow);
   color: #ffffff;
-  box-shadow: 0 0 10px rgba(45, 212, 191, 0.45);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-bright) 45%, transparent);
 }
 
 /* 7. Auto-Reconnect with Exponential Backoff & Session Restore (F-27) */
@@ -7587,7 +7589,7 @@ button:hover .cyber-svg-icon {
 .reconnect-subtext {
   margin: 0;
   font-size: 0.82rem;
-  color: var(--text-bright);
+  color: var(--text-main);
   line-height: 1.4;
 }
 
@@ -7641,7 +7643,7 @@ button:hover .cyber-svg-icon {
 }
 
 .network-map-view.is-docked {
-  border: 1px solid rgba(45, 212, 191, 0.2);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent);
   border-radius: 6px;
 }
 
@@ -7651,7 +7653,7 @@ button:hover .cyber-svg-icon {
   justify-content: space-between;
   padding: 0.45rem 0.85rem;
   background: rgba(10, 16, 28, 0.94);
-  border-bottom: 1px solid rgba(45, 212, 191, 0.22);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-bright) 22%, transparent);
   backdrop-filter: blur(10px);
   gap: 0.75rem;
   z-index: 10;
@@ -7678,8 +7680,8 @@ button:hover .cyber-svg-icon {
   font-weight: 700;
   padding: 0.1rem 0.35rem;
   border-radius: 3px;
-  background: rgba(45, 212, 191, 0.15);
-  border: 1px solid rgba(45, 212, 191, 0.35);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent);
   color: var(--accent-glow);
 }
 
@@ -7742,14 +7744,14 @@ button:hover .cyber-svg-icon {
 }
 
 .topo-mode-btn.active {
-  background: rgba(45, 212, 191, 0.2);
+  background: color-mix(in srgb, var(--accent-bright) 20%, transparent);
   color: var(--accent-glow);
-  box-shadow: 0 0 6px rgba(45, 212, 191, 0.3);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent-bright) 30%, transparent);
 }
 
 .topo-layout-select {
   background: rgba(4, 8, 15, 0.85);
-  border: 1px solid rgba(45, 212, 191, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent);
   color: var(--text-main);
   font-size: 0.74rem;
   padding: 0.25rem 0.55rem;
@@ -7800,9 +7802,15 @@ button:hover .cyber-svg-icon {
 }
 
 /* React Flow custom styling */
+/* Background dots: react-flow writes `fill` as an SVG attribute (no var() support),
+   so the theme tint is applied here — CSS beats presentation attributes. */
+.network-map-flow-bg circle {
+  fill: color-mix(in srgb, var(--accent-bright) 15%, transparent);
+}
+
 .network-map-flow-controls {
   background: rgba(10, 16, 28, 0.92) !important;
-  border: 1px solid rgba(45, 212, 191, 0.3) !important;
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent) !important;
   border-radius: 6px !important;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
@@ -7810,18 +7818,18 @@ button:hover .cyber-svg-icon {
 
 .network-map-flow-controls button {
   background: transparent !important;
-  border-bottom: 1px solid rgba(45, 212, 191, 0.15) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-bright) 15%, transparent) !important;
   fill: var(--text-main) !important;
   color: var(--text-main) !important;
 }
 
 .network-map-flow-controls button:hover {
-  background: rgba(45, 212, 191, 0.15) !important;
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent) !important;
 }
 
 .network-map-minimap {
   background: rgba(10, 16, 28, 0.92) !important;
-  border: 1px solid rgba(45, 212, 191, 0.35) !important;
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent) !important;
   border-radius: 6px !important;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8) !important;
 }
@@ -7830,10 +7838,10 @@ button:hover .cyber-svg-icon {
 .topology-host-card {
   width: 250px;
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.94) 0%, rgba(9, 14, 26, 0.96) 100%);
-  border: 1px solid rgba(45, 212, 191, 0.35);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 10px rgba(45, 212, 191, 0.08);
-  font-family: var(--font-sans, system-ui, sans-serif);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 10px color-mix(in srgb, var(--accent-bright) 8%, transparent);
+  font-family: var(--font-sans);
   padding: 0.65rem;
   display: flex;
   flex-direction: column;
@@ -7844,7 +7852,7 @@ button:hover .cyber-svg-icon {
 
 .topology-host-card:hover {
   border-color: var(--accent-glow);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.8), 0 0 16px rgba(45, 212, 191, 0.25);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.8), 0 0 16px color-mix(in srgb, var(--accent-bright) 25%, transparent);
   transform: translateY(-2px);
 }
 
@@ -7887,7 +7895,7 @@ button:hover .cyber-svg-icon {
 .topo-node-label {
   font-size: 0.82rem;
   font-weight: 700;
-  color: var(--text-bright);
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8014,8 +8022,8 @@ button:hover .cyber-svg-icon {
 }
 
 .topo-btn-primary {
-  background: rgba(45, 212, 191, 0.18);
-  border: 1px solid rgba(45, 212, 191, 0.45);
+  background: color-mix(in srgb, var(--accent-bright) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 45%, transparent);
   color: var(--accent-glow);
   flex: 1;
 }
@@ -8023,13 +8031,13 @@ button:hover .cyber-svg-icon {
 .topo-btn-primary:hover {
   background: var(--accent-glow);
   color: #04080f;
-  box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-bright) 50%, transparent);
 }
 
 .topo-btn-secondary {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(148, 163, 184, 0.25);
-  color: var(--text-bright);
+  color: var(--text-main);
 }
 
 .topo-btn-secondary:hover {
@@ -8048,11 +8056,11 @@ button:hover .cyber-svg-icon {
 /* Custom Client Node Card */
 .topology-client-card {
   width: 220px;
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.22) 0%, rgba(9, 14, 26, 0.95) 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-bright) 22%, transparent) 0%, rgba(9, 14, 26, 0.95) 100%);
   border: 1px solid var(--accent-glow);
   border-radius: 8px;
   padding: 0.75rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(45, 212, 191, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 16px color-mix(in srgb, var(--accent-bright) 30%, transparent);
 }
 
 .client-node-header {
@@ -8097,10 +8105,10 @@ button:hover .cyber-svg-icon {
   max-width: calc(100% - 20px);
   max-height: calc(100% - 20px);
   background: rgba(10, 16, 28, 0.96);
-  border: 1px solid rgba(45, 212, 191, 0.4);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent);
   border-radius: 8px;
   backdrop-filter: blur(12px);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(45, 212, 191, 0.15);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 20px color-mix(in srgb, var(--accent-bright) 15%, transparent);
   display: flex;
   flex-direction: column;
   z-index: 20;
@@ -8117,7 +8125,7 @@ button:hover .cyber-svg-icon {
   align-items: center;
   justify-content: space-between;
   padding: 0.65rem 0.85rem;
-  border-bottom: 1px solid rgba(45, 212, 191, 0.2);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent);
 }
 
 .inspector-title-row {
@@ -8170,7 +8178,7 @@ button:hover .cyber-svg-icon {
 
 .inspector-val {
   font-size: 0.82rem;
-  color: var(--text-bright);
+  color: var(--text-main);
 }
 
 .inspector-val code {
@@ -8231,7 +8239,7 @@ button:hover .cyber-svg-icon {
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 4px;
   padding: 0.3rem 0.5rem;
-  color: var(--text-bright);
+  color: var(--text-main);
   font-size: 0.76rem;
   text-align: left;
   cursor: pointer;
@@ -8249,7 +8257,7 @@ button:hover .cyber-svg-icon {
   flex-direction: column;
   gap: 0.45rem;
   padding: 0.85rem;
-  border-top: 1px solid rgba(45, 212, 191, 0.2);
+  border-top: 1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent);
   background: rgba(4, 8, 15, 0.5);
 }
 
@@ -8270,7 +8278,7 @@ button:hover .cyber-svg-icon {
   gap: 1.25rem;
   padding: 0.35rem 0.85rem;
   background: rgba(10, 16, 28, 0.94);
-  border-top: 1px solid rgba(45, 212, 191, 0.18);
+  border-top: 1px solid color-mix(in srgb, var(--accent-bright) 18%, transparent);
   font-size: 0.7rem;
   color: var(--text-muted);
   flex-wrap: wrap;
@@ -8377,8 +8385,8 @@ button:hover .cyber-svg-icon {
   font-weight: 700;
   padding: 0.12rem 0.45rem;
   border-radius: 4px;
-  background: rgba(45, 212, 191, 0.15);
-  border: 1px solid rgba(45, 212, 191, 0.4);
+  background: color-mix(in srgb, var(--accent-bright) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent);
   color: var(--accent-glow);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -8445,12 +8453,12 @@ button:hover .cyber-svg-icon {
   background: linear-gradient(135deg, var(--accent-bright), var(--accent-primary));
   color: #ffffff;
   border: none;
-  box-shadow: 0 0 10px rgba(20, 184, 166, 0.3);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-bright) 30%, transparent);
 }
 
 .editor-btn.primary:hover:not(:disabled) {
   filter: brightness(1.15);
-  box-shadow: 0 0 14px rgba(45, 212, 191, 0.45);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent-bright) 45%, transparent);
 }
 
 .editor-btn.secondary {
@@ -8462,7 +8470,7 @@ button:hover .cyber-svg-icon {
 .editor-btn.secondary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  border-color: var(--accent);
+  border-color: var(--accent-bright);
 }
 
 .editor-btn.close {
@@ -8679,8 +8687,8 @@ button:hover .cyber-svg-icon {
 }
 
 .topo-node-tunnels-box.standby {
-  border-color: rgba(20, 184, 166, 0.35);
-  box-shadow: 0 0 8px rgba(20, 184, 166, 0.12);
+  border-color: color-mix(in srgb, var(--accent-bright) 35%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-bright) 12%, transparent);
 }
 
 .topo-tunnels-box-header {
@@ -8723,7 +8731,7 @@ button:hover .cyber-svg-icon {
 }
 
 .topo-tunnel-route-chip.standby {
-  border-color: rgba(20, 184, 166, 0.22);
+  border-color: color-mix(in srgb, var(--accent-bright) 22%, transparent);
 }
 
 .chip-mode {
@@ -8736,7 +8744,7 @@ button:hover .cyber-svg-icon {
 }
 
 .chip-mode.standby {
-  background: rgba(20, 184, 166, 0.2);
+  background: color-mix(in srgb, var(--accent-bright) 20%, transparent);
   color: var(--accent-glow);
 }
 
@@ -8779,13 +8787,13 @@ button:hover .cyber-svg-icon {
   font-weight: 700;
   padding: 0.1rem 0.35rem;
   cursor: pointer;
-  box-shadow: 0 0 6px rgba(20, 184, 166, 0.4);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent-bright) 40%, transparent);
   transition: all 0.15s ease;
 }
 
 .topo-tunnel-start-btn:hover {
   transform: scale(1.05);
-  box-shadow: 0 0 10px rgba(20, 184, 166, 0.7);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-bright) 70%, transparent);
 }
 
 /* 2. Inspector Tunnel Routing Matrix */
@@ -8799,7 +8807,7 @@ button:hover .cyber-svg-icon {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(45, 212, 191, 0.25);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent);
   padding-bottom: 0.35rem;
 }
 
@@ -8818,7 +8826,7 @@ button:hover .cyber-svg-icon {
 
 .inspector-new-tunnel-link {
   background: transparent;
-  border: 1px solid rgba(20, 184, 166, 0.4);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent);
   border-radius: 3px;
   color: var(--accent-glow);
   font-family: 'JetBrains Mono', Consolas, monospace;
@@ -8830,10 +8838,10 @@ button:hover .cyber-svg-icon {
 }
 
 .inspector-new-tunnel-link:hover {
-  background: rgba(20, 184, 166, 0.18);
+  background: color-mix(in srgb, var(--accent-bright) 18%, transparent);
   border-color: var(--accent-bright);
   color: #ffffff;
-  box-shadow: 0 0 8px rgba(20, 184, 166, 0.35);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-bright) 35%, transparent);
 }
 
 .inspector-tunnels-group {
@@ -8883,8 +8891,8 @@ button:hover .cyber-svg-icon {
 }
 
 .inspector-tunnel-card.standby {
-  border-color: rgba(20, 184, 166, 0.35);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 8px rgba(20, 184, 166, 0.1);
+  border-color: color-mix(in srgb, var(--accent-bright) 35%, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), 0 0 8px color-mix(in srgb, var(--accent-bright) 10%, transparent);
 }
 
 .tunnel-card-header {
@@ -8909,8 +8917,8 @@ button:hover .cyber-svg-icon {
 }
 
 .tunnel-card-badge.standby {
-  background: rgba(20, 184, 166, 0.18);
-  border: 1px solid rgba(20, 184, 166, 0.4);
+  background: color-mix(in srgb, var(--accent-bright) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent);
   color: var(--accent-glow);
 }
 
@@ -9030,7 +9038,7 @@ button:hover .cyber-svg-icon {
 }
 
 .tunnel-telemetry-bar strong {
-  color: var(--text-bright);
+  color: var(--text-main);
 }
 
 /* Card Actions */
@@ -10582,21 +10590,8 @@ body.perf-low-latency .terminal-bg-layer {
   color: var(--accent-text);
 }
 
-.remote-dir-modal {
+.remote-dir-dialog {
   width: min(680px, 92vw);
-  max-height: 84vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.remote-dir-body {
-  padding: 0.9rem 1.1rem 1rem 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  min-height: 0;
-  flex: 1;
 }
 
 .remote-dir-toolbar,
@@ -10609,7 +10604,7 @@ body.perf-low-latency .terminal-bg-layer {
 .remote-dir-path-input {
   flex: 1;
   min-width: 0;
-  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
 }
 
@@ -10619,7 +10614,7 @@ body.perf-low-latency .terminal-bg-layer {
   max-height: 46vh;
   overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--accent-bright) 24%, transparent);
-  background: rgba(2, 6, 23, 0.78);
+  background: var(--bg-base);
   padding: 0.3rem;
   display: flex;
   flex-direction: column;
@@ -10634,10 +10629,10 @@ body.perf-low-latency .terminal-bg-layer {
   text-align: left;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: 2px;
   padding: 0.4rem 0.6rem;
-  color: var(--text-primary);
-  font-family: 'JetBrains Mono', Consolas, monospace;
+  color: var(--text-main);
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   cursor: pointer;
 }

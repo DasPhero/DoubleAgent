@@ -2592,7 +2592,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    className="cyber-btn cyber-btn-ghost"
+                    className="cyber-btn cyber-btn-secondary"
                     onClick={() => void compileReportPreview()}
                     disabled={reportLoading}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
@@ -2612,7 +2612,7 @@ export const EvidenceVaultModal: React.FC<EvidenceVaultModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    className="cyber-btn cyber-btn-ghost"
+                    className="cyber-btn cyber-btn-secondary"
                     onClick={() => void handleBatchExportPerHost()}
                     disabled={reportLoading}
                     title="Writes one report file per target host plus manifest.sha256"

@@ -79,37 +79,40 @@ export const RemoteDirPickerModal: React.FC<RemoteDirPickerModalProps> = ({
   };
 
   return (
-    <div
-      className="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Remote Directory Browser"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="cyber-totp-hud-modal remote-dir-modal">
-        <div className="cyber-totp-hud-header">
-          <div className="cyber-totp-hud-title-row">
-            <CyberIcon name="folder" size={16} />
-            <span className="cyber-totp-hud-title">REMOTE DIRECTORIES // {agentLabel.toUpperCase()}</span>
+    <div className="cyber-modal-overlay" onClick={onClose}>
+      <div
+        className="cyber-dialog-card remote-dir-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Remote Directory Browser"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="dialog-header">
+          <div className="dialog-title">
+            <span className="cyber-hazard-stripes">///</span>
+            <CyberIcon name="folder" size={15} />
+            <h3>REMOTE DIRECTORIES</h3>
+            <span className="cyber-telemetry-chip chip-cyan">
+              <span className="chip-dot" />
+              {agentLabel}
+            </span>
           </div>
           <button type="button" className="cyber-btn-close" aria-label="Close" onClick={onClose}>
             <CyberIcon name="close" size={14} />
           </button>
         </div>
 
-        <div className="remote-dir-body">
+        <div className="dialog-body">
           <div className="remote-dir-toolbar">
             <button
               type="button"
-              className="cyber-hud-btn btn-sm"
+              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
               disabled={!listing?.parent || loading}
               onClick={() => listing?.parent && void loadPath(listing.parent)}
               title="Parent directory"
             >
               <CyberIcon name="chevron-up" size={12} />
-              <span>Up</span>
+              <span>UP</span>
             </button>
             <input
               type="text"
@@ -125,16 +128,16 @@ export const RemoteDirPickerModal: React.FC<RemoteDirPickerModalProps> = ({
             />
             <button
               type="button"
-              className="cyber-hud-btn btn-sm"
+              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
               disabled={loading}
               onClick={() => void loadPath(pathInput)}
             >
               <CyberIcon name="refresh" size={12} />
-              <span>Go</span>
+              <span>GO</span>
             </button>
           </div>
 
-          {error && <div className="modal-error-banner">{error}</div>}
+          {error && <div className="cyber-banner-error">{error}</div>}
 
           <div className="remote-dir-list">
             {loading ? (
@@ -179,42 +182,46 @@ export const RemoteDirPickerModal: React.FC<RemoteDirPickerModalProps> = ({
             />
             <button
               type="button"
-              className="cyber-hud-btn btn-sm"
+              className="cyber-btn cyber-btn-secondary cyber-btn-sm"
               disabled={!newFolderName.trim() || loading}
               onClick={() => void handleCreateFolder()}
             >
               <CyberIcon name="plus" size={12} />
-              <span>New Folder</span>
+              <span>NEW FOLDER</span>
             </button>
           </div>
+        </div>
 
-          <div className="cyber-dialog-actions">
-            <button
-              type="button"
-              className="cyber-hud-btn btn-sm"
-              onClick={() => {
-                onOpenShellInDir(currentPath);
-                onClose();
-              }}
-            >
-              <CyberIcon name="terminal" size={13} />
-              <span>Open Shell Here</span>
-            </button>
-            <button
-              type="button"
-              className="cyber-hud-btn btn-sm btn-primary"
-              onClick={() => {
-                onSelectDir(currentPath);
-                onClose();
-              }}
-            >
-              <CyberIcon name="check" size={13} />
-              <span>Use as Staging Dir</span>
-            </button>
-            <button type="button" className="cyber-hud-btn btn-sm btn-cancel" onClick={onClose}>
-              <span>Close</span>
-            </button>
-          </div>
+        <div className="dialog-footer">
+          <button
+            type="button"
+            className="cyber-btn cyber-btn-danger"
+            onClick={onClose}
+          >
+            <span>CLOSE</span>
+          </button>
+          <button
+            type="button"
+            className="cyber-btn cyber-btn-secondary"
+            onClick={() => {
+              onOpenShellInDir(currentPath);
+              onClose();
+            }}
+          >
+            <CyberIcon name="terminal" size={13} />
+            <span>OPEN SHELL HERE</span>
+          </button>
+          <button
+            type="button"
+            className="cyber-btn cyber-btn-primary"
+            onClick={() => {
+              onSelectDir(currentPath);
+              onClose();
+            }}
+          >
+            <CyberIcon name="check" size={13} />
+            <span>USE AS STAGING DIR</span>
+          </button>
         </div>
       </div>
     </div>

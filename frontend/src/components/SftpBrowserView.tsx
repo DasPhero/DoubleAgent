@@ -851,9 +851,9 @@ export function SftpBrowserView({
                       onClick={() => void handleStartRemoteEdit(selectedRemoteItem)}
                       style={{
                         padding: '2px 10px',
-                        backgroundColor: 'rgba(45, 212, 191, 0.2)',
+                        backgroundColor: 'color-mix(in srgb, var(--accent-bright) 20%, transparent)',
                         color: 'var(--accent-glow)',
-                        border: '1px solid rgba(45, 212, 191, 0.4)',
+                        border: '1px solid color-mix(in srgb, var(--accent-bright) 40%, transparent)',
                         borderRadius: '3px',
                         cursor: 'pointer',
                         fontSize: '12px',
@@ -1340,22 +1340,27 @@ export function SftpBrowserView({
       {/* Elevated Sudo Edit Password Prompt Modal */}
       {sudoEditTarget && (
         <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Elevated Sudo Edit"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !sudoBusy) {
+          className="cyber-modal-overlay"
+          onClick={() => {
+            if (!sudoBusy) {
               setSudoEditTarget(null);
               setSudoPassword('');
             }
           }}
         >
-          <div className="cyber-totp-hud-modal" style={{ width: 'min(440px, 92vw)' }}>
-            <div className="cyber-totp-hud-header">
-              <div className="cyber-totp-hud-title-row">
-                <CyberIcon name="shield" size={16} />
-                <span className="cyber-totp-hud-title">ELEVATED EDIT // SUDO REQUIRED</span>
+          <div
+            className="cyber-dialog-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Elevated Sudo Edit"
+            style={{ width: 'min(460px, 92vw)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-header">
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <CyberIcon name="shield" size={15} />
+                <h3>ELEVATED EDIT</h3>
               </div>
               <button
                 type="button"
@@ -1370,8 +1375,8 @@ export function SftpBrowserView({
                 <CyberIcon name="close" size={14} />
               </button>
             </div>
-            <div style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            <div className="dialog-body">
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
                 Permission denied opening <code>{sudoEditTarget.path}</code>. Enter your <code>sudo</code> password to
                 read this file with root privileges:
               </p>
@@ -1389,29 +1394,29 @@ export function SftpBrowserView({
                   }
                 }}
               />
-              {sudoError && <div className="modal-error-banner">{sudoError}</div>}
-              <div className="cyber-dialog-actions">
-                <button
-                  type="button"
-                  className="cyber-hud-btn btn-sm btn-primary"
-                  disabled={sudoBusy}
-                  onClick={() => void handleConfirmSudoEdit()}
-                >
-                  <CyberIcon name="unlock" size={13} />
-                  <span>{sudoBusy ? 'Reading with sudo...' : 'Open with sudo'}</span>
-                </button>
-                <button
-                  type="button"
-                  className="cyber-hud-btn btn-sm btn-cancel"
-                  disabled={sudoBusy}
-                  onClick={() => {
-                    setSudoEditTarget(null);
-                    setSudoPassword('');
-                  }}
-                >
-                  <span>Cancel</span>
-                </button>
-              </div>
+              {sudoError && <div className="cyber-banner-error">{sudoError}</div>}
+            </div>
+            <div className="dialog-footer">
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-danger"
+                disabled={sudoBusy}
+                onClick={() => {
+                  setSudoEditTarget(null);
+                  setSudoPassword('');
+                }}
+              >
+                <span>CANCEL</span>
+              </button>
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-primary"
+                disabled={sudoBusy}
+                onClick={() => void handleConfirmSudoEdit()}
+              >
+                <CyberIcon name="unlock" size={13} />
+                <span>{sudoBusy ? 'READING...' : 'OPEN WITH SUDO'}</span>
+              </button>
             </div>
           </div>
         </div>

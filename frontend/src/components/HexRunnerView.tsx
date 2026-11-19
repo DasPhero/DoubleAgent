@@ -319,8 +319,8 @@ export function HexRunnerView({
         flexDirection: 'column',
         height: '100%',
         minHeight: 0,
-        background: 'var(--bg-terminal)',
-        color: 'var(--text-primary)',
+        background: 'var(--bg-base)',
+        color: 'var(--text-main)',
         overflow: 'hidden',
       }}
     >

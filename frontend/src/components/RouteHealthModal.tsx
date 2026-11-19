@@ -546,7 +546,7 @@ export const RouteHealthModal: React.FC<RouteHealthModalProps> = ({
             <div
               style={{
                 background: 'rgba(15, 23, 42, 0.78)',
-                border: '1px solid rgba(45, 212, 191, 0.35)',
+                border: '1px solid color-mix(in srgb, var(--accent-bright) 35%, transparent)',
                 borderRadius: '4px',
                 padding: '0.5rem 0.7rem',
                 display: 'flex',

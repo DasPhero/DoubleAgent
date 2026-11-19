@@ -517,7 +517,7 @@ export const TotpManagerModal: React.FC<TotpManagerModalProps> = ({
             aria-label="Add Authenticator"
             title="Register a new TOTP 2FA secret or paste URI"
           >
-            <span className="btn-glitch-icon">+</span> ADD KEY
+            <CyberIcon name="plus" size={14} /> ADD KEY
           </button>
           <button
             type="button"

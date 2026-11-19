@@ -134,7 +134,7 @@ export const HostNodeComponent: React.FC<NodeProps<TopologyNodeData>> = ({
             <span
               className="topo-group-pill"
               style={{
-                borderColor: data.groupColor || 'rgba(45, 212, 191, 0.4)',
+                borderColor: data.groupColor || 'color-mix(in srgb, var(--accent-bright) 40%, transparent)',
                 color: data.groupColor || 'var(--accent-bright)',
               }}
             >
@@ -755,7 +755,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             target: h.id,
             animated: isSessionActive,
             style: {
-              stroke: isSessionActive ? 'var(--accent-bright)' : 'rgba(45, 212, 191, 0.45)',
+              stroke: isSessionActive ? 'var(--accent-bright)' : 'color-mix(in srgb, var(--accent-bright) 45%, transparent)',
               strokeWidth: isSessionActive ? 2.5 : 1.5,
             },
             markerEnd: {
@@ -818,12 +818,12 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
           labelBgStyle: {
             fill: '#051119',
             fillOpacity: 0.92,
-            stroke: 'rgba(20, 184, 166, 0.45)',
+            stroke: 'color-mix(in srgb, var(--accent-bright) 45%, transparent)',
             strokeWidth: 1,
           },
           labelBgPadding: [8, 4],
           labelBgBorderRadius: 5,
-          style: { stroke: 'rgba(20, 184, 166, 0.35)', strokeWidth: 1.5, strokeDasharray: '4,6' },
+          style: { stroke: 'color-mix(in srgb, var(--accent-bright) 35%, transparent)', strokeWidth: 1.5, strokeDasharray: '4,6' },
           markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(20, 184, 166, 0.5)' },
         });
       });
@@ -1017,7 +1017,7 @@ export const NetworkMapView: React.FC<NetworkMapViewProps> = ({
             variant={BackgroundVariant.Dots}
             gap={20}
             size={1.2}
-            color="rgba(45, 212, 191, 0.15)"
+            className="network-map-flow-bg"
           />
           <Controls className="network-map-flow-controls" showInteractive={false} />
           <MiniMap

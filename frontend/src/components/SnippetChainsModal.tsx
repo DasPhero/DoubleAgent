@@ -306,11 +306,11 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
         {/* Modal Header */}
         <div className="cyber-modal-header" style={{ padding: '0.85rem 1.25rem', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{ color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
+            <span style={{ color: 'var(--accent-bright)' }}>
               <CyberIcon name="chain" size={18} />
             </span>
             <div>
-              <div style={{ fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent-bright)' }}>
                 SNIPPET CHAINS // MULTI-STAGE SEQUENCES
               </div>
               <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
@@ -584,7 +584,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                                 {chain.name}
                               </span>
                               {chain.category && (
-                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'color-mix(in srgb, var(--accent-bright) 12%, transparent)', color: 'var(--color-primary-cyan, var(--accent-bright))', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' }}>
+                                <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: '3px', backgroundColor: 'color-mix(in srgb, var(--accent-bright) 12%, transparent)', color: 'var(--accent-bright)', border: '1px solid color-mix(in srgb, var(--accent-bright) 30%, transparent)' }}>
                                   {chain.category}
                                 </span>
                               )}
@@ -663,7 +663,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                         {/* Collapsible Steps Preview */}
                         {isExpanded && (
                           <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px dashed color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
-                            <div style={{ fontSize: '0.72rem', letterSpacing: '0.05em', color: 'var(--color-primary-cyan, var(--accent-bright))', marginBottom: '0.5rem', fontWeight: 600 }}>
+                            <div style={{ fontSize: '0.72rem', letterSpacing: '0.05em', color: 'var(--accent-bright)', marginBottom: '0.5rem', fontWeight: 600 }}>
                               CHAIN STEP BREAKDOWN:
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -701,7 +701,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                                       borderRadius: '2px',
                                       color: '#a7f3d0',
                                       fontSize: '0.74rem',
-                                      fontFamily: 'var(--font-mono, monospace)',
+                                      fontFamily: 'var(--font-mono)',
                                       overflowX: 'auto',
                                       whiteSpace: 'pre-wrap',
                                     }}
@@ -723,7 +723,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
             /* Chain Edit / Create Form */
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)' }}>
-                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
+                <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--accent-bright)' }}>
                   {editingChain.id ? `EDIT CHAIN: ${editingChain.name}` : 'CREATE NEW SNIPPET CHAIN'}
                 </span>
                 <button
@@ -856,7 +856,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
               {/* Steps Editor */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--accent-bright)' }}>
                     ORDERED CHAIN STEPS ({editingChain.steps.length})
                   </span>
                   <button
@@ -885,7 +885,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-primary-cyan, var(--accent-bright))', width: '22px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-bright)', width: '22px' }}>
                           #{idx + 1}
                         </span>
                         <input
@@ -953,7 +953,7 @@ export const SnippetChainsModal: React.FC<SnippetChainsModalProps> = ({
                         onChange={(e) => handleStepChange(idx, 'command', e.target.value)}
                         placeholder={"e.g. sudo -l || python3 -c 'import pty; pty.spawn(\"/bin/bash\")'"}
                         rows={3}
-                        style={{ width: '100%', fontFamily: 'var(--font-mono, monospace)', fontSize: '0.8rem' }}
+                        style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}
                         required
                       />
                     </div>

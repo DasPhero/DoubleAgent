@@ -1065,7 +1065,7 @@ export function ApiTesterView({
                     }}
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-bright)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         <span style={{ color: 'var(--accent-bright)', marginRight: '0.35rem', fontFamily: 'JetBrains Mono, monospace' }}>
                           {item.method}
                         </span>
@@ -1514,7 +1514,7 @@ export function ApiTesterView({
                                 </button>
                               )}
                               {activeReq.bodyType === 'hex' && (
-                                <span style={{ fontSize: '0.68rem', color: 'var(--accent-soft)' }}>
+                                <span style={{ fontSize: '0.68rem', color: 'var(--accent-text)' }}>
                                   Exact binary bytes sent (supports 41 00 ff, \x90, u32le(...), A*32)
                                 </span>
                               )}

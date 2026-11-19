@@ -114,7 +114,7 @@ export const VaultConflictModal: React.FC<VaultConflictModalProps> = ({
           </div>
 
           <div className="conflict-quick-actions" style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary, #94a3b8)', alignSelf: 'center' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
               Bulk Actions:
             </span>
             <button

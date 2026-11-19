@@ -920,7 +920,7 @@ export function SettingsView({
                         fontSize: '0.68rem',
                         padding: '0.1rem 0.45rem',
                         borderRadius: '9999px',
-                        background: leaderEnabled ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                        background: leaderEnabled ? 'color-mix(in srgb, var(--accent-bright) 20%, transparent)' : 'rgba(255, 255, 255, 0.1)',
                         color: leaderEnabled ? 'var(--accent-bright)' : 'var(--text-muted)',
                       }}
                     >
@@ -1083,7 +1083,7 @@ export function SettingsView({
                   return (
                     <tr key={def.actionId}>
                       <td>
-                        <div style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{def.label}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{def.label}</div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{def.description}</div>
                       </td>
                       <td>
@@ -1365,7 +1365,7 @@ export function SettingsView({
                   {currentCustomShortcuts.map((sc) => (
                     <tr key={sc.id}>
                       <td>
-                        <div style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{sc.action}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{sc.action}</div>
                         {sc.snippetName && (
                           <span style={{ fontSize: '0.72rem', color: 'var(--accent-bright)' }}>
                             <CyberIcon name="bolt" size={14} /> Bound to snippet: {sc.snippetName}
@@ -1886,7 +1886,7 @@ export function SettingsView({
         <div className="settings-tab-content">
           <section className="settings-section" style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
             <img src={brandLogoText} alt="DoubleAgent" className="about-hero-img" />
-            <h2 style={{ margin: '0.25rem 0', color: 'var(--text-bright)' }}>DoubleAgent SSH Client</h2>
+            <h2 style={{ margin: '0.25rem 0', color: 'var(--text-main)' }}>DoubleAgent SSH Client</h2>
             <div style={{ display: 'inline-block', padding: '0.2rem 0.65rem', borderRadius: '9999px', background: 'var(--accent-glow)', color: 'var(--accent-text)', fontSize: '0.8rem', fontWeight: 600, marginBottom: '1.25rem' }}>
               Version 0.1.0 • Native Desktop Build
             </div>
@@ -1897,22 +1897,22 @@ export function SettingsView({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', textAlign: 'left', maxWidth: '680px', margin: '0 auto' }}>
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.85rem' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Core Architecture</div>
-                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-bright)', marginTop: '0.2rem' }}>Go 1.26 + Wails v2</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-main)', marginTop: '0.2rem' }}>Go 1.26 + Wails v2</div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Single native binary, OS WebView2</div>
               </div>
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.85rem' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>SSH &amp; SFTP Protocol</div>
-                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-bright)', marginTop: '0.2rem' }}>golang.org/x/crypto/ssh</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-main)', marginTop: '0.2rem' }}>golang.org/x/crypto/ssh</div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Strict TOFU host-key verification</div>
               </div>
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.85rem' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Vault Cryptography</div>
-                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-bright)', marginTop: '0.2rem' }}>Argon2id + XChaCha20-Poly1305</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-main)', marginTop: '0.2rem' }}>Argon2id + XChaCha20-Poly1305</div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Windows Hello &amp; FIDO2 quick unlock</div>
               </div>
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.85rem' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Terminal Engine</div>
-                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-bright)', marginTop: '0.2rem' }}>xterm.js + ConPTY / PTY</div>
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-main)', marginTop: '0.2rem' }}>xterm.js + ConPTY / PTY</div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Truecolor, split panes, in-buffer regex</div>
               </div>
             </div>

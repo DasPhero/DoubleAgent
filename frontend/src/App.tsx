@@ -13361,7 +13361,7 @@ export function App({
                         style={{
                           marginTop: '0.75rem',
                           paddingTop: '0.5rem',
-                          borderTop: '1px solid var(--border-color)',
+                          borderTop: '1px solid var(--border-subtle)',
                         }}
                       >
                         <div
@@ -15476,7 +15476,7 @@ export function App({
             style={{
               zIndex: 100051,
               border: '2px solid var(--accent-bright)',
-              boxShadow: '0 0 32px rgba(45, 212, 191, 0.5)',
+              boxShadow: '0 0 32px color-mix(in srgb, var(--accent-bright) 50%, transparent)',
             }}
           >
             <h2>Verify Unknown Host Key</h2>

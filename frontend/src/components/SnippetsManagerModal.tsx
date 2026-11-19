@@ -554,7 +554,7 @@ export function SnippetsManagerModal({
                   <div key={s.id} className="snippet-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
                       <div>
-                        <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-bright)', fontSize: '0.92rem' }}>{s.name}</h4>
+                        <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--text-main)', fontSize: '0.92rem' }}>{s.name}</h4>
                         {s.description && (
                           <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                             {s.description}

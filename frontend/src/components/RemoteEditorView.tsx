@@ -506,22 +506,27 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
       {/* Elevated Sudo Save Password Prompt Modal */}
       {showSudoSaveModal && (
         <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Elevated Sudo Save"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !isSaving) {
+          className="cyber-modal-overlay"
+          onClick={() => {
+            if (!isSaving) {
               setShowSudoSaveModal(false);
               setSudoPassword('');
             }
           }}
         >
-          <div className="cyber-totp-hud-modal" style={{ width: 'min(440px, 92vw)' }}>
-            <div className="cyber-totp-hud-header">
-              <div className="cyber-totp-hud-title-row">
-                <CyberIcon name="shield" size={16} />
-                <span className="cyber-totp-hud-title">ELEVATED SAVE // SUDO REQUIRED</span>
+          <div
+            className="cyber-dialog-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Elevated Sudo Save"
+            style={{ width: 'min(460px, 92vw)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-header">
+              <div className="dialog-title">
+                <span className="cyber-hazard-stripes">///</span>
+                <CyberIcon name="shield" size={15} />
+                <h3>ELEVATED SAVE</h3>
               </div>
               <button
                 type="button"
@@ -536,8 +541,8 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
                 <CyberIcon name="close" size={14} />
               </button>
             </div>
-            <div style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            <div className="dialog-body">
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
                 Permission denied writing <code>{editSession.remotePath}</code>. Enter your <code>sudo</code> password to
                 save with elevated privileges:
               </p>
@@ -555,29 +560,29 @@ export const RemoteEditorView: React.FC<RemoteEditorViewProps> = ({
                   }
                 }}
               />
-              {sudoError && <div className="modal-error-banner">{sudoError}</div>}
-              <div className="cyber-dialog-actions">
-                <button
-                  type="button"
-                  className="cyber-hud-btn btn-sm btn-primary"
-                  disabled={isSaving}
-                  onClick={() => void handleSaveWithSudo()}
-                >
-                  <CyberIcon name="save" size={13} />
-                  <span>{isSaving ? 'Saving with sudo...' : 'Save with sudo'}</span>
-                </button>
-                <button
-                  type="button"
-                  className="cyber-hud-btn btn-sm btn-cancel"
-                  disabled={isSaving}
-                  onClick={() => {
-                    setShowSudoSaveModal(false);
-                    setSudoPassword('');
-                  }}
-                >
-                  <span>Cancel</span>
-                </button>
-              </div>
+              {sudoError && <div className="cyber-banner-error">{sudoError}</div>}
+            </div>
+            <div className="dialog-footer">
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-danger"
+                disabled={isSaving}
+                onClick={() => {
+                  setShowSudoSaveModal(false);
+                  setSudoPassword('');
+                }}
+              >
+                <span>CANCEL</span>
+              </button>
+              <button
+                type="button"
+                className="cyber-btn cyber-btn-primary"
+                disabled={isSaving}
+                onClick={() => void handleSaveWithSudo()}
+              >
+                <CyberIcon name="save" size={13} />
+                <span>{isSaving ? 'SAVING...' : 'SAVE WITH SUDO'}</span>
+              </button>
             </div>
           </div>
         </div>

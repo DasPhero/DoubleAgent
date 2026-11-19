@@ -215,11 +215,11 @@ export const SnippetChainRunnerModal: React.FC<SnippetChainRunnerModalProps> = (
         {/* Modal Header */}
         <div className="cyber-modal-header" style={{ padding: '0.85rem 1.25rem', borderBottom: '1px solid color-mix(in srgb, var(--accent-bright) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{ color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
+            <span style={{ color: 'var(--accent-bright)' }}>
               <CyberIcon name="chain" size={18} />
             </span>
             <div>
-              <div style={{ fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent-bright)' }}>
                 CHAIN RUNNER: {chain.name.toUpperCase()}
               </div>
               <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
@@ -255,7 +255,7 @@ export const SnippetChainRunnerModal: React.FC<SnippetChainRunnerModalProps> = (
                 const status = stepStatuses[idx];
                 let bg = 'rgba(100, 116, 139, 0.3)';
                 if (status === 'completed') bg = '#10b981';
-                else if (status === 'running') bg = 'var(--color-primary-cyan, var(--accent-bright))';
+                else if (status === 'running') bg = 'var(--accent-bright)';
                 else if (status === 'skipped') bg = '#f59e0b';
                 else if (status === 'failed') bg = '#ef4444';
                 else if (idx === currentStepIndex && !completedAll) bg = 'color-mix(in srgb, var(--accent-bright) 60%, transparent)';
@@ -284,8 +284,8 @@ export const SnippetChainRunnerModal: React.FC<SnippetChainRunnerModalProps> = (
               let borderColor = 'rgba(100, 116, 139, 0.25)';
               let color = '#94a3b8';
               if (isCurrent) {
-                borderColor = 'var(--color-primary-cyan, var(--accent-bright))';
-                color = 'var(--color-primary-cyan, var(--accent-bright))';
+                borderColor = 'var(--accent-bright)';
+                color = 'var(--accent-bright)';
               } else if (status === 'completed') {
                 borderColor = '#10b981';
                 color = '#10b981';
@@ -320,7 +320,7 @@ export const SnippetChainRunnerModal: React.FC<SnippetChainRunnerModalProps> = (
           {/* Variable Parameters Form (if custom variables exist) */}
           {chainVariables.length > 0 && !completedAll && currentStepIndex === 0 && (
             <div style={{ padding: '0.75rem', backgroundColor: 'rgba(0, 0, 0, 0.4)', border: '1px solid color-mix(in srgb, var(--accent-bright) 20%, transparent)', borderRadius: '4px' }}>
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-primary-cyan, var(--accent-bright))', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--accent-bright)', marginBottom: '0.5rem' }}>
                 CHAIN PARAMETERS & VARIABLE RESOLUTION:
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
@@ -378,7 +378,7 @@ export const SnippetChainRunnerModal: React.FC<SnippetChainRunnerModalProps> = (
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary-cyan, var(--accent-bright))' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-bright)' }}>
                       STEP {currentStepIndex + 1} OF {chain.steps.length}:
                     </span>
                     <span style={{ fontSize: '0.92rem', fontWeight: 600, color: '#f8fafc' }}>
@@ -421,7 +421,7 @@ export const SnippetChainRunnerModal: React.FC<SnippetChainRunnerModalProps> = (
                       borderRadius: '3px',
                       color: '#6ee7b7',
                       fontSize: '0.82rem',
-                      fontFamily: 'var(--font-mono, monospace)',
+                      fontFamily: 'var(--font-mono)',
                       overflowX: 'auto',
                       whiteSpace: 'pre-wrap',
                       lineHeight: '1.45',

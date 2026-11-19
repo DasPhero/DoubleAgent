@@ -303,15 +303,15 @@ export function ProxyProfilesView({
             <form
               onSubmit={handleSubmit}
               style={{
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--accent)',
+                background: 'var(--bg-panel)',
+                border: '1px solid var(--accent-bright)',
                 borderRadius: '8px',
                 padding: '20px',
                 marginBottom: '24px',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-bright)' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-main)' }}>
                   {editingProfileId ? 'Edit Proxy Profile' : 'Create New Proxy Profile'}
                 </h3>
                 <button
@@ -402,8 +402,8 @@ export function ProxyProfilesView({
 
               {/* Type-specific Fields */}
               {type === 'jump' && (
-                <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-bright)', marginBottom: '8px' }}>
+                <div style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>
                     Intermediate Jump Hops (ProxyChain)
                   </div>
                   <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -420,16 +420,16 @@ export function ProxyProfilesView({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            background: 'var(--bg-primary)',
+                            background: 'var(--bg-base)',
                             padding: '8px 12px',
                             borderRadius: '4px',
-                            border: '1px solid var(--border-color)',
+                            border: '1px solid var(--border-subtle)',
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <span
                               style={{
-                                background: 'var(--accent)',
+                                background: 'var(--accent-bright)',
                                 color: '#000',
                                 padding: '2px 6px',
                                 borderRadius: '10px',
@@ -534,8 +534,8 @@ export function ProxyProfilesView({
               )}
 
               {type === 'command' && (
-                <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-bright)' }}>
+                <div style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-main)' }}>
                     ProxyCommand Expression *
                   </label>
                   <input
@@ -556,7 +556,7 @@ export function ProxyProfilesView({
               )}
 
               {type === 'socks5' && (
-                <div style={{ background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
+                <div style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: '6px', marginBottom: '16px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '12px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
@@ -635,15 +635,15 @@ export function ProxyProfilesView({
               style={{
                 textAlign: 'center',
                 padding: '48px 20px',
-                background: 'var(--bg-secondary)',
+                background: 'var(--bg-panel)',
                 borderRadius: '8px',
-                border: '1px dashed var(--border-color)',
+                border: '1px dashed var(--border-subtle)',
               }}
             >
               <div style={{ marginBottom: '12px', color: 'var(--accent-bright)', display: 'flex', justifyContent: 'center' }}>
                 <CyberIcon name="shield" size={32} />
               </div>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'var(--text-bright)' }}>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', color: 'var(--text-main)' }}>
                 No Proxy Profiles Configured
               </h3>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '420px', marginInline: 'auto' }}>
@@ -673,8 +673,8 @@ export function ProxyProfilesView({
                   <div
                     key={p.id}
                     style={{
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-panel)',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: '8px',
                       padding: '16px',
                       display: 'flex',
@@ -686,7 +686,7 @@ export function ProxyProfilesView({
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-bright)' }}>
+                          <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-main)' }}>
                             {p.name}
                           </span>
                           <span
